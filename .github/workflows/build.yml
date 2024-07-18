@@ -91,17 +91,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build-mac
 
-      # - name: Build Electron app (Linux)
-      #   if: runner.os == 'Linux'
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: npm run build-linux
+      - name: Build Electron app (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-linux
 
-      # - name: Build Electron app (Windows)
-      #   if: runner.os == 'Windows'
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: npm run build-win
+      - name: Build Electron app (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-win
       
 
       
