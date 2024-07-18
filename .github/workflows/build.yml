@@ -177,8 +177,6 @@ jobs:
 
             - For Mac **Intel** x64 machines: download `-${{ env.VERSION }}.dmg`.
 
-            - For **both** Intel and Apple Silicon machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a **larger size**, but can be installed on both machines. 
-
             ## For Linux:
 
             - Recommended: Download the `.AppImage` file.

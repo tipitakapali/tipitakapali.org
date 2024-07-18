@@ -33,8 +33,6 @@ Releases follow this naming pattern: `Tipitakapali.org-{version[-architecture]}.
 
 - For Mac Intel x64 machines: download `Tipitakapali.org-{version}.dmg`.
 
-- For both Intel and Apple Silicon machines, use the `universal` build, though it has a larger size. 
-
 
 
 ---
