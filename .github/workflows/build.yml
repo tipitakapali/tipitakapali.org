@@ -1,0 +1,195 @@
+name: Build Electron Apps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout public repository
+        uses: actions/checkout@v4
+
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          repository: tipitakapali/tpo_offline
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: tpo_offline
+
+      - name: Move contents of tpo_offline to current directory
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            powershell -Command "
+              # Move all directories
+              robocopy .\tpo_offline .\ /E /MOVE /NFL /NDL /NJH /NJS /NC /NS /NP
+
+               # Create a new 'dist' directory
+              mkdir dist
+
+              # Copy package.json to 'dist'
+              Copy-Item package.json dist/
+              
+              # List directories moved to the current directory
+              Write-Host 'Directories moved to current directory:'
+              Get-ChildItem -Directory | Select-Object -ExpandProperty Name
+            "
+          elif [ "$RUNNER_OS" == "Linux" ] || [ "$RUNNER_OS" == "macOS" ]; then
+            mv -f ./tpo_offline/* .
+          else
+            echo "Unknown OS"
+            exit 1
+          fi
+        
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.12.2"
+
+      - name: Install dependencies
+        run: npm ci
+      
+      
+      - name: Restore database
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # For Windows, use PowerShell
+            powershell -Command "
+              Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+              & ./db_restore.ps1
+              & ./db_check.ps1
+            "
+          else
+            # For Linux and macOS
+            chmod +x db_restore.sh db_check.sh
+            ./db_restore.sh
+            ./db_check.sh
+          fi
+
+      - name: Copy package.json to dist (non-Windows)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir  -p dist 
+          cp package.json dist/
+
+      ### build
+
+      - name: Build Electron app (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-mac
+
+      - name: Build Electron app (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-linux
+
+      - name: Build Electron app (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-win
+      
+
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-build
+          path: |
+            dist/**/latest*.yml
+            dist/**/Tipitakapali.org-*.exe
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/**/*.dmg
+            dist/package.json
+          if-no-files-found: ignore
+  
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: ubuntu-latest-build
+      #     path: dist/linux
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: macos-latest-build
+      #     path: dist/macos
+
+      - name: Print file sizes in dist directory
+        run: |
+          echo "File sizes in dist directory:"
+          find dist -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.dmg" \) -exec du -h {} + | sort -h
+        shell: bash
+
+      # - name: Get version from package.json
+      #   id: package-version
+      #   run: |
+      #     echo "VERSION=v$(node -p "require('./dist/package.json').version")" >> $GITHUB_ENV
+      #     echo "Use version $VERSION"
+      - name: Get version from package.json
+        id: package-version
+        run: |
+          VERSION=v$(node -p "require('./dist/package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Use version $VERSION"
+      - name: create Github release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Auto build Tipitakapali.org ${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}
+          draft: true
+          prerelease: false
+          make_latest: false
+          body: |
+            Download Tipitakapali.org **${{ env.VERSION }}**. In the below **Assets**:
+
+            ## For Windows:
+
+            - Download the `.exe` file.
+
+            ## For Mac:
+              
+            - For Apple Silicon **M1, M2 etc..**  (arm64) machines: download the `${{ env.VERSION }}-arm64.dmg` file. Please pay attention to the **-arm64.dmg**.
+
+            - For Mac **Intel** x64 machines: download `-${{ env.VERSION }}.dmg`.
+
+            - For **both** Intel and Apple Silicon machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a **larger size**, but can be installed on both machines. 
+
+            ## For Linux:
+
+            - Recommended: Download the `.AppImage` file.
+
+            - Alternatively, download the `.deb` file. Install `sudo apt install ./thisfile.deb` .
+
+          files: |
+            dist/**/latest*.yml
+            dist/**/Tipitakapali.org-*.exe
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/**/*.dmg
+          # if-no-files-found: ignore
+          fail_on_unmatched_files: false
