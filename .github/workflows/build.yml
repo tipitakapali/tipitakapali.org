@@ -115,7 +115,6 @@ jobs:
             dist/**/*.AppImage
             dist/**/*.deb
             dist/package.json
-          # dist/**/*.dmg
           if-no-files-found: ignore
   
 
