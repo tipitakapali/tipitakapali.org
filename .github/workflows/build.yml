@@ -116,7 +116,7 @@ jobs:
             dist/**/*.deb
             dist/package.json
           # dist/**/*.dmg
-            if-no-files-found: ignore
+          if-no-files-found: ignore
   
 
   release:
