@@ -8,6 +8,17 @@ Please note: Since the code is not signed with a paid certificate, do not instal
 
 Each release file includes a `sha512` value in its respective `.yml` file for verification.
 
+On Unix like Ubuntu, you can check for example:
+
+```bash 
+
+sha512sum Tipitakapali.org-24.7.19-arm64.dmg | awk '{print $1}' | xxd -r -p | base64
+
+bn89Z8Mx6p3iG2xHRByU6zLueYFzLllrdrW+WoFpis8gCNfyqftwqaMtlrT1UvwpvIj7/WlUag86
+zih6gOxZRg==
+
+```
+
 ## Naming Convention
 
 Releases follow this naming pattern: `Tipitakapali.org-{version[-architecture]}.{ext}`

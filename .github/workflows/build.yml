@@ -10,8 +10,8 @@ jobs:
         include:
           - os: windows-latest
           - os: ubuntu-latest
-          - os: macos-latest
-            arch: arm64
+          # - os: macos-latest
+          #   arch: arm64
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -85,11 +85,11 @@ jobs:
 
       ### build
 
-      - name: Build Electron app (macOS)
-        if: runner.os == 'macOS'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build-mac
+      # - name: Build Electron app (macOS)
+      #   if: runner.os == 'macOS'
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: npm run build-mac
 
       - name: Build Electron app (Linux)
         if: runner.os == 'Linux'
@@ -114,9 +114,9 @@ jobs:
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
-            dist/**/*.dmg
             dist/package.json
-          if-no-files-found: ignore
+          # dist/**/*.dmg
+            if-no-files-found: ignore
   
 
   release:
@@ -177,17 +177,35 @@ jobs:
 
             - For Mac **Intel** x64 machines: download `-${{ env.VERSION }}.dmg`.
 
+            - For both Intel and Apple Silicon machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a larger size, but can be installed on both machines. It you dp .
+
             ## For Linux:
 
             - Recommended: Download the `.AppImage` file.
 
             - Alternatively, download the `.deb` file. Install `sudo apt install ./thisfile.deb` .
 
+            ## Please note**:
+            
+            Since the code is not signed with a paid certificate, do not download or install from unknown sources.
+
+            Each release file includes a `sha512` value in its respective `.yml` file for verification.
+            On Unix like Ubuntu, you can check for example:
+
+            ```bash 
+
+            sha512sum Tipitakapali.org-24.7.19-arm64.dmg | awk '{print $1}' | xxd -r -p | base64
+
+            # output: bn89Z8Mx6p3iG2xHRByU6zLueYFzLllrdrW+WoFpis8gCNfyqftwqaMtlrT1UvwpvIj7/WlUag86
+            zih6gOxZRg==
+
+            ```
+
           files: |
             dist/**/latest*.yml
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
-            dist/**/*.dmg
+          # dist/**/*.dmg
           # if-no-files-found: ignore
           fail_on_unmatched_files: false
