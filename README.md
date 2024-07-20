@@ -12,10 +12,12 @@ On Unix like Ubuntu, you can check for example:
 
 ```bash 
 
-sha512sum Tipitakapali.org-24.7.19-arm64.dmg | awk '{print $1}' | xxd -r -p | base64
+echo test > test.txt       
 
-bn89Z8Mx6p3iG2xHRByU6zLueYFzLllrdrW+WoFpis8gCNfyqftwqaMtlrT1UvwpvIj7/WlUag86
-zih6gOxZRg==
+sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
+
+Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEv
+fMNXGUXBIw==
 
 ```
 
@@ -40,9 +42,7 @@ Releases follow this naming pattern: `Tipitakapali.org-{version[-architecture]}.
 ## For Mac:
 
 
-- For Apple Silicon M1, M2 etc.. (arm64) machines: download the `-arm64.dmg` file.
-
-- For Mac Intel x64 machines: download `Tipitakapali.org-{version}.dmg`.
+- For both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a larger size, but can be installed on both machines. 
 
 
 

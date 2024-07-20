@@ -171,12 +171,8 @@ jobs:
             - Download the `.exe` file.
 
             ## For Mac:
-              
-            - For Apple Silicon **M1, M2 etc..**  (arm64) machines: download the `${{ env.VERSION }}-arm64.dmg` file. Please pay attention to the **-arm64.dmg**.
 
-            - For Mac **Intel** x64 machines: download `-${{ env.VERSION }}.dmg`.
-
-            - For both Intel and Apple Silicon machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a larger size, but can be installed on both machines. It you dp .
+            - For both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a larger size, but can be installed on both machines. 
 
             ## For Linux:
 
@@ -184,7 +180,7 @@ jobs:
 
             - Alternatively, download the `.deb` file. Install `sudo apt install ./thisfile.deb` .
 
-            ## Please note**:
+            ## Please note:
             
             Since the code is not signed with a paid certificate, do not download or install from unknown sources.
 
@@ -193,10 +189,12 @@ jobs:
 
             ```bash 
 
-            sha512sum Tipitakapali.org-24.7.19-arm64.dmg | awk '{print $1}' | xxd -r -p | base64
+            echo test > test.txt       
 
-            # output: bn89Z8Mx6p3iG2xHRByU6zLueYFzLllrdrW+WoFpis8gCNfyqftwqaMtlrT1UvwpvIj7/WlUag86
-            zih6gOxZRg==
+            sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
+
+            Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEv
+            fMNXGUXBIw==
 
             ```
 
