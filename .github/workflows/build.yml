@@ -176,10 +176,9 @@ jobs:
 
             ## For Linux:
 
-            - Download the `.AppImage` file.
+            - Download the `.deb` file. Install it with the following command: `sudo apt install ./path-to-this-file.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org` 
 
-            - Or alternatively, download the `.deb` file. Then install: `sudo apt install ./path-to-this-file.deb`. When installed you can "Pin to Dash" to have a proper shortcut icon on your Dash. I myself using this one on my Debian 12. To uninstall `sudo apt remove tipitakapali.org` 
-
+            - Or download the `.AppImage` file.
 
             ## Please note:
             
