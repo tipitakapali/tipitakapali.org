@@ -178,11 +178,11 @@ jobs:
 
             - Download the `.deb` file. Install it with the following command: `sudo apt install ./path-to-this-file.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org` 
 
-            - Or download the `.AppImage` file.
+            - Or download the `.AppImage` file (NO icon).
 
             ## Please note:
             
-            Since the code is not signed with a paid certificate, do not download or install from unknown sources.
+            Since the code is **NOT** signed with a paid certificate, pls do not download or install from unknown sources.
 
             Each release file includes a `sha512` value in its respective `.yml` file for verification.
             On Unix like Ubuntu, you can check for example:
