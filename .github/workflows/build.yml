@@ -103,6 +103,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build-win
       
+      - name: Zip Windows build
+        if: runner.os == 'Windows'
+        run: |
+          powershell -Command "
+            $exeFile = Get-ChildItem dist -Filter 'Tipitakapali.org-*.exe' | Select-Object -ExpandProperty Name
+            $baseName = $exeFile -replace '.exe$', ''
+            $zipName = \"${baseName}-windows.zip\"
+            Compress-Archive -Path dist/**/$exeFile,dist/**/latest*.yml,dist/package.json -DestinationPath dist/$zipName
+            Write-Host \"Created zip: $zipName\"
+          "
 
       
       - name: Upload artifacts
@@ -115,6 +125,8 @@ jobs:
             dist/**/*.AppImage
             dist/**/*.deb
             dist/package.json
+            dist/**/Tipitakapali.org-*-windows.zip
+
           if-no-files-found: ignore
   
 
@@ -141,7 +153,7 @@ jobs:
       - name: Print file sizes in dist directory
         run: |
           echo "File sizes in dist directory:"
-          find dist -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.dmg" \) -exec du -h {} + | sort -h
+          find dist -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" -o -name "*.dmg" \) -exec du -h {} + | sort -h
         shell: bash
 
       # - name: Get version from package.json
@@ -168,24 +180,31 @@ jobs:
 
             ## For Windows:
 
-            - Download the `.exe` file.
+            - **Download the `-windows.zip` file**.
+            - **Unzip/Extract** the contents of the file.
+            - Locate and double-click the **install file (`.exe`)** to start the installation process.
+            - **Note**: I do not have a **paid certificate** to sign the app, so Windows Defender SmartScreen may block the installation.
+                - If this happens, follow the steps shown in the provided picture instructions to install:
+                
+            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/13137685-6d98-4a6f-a6d3-fb698a6e63ec)
 
             ## For Mac:
 
-            - For both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines, download the `${{ env.VERSION }}-universal.dmg` build. It has a larger size, but can be installed on both machines. 
+            - Download the `${{ env.VERSION }}-universal.dmg` build. It can be installed on both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines.
 
             ## For Linux:
 
-            - Download the `.deb` file. Install it with the following command: `sudo apt install ./path-to-this-file.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org` 
+            - Download the `.deb` file. Install it with the following command: `sudo apt install ./path-to-this-file.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org`
 
             - Or download the `.AppImage` file (NO icon).
 
             ## Please note:
-            
-            Since the code is **NOT** signed with a paid certificate, pls do not download or install from unknown sources.
+            Since the apps are **NOT** signed with a paid certificate, for safety reasons, please do not download or install from unknown sources.
 
             Each release file includes a `sha512` value in its respective `.yml` file for verification.
-            On Unix like Ubuntu, you can check for example:
+
+            <details>
+            <summary>On Unix like Debian/Ubuntu..., you can check for example:</summary>
 
             ```bash 
 
@@ -198,11 +217,15 @@ jobs:
 
             ```
 
+            </details>
+
           files: |
             dist/**/latest*.yml
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
+            dist/**/Tipitakapali.org-*-windows.zip
           # dist/**/*.dmg
           # if-no-files-found: ignore
+
           fail_on_unmatched_files: false
