@@ -107,11 +107,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           powershell -Command "
-            $exeFile = Get-ChildItem dist -Filter 'Tipitakapali.org-*.exe' | Select-Object -ExpandProperty Name
-            $baseName = $exeFile -replace '.exe$', ''
-            $zipName = \"${baseName}-windows.zip\"
-            Compress-Archive -Path dist/**/$exeFile,dist/**/latest*.yml,dist/package.json -DestinationPath dist/$zipName
-            Write-Host \"Created zip: $zipName\"
+            Compress-Archive -Path dist/**/Tipitakapali.org-*.exe,dist/**/latest*.yml,dist/package.json -DestinationPath dist/Tipitakapali.org-windows-build.zip
           "
 
       
@@ -125,7 +121,7 @@ jobs:
             dist/**/*.AppImage
             dist/**/*.deb
             dist/package.json
-            dist/**/Tipitakapali.org-*-windows.zip
+            dist/Tipitakapali.org-windows-build.zip
 
           if-no-files-found: ignore
   
@@ -180,7 +176,7 @@ jobs:
 
             ## For Windows:
 
-            - **Download the `-windows.zip` file**.
+            - **Download the `Tipitakapali.org-windows-build.zip` file**.
             - **Unzip/Extract** the contents of the file.
             - Locate and double-click the **install file (`.exe`)** to start the installation process.
             - **Note**: I do not have a **paid certificate** to sign the app, so Windows Defender SmartScreen may block the installation.
@@ -224,7 +220,7 @@ jobs:
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
-            dist/**/Tipitakapali.org-*-windows.zip
+            dist/Tipitakapali.org-windows-build.zip
           # dist/**/*.dmg
           # if-no-files-found: ignore
 
