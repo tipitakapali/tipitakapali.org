@@ -107,7 +107,8 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           powershell -Command "
-            Compress-Archive -Path dist/**/Tipitakapali.org-*.exe,dist/**/latest*.yml,dist/package.json -DestinationPath dist/Tipitakapali.org-windows-build.zip
+            Get-ChildItem -Path dist -Recurse -Filter 'Tipitakapali.org-*.exe' |
+            Compress-Archive -DestinationPath dist/Tipitakapali.org-windows.zip
           "
 
       
@@ -121,7 +122,7 @@ jobs:
             dist/**/*.AppImage
             dist/**/*.deb
             dist/package.json
-            dist/Tipitakapali.org-windows-build.zip
+            dist/Tipitakapali.org-windows.zip
 
           if-no-files-found: ignore
   
@@ -161,7 +162,7 @@ jobs:
         id: package-version
         run: |
           VERSION=v$(node -p "require('./dist/package.json').version")
-          echo "VERSION=v24.11.28" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Use version $VERSION"
       - name: create Github release
         uses: softprops/action-gh-release@v2
@@ -176,17 +177,18 @@ jobs:
 
             ## For Windows:
 
-            - **Download the `Tipitakapali.org-windows-build.zip` file**.
-            - **Unzip/Extract** the contents of the file.
-            - Locate and double-click the **install file (`.exe`)** to start the installation process.
-            - **Note**: I do not have a **paid certificate** to sign the app, so Windows Defender SmartScreen may block the installation.
+            - Download the **-windows.zip** file (recommended) .
+            - **Unzip/Extract** the contents of the **zip** file, and run the install file. 
+            - **Note**: We do not have a **paid certificate** to sign the app, so **Windows Defender SmartScreen** may prevent the installation.
                 - If this happens, follow the steps shown in the provided picture instructions to install:
                 
-            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/13137685-6d98-4a6f-a6d3-fb698a6e63ec)
+            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/42ef952b-4d1e-4478-82f9-3ccaf9089871)
+
+            - You can also directly download and install the `.exe` file if your browser allows to download the `exe` file directly.
 
             ## For Mac:
 
-            - Download the `${{ env.VERSION }}-universal.dmg` build. It can be installed on both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines.
+            - Download the `${{ env.VERSION }}-universal.dmg` build (for both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines).
 
             ## For Linux:
 
@@ -220,7 +222,7 @@ jobs:
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
-            dist/Tipitakapali.org-windows-build.zip
+            dist/Tipitakapali.org-windows.zip
           # dist/**/*.dmg
           # if-no-files-found: ignore
 
