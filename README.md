@@ -1,33 +1,20 @@
-<div align="left">
+<div align="center">
   <img src="docs/img/Tipitakapali.org-1024x314-compressed.png" alt="Tipitakapali.org" />
-</div>
-
-
-### Online Web App
-
-<div align="left">
-<a target="_blank" href="https://tipitakapali.org"><img height="40" src="docs/img/tipitakapali.org_web.jpeg" alt="Online Tipitakapali.org Web App"></a>
-</div>
-
-
-### Computers
-
-<div align="left">
-<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Tux.svg.png" alt="Download for Linux"></a>
-<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+<br /> <br />
 <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Apple_logo_dark_grey.svg.png" alt="Download for macOS"></a>
-<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+<span>&nbsp;&nbsp;&nbsp;</span>
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Tux.svg.png" alt="Download for Linux"></a>
+<span>&nbsp;&nbsp;&nbsp;</span>
 <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Windows_logo_-_2012.svg.png" alt="Download for Windows"></a>
-</div>
-
-### Mobile Devices
-
-<div align="left">
+<br /> <br />
 <a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213"><img height="40" src="docs/img/download-on-the-app-store.svg" alt="Download on the App Store"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>
 <a target="_blank" href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"><img height="40" src="docs/img/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>
-<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/latest/download/Tipitakapali.org.apk"><img height="40" src="docs/img/tipitakapali.org.apk.png" alt="Download APK"></a>
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="40" src="docs/img/tipitakapali.org.apk.png" alt="Download APK"></a>
+<br/> <br/> 
+<a target="_blank" href="https://tipitakapali.org">Tipitakapali.org</a> offline software is available for all major platforms: Windows, macOS, Linux, Android, and iOS.
+
 </div>
 
 ## 👋 Welcome
