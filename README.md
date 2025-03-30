@@ -1,37 +1,55 @@
-# Download offline Tipitakapali.org:
-
-- [https://github.com/tipitakapali/tipitakapali.org/releases](https://github.com/tipitakapali/tipitakapali.org/releases)
-
-## Please note:
-
-- You can also use the online web app: [https://tipitakapali.org](https://tipitakapali.org)
-
-- Since the code is **NOT** signed with a paid certificate, pls do not download or install from unknown sources.
-
-Each release file includes a `sha512` value in its respective `.yml` file for verification.
-
-<details>
-<summary>On Unix like Debian/Ubuntu..., you can check for example:</summary>
-
-```bash 
-
-echo test > test.txt       
-
-sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
-
-Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEv
-fMNXGUXBIw==
-
-```
-
-</details>
+<div align="left">
+  <img src="docs/img/Tipitakapali.org-1024x314-compressed.png" alt="Tipitakapali.org" />
+</div>
 
 
-# Prompt
+### Online Web App
 
-Flux appears to be more effective at following prompts [Flux 1 dev](https://huggingface.co/spaces/black-forest-labs/FLUX.1-dev)
+<div align="left">
+<a target="_blank" href="https://tipitakapali.org"><img height="40" src="docs/img/tipitakapali.org_web.jpeg" alt="Online Tipitakapali.org Web App"></a>
+</div>
 
-```text
-A creative wooden desk calendar with the text 'TIPITAKAPALI.ORG' engraved on the top panel and the numbers '25 1 14' displayed prominently on three wooden blocks. The background features a serene safari sky with hues of orange and blue, and distant acacia trees enhancing the natural ambiance. The calendar is placed on a stone or concrete platform, blending harmoniously with the environment.
 
-```
+### Computers
+
+<div align="left">
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Tux.svg.png" alt="Download for Linux"></a>
+<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Apple_logo_dark_grey.svg.png" alt="Download for macOS"></a>
+<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Windows_logo_-_2012.svg.png" alt="Download for Windows"></a>
+</div>
+
+### Mobile Devices
+
+<div align="left">
+<a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213"><img height="40" src="docs/img/download-on-the-app-store.svg" alt="Download on the App Store"></a>
+<span>&nbsp;&nbsp;&nbsp;</span>
+<a target="_blank" href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"><img height="40" src="docs/img/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play"></a>
+<span>&nbsp;&nbsp;&nbsp;</span>
+<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/latest/download/Tipitakapali.org.apk"><img height="40" src="docs/img/tipitakapali.org.apk.png" alt="Download APK"></a>
+</div>
+
+## 👋 Welcome
+
+### Read & learn Tipiṭaka Pāḷi
+
+[Tipitakapali.org](https://tipitakapali.org) and its [offline apps](#download-offline-tipitaka-pali-apps) aim to offer a simple and pleasant way to read and learn Tipiṭaka Pāḷi. They include helpful Pāḷi and Sanskrit dictionaries, as well as full-text search features.
+
+The Pāḷi Roman text on [Tipitakapali.org](https://tipitakapali.org) follows the latest Chaṭṭha Saṅgāyana Tipiṭaka (CST) - [Official VRI Edition](https://github.com/VipassanaTech/tipitaka-xml). The most recent update by VRI, including typo corrections and other improvements, was in **Aug 2024**. We strive to stay in sync with VRI updates, ensuring you always have access to the latest corrections.
+
+### ✅ Key Features  
+
+✔ Integrated powerful Pāḷi and Sanskrit dictionaries for enhanced learning  
+
+✔ Access to the latest Chaṭṭha Saṅgāyana Tipiṭaka (CST) Pāḷi text  
+
+✔ Powerful full-text search for quick and easy navigation  
+
+✔ Simple, classical reading interface for distraction-free study  
+
+✔ AI Assistant for Pāḷi->English translations & Pāḷi grammar analysis (online web app only: requires internet connection)
+
+### 🌟 Attributions & more info
+Check [https://tipitakapali.org/info](https://tipitakapali.org/info)
+

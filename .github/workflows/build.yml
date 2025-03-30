@@ -173,7 +173,35 @@ jobs:
           prerelease: false
           make_latest: false
           body: |
+            Tipitakapali.org Offline Apps are available on all platforms: Windows, macOS, Linux, Android, and iOS.
+
+            ### 1- Mobile devices:
+
+            [![Download Tipitaka CST on the App Store](https://github.com/user-attachments/assets/fbc6078b-6580-4216-889f-bb297454e325)](https://apps.apple.com/vn/app/tipitakacst/id6743404213)
+
+
+            [![Get Tipitaka CST on Google Play](https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714)](https://play.google.com/store/apps/details?id=org.tipitakapali.android)
+
+
+            [![Download Tipitakapali.org.apk](https://github.com/user-attachments/assets/88c81ebc-6e4c-4bb2-a8de-61886c10c51f)](https://github.com/tipitakapali/tipitakapali.org/releases/latest/download/Tipitakapali.org_${{ env.VERSION }}.apk)
+
+            md5sum Tipitakapali.org_${{ env.VERSION }}.apk # `enter md5 sum here`
+
+            ---
+
+            ### 2- For computers
+
             Download Tipitakapali.org **${{ env.VERSION }}**. In the below **Assets**:
+
+            <details>
+            <summary>Change log:</summary>
+
+            - Change log here
+
+            </details>
+
+            ![tipitakapali_v25-3-14_small](https://github.com/user-attachments/assets/190ff7f2-fecf-443a-82f5-eee94f2e111d)
+
 
             ## For Windows:
 
