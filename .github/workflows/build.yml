@@ -183,7 +183,7 @@ jobs:
             [![Get Tipitaka CST on Google Play](https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714)](https://play.google.com/store/apps/details?id=org.tipitakapali.android)
 
 
-            [![Download Tipitakapali.org.apk](https://github.com/user-attachments/assets/88c81ebc-6e4c-4bb2-a8de-61886c10c51f)](https://github.com/tipitakapali/tipitakapali.org/releases/latest/download/Tipitakapali.org_${{ env.VERSION }}.apk)
+            <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk"><img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK"></a>
 
             md5sum Tipitakapali.org_${{ env.VERSION }}.apk # `enter md5 sum here`
 
