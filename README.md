@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/img/Tipitakapali.org-1024x314-compressed.png" alt="Tipitakapali.org" />
+  <img src="docs/img/Tipitakapali.org-1024x448-compressed.png" alt="Tipitakapali.org" />
 <br /> <br />
 <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Apple_logo_dark_grey.svg.png" alt="Download for macOS"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>
