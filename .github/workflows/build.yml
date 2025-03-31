@@ -185,7 +185,13 @@ jobs:
 
             <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk"><img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK"></a>
 
-            md5sum Tipitakapali.org_${{ env.VERSION }}.apk # `enter md5 sum here`
+            For safety reasons, please do not install from unknown sources.
+            
+            Sha1sum of this APK Tipitakapali.org_${{ env.VERSION }}.apk for verification:
+            
+            `enter sha1sum sum here`
+
+            ( sha1sum Tipitakapali.org_${{ env.VERSION }}.apk )
 
             ---
 
