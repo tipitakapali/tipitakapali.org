@@ -182,16 +182,20 @@ jobs:
 
             [![Get Tipitaka CST on Google Play](https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714)](https://play.google.com/store/apps/details?id=org.tipitakapali.android)
 
-
+            
             <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk"><img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK"></a>
 
-            For safety reasons, please do not install from unknown sources.
-            
-            Sha1sum of this APK Tipitakapali.org_${{ env.VERSION }}.apk for verification:
-            
-            `enter sha1sum sum here`
+            For security reasons, please avoid installing APKs from untrusted sources.
 
-            ( sha1sum Tipitakapali.org_${{ env.VERSION }}.apk )
+            SHA-1 checksum for verifying `Tipitakapali.org_${{ env.VERSION }}.apk`:
+
+            ```bash 
+            sha1sum Tipitakapali.org_${{ env.VERSION }}.apk
+
+            ENTER SHA1SUM HERE
+            ```
+
+            (Note: The app ID and signature differ from the Tipitaka CST version released on Google Play.)
 
             ---
 
