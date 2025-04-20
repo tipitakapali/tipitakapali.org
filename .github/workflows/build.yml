@@ -220,7 +220,7 @@ jobs:
             - **Note**: We do not have a **paid certificate** to sign the app, so **Windows Defender SmartScreen** may prevent the installation.
                 - If this happens, follow the steps shown in the provided picture instructions to install:
                 
-            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/42ef952b-4d1e-4478-82f9-3ccaf9089871)
+            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/6bcd5d8f-339b-4aa8-bf31-6852c833a168)
 
             - You can also directly download and install the `.exe` file if your browser allows to download the `exe` file directly.
 
