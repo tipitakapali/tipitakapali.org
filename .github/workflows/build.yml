@@ -230,7 +230,7 @@ jobs:
 
             ##   <img height="50" src="https://github.com/user-attachments/assets/51da2ccd-6ed2-49a8-9827-fd03ade8ad2d" alt="Linux" /> Linux:
 
-            - Download the [tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb) file. You can install it with the following command: `sudo apt install ./tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org`
+            - Download the [tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb) file. You can install it with the following command: `sudo apt install ./tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. To uninstall, simply run: `sudo apt remove tipitakapali.org`
 
             - Or download the [Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage) file (you may need to create a desktop shortcut yourself).
 
