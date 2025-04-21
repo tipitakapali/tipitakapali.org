@@ -194,7 +194,7 @@ jobs:
             ```bash 
             sha1sum Tipitakapali.org_${{ env.VERSION }}.apk
 
-            38e326bd67bd0ce2211dbc1af9265ef653e3a871
+            Enter the checksum HERE
             ```
 
             (Note: The Android APK app ID and signature differ from the Tipitaka CST version released on Google Play.)
