@@ -175,9 +175,7 @@ jobs:
           prerelease: false
           make_latest: false
           body: |
-            Tipitakapali.org offline software is available for all major platforms: Desktop (Windows, Mac, Linux) and Mobile (Android, iOS). 
-
-            [Youtube - how to use Tipitakapali.org] (https://www.youtube.com/playlist?list=PL_yc3HlmeNQrYWo_dPLOqC5Bo74HmO3IJ)
+            Tipitakapali.org offline software is available for all major platforms: Desktop (Windows, Mac, Linux) and Mobile (Android, iOS). [Instructions videos - how to use Tipitakapali.org](https://www.youtube.com/playlist?list=PL_yc3HlmeNQrYWo_dPLOqC5Bo74HmO3IJ)
 
             ### 1- Mobile devices:
 
