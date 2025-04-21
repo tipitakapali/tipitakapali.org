@@ -161,8 +161,10 @@ jobs:
       - name: Get version from package.json
         id: package-version
         run: |
-          VERSION=v$(node -p "require('./dist/package.json').version")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          NUMBERONLY=$(node -p "require('./dist/package.json').version")
+          echo "VERSION=v$NUMBERONLY" >> $GITHUB_ENV
+          echo "NUMBERONLY=$NUMBERONLY" >> $GITHUB_ENV
+          echo "Use version $NUMBERONLY"
           echo "Use version $VERSION"
       - name: create Github release
         uses: softprops/action-gh-release@v2
@@ -173,68 +175,66 @@ jobs:
           prerelease: false
           make_latest: false
           body: |
-            Tipitakapali.org Offline Apps are available on all platforms: Windows, macOS, Linux, Android, and iOS.
+            Tipitakapali.org offline software is available for all major platforms: Desktop (Windows, Mac, Linux) and Mobile (Android, iOS). 
+
+            [Youtube - how to use Tipitakapali.org] (https://www.youtube.com/playlist?list=PL_yc3HlmeNQrYWo_dPLOqC5Bo74HmO3IJ)
 
             ### 1- Mobile devices:
 
-            [![Download Tipitaka CST on the App Store](https://github.com/user-attachments/assets/fbc6078b-6580-4216-889f-bb297454e325)](https://apps.apple.com/vn/app/tipitakacst/id6743404213)
+            <a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213">
+            <img height="50" src="https://github.com/user-attachments/assets/fbc6078b-6580-4216-889f-bb297454e325" alt="Download Tipitaka CST on the App Store" />
+            </a>
+            <a target="_blank" href="https://play.google.com/store/apps/details?id=org.tipitakapali.android">
+            <img height="50" src="https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714" alt="Get Tipitaka CST on Google Play" />
+            </a>
+            <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk">
+            <img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK" />
+            </a>
 
-
-            [![Get Tipitaka CST on Google Play](https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714)](https://play.google.com/store/apps/details?id=org.tipitakapali.android)
-
-            
-            <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk"><img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK"></a>
-
-            For security reasons, please avoid installing APKs from untrusted sources.
-
-            SHA-1 checksum for verifying `Tipitakapali.org_${{ env.VERSION }}.apk`:
+            For security reasons, please avoid installing APKs from untrusted sources. SHA-1 checksum for verifying `Tipitakapali.org_${{ env.VERSION }}.apk`:
 
             ```bash 
             sha1sum Tipitakapali.org_${{ env.VERSION }}.apk
 
-            ENTER SHA1SUM HERE
+            38e326bd67bd0ce2211dbc1af9265ef653e3a871
             ```
 
-            (Note: The app ID and signature differ from the Tipitaka CST version released on Google Play.)
+            (Note: The Android APK app ID and signature differ from the Tipitaka CST version released on Google Play.)
 
             ---
 
-            ### 2- For computers
+            ### 2- Download Tipitakapali.org ${{ env.VERSION }} for computers
 
-            Download Tipitakapali.org **${{ env.VERSION }}**. In the below **Assets**:
+            Change log:
 
-            <details>
-            <summary>Change log:</summary>
+            - Added navigation between Mula, Attha, and Tika paragraphs
+            - New Full Text Search input types and filter UI
+            - Various improvements and optimizations
 
-            - Change log here
+            ## <img height="50" src="https://github.com/user-attachments/assets/5eab3cb8-db97-46a3-9e39-71c1d3c00e13" alt="Windows" /> Windows
 
-            </details>
+            - Download the [Tipitakapali.org-windows.zip](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-windows.zip) file, extract and install.
 
-            ![tipitakapali_v25-3-14_small](https://github.com/user-attachments/assets/190ff7f2-fecf-443a-82f5-eee94f2e111d)
+            - OR download the [Tipitakapali.org-${{ env.NUMBERONLY }}-Install.exe](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}-Install.exe) directly if your if your browser allows
 
+            - **Note**: We do not have a **paid certificate** to sign the app, so **Windows Defender SmartScreen** may prevent the installation. If this happens, follow the steps shown in the provided picture instructions to install:
 
-            ## For Windows:
-
-            - Download the **-windows.zip** file (recommended) .
-            - **Unzip/Extract** the contents of the **zip** file, and run the install file. 
-            - **Note**: We do not have a **paid certificate** to sign the app, so **Windows Defender SmartScreen** may prevent the installation.
-                - If this happens, follow the steps shown in the provided picture instructions to install:
-                
             ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/6bcd5d8f-339b-4aa8-bf31-6852c833a168)
 
-            - You can also directly download and install the `.exe` file if your browser allows to download the `exe` file directly.
 
-            ## For Mac:
+            ## <img height="50" src="https://github.com/user-attachments/assets/7bb2472c-8bde-4acf-860a-5bfc407550a3" alt="macOS" /> macOS (Intel, M1, M2...):
 
-            - Download the `${{ env.VERSION }}-universal.dmg` build (for both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines).
+            - Download the [Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg) build (for both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines).
 
-            ## For Linux:
+            - Follow Apple instructions to install [How to open a Mac app from an unknown developer](https://support.apple.com/en-vn/guide/mac-help/mh40616/mac)
 
-            - Download the `.deb` file. Install it with the following command: `sudo apt install ./path-to-this-file.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org`
+            ##   <img height="50" src="https://github.com/user-attachments/assets/51da2ccd-6ed2-49a8-9827-fd03ade8ad2d" alt="Linux" /> Linux:
 
-            - Or download the `.AppImage` file (NO icon).
+            - Download the [tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb) file. You can install it with the following command: `sudo apt install ./tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. I personally use this method on my Debian 12 setup. To uninstall, simply run: `sudo apt remove tipitakapali.org`
 
-            ## Please note:
+            - Or download the [Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage) file (you may need to create a desktop shortcut yourself).
+
+            ## Notes:
             Since the apps are **NOT** signed with a paid certificate, for safety reasons, please do not download or install from unknown sources.
 
             Each release file includes a `sha512` value in its respective `.yml` file for verification.
