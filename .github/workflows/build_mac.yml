@@ -188,7 +188,7 @@ jobs:
       - name: create Github release
         uses: softprops/action-gh-release@v2
         with:
-          name: Tipitakapali.org ${{ env.VERSION }} - Releases 
+          name: Tipitakapali.org ${{ env.VERSION }} 
           tag_name: ${{ env.VERSION }}
           draft: true
           prerelease: false
@@ -262,13 +262,15 @@ jobs:
             Each release file includes a `sha512` value in its respective `.yml` file for verification.
 
             <details>
-            <summary>On Unix like Debian/Ubuntu..., you can check for example:</summary>
+            <summary>On Unix-like OS: MacOS/Linux..., you can check for example:</summary>
 
             ```bash 
 
-            echo test > test.txt       
+            # echo test > test.txt       
 
-            sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
+            sha512sum test.txt | xxd -r -p | base64 
+            
+            # or: sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
 
             Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEv
             fMNXGUXBIw==
