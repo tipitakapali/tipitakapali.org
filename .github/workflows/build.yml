@@ -1,4 +1,4 @@
-name: Build Windows Linux Mac Electron Apps
+name: Build Electron Desktop Apps
 
 on:
   workflow_dispatch:
