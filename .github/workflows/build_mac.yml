@@ -1,4 +1,4 @@
-name: Build Mac Only
+name: Build Desktop Apps
 
 on:
   workflow_dispatch:
@@ -8,9 +8,10 @@ jobs:
     strategy:
       matrix:
         include:
-          # - os: windows-latest
           # - os: ubuntu-latest
-          - os: macos-latest
+          # - os: windows-latest
+          - os: macos-15
+          # - os: macos-latest
           #   arch: arm64
 
     runs-on: ${{ matrix.os }}
@@ -83,8 +84,24 @@ jobs:
           mkdir  -p dist 
           cp package.json dist/
 
-      ### build
 
+      # # Show macOS version
+      # - name: Show macOS version
+      #   if: runner.os == 'macOS'
+      #   run: sw_vers
+
+      # # Ubuntu version
+      # - name: Show Ubuntu version
+      #   if: runner.os == 'Linux'
+      #   run: cat /etc/os-release
+
+      # # Windows version
+      # - name: Show Windows version
+      #   if: runner.os == 'Windows'
+      #   run: |
+      #     systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+
+      ### build
       - name: Build Electron app (macOS)
         if: runner.os == 'macOS'
         env:
@@ -197,17 +214,19 @@ jobs:
             Enter the checksum HERE
             ```
 
-            (Note: The Android APK app ID and signature differ from the Tipitaka CST version released on Google Play.)
+            (Note: If you can please try the Google Play version. This Android APK build's signature is differ from the version one released on Google Play. If you have any issues, uninstalling the old APK ones.)
 
             ---
 
             ### 2- Download Tipitakapali.org ${{ env.VERSION }} for computers
 
-            Change log:
+            <details>
+            <summary>What’s new:</summary>
+            🔧 Fix font size for Sanskrit & PTS, gatha on mobile devices 
+            📦 Update dictionaries, new CSS 
+            🚀 Various improvements 
 
-            - Added navigation between Mula, Attha, and Tika paragraphs
-            - New Full Text Search input types and filter UI
-            - Various improvements and optimizations
+            </details>
 
             ## <img height="50" src="https://github.com/user-attachments/assets/5eab3cb8-db97-46a3-9e39-71c1d3c00e13" alt="Windows" /> Windows
 
@@ -220,11 +239,14 @@ jobs:
             ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/6bcd5d8f-339b-4aa8-bf31-6852c833a168)
 
 
-            ## <img height="50" src="https://github.com/user-attachments/assets/7bb2472c-8bde-4acf-860a-5bfc407550a3" alt="macOS" /> macOS (Intel, M1, M2...):
+            ## <img height="50" src="https://github.com/user-attachments/assets/7bb2472c-8bde-4acf-860a-5bfc407550a3" alt="macOS" /> macOS (Intel, M1, M2, M3, M4...):
 
             - Download the [Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg) build (for both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines).
 
-            - Follow Apple instructions to install [How to open a Mac app from an unknown developer](https://support.apple.com/en-vn/guide/mac-help/mh40616/mac)
+            When opening the app, if you see this:
+            <img width="270" alt="Screenshot 2025-05-19 at 10 03 38 AM" src="https://github.com/user-attachments/assets/6d2d791b-161d-4acc-a42e-8f356aa31bd9" />
+
+            - Then, please following the Apple instructions to install [How to open a Mac app from an unknown developer](https://support.apple.com/en-us/guide/mac-help/mh40616/mac). (On your Mac, choose Apple menu  > System Settings, then click Privacy & Security  in the sidebar. You may need to scroll down. -> Go to Security, then click Open. -> Click Open Anyway. Enter your (Computer) login password, then click OK.)
 
             ##   <img height="50" src="https://github.com/user-attachments/assets/51da2ccd-6ed2-49a8-9827-fd03ade8ad2d" alt="Linux" /> Linux:
 
