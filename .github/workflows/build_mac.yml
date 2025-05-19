@@ -1,0 +1,265 @@
+name: Build Electron Apps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # - os: windows-latest
+          # - os: ubuntu-latest
+          - os: macos-latest
+          #   arch: arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout public repository
+        uses: actions/checkout@v4
+
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          repository: tipitakapali/tipitakapali_electron
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: tpo_offline
+
+      - name: Move contents of tpo_offline to current directory
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            powershell -Command "
+              # Move all directories
+              robocopy .\tpo_offline .\ /E /MOVE /NFL /NDL /NJH /NJS /NC /NS /NP
+
+               # Create a new 'dist' directory
+              mkdir dist
+
+              # Copy package.json to 'dist'
+              Copy-Item package.json dist/
+              
+              # List directories moved to the current directory
+              Write-Host 'Directories moved to current directory:'
+              Get-ChildItem -Directory | Select-Object -ExpandProperty Name
+            "
+          elif [ "$RUNNER_OS" == "Linux" ] || [ "$RUNNER_OS" == "macOS" ]; then
+            mv -f ./tpo_offline/* .
+          else
+            echo "Unknown OS"
+            exit 1
+          fi
+        
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.15.0"
+
+      - name: Install dependencies
+        run: npm ci
+      
+      
+      - name: Restore database
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            # For Windows, use PowerShell
+            powershell -Command "
+              Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+              & ./db_restore.ps1
+              & ./db_check.ps1
+            "
+          else
+            # For Linux and macOS
+            chmod +x db_restore.sh db_check.sh
+            ./db_restore.sh
+            ./db_check.sh
+          fi
+
+      - name: Copy package.json to dist (non-Windows)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir  -p dist 
+          cp package.json dist/
+
+      ### build
+
+      - name: Build Electron app (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-mac
+
+      - name: Build Electron app (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-linux
+
+      - name: Build Electron app (Windows)
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build-win
+      
+      - name: Zip Windows build
+        if: runner.os == 'Windows'
+        run: |
+          powershell -Command "
+            Get-ChildItem -Path dist -Recurse -Filter 'Tipitakapali.org-*.exe' |
+            Compress-Archive -DestinationPath dist/Tipitakapali.org-windows.zip
+          "
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-build
+          path: |
+            dist/**/latest*.yml
+            dist/**/*.dmg
+            dist/**/Tipitakapali.org-*.exe
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/package.json
+            dist/Tipitakapali.org-windows.zip
+
+          if-no-files-found: ignore
+  
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: ubuntu-latest-build
+      #     path: dist/linux
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: macos-latest-build
+      #     path: dist/macos
+
+      - name: Print file sizes in dist directory
+        run: |
+          echo "File sizes in dist directory:"
+          find dist -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" -o -name "*.dmg" \) -exec du -h {} + | sort -h
+        shell: bash
+
+      # - name: Get version from package.json
+      #   id: package-version
+      #   run: |
+      #     echo "VERSION=v$(node -p "require('./dist/package.json').version")" >> $GITHUB_ENV
+      #     echo "Use version $VERSION"
+      - name: Get version from package.json
+        id: package-version
+        run: |
+          NUMBERONLY=$(node -p "require('./dist/package.json').version")
+          echo "VERSION=v$NUMBERONLY" >> $GITHUB_ENV
+          echo "NUMBERONLY=$NUMBERONLY" >> $GITHUB_ENV
+          echo "Use version $NUMBERONLY"
+          echo "Use version $VERSION"
+      - name: create Github release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Tipitakapali.org ${{ env.VERSION }} - Releases 
+          tag_name: ${{ env.VERSION }}
+          draft: true
+          prerelease: false
+          make_latest: false
+          body: |
+            Tipitakapali.org offline software is available for all major platforms: Desktop (Windows, Mac, Linux) and Mobile (Android, iOS). [Instructions videos - how to use Tipitakapali.org](https://www.youtube.com/playlist?list=PL_yc3HlmeNQrYWo_dPLOqC5Bo74HmO3IJ)
+
+            ### 1- Mobile devices:
+
+            <a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213">
+            <img height="50" src="https://github.com/user-attachments/assets/fbc6078b-6580-4216-889f-bb297454e325" alt="Download Tipitaka CST on the App Store" />
+            </a>
+            <a target="_blank" href="https://play.google.com/store/apps/details?id=org.tipitakapali.android">
+            <img height="50" src="https://github.com/user-attachments/assets/5fdedb53-cbcd-4e51-bc1f-58f026a54714" alt="Get Tipitaka CST on Google Play" />
+            </a>
+            <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org_${{ env.VERSION }}.apk">
+            <img height="50" src="https://github.com/user-attachments/assets/4898254e-6d65-49df-ac18-2e1cde96b029" alt="Download APK" />
+            </a>
+
+            For security reasons, please avoid installing APKs from untrusted sources. SHA-1 checksum for verifying `Tipitakapali.org_${{ env.VERSION }}.apk`:
+
+            ```bash 
+            sha1sum Tipitakapali.org_${{ env.VERSION }}.apk
+
+            Enter the checksum HERE
+            ```
+
+            (Note: The Android APK app ID and signature differ from the Tipitaka CST version released on Google Play.)
+
+            ---
+
+            ### 2- Download Tipitakapali.org ${{ env.VERSION }} for computers
+
+            Change log:
+
+            - Added navigation between Mula, Attha, and Tika paragraphs
+            - New Full Text Search input types and filter UI
+            - Various improvements and optimizations
+
+            ## <img height="50" src="https://github.com/user-attachments/assets/5eab3cb8-db97-46a3-9e39-71c1d3c00e13" alt="Windows" /> Windows
+
+            - Download the [Tipitakapali.org-windows.zip](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-windows.zip) file, extract and install.
+
+            - OR download the [Tipitakapali.org-${{ env.NUMBERONLY }}-Install.exe](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}-Install.exe) directly if your if your browser allows
+
+            - **Note**: We do not have a **paid certificate** to sign the app, so **Windows Defender SmartScreen** may prevent the installation. If this happens, follow the steps shown in the provided picture instructions to install:
+
+            ![WindowsDefenderSmartScreen](https://github.com/user-attachments/assets/6bcd5d8f-339b-4aa8-bf31-6852c833a168)
+
+
+            ## <img height="50" src="https://github.com/user-attachments/assets/7bb2472c-8bde-4acf-860a-5bfc407550a3" alt="macOS" /> macOS (Intel, M1, M2...):
+
+            - Download the [Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}-universal.dmg) build (for both Apple Silicon (arm64) **M1, M2 etc..** and **Intel** x64 machines).
+
+            - Follow Apple instructions to install [How to open a Mac app from an unknown developer](https://support.apple.com/en-vn/guide/mac-help/mh40616/mac)
+
+            ##   <img height="50" src="https://github.com/user-attachments/assets/51da2ccd-6ed2-49a8-9827-fd03ade8ad2d" alt="Linux" /> Linux:
+
+            - Download the [tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb) file. You can install it with the following command: `sudo apt install ./tipitakapali.org_${{ env.NUMBERONLY }}_amd64.deb`. Once installed, you can "Pin to Dash" for easy access and a proper shortcut icon. To uninstall, simply run: `sudo apt remove tipitakapali.org`
+
+            - Or download the [Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage](https://github.com/tipitakapali/tipitakapali.org/releases/download/${{ env.VERSION }}/Tipitakapali.org-${{ env.NUMBERONLY }}.AppImage) file (you may need to create a desktop shortcut yourself).
+
+            ## Notes:
+            Since the apps are **NOT** signed with a paid certificate, for safety reasons, please do not download or install from unknown sources.
+
+            Each release file includes a `sha512` value in its respective `.yml` file for verification.
+
+            <details>
+            <summary>On Unix like Debian/Ubuntu..., you can check for example:</summary>
+
+            ```bash 
+
+            echo test > test.txt       
+
+            sha512sum test.txt | awk '{print $1}' | xxd -r -p | base64 
+
+            Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEv
+            fMNXGUXBIw==
+
+            ```
+
+            </details>
+
+          files: |
+            dist/**/latest*.yml
+            dist/**/Tipitakapali.org-*.exe
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/Tipitakapali.org-windows.zip
+          # dist/**/*.dmg
+          # if-no-files-found: ignore
+
+          fail_on_unmatched_files: false
