@@ -1,4 +1,4 @@
-name: Build Mac Electron Apps
+name: Build Mac Only
 
 on:
   workflow_dispatch:

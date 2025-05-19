@@ -1,4 +1,4 @@
-name: Build Electron Desktop Apps
+name: Build Desktop Apps
 
 on:
   workflow_dispatch:
@@ -8,8 +8,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
           - os: ubuntu-latest
+          - os: windows-latest
           - os: macos-latest
           #   arch: arm64
 
