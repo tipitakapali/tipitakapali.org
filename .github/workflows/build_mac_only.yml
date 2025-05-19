@@ -1,4 +1,4 @@
-name: Build Electron Apps
+name: Build Mac Electron Apps
 
 on:
   workflow_dispatch:
@@ -18,14 +18,14 @@ jobs:
       - name: Checkout public repository
         uses: actions/checkout@v4
 
-      - name: Checkout private repository
+      - name: Checkout private codebase repository
         uses: actions/checkout@v4
         with:
           repository: tipitakapali/tipitakapali_electron
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: tpo_offline
 
-      - name: Move contents of tpo_offline to current directory
+      - name: Move contents of private codebase to current directory
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
@@ -51,7 +51,7 @@ jobs:
           fi
         
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22.15.0"
@@ -255,6 +255,7 @@ jobs:
 
           files: |
             dist/**/latest*.yml
+            dist/**/*.dmg
             dist/**/Tipitakapali.org-*.exe
             dist/**/*.AppImage
             dist/**/*.deb
