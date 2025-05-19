@@ -83,8 +83,24 @@ jobs:
           mkdir  -p dist 
           cp package.json dist/
 
-      ### build
 
+      # # Show macOS version
+      # - name: Show macOS version
+      #   if: runner.os == 'macOS'
+      #   run: sw_vers
+
+      # # Ubuntu version
+      # - name: Show Ubuntu version
+      #   if: runner.os == 'Linux'
+      #   run: cat /etc/os-release
+
+      # # Windows version
+      # - name: Show Windows version
+      #   if: runner.os == 'Windows'
+      #   run: |
+      #     systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+
+      ### build
       - name: Build Electron app (macOS)
         if: runner.os == 'macOS'
         env:
