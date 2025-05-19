@@ -16,6 +16,23 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
+
+      # Show macOS version
+      - name: Print macOS version
+        if: runner.os == 'macOS'
+        run: sw_vers
+
+      # Ubuntu version
+      - name: Print Ubuntu version
+        if: runner.os == 'Linux'
+        run: cat /etc/os-release
+
+      # Windows version
+      - name: Print Windows version
+        if: runner.os == 'Windows'
+        run: |
+          systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+
       - name: Checkout public repository
         uses: actions/checkout@v4
 
@@ -85,21 +102,6 @@ jobs:
           cp package.json dist/
 
 
-      # # Show macOS version
-      # - name: Show macOS version
-      #   if: runner.os == 'macOS'
-      #   run: sw_vers
-
-      # # Ubuntu version
-      # - name: Show Ubuntu version
-      #   if: runner.os == 'Linux'
-      #   run: cat /etc/os-release
-
-      # # Windows version
-      # - name: Show Windows version
-      #   if: runner.os == 'Windows'
-      #   run: |
-      #     systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
 
       ### build
       - name: Build Electron app (macOS)
