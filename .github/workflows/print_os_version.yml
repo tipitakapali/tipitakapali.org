@@ -1,4 +1,4 @@
-name: Show OS Version
+name: Print OS Version
 
 on:
   workflow_dispatch:
