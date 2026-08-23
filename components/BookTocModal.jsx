@@ -158,25 +158,25 @@ export default function BookTocModal({ isOpen, onClose }) {
               let titleClass = 'truncate leading-snug ';
               let indentClass = '';
 
-              if (level === 1) {
-                // Chapter / Major Division
-                indentClass = 'pl-2';
-                titleClass += 'font-bold text-[13px] text-[var(--accent)]';
+              if (level === 0) {
+                // Book / Root Division
+                indentClass = 'pl-1';
+                titleClass += 'font-bold text-[13px] text-[var(--text-primary)]';
+                itemClass += 'hover:bg-[var(--accent-light)]/30 border-b border-[var(--border-color)]/30 mb-0.5 pb-1 ';
+              } else if (level === 1) {
+                // Chapter / Major Division / Sutta
+                indentClass = 'pl-3.5';
+                titleClass += 'font-semibold text-[12.5px] text-[var(--accent)]';
                 itemClass += 'hover:bg-[var(--accent-light)]/40 ';
               } else if (level === 2) {
-                // Sutta / Title
-                indentClass = 'pl-5';
-                titleClass += 'font-semibold text-[12px] text-[var(--text-primary)]';
-                itemClass += 'hover:bg-[var(--bg-secondary)] ';
-              } else if (level === 3) {
-                // Subhead / Section
-                indentClass = 'pl-8';
-                titleClass += 'text-[11.5px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
+                // Sutta / Section
+                indentClass = 'pl-6';
+                titleClass += 'font-normal text-[12px] text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               } else {
-                // Subsubhead
-                indentClass = 'pl-11';
-                titleClass += 'text-[11px] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]';
+                // Subhead / Subsection
+                indentClass = 'pl-9';
+                titleClass += 'text-[11.5px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               }
 
@@ -192,7 +192,9 @@ export default function BookTocModal({ isOpen, onClose }) {
                   className={`${itemClass} ${indentClass}`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden mr-2">
-                    {level === 1 ? (
+                    {level === 0 ? (
+                      <BookOpen size={13} className="text-[var(--accent)] shrink-0" />
+                    ) : level === 1 ? (
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
                     ) : level === 2 ? (
                       <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">§</span>

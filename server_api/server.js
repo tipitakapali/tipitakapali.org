@@ -36,27 +36,17 @@ const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
 const stmtGetBook = db.prepare('SELECT id, code, title, nikaya, category, xml_content, chapter_count FROM books WHERE code = ?');
 const stmtGetChapters = db.prepare('SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index');
-let stmtGetToc = null;
-
-try {
-  stmtGetToc = db.prepare('SELECT item_index, level, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
-} catch (e) {
-  stmtGetToc = {
-    all: (code) => {
-      const chaps = stmtGetChapters.all(code);
-      return chaps.map((c, i) => ({
-        item_index: i,
-        level: 1,
-        rend: 'chapter',
-        title: c.title,
-        para_index: c.para_index,
-        para_num: null,
-        anchor_id: c.anchor_id,
-        chapter_index: c.chapter_index,
-      }));
-    },
-  };
+function formatChapterTitle(title) {
+  if (!title) return '';
+  return title
+    .replace(/^([a-zñāīūṃṅṭḍṇḷ])/i, (m) => m.toUpperCase())
+    .replace(/(\d+\.\s*)([a-zñāīūṃṅṭḍṇḷ])/gi, (m, p1, p2) => `${p1}${p2.toUpperCase()}`)
+    .replace(/([\(\-\/\s])([a-zñāīūṃṅṭḍṇḷ])/gi, (m, p1, p2) => `${p1}${p2.toUpperCase()}`);
 }
+
+const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
+
+
 
 
 let stmtGetMat = null;
