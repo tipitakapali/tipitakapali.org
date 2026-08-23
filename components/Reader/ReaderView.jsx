@@ -87,7 +87,10 @@ export default function ReaderView() {
     addBookmark,
     removeBookmark,
     bookmarks,
+    activeParaNum,
+    setActiveParaNum,
   } = useTabs();
+
 
   const { settings, setIsZenMode } = useThemeSettings();
   const containerRef = useRef(null);
@@ -111,7 +114,7 @@ export default function ReaderView() {
     }
   }, [activeTab?.bookCode, getSavedScroll, targetScrollIntent]);
 
-  // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping)
+  // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping)
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
 
@@ -124,7 +127,12 @@ export default function ReaderView() {
       bufferAdjacentChapters(activeTab.bookCode, chapterIdx);
     }
 
-    const timer = setTimeout(() => {
+    let retries = 0;
+    const maxRetries = 25; // Check every 60ms for up to 1.5 seconds
+
+    let timerId = null;
+
+    const attemptScroll = () => {
       if (!containerRef.current) return;
 
       // 1. Target paragraph
@@ -143,6 +151,8 @@ export default function ReaderView() {
             void el.offsetWidth;
             el.classList.add('pulse-highlight');
           }
+          const foundPNum = el.getAttribute('data-para');
+          if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
           clearTargetScrollIntent();
           return;
@@ -150,13 +160,35 @@ export default function ReaderView() {
       }
 
       if (paraNum) {
-        const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '');
-        const el =
+        const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
+        let el =
           containerRef.current.querySelector(`#para${cleanPara}`) ||
           containerRef.current.querySelector(`#para-${cleanPara}`) ||
           containerRef.current.querySelector(`[data-para="${cleanPara}"]`) ||
           containerRef.current.querySelector(`strong.paranum[id="para-${cleanPara}"]`) ||
           containerRef.current.querySelector(`[id="${paraNum}"]`);
+
+        // If exact paragraph element not found yet, check nearest available <= cleanPara
+        if (!el) {
+          const targetInt = parseInt(cleanPara, 10);
+          if (!isNaN(targetInt)) {
+            const allParas = containerRef.current.querySelectorAll('[data-para]');
+            let bestEl = null;
+            let bestDiff = Infinity;
+            for (const p of allParas) {
+              const pNum = parseInt(p.getAttribute('data-para'), 10);
+              if (!isNaN(pNum) && pNum <= targetInt) {
+                const diff = targetInt - pNum;
+                if (diff < bestDiff) {
+                  bestDiff = diff;
+                  bestEl = p;
+                }
+              }
+            }
+            if (bestEl) el = bestEl;
+          }
+        }
+
         if (el) {
           const rect = el.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
@@ -168,18 +200,24 @@ export default function ReaderView() {
             void el.offsetWidth;
             el.classList.add('pulse-highlight');
           }
+          const foundPNum = el.getAttribute('data-para') || cleanPara;
+          if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
           clearTargetScrollIntent();
           return;
         }
       }
 
-
       // 2. Target chapter
-      if (chapterIdx !== undefined && chapterIdx !== null) {
+      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined) {
         if (chapterIdx === 0) {
           containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           saveTabScroll(activeTab.bookCode, 0);
+          const firstP = containerRef.current.querySelector('[data-para]');
+          if (firstP) {
+            const pNum = firstP.getAttribute('data-para');
+            if (pNum) setActiveParaNum(pNum);
+          }
           clearTargetScrollIntent();
           return;
         }
@@ -199,16 +237,45 @@ export default function ReaderView() {
             void target.offsetWidth;
             target.classList.add('pulse-highlight');
           }
+
+          // Detect first paragraph in the chapter
+          let nextEl = target.nextElementSibling;
+          while (nextEl) {
+            if (nextEl.hasAttribute && nextEl.hasAttribute('data-para')) {
+              const pNum = nextEl.getAttribute('data-para');
+              if (pNum) {
+                setActiveParaNum(pNum);
+                break;
+              }
+            }
+            const innerP = nextEl.querySelector ? nextEl.querySelector('[data-para]') : null;
+            if (innerP) {
+              const pNum = innerP.getAttribute('data-para');
+              if (pNum) {
+                setActiveParaNum(pNum);
+                break;
+              }
+            }
+            nextEl = nextEl.nextElementSibling;
+          }
+
           saveTabScroll(activeTab.bookCode, offset);
-        } else {
-          containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-          saveTabScroll(activeTab.bookCode, 0);
+          clearTargetScrollIntent();
+          return;
         }
+      }
+
+
+      retries++;
+      if (retries < maxRetries) {
+        timerId = setTimeout(attemptScroll, 60);
+      } else {
         clearTargetScrollIntent();
       }
-    }, 60);
+    };
 
-    return () => clearTimeout(timer);
+    timerId = setTimeout(attemptScroll, 40);
+    return () => clearTimeout(timerId);
   }, [
     targetScrollIntent,
     activeTab,
@@ -217,7 +284,9 @@ export default function ReaderView() {
     bufferAdjacentChapters,
     saveTabScroll,
     clearTargetScrollIntent,
+    setActiveParaNum,
   ]);
+
 
   // Direct fast scroll listener
   const handleScroll = useCallback(
@@ -227,41 +296,73 @@ export default function ReaderView() {
       lastScrollTopRef.current = top;
 
       if (contentHeaderRef.current) {
-        if (top <= 35) {
-          contentHeaderRef.current.classList.remove('hidden-scroll');
-        } else if (delta > 6) {
-          contentHeaderRef.current.classList.add('hidden-scroll');
-        } else if (delta < -6) {
-          contentHeaderRef.current.classList.remove('hidden-scroll');
-        }
-      }
-
-      // Dynamic Zen / Normal mode on scroll:
-      // Scroll Up or Near Top -> Show Normal Mode (Header, Footer, Tabs)
-      // Scroll Down -> Show Zen Mode (maximize reading area)
-      if (top <= 35 || delta < -8) {
-        if (document.body.classList.contains('zen-mode')) {
-          document.body.classList.remove('zen-mode');
-          setIsZenMode(false);
-        }
-      } else if (top > 60 && delta > 8) {
-        if (!document.body.classList.contains('zen-mode')) {
-          document.body.classList.add('zen-mode');
-          setIsZenMode(true);
-        }
+        contentHeaderRef.current.classList.remove('hidden-scroll');
       }
 
       if (scrollTimeoutRef.current) {
+
         clearTimeout(scrollTimeoutRef.current);
       }
       scrollTimeoutRef.current = setTimeout(() => {
-        if (activeTab) {
+        if (activeTab && containerRef.current) {
           saveTabScroll(activeTab.bookCode, top);
+
+          // Detect active paragraph in reading viewport
+          const container = containerRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const targetY = containerRect.top + 80;
+
+          const paraElements = container.querySelectorAll('p[data-pindex]');
+          let foundParaNum = null;
+
+          for (const p of paraElements) {
+            const rect = p.getBoundingClientRect();
+            if (rect.bottom >= targetY) {
+              const paraNum = p.getAttribute('data-para');
+              if (paraNum) {
+                foundParaNum = paraNum;
+                break;
+              }
+              let prev = p.previousElementSibling;
+              while (prev) {
+                const prevNum = prev.getAttribute('data-para');
+                if (prevNum) {
+                  foundParaNum = prevNum;
+                  break;
+                }
+                prev = prev.previousElementSibling;
+              }
+              break;
+            }
+          }
+
+          if (foundParaNum) {
+            setActiveParaNum(foundParaNum);
+          }
         }
       }, 100);
     },
-    [activeTab, saveTabScroll, setIsZenMode]
+    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum]
   );
+
+  const handleReaderClick = useCallback((e) => {
+    const pEl = e.target.closest('p[data-pindex]');
+    if (pEl) {
+      let pNum = pEl.getAttribute('data-para');
+      if (!pNum) {
+        let prev = pEl.previousElementSibling;
+        while (prev) {
+          pNum = prev.getAttribute('data-para');
+          if (pNum) break;
+          prev = prev.previousElementSibling;
+        }
+      }
+      if (pNum) {
+        setActiveParaNum(pNum);
+      }
+    }
+  }, [setActiveParaNum]);
+
 
 
   const handleBreadcrumbClick = () => {
@@ -354,8 +455,9 @@ export default function ReaderView() {
       </div>
 
       {/* Lazy-Loaded Chapter Content Stream */}
-      <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6">
+      <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6" onClick={handleReaderClick}>
         <div className="reader-container max-w-[860px] w-full">
+
           {activeTab.chapters && activeTab.chapters.length > 0 ? (
             activeTab.chapters.map((chap) => (
               <ChapterBlock

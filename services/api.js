@@ -95,7 +95,21 @@ export async function fetchToc(bookCode) {
   }, 60 * 60 * 1000);
 }
 
+export async function fetchMat(bookCode) {
+  let cleanCode = bookCode.replace('.xml', '');
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+  const cacheKey = `mat_${cleanCode}`;
+
+  return cachedFetch(cacheKey, async () => {
+    const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat`);
+    if (!res.ok) return null;
+    return res.json();
+  }, 60 * 60 * 1000);
+}
+
 export async function searchTipitaka(query, options = {}) {
+
   const params = new URLSearchParams();
   params.set('q', query);
   if (options.book) params.set('book', options.book);

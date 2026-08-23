@@ -36,8 +36,39 @@ const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
 const stmtGetBook = db.prepare('SELECT id, code, title, nikaya, category, xml_content, chapter_count FROM books WHERE code = ?');
 const stmtGetChapters = db.prepare('SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index');
-const stmtGetToc = db.prepare('SELECT item_index, level, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
+let stmtGetToc = null;
+
+try {
+  stmtGetToc = db.prepare('SELECT item_index, level, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
+} catch (e) {
+  stmtGetToc = {
+    all: (code) => {
+      const chaps = stmtGetChapters.all(code);
+      return chaps.map((c, i) => ({
+        item_index: i,
+        level: 1,
+        rend: 'chapter',
+        title: c.title,
+        para_index: c.para_index,
+        para_num: null,
+        anchor_id: c.anchor_id,
+        chapter_index: c.chapter_index,
+      }));
+    },
+  };
+}
+
+
+let stmtGetMat = null;
+let stmtGetAllMat = null;
+try {
+  stmtGetMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat WHERE book_code = ?');
+  stmtGetAllMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat');
+} catch (e) {
+  console.warn('[MAT] book_mat table prepared statement error:', e.message);
+}
 const stmtSearchCount = db.prepare('SELECT count(*) as total FROM paragraphs_fts WHERE paragraphs_fts MATCH ?');
+
 const stmtSearch = db.prepare(`
   SELECT 
     rowid,
@@ -73,6 +104,8 @@ function parseBookChaptersHtml(xmlContent, chapters) {
   const chapterParas = new Map();
   const paraToChapter = {};
   const paraToIndex = {};
+  const pageToChapter = { V: {}, P: {}, T: {}, M: {} };
+  const pageToPara = { V: {}, P: {}, T: {}, M: {} };
   let currentChapIdx = 0;
   let paraCounter = 0;
 
@@ -93,6 +126,31 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     const rend = match[2];
     const nAttr = match[3];
     let inner = match[4];
+
+    // Index page breaks before HTML conversion
+    const pbRegex = /<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g;
+    let pbMatch;
+    while ((pbMatch = pbRegex.exec(inner)) !== null) {
+      const ed = pbMatch[1].toUpperCase();
+      const page = pbMatch[2];
+      if (!pageToChapter[ed]) pageToChapter[ed] = {};
+      if (!pageToPara[ed]) pageToPara[ed] = {};
+
+      pageToChapter[ed][page] = currentChapIdx;
+      if (nAttr) pageToPara[ed][page] = nAttr;
+
+      if (page.includes('.')) {
+        const parts = page.split('.');
+        const shortNum = String(parseInt(parts[1], 10));
+        const shortDotted = `${parts[0]}.${shortNum}`;
+        pageToChapter[ed][shortNum] = currentChapIdx;
+        pageToChapter[ed][shortDotted] = currentChapIdx;
+        if (nAttr) {
+          pageToPara[ed][shortNum] = nAttr;
+          pageToPara[ed][shortDotted] = nAttr;
+        }
+      }
+    }
 
     inner = inner.replace(/<hi\s+rend="bold">([^<]+)<\/hi>/g, '<strong class="bld">$1</strong>');
     if (nAttr) {
@@ -131,7 +189,13 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     result.set(chIdx, `${headerHtml}\n${paras.join('\n')}`);
   }
 
-  return { chapterHtmls: result, paraToChapter, paraToIndex };
+  return {
+    chapterHtmls: result,
+    paraToChapter,
+    paraToIndex,
+    pageToChapter,
+    pageToPara,
+  };
 }
 
 function getOrParseBook(cleanCode) {
@@ -157,9 +221,13 @@ function getOrParseBook(cleanCode) {
       toc: toc,
       para_to_chapter: parsedData.paraToChapter,
       para_to_index: parsedData.paraToIndex,
+      page_to_chapter: parsedData.pageToChapter,
+      page_to_para: parsedData.pageToPara,
+      mat: stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null,
     },
     chapterHtmls: parsedData.chapterHtmls,
   };
+
 
   bookParsedCache.set(cleanCode, parsed);
   return parsed;
@@ -357,6 +425,42 @@ async function main() {
       toc: toc,
     };
   });
+
+  // Get MAT (Mūla / Aṭṭhakathā / Ṭīkā) cross-reference relations for a book
+  fastify.get('/api/book/:code/mat', async (req, reply) => {
+    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    const rawCode = req.params.code;
+    let cleanCode = rawCode.replace('.xml', '');
+
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) {
+      cleanCode = chapSuffixMatch[1];
+    }
+
+    if (!stmtGetMat) {
+      reply.code(500);
+      return { error: 'MAT database index not initialized' };
+    }
+
+    const mat = stmtGetMat.get(cleanCode);
+    if (!mat) {
+      reply.code(404);
+      return { error: `No MAT relationship found for '${cleanCode}'` };
+    }
+    return mat;
+  });
+
+  // Get full MAT matrix for all books
+  fastify.get('/api/mat', async (req, reply) => {
+    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    if (!stmtGetAllMat) {
+      reply.code(500);
+      return { error: 'MAT database index not initialized' };
+    }
+    const rows = stmtGetAllMat.all();
+    return rows;
+  });
+
 
   // Full-Text Search across 520,000+ paragraphs
   fastify.get('/api/search', async (req, reply) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { fetchBook, fetchChapter } from '../services/api';
+import { fetchBook, fetchChapter, fetchMat } from '../services/api';
 import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
@@ -14,11 +14,58 @@ const STORAGE_KEYS = {
   HISTORY: 'tipitaka_recent_history_v2',
 };
 
+function resolveNearestChapterAndPara(paraToChapMap, rawParaNum) {
+
+  if (!paraToChapMap || !rawParaNum) return null;
+  const cleanPara = String(rawParaNum).replace(/^(?:para-?|p)/i, '').trim();
+  if (paraToChapMap[cleanPara] !== undefined) {
+    return { chapterIdx: paraToChapMap[cleanPara], paraNum: cleanPara };
+  }
+  const targetInt = parseInt(cleanPara, 10);
+  if (isNaN(targetInt)) return null;
+
+  let bestNum = null;
+  let bestChap = null;
+  for (const [pStr, cIdx] of Object.entries(paraToChapMap)) {
+    const pInt = parseInt(pStr, 10);
+    if (!isNaN(pInt) && pInt <= targetInt) {
+      if (bestNum === null || pInt > bestNum) {
+        bestNum = pInt;
+        bestChap = cIdx;
+      }
+    }
+  }
+  if (bestChap !== null) {
+    return { chapterIdx: bestChap, paraNum: bestNum !== null ? String(bestNum) : cleanPara };
+  }
+  return null;
+}
+
+function getFirstParaOfChapter(paraToChapMap, targetChapIdx) {
+
+  if (!paraToChapMap || targetChapIdx === undefined || targetChapIdx === null) return null;
+  let firstNum = null;
+  let minNum = Infinity;
+  for (const [pStr, cIdx] of Object.entries(paraToChapMap)) {
+    if (cIdx === targetChapIdx) {
+      const pInt = parseInt(pStr, 10);
+      if (!isNaN(pInt) && pInt < minNum) {
+        minNum = pInt;
+        firstNum = pStr;
+      }
+    }
+  }
+  return firstNum;
+}
+
 export function TabProvider({ children }) {
+
+
   const { setIsZenMode } = useThemeSettings();
 
   const [openTabs, setOpenTabs] = useState([]);
   const [activeBookCode, setActiveBookCode] = useState(null);
+  const [activeParaNum, setActiveParaNum] = useState(null);
   const [loadingBook, setLoadingBook] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -33,6 +80,7 @@ export function TabProvider({ children }) {
 
   const openTabsRef = useRef([]);
   const activeBookCodeRef = useRef(null);
+
   const tabScrollMemoryRef = useRef({});
   const isInitializedRef = useRef(false);
 
@@ -278,25 +326,41 @@ export function TabProvider({ children }) {
 
       const rawParaNum = options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '') : null;
 
+
       const currentTabs = openTabsRef.current;
       const existingTabIndex = currentTabs.findIndex((t) => t.bookCode === cleanCode);
 
-      if (options.zenMode !== false) {
+      if (options.zenMode === true) {
         setIsZenMode(true);
         setIsSidebarOpen(false);
         if (typeof document !== 'undefined') {
           document.body.classList.add('zen-mode');
         }
+      } else {
+        setIsZenMode(false);
+        if (typeof document !== 'undefined') {
+          document.body.classList.remove('zen-mode');
+        }
       }
+
 
       if (existingTabIndex !== -1) {
         setActiveBookCode(cleanCode);
-
         const tab = currentTabs[existingTabIndex];
 
-        if (rawParaNum && tab.para_to_chapter && tab.para_to_chapter[rawParaNum] !== undefined) {
-          targetChapIdx = tab.para_to_chapter[rawParaNum];
-          hasTargetChapter = true;
+
+        if (rawParaNum && tab.para_to_chapter) {
+          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum);
+          if (resolved) {
+            targetChapIdx = resolved.chapterIdx;
+            hasTargetChapter = true;
+            setActiveParaNum(resolved.paraNum || rawParaNum);
+          }
+        } else if (hasTargetChapter) {
+          const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx);
+          if (firstP) {
+            setActiveParaNum(firstP);
+          }
         }
 
         if (hasTargetChapter) {
@@ -352,17 +416,25 @@ export function TabProvider({ children }) {
           buffer: 1,
         });
 
-        if (rawParaNum && bookData.para_to_chapter && bookData.para_to_chapter[rawParaNum] !== undefined) {
-          const resolvedChap = bookData.para_to_chapter[rawParaNum];
-          if (resolvedChap !== targetChapIdx) {
-            targetChapIdx = resolvedChap;
+        if (rawParaNum && bookData.para_to_chapter) {
+          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum);
+          if (resolved) {
+            targetChapIdx = resolved.chapterIdx;
             hasTargetChapter = true;
+            setActiveParaNum(resolved.paraNum || rawParaNum);
             if (!bookData.chapters_data?.[targetChapIdx]) {
               const chapData = await fetchBook(cleanCode, { chapter: targetChapIdx, buffer: 1 });
               Object.assign(bookData.chapters_data, chapData.chapters_data);
             }
           }
+        } else if (hasTargetChapter) {
+          const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx);
+          if (firstP) {
+            setActiveParaNum(firstP);
+          }
         }
+
+
 
         const newTab = {
           bookCode: bookData.code,
@@ -372,8 +444,10 @@ export function TabProvider({ children }) {
           chapter_count: bookData.chapter_count,
           chapters: bookData.chapters || [],
           toc: bookData.toc || [],
+          mat: bookData.mat || null,
           para_to_chapter: bookData.para_to_chapter || {},
           para_to_index: bookData.para_to_index || {},
+
           loadedChapters: { ...bookData.chapters_data },
           loadingChapters: {},
           currentChapterIdx: targetChapIdx,
@@ -433,6 +507,10 @@ export function TabProvider({ children }) {
 
       const tab = openTabsRef.current.find((t) => t.bookCode === bookCode);
       if (tab) {
+        const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx || 0);
+        if (firstP) {
+          setActiveParaNum(firstP);
+        }
         setTreeSelectedNode({
           bookCode: tab.bookCode,
           chapterIdx: tab.currentChapterIdx || 0,
@@ -452,7 +530,7 @@ export function TabProvider({ children }) {
         });
       }
     },
-    [updateUrlParams, persistTabs, addToHistory]
+    [updateUrlParams, persistTabs, addToHistory, setActiveParaNum]
   );
 
   const closeTab = useCallback(
@@ -470,6 +548,10 @@ export function TabProvider({ children }) {
             const nextIdx = Math.min(idx, newTabs.length - 1);
             const nextTab = newTabs[nextIdx];
             setActiveBookCode(nextTab.bookCode);
+            const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
+            if (firstP) {
+              setActiveParaNum(firstP);
+            }
             setTreeSelectedNode({
               bookCode: nextTab.bookCode,
               chapterIdx: nextTab.currentChapterIdx || 0,
@@ -498,7 +580,7 @@ export function TabProvider({ children }) {
         return newTabs;
       });
     },
-    [updateUrlParams, persistTabs]
+    [updateUrlParams, persistTabs, setActiveParaNum]
   );
 
   const setChapterForActiveTab = useCallback(
@@ -514,6 +596,21 @@ export function TabProvider({ children }) {
         return next;
       });
 
+      const currentTab = openTabsRef.current.find((t) => t.bookCode === activeCode);
+      if (currentTab) {
+        const firstP = getFirstParaOfChapter(currentTab.para_to_chapter, chapterIdx);
+        if (firstP) {
+          setActiveParaNum(firstP);
+        }
+        addToHistory({
+          bookCode: activeCode,
+          bookTitle: currentTab.title,
+          nikaya: currentTab.nikaya,
+          chapterIdx: chapterIdx,
+          chapterTitle: currentTab.chapters?.[chapterIdx]?.title || '',
+        });
+      }
+
       setTreeSelectedNode({ bookCode: activeCode, chapterIdx });
       setTargetScrollIntent({
         chapterIdx,
@@ -523,22 +620,12 @@ export function TabProvider({ children }) {
       loadChapter(activeCode, chapterIdx);
       bufferAdjacentChapters(activeCode, chapterIdx);
       updateUrlParams({ book: activeCode, chapter: chapterIdx + 1 });
-
-      const currentTab = openTabsRef.current.find((t) => t.bookCode === activeCode);
-      if (currentTab) {
-        addToHistory({
-          bookCode: activeCode,
-          bookTitle: currentTab.title,
-          nikaya: currentTab.nikaya,
-          chapterIdx: chapterIdx,
-          chapterTitle: currentTab.chapters?.[chapterIdx]?.title || '',
-        });
-      }
     },
-    [updateUrlParams, loadChapter, bufferAdjacentChapters, persistTabs, addToHistory]
+    [updateUrlParams, persistTabs, loadChapter, bufferAdjacentChapters, addToHistory, setActiveParaNum]
   );
 
   const saveTabScroll = useCallback((bookCode, scrollTop) => {
+
     if (bookCode) {
       tabScrollMemoryRef.current[bookCode] = scrollTop;
       try {
@@ -633,12 +720,80 @@ export function TabProvider({ children }) {
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 
+  // Auto-fetch MAT if missing on activeTab
+  useEffect(() => {
+    if (activeTab && !activeTab.mat) {
+      fetchMat(activeTab.bookCode).then((mat) => {
+        if (mat) {
+          setOpenTabs((prev) =>
+            prev.map((t) => (t.bookCode === activeTab.bookCode ? { ...t, mat } : t))
+          );
+        }
+      });
+    }
+  }, [activeTab]);
+
+  // Jump MAT (Mūla · Aṭṭhakathā · Ṭīkā) handler
+  const jumpToMat = useCallback(
+    async (targetLayer) => {
+      if (!activeTab) return;
+      let mat = activeTab.mat;
+      if (!mat) {
+        try {
+          mat = await fetchMat(activeTab.bookCode);
+        } catch (e) {}
+      }
+
+      let targetCode = null;
+      if (mat) {
+        if (targetLayer === 'mula') targetCode = mat.mula_code;
+        else if (targetLayer === 'attha') targetCode = mat.attha_code;
+        else if (targetLayer === 'tika') targetCode = mat.tika_code;
+      }
+
+      if (!targetCode) {
+        const base = activeTab.bookCode.split('.')[0];
+        const prefix = (base.length > 2 && 'matn'.includes(base.slice(-2, -1)))
+          ? base.slice(0, -2)
+          : (base.length > 1 && 'matn'.includes(base.slice(-1)))
+          ? base.slice(0, -1)
+          : base;
+        if (targetLayer === 'mula') targetCode = `${prefix}m.mul`;
+        else if (targetLayer === 'attha') targetCode = `${prefix}a.att`;
+        else if (targetLayer === 'tika') targetCode = `${prefix}t.tik`;
+      }
+
+      if (!targetCode || targetCode === activeTab.bookCode) return;
+
+      // Extract current active paragraph number from state or DOM
+      let currentPara = activeParaNum;
+      if (!currentPara && typeof document !== 'undefined') {
+        const container = document.querySelector('.reader-container') || document.querySelector('main');
+        if (container) {
+          const visibleParaEl = container.querySelector('[data-para]');
+          if (visibleParaEl) {
+            currentPara = visibleParaEl.getAttribute('data-para');
+          }
+        }
+      }
+
+      openBook(targetCode, {
+        targetParaNum: currentPara || undefined,
+      });
+    },
+    [activeTab, activeParaNum, openBook]
+  );
+
+
   return (
     <TabContext.Provider
       value={{
         openTabs,
         activeBookCode,
         activeTab,
+        activeParaNum,
+        setActiveParaNum,
+        jumpToMat,
         loadingBook,
         isSidebarOpen,
         isSearchOpen,
@@ -673,6 +828,7 @@ export function TabProvider({ children }) {
         updateUrlParams,
       }}
     >
+
       {children}
     </TabContext.Provider>
   );

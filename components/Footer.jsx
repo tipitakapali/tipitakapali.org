@@ -2,25 +2,27 @@
 
 import React, { useState } from 'react';
 import {
-  ChevronLeft,
-  ChevronRight,
   ListTree,
   ChevronUp,
   BookA,
   Bookmark,
-  History,
+  Layers,
+  Navigation,
 } from 'lucide-react';
+
 import BookTocModal from './BookTocModal';
 import DictionaryModal from './DictionaryModal';
 import BookmarkModal from './BookmarkModal';
 import HistoryModal from './HistoryModal';
+import MatJumpModal from './MatJumpModal';
+import GoToModal from './GoToModal';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 
 export default function Footer() {
   const {
     activeTab,
-    setChapterForActiveTab,
+    activeParaNum,
     bookmarks,
     isHistoryOpen,
     setIsHistoryOpen,
@@ -31,21 +33,8 @@ export default function Footer() {
 
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
-
-  const totalChaps = activeTab?.chapters?.length || 1;
-  const currentChapIdx = activeTab?.currentChapterIdx || 0;
-
-  const handlePrevChapter = () => {
-    if (currentChapIdx > 0) {
-      setChapterForActiveTab(currentChapIdx - 1);
-    }
-  };
-
-  const handleNextChapter = () => {
-    if (currentChapIdx < totalChaps - 1) {
-      setChapterForActiveTab(currentChapIdx + 1);
-    }
-  };
+  const [isMatModalOpen, setIsMatModalOpen] = useState(false);
+  const [isGoToModalOpen, setIsGoToModalOpen] = useState(false);
 
   return (
     <>
@@ -73,28 +62,33 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Center: Chapter Navigation */}
-        <div className="footer-center flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Center: MAT Jump & Go To Navigation Controls */}
+        <div className="footer-center flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+          {/* MAT Jump Button */}
           <button
-            className="footer-nav-btn px-1 sm:px-2.5 py-1 text-[11px] sm:text-xs"
-            onClick={handlePrevChapter}
-            disabled={!activeTab || currentChapIdx <= 0}
-            title="Previous Chapter"
+            onClick={() => setIsMatModalOpen(true)}
+            disabled={!activeTab}
+            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer"
+            title="Open MAT Jump (Mūla · Aṭṭhakathā · Ṭīkā Connected Books)"
           >
-            <ChevronLeft size={13} />
-            <span className="hidden sm:inline">Prev</span>
+            <Layers size={13} className="text-[var(--accent)]" />
+            <span>MAT Jump</span>
+            {activeParaNum && (
+              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold">
+                ¶{activeParaNum}
+              </span>
+            )}
           </button>
-          <span className="footer-chap-counter font-semibold text-[10px] sm:text-[11.5px] min-w-[48px] sm:min-w-[65px] text-center truncate">
-            {activeTab ? `Ch ${currentChapIdx + 1}/${totalChaps}` : '—'}
-          </span>
+
+          {/* Go To Button */}
           <button
-            className="footer-nav-btn px-1 sm:px-2.5 py-1 text-[11px] sm:text-xs"
-            onClick={handleNextChapter}
-            disabled={!activeTab || currentChapIdx >= totalChaps - 1}
-            title="Next Chapter"
+            onClick={() => setIsGoToModalOpen(true)}
+            disabled={!activeTab}
+            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer"
+            title="Go to Paragraph or Page Number"
           >
-            <span className="hidden sm:inline">Next</span>
-            <ChevronRight size={13} />
+            <Navigation size={13} className="text-[var(--accent)]" />
+            <span>Go to</span>
           </button>
         </div>
 
@@ -145,6 +139,8 @@ export default function Footer() {
       </footer>
 
       {/* Modals */}
+      <MatJumpModal isOpen={isMatModalOpen} onClose={() => setIsMatModalOpen(false)} />
+      <GoToModal isOpen={isGoToModalOpen} onClose={() => setIsGoToModalOpen(false)} />
       <BookTocModal isOpen={isTocOpen} onClose={() => setIsTocOpen(false)} />
       <DictionaryModal isOpen={isDictOpen} onClose={() => setIsDictOpen(false)} />
       <BookmarkModal isOpen={isBookmarkOpen} onClose={() => setIsBookmarkOpen(false)} />
@@ -152,4 +148,5 @@ export default function Footer() {
     </>
   );
 }
+
 
