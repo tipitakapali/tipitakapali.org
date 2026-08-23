@@ -1,9 +1,10 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { use, Suspense } from 'react';
 import { MainAppContent } from '../../page';
 
 export default function BookPage({ params }) {
+  const unwrappedParams = params && typeof params.then === 'function' ? use(params) : params;
   return (
     <Suspense
       fallback={
@@ -12,7 +13,8 @@ export default function BookPage({ params }) {
         </div>
       }
     >
-      <MainAppContent params={params} />
+      <MainAppContent params={unwrappedParams} />
     </Suspense>
   );
 }
+

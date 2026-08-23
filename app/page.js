@@ -12,10 +12,12 @@ import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
-export function MainAppContent({ params }) {
+export function MainAppContent({ params: rawParams }) {
+  const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
   const { openBook, openSearchModal, activeTab, activeBookCode } = useTabs();
   const { settings } = useThemeSettings();
   const hasInitializedRef = useRef(false);
+
 
   // Dynamic Browser, Search & SEO friendly Title Synchronizer
   useEffect(() => {

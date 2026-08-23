@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ['85.190.97.158'],
   reactStrictMode: true,
   async rewrites() {
     return [

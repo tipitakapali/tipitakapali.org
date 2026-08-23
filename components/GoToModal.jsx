@@ -18,8 +18,9 @@ export default function GoToModal({ isOpen, onClose }) {
 
   const inputRef = useRef(null);
 
-  // 1. Safe compute paragraph limits without spread-overflow
+  // 1. Direct precomputed paragraph limits (from server DB/JSON, 0ms compute)
   const paraRange = useMemo(() => {
+    if (activeTab?.para_range) return activeTab.para_range;
     const pMap = activeTab?.para_to_chapter || {};
     let min = Infinity;
     let max = -Infinity;
@@ -36,8 +37,9 @@ export default function GoToModal({ isOpen, onClose }) {
     return { min, max, total: count };
   }, [activeTab]);
 
-  // 2. Safe compute page limits per edition without spread-overflow
+  // 2. Direct precomputed page limits per edition (from server DB/JSON, 0ms compute)
   const editionRanges = useMemo(() => {
+    if (activeTab?.edition_ranges) return activeTab.edition_ranges;
     const res = {};
     const pageToChap = activeTab?.page_to_chapter || {};
     for (const sys of ['V', 'P', 'T', 'M']) {
@@ -81,7 +83,6 @@ export default function GoToModal({ isOpen, onClose }) {
     }
     return res;
   }, [activeTab]);
-
 
   const currentEdRange = editionRanges[pageSystem] || { available: false, label: 'Unavailable' };
 
@@ -139,6 +140,8 @@ export default function GoToModal({ isOpen, onClose }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+
 
   const pageSystems = [
     { code: 'V', label: 'VRI', name: 'Vipassana Research Institute' },

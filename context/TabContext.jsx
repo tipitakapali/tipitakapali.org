@@ -345,9 +345,41 @@ export function TabProvider({ children }) {
 
 
       if (existingTabIndex !== -1) {
-        setActiveBookCode(cleanCode);
+        setActiveBookCode((prev) => (prev !== cleanCode ? cleanCode : prev));
         const tab = currentTabs[existingTabIndex];
 
+        // Ensure tab has full metadata (para_to_chapter, page_to_chapter, etc.)
+        if (
+          !tab.para_to_chapter ||
+          Object.keys(tab.para_to_chapter).length === 0 ||
+          !tab.page_to_chapter ||
+          Object.keys(tab.page_to_chapter).length === 0
+        ) {
+          fetchBook(cleanCode, { chapter: targetChapIdx })
+            .then((bData) => {
+              if (bData) {
+                setOpenTabs((prev) =>
+                  prev.map((t) =>
+                    t.bookCode === cleanCode
+                      ? {
+                          ...t,
+                          para_to_chapter: bData.para_to_chapter || {},
+                          para_to_index: bData.para_to_index || {},
+                          page_to_chapter: bData.page_to_chapter || {},
+                          page_to_para: bData.page_to_para || {},
+                          para_range: bData.para_range || t.para_range,
+                          edition_ranges: bData.edition_ranges || t.edition_ranges,
+                          toc: bData.toc?.length ? bData.toc : t.toc,
+                          mat: bData.mat || t.mat,
+                          loadedChapters: { ...t.loadedChapters, ...bData.chapters_data },
+                        }
+                      : t
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        }
 
         if (rawParaNum && tab.para_to_chapter) {
           const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum);
@@ -391,7 +423,6 @@ export function TabProvider({ children }) {
         } else {
           setTargetScrollIntent(null);
         }
-
 
         const activeChap = hasTargetChapter
           ? targetChapIdx
@@ -437,8 +468,6 @@ export function TabProvider({ children }) {
           }
         }
 
-
-
         const newTab = {
           bookCode: bookData.code,
           title: bookData.title,
@@ -452,6 +481,8 @@ export function TabProvider({ children }) {
           para_to_index: bookData.para_to_index || {},
           page_to_chapter: bookData.page_to_chapter || {},
           page_to_para: bookData.page_to_para || {},
+          para_range: bookData.para_range || null,
+          edition_ranges: bookData.edition_ranges || null,
 
           loadedChapters: { ...bookData.chapters_data },
           loadingChapters: {},
@@ -460,12 +491,23 @@ export function TabProvider({ children }) {
 
 
         setOpenTabs((prev) => {
-          if (prev.some((t) => t.bookCode === cleanCode)) return prev;
+          const idx = prev.findIndex((t) => t.bookCode === cleanCode);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = {
+              ...next[idx],
+              ...newTab,
+              loadedChapters: { ...next[idx].loadedChapters, ...newTab.loadedChapters },
+            };
+            persistTabs(next, cleanCode);
+            return next;
+          }
           const next = [...prev, newTab];
           persistTabs(next, cleanCode);
           return next;
         });
         setActiveBookCode(cleanCode);
+
 
         if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
           setTargetScrollIntent({
@@ -516,6 +558,38 @@ export function TabProvider({ children }) {
 
       const tab = openTabsRef.current.find((t) => t.bookCode === bookCode);
       if (tab) {
+        if (
+          !tab.para_to_chapter ||
+          Object.keys(tab.para_to_chapter).length === 0 ||
+          !tab.page_to_chapter ||
+          Object.keys(tab.page_to_chapter).length === 0
+        ) {
+          fetchBook(bookCode, { chapter: tab.currentChapterIdx || 0 })
+            .then((bData) => {
+              if (bData) {
+                setOpenTabs((prev) =>
+                  prev.map((t) =>
+                    t.bookCode === bookCode
+                      ? {
+                          ...t,
+                          para_to_chapter: bData.para_to_chapter || {},
+                          para_to_index: bData.para_to_index || {},
+                          page_to_chapter: bData.page_to_chapter || {},
+                          page_to_para: bData.page_to_para || {},
+                          para_range: bData.para_range || t.para_range,
+                          edition_ranges: bData.edition_ranges || t.edition_ranges,
+                          toc: bData.toc?.length ? bData.toc : t.toc,
+                          mat: bData.mat || t.mat,
+                        }
+                      : t
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        }
+
+
         const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx || 0);
         if (firstP) {
           setActiveParaNum(firstP);
@@ -541,6 +615,7 @@ export function TabProvider({ children }) {
     },
     [updateUrlParams, persistTabs, addToHistory, setActiveParaNum]
   );
+
 
   const closeTab = useCallback(
     (bookCode, e) => {
@@ -711,9 +786,10 @@ export function TabProvider({ children }) {
 
     if (urlBook) {
       const targetChapIdx = urlChapter ? Math.max(0, parseInt(urlChapter, 10) - 1) : 0;
-      openBook(urlBook, { targetChapterIdx });
+      openBook(urlBook, { targetChapterIdx: targetChapIdx });
       return;
     }
+
 
     // Resume from localStorage
     try {

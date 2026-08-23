@@ -71,6 +71,9 @@ export default function MatJumpModal({ isOpen, onClose }) {
     },
   ];
 
+  // Simplify Jump list by showing only other connected layers
+  const jumpTargets = connectedBooks.filter((item) => !item.isCurrent);
+
   const handleJump = (layer) => {
     jumpToMat(layer);
     onClose();
@@ -96,13 +99,13 @@ export default function MatJumpModal({ isOpen, onClose }) {
                 MAT Connected Books
               </h3>
               <p className="text-[11px] text-[var(--text-muted)]">
-                Jump across Mūla, Aṭṭhakathā, and Ṭīkā layers
+                Jump to connected Commentary or Sub-commentary
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition"
+            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -125,74 +128,78 @@ export default function MatJumpModal({ isOpen, onClose }) {
 
         {/* Connected Books List */}
         <div className="p-3 sm:p-4 space-y-2.5 overflow-y-auto">
-          {connectedBooks.map((item) => (
-            <div
-              key={item.layer}
-              onClick={() => !item.isCurrent && item.available && handleJump(item.layer)}
-              className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 select-none ${
-                item.isCurrent
-                  ? 'border-[var(--accent)] bg-[var(--accent)]/5 shadow-xs'
-                  : item.available
-                  ? 'border-[var(--border-color)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--bg-card)] cursor-pointer group'
-                  : 'border-[var(--border-color)]/50 bg-[var(--bg-secondary)]/40 opacity-45 cursor-not-allowed'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
-                    item.isCurrent
-                      ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                      : item.badgeColor
-                  }`}
-                >
-                  <BookOpen size={16} />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
-                      {convertPaliScript(item.title, settings?.paliScript)}
-                    </span>
-                    <span
-                      className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${item.badgeColor}`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
-                    {item.code} • {item.desc}
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Button / Badge */}
-              <div className="shrink-0">
-                {item.isCurrent ? (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 rounded-lg border border-[var(--accent)]/20">
-                    <CheckCircle2 size={13} />
-                    Reading
-                  </span>
-                ) : item.available ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleJump(item.layer);
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
-                  >
-                    <span>Jump</span>
-                    {activeParaNum && <span className="font-mono font-normal opacity-80 text-[10px]">p.{activeParaNum}</span>}
-                    <ArrowUpRight size={12} />
-                  </button>
-                ) : (
-                  <span className="text-[10.5px] text-[var(--text-muted)] px-2 py-1">
-                    Unavailable
-                  </span>
-                )}
-              </div>
+          {jumpTargets.length === 0 ? (
+            <div className="py-6 text-center text-xs text-[var(--text-muted)]">
+              No other connected MAT books found.
             </div>
-          ))}
+          ) : (
+            jumpTargets.map((item) => (
+              <div
+                key={item.layer}
+                onClick={() => item.available && handleJump(item.layer)}
+                className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 select-none ${
+                  item.available
+                    ? 'border-[var(--border-color)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--bg-card)] cursor-pointer group'
+                    : 'border-[var(--border-color)]/50 bg-[var(--bg-secondary)]/40 opacity-45 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                      item.isCurrent
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : item.badgeColor
+                    }`}
+                  >
+                    <BookOpen size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
+                        {convertPaliScript(item.title, settings?.paliScript)}
+                      </span>
+                      <span
+                        className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${item.badgeColor}`}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                      {item.code} • {item.desc}
+                    </p>
+                  </div>
+                </div>
 
+                {/* Action Button / Badge */}
+                <div className="shrink-0">
+                  {item.isCurrent ? (
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 rounded-lg border border-[var(--accent)]/20">
+                      <CheckCircle2 size={13} />
+                      Reading
+                    </span>
+                  ) : item.available ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleJump(item.layer);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
+                    >
+                      <span>Jump</span>
+                      {activeParaNum && <span className="font-mono font-normal opacity-80 text-[10px]">p.{activeParaNum}</span>}
+                      <ArrowUpRight size={12} />
+                    </button>
+                  ) : (
+                    <span className="text-[10.5px] text-[var(--text-muted)] px-2 py-1">
+                      Unavailable
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
+
 
         {/* Footer info tip */}
         <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex items-center justify-between">

@@ -189,12 +189,73 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     result.set(chIdx, `${headerHtml}\n${paras.join('\n')}`);
   }
 
+  // Precompute paragraph range directly in backend
+  let paraMin = Infinity;
+  let paraMax = -Infinity;
+  let paraCount = 0;
+  for (const k of Object.keys(paraToChapter)) {
+    const n = parseInt(k, 10);
+    if (!isNaN(n)) {
+      if (n < paraMin) paraMin = n;
+      if (n > paraMax) paraMax = n;
+      paraCount++;
+    }
+  }
+  const paraRange =
+    paraCount === 0
+      ? { min: 1, max: 1, total: 0 }
+      : { min: paraMin, max: paraMax, total: paraCount };
+
+  // Precompute edition ranges directly in backend
+  const editionRanges = {};
+  for (const sys of ['V', 'P', 'T', 'M']) {
+    const pMap = pageToChapter[sys] || {};
+    const uniquePages = new Set();
+    let minNum = Infinity;
+    let maxNum = -Infinity;
+    for (const p of Object.keys(pMap)) {
+      let n = NaN;
+      if (p.includes('.')) {
+        const parts = p.split('.');
+        n = parseInt(parts[1], 10);
+      } else {
+        n = parseInt(p, 10);
+      }
+      if (!isNaN(n)) {
+        uniquePages.add(n);
+        if (n < minNum) minNum = n;
+        if (n > maxNum) maxNum = n;
+      }
+    }
+    if (uniquePages.size === 0) {
+      editionRanges[sys] = {
+        available: false,
+        count: 0,
+        minNum: 1,
+        maxNum: 1,
+        label: 'Unavailable',
+        hint: '1',
+      };
+    } else {
+      editionRanges[sys] = {
+        available: true,
+        count: uniquePages.size,
+        minNum,
+        maxNum,
+        label: `Page ${minNum} – ${maxNum}`,
+        hint: `e.g. ${minNum} to ${maxNum}`,
+      };
+    }
+  }
+
   return {
     chapterHtmls: result,
     paraToChapter,
     paraToIndex,
     pageToChapter,
     pageToPara,
+    paraRange,
+    editionRanges,
   };
 }
 
@@ -223,15 +284,17 @@ function getOrParseBook(cleanCode) {
       para_to_index: parsedData.paraToIndex,
       page_to_chapter: parsedData.pageToChapter,
       page_to_para: parsedData.pageToPara,
+      para_range: parsedData.paraRange,
+      edition_ranges: parsedData.editionRanges,
       mat: stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null,
     },
     chapterHtmls: parsedData.chapterHtmls,
   };
 
-
   bookParsedCache.set(cleanCode, parsed);
   return parsed;
 }
+
 
 
 // Clean top-level Tipiṭaka root if present
