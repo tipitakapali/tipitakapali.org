@@ -1,14 +1,22 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Book, X, History } from 'lucide-react';
+import { Book, X, History, Menu } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
 export default function BookTabsBar() {
-  const { openTabs, activeBookCode, switchTab, closeTab, recentHistory, setIsHistoryOpen } = useTabs();
-  const { settings } = useThemeSettings();
+  const {
+    openTabs,
+    activeBookCode,
+    switchTab,
+    closeTab,
+    recentHistory,
+    setIsHistoryOpen,
+    setIsSidebarOpen,
+  } = useTabs();
+  const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const tabsScrollRef = useRef(null);
 
   useEffect(() => {
@@ -27,8 +35,28 @@ export default function BookTabsBar() {
     }
   };
 
+  const handleOpenNavAndExitZen = () => {
+    setIsZenMode(false);
+    setIsSidebarOpen(true);
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('zen-mode');
+    }
+  };
+
   return (
     <div className="book-tabs-bar" onWheel={handleWheel}>
+      {/* Menu Icon before any tab when in Zen Mode */}
+      {isZenMode && (
+        <button
+          className="zen-menu-btn flex items-center justify-center h-[28px] px-2 mb-[3px] rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition shrink-0 cursor-pointer"
+          onClick={handleOpenNavAndExitZen}
+          title="Open Navigation & Menu (Exit Zen Mode)"
+          aria-label="Open Navigation & Menu"
+        >
+          <Menu size={16} />
+        </button>
+      )}
+
       <div className="tabs-scroll-container" ref={tabsScrollRef}>
         {openTabs.map((tab) => {
           const isActive = tab.bookCode === activeBookCode;

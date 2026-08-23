@@ -89,7 +89,7 @@ export default function ReaderView() {
     bookmarks,
   } = useTabs();
 
-  const { settings } = useThemeSettings();
+  const { settings, setIsZenMode } = useThemeSettings();
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -150,9 +150,13 @@ export default function ReaderView() {
       }
 
       if (paraNum) {
+        const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '');
         const el =
-          containerRef.current.querySelector(`#para-${paraNum}`) ||
-          containerRef.current.querySelector(`[data-para="${paraNum}"]`);
+          containerRef.current.querySelector(`#para${cleanPara}`) ||
+          containerRef.current.querySelector(`#para-${cleanPara}`) ||
+          containerRef.current.querySelector(`[data-para="${cleanPara}"]`) ||
+          containerRef.current.querySelector(`strong.paranum[id="para-${cleanPara}"]`) ||
+          containerRef.current.querySelector(`[id="${paraNum}"]`);
         if (el) {
           const rect = el.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
@@ -169,6 +173,7 @@ export default function ReaderView() {
           return;
         }
       }
+
 
       // 2. Target chapter
       if (chapterIdx !== undefined && chapterIdx !== null) {
@@ -231,6 +236,21 @@ export default function ReaderView() {
         }
       }
 
+      // Dynamic Zen / Normal mode on scroll:
+      // Scroll Up or Near Top -> Show Normal Mode (Header, Footer, Tabs)
+      // Scroll Down -> Show Zen Mode (maximize reading area)
+      if (top <= 35 || delta < -8) {
+        if (document.body.classList.contains('zen-mode')) {
+          document.body.classList.remove('zen-mode');
+          setIsZenMode(false);
+        }
+      } else if (top > 60 && delta > 8) {
+        if (!document.body.classList.contains('zen-mode')) {
+          document.body.classList.add('zen-mode');
+          setIsZenMode(true);
+        }
+      }
+
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -240,8 +260,9 @@ export default function ReaderView() {
         }
       }, 100);
     },
-    [activeTab, saveTabScroll]
+    [activeTab, saveTabScroll, setIsZenMode]
   );
+
 
   const handleBreadcrumbClick = () => {
     document.body.classList.remove('zen-mode');

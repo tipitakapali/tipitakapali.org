@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { fetchBook, fetchChapter } from '../services/api';
+import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
 
@@ -14,6 +15,8 @@ const STORAGE_KEYS = {
 };
 
 export function TabProvider({ children }) {
+  const { setIsZenMode } = useThemeSettings();
+
   const [openTabs, setOpenTabs] = useState([]);
   const [activeBookCode, setActiveBookCode] = useState(null);
   const [loadingBook, setLoadingBook] = useState(false);
@@ -259,17 +262,43 @@ export function TabProvider({ children }) {
   const openBook = useCallback(
     async (bookCode, options = {}) => {
       if (!bookCode) return;
-      const cleanCode = bookCode.replace('.xml', '');
-      const hasTargetChapter = options.targetChapterIdx !== undefined && options.targetChapterIdx !== null;
-      const targetChapIdx = hasTargetChapter ? options.targetChapterIdx : 0;
+      let cleanCode = bookCode.replace('.xml', '');
+      let hasTargetChapter = options.targetChapterIdx !== undefined && options.targetChapterIdx !== null;
+      let targetChapIdx = hasTargetChapter ? options.targetChapterIdx : 0;
+
+      // Handle chapter suffix in code (e.g. s0201m.mul1 -> s0201m.mul, chapter_index 1)
+      const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) {
+        cleanCode = chapSuffixMatch[1];
+        if (!hasTargetChapter) {
+          targetChapIdx = parseInt(chapSuffixMatch[2], 10);
+          hasTargetChapter = true;
+        }
+      }
+
+      const rawParaNum = options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '') : null;
 
       const currentTabs = openTabsRef.current;
       const existingTabIndex = currentTabs.findIndex((t) => t.bookCode === cleanCode);
+
+      if (options.zenMode !== false) {
+        setIsZenMode(true);
+        setIsSidebarOpen(false);
+        if (typeof document !== 'undefined') {
+          document.body.classList.add('zen-mode');
+        }
+      }
 
       if (existingTabIndex !== -1) {
         setActiveBookCode(cleanCode);
 
         const tab = currentTabs[existingTabIndex];
+
+        if (rawParaNum && tab.para_to_chapter && tab.para_to_chapter[rawParaNum] !== undefined) {
+          targetChapIdx = tab.para_to_chapter[rawParaNum];
+          hasTargetChapter = true;
+        }
+
         if (hasTargetChapter) {
           setOpenTabs((prev) => {
             const next = prev.map((t) =>
@@ -285,11 +314,11 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || options.targetParaNum) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
-            paraNum: options.targetParaNum,
+            paraNum: rawParaNum,
             highlightQuery: options.highlightQuery,
             timestamp: Date.now(),
           });
@@ -317,10 +346,23 @@ export function TabProvider({ children }) {
 
       setLoadingBook(true);
       try {
+        // First resolve chapter if targetParaNum is provided and we can pre-check or load metadata
         const bookData = await fetchBook(cleanCode, {
           chapter: targetChapIdx,
           buffer: 1,
         });
+
+        if (rawParaNum && bookData.para_to_chapter && bookData.para_to_chapter[rawParaNum] !== undefined) {
+          const resolvedChap = bookData.para_to_chapter[rawParaNum];
+          if (resolvedChap !== targetChapIdx) {
+            targetChapIdx = resolvedChap;
+            hasTargetChapter = true;
+            if (!bookData.chapters_data?.[targetChapIdx]) {
+              const chapData = await fetchBook(cleanCode, { chapter: targetChapIdx, buffer: 1 });
+              Object.assign(bookData.chapters_data, chapData.chapters_data);
+            }
+          }
+        }
 
         const newTab = {
           bookCode: bookData.code,
@@ -330,6 +372,8 @@ export function TabProvider({ children }) {
           chapter_count: bookData.chapter_count,
           chapters: bookData.chapters || [],
           toc: bookData.toc || [],
+          para_to_chapter: bookData.para_to_chapter || {},
+          para_to_index: bookData.para_to_index || {},
           loadedChapters: { ...bookData.chapters_data },
           loadingChapters: {},
           currentChapterIdx: targetChapIdx,
@@ -343,11 +387,11 @@ export function TabProvider({ children }) {
         });
         setActiveBookCode(cleanCode);
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || options.targetParaNum) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
-            paraNum: options.targetParaNum,
+            paraNum: rawParaNum,
             highlightQuery: options.highlightQuery,
             timestamp: Date.now(),
           });
@@ -362,6 +406,8 @@ export function TabProvider({ children }) {
 
         updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1 });
         bufferAdjacentChapters(cleanCode, targetChapIdx);
+
+
 
         addToHistory({
           bookCode: cleanCode,
@@ -438,7 +484,13 @@ export function TabProvider({ children }) {
             setTreeSelectedNode(null);
             updateUrlParams({ book: null, chapter: null });
             persistTabs([], null);
+            setIsZenMode(false);
+            setIsSidebarOpen(true);
+            if (typeof document !== 'undefined') {
+              document.body.classList.remove('zen-mode');
+            }
           }
+
         } else {
           persistTabs(newTabs, activeBookCodeRef.current);
         }

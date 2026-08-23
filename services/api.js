@@ -44,9 +44,19 @@ export async function fetchBooks() {
 }
 
 export async function fetchBook(bookCode, options = {}) {
-  const cleanCode = bookCode.replace('.xml', '');
+  let cleanCode = bookCode.replace('.xml', '');
+  let resolvedChapter = options.chapter;
+
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) {
+    cleanCode = chapSuffixMatch[1];
+    if (resolvedChapter === undefined) {
+      resolvedChapter = parseInt(chapSuffixMatch[2], 10);
+    }
+  }
+
   const params = new URLSearchParams();
-  if (options.chapter !== undefined) params.set('chapter', options.chapter);
+  if (resolvedChapter !== undefined) params.set('chapter', resolvedChapter);
   if (options.buffer !== undefined) params.set('buffer', options.buffer);
   if (options.full) params.set('full', 'true');
 
@@ -61,7 +71,9 @@ export async function fetchBook(bookCode, options = {}) {
 }
 
 export async function fetchChapter(bookCode, chapterIndex) {
-  const cleanCode = bookCode.replace('.xml', '');
+  let cleanCode = bookCode.replace('.xml', '');
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
   const cacheKey = `chapter_${cleanCode}_${chapterIndex}`;
 
   return cachedFetch(cacheKey, async () => {
@@ -70,6 +82,7 @@ export async function fetchChapter(bookCode, chapterIndex) {
     return res.json();
   }, 30 * 60 * 1000);
 }
+
 
 export async function fetchToc(bookCode) {
   const cleanCode = bookCode.replace('.xml', '');

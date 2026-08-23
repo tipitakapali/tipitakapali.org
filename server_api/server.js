@@ -264,17 +264,30 @@ async function main() {
   fastify.get('/api/book/:code', async (req, reply) => {
     reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     const rawCode = req.params.code;
-    const cleanCode = rawCode.replace('.xml', '');
+    let cleanCode = rawCode.replace('.xml', '');
+    let resolvedChapFromCode = undefined;
 
-    const parsed = getOrParseBook(cleanCode);
+    let parsed = getOrParseBook(cleanCode);
+    if (!parsed) {
+      const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) {
+        cleanCode = chapSuffixMatch[1];
+        resolvedChapFromCode = parseInt(chapSuffixMatch[2], 10);
+        parsed = getOrParseBook(cleanCode);
+      }
+    }
+
     if (!parsed) {
       reply.code(404);
       return { error: `Book '${cleanCode}' not found` };
     }
 
     const isFullRequested = req.query.full === 'true';
-    const reqChap = req.query.chapter !== undefined ? parseInt(req.query.chapter, 10) : 0;
+    const reqChap = req.query.chapter !== undefined
+      ? parseInt(req.query.chapter, 10)
+      : (resolvedChapFromCode !== undefined ? resolvedChapFromCode : 0);
     const bufferCount = req.query.buffer !== undefined ? parseInt(req.query.buffer, 10) : 1;
+
 
     const chaptersData = {};
     const totalChaps = parsed.metadata.chapters.length;

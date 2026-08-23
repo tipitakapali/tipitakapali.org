@@ -8,13 +8,12 @@ import ReaderView from '../components/Reader/ReaderView';
 import Footer from '../components/Footer';
 import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
-import FloatingMenuBtn from '../components/FloatingMenuBtn';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
 export function MainAppContent({ params }) {
-  const { openBook, openSearchModal, activeTab } = useTabs();
+  const { openBook, openSearchModal, activeTab, activeBookCode } = useTabs();
   const { settings } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
@@ -54,6 +53,25 @@ export function MainAppContent({ params }) {
     settings?.paliScript,
   ]);
 
+  // Listen for dynamic hash navigation (e.g. user changes URL hash or clicks an anchor link)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
+      if (!hash) return;
+      const numMatch = hash.match(/^(?:para-?|p)?(\d+)$/i);
+      if (numMatch && activeBookCode) {
+        openBook(activeBookCode, { targetParaNum: numMatch[1] });
+      } else if (hash.startsWith('pindex-') && activeBookCode) {
+        const pindex = parseInt(hash.replace('pindex-', ''), 10);
+        if (!isNaN(pindex)) {
+          openBook(activeBookCode, { targetParaIndex: pindex });
+        }
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [activeBookCode, openBook]);
+
   // Read URL search parameters and route params strictly once on initial mount
   useEffect(() => {
     if (hasInitializedRef.current) return;
@@ -63,14 +81,51 @@ export function MainAppContent({ params }) {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q') || urlParams.get('search');
 
-    // Check pathname: e.g. /book/s0505m.mul or /book/s0505m.mul/2
+    // Check pathname: e.g. /book/s0505m.mul, /book/s0201m.mul/2, /chapter/s0201m.mul1, /chapter/s0201m.mul/2
     const pathname = window.location.pathname;
     let pathBook = null;
     let pathChapter = null;
-    if (pathname.startsWith('/book/')) {
-      const parts = pathname.replace(/^\/book\//, '').split('/');
+
+    if (pathname.startsWith('/book/') || pathname.startsWith('/chapter/')) {
+      const rawPath = pathname.replace(/^\/(?:book|chapter)\//, '');
+      const parts = rawPath.split('/');
       if (parts[0]) pathBook = decodeURIComponent(parts[0]);
       if (parts[1]) pathChapter = decodeURIComponent(parts[1]);
+
+      if (pathBook) {
+        const chapSuffixMatch = pathBook.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+        if (chapSuffixMatch) {
+          pathBook = chapSuffixMatch[1];
+          if (pathChapter === null || pathChapter === undefined) {
+            // Suffix 0 -> index 0 (ch 1), Suffix 1 -> index 1 (ch 2), etc.
+            pathChapter = parseInt(chapSuffixMatch[2], 10) + 1;
+          }
+        }
+      }
+    }
+
+    if (params?.slug?.[0]) {
+      const slug0 = decodeURIComponent(params.slug[0]);
+      const chapSuffixMatch = slug0.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) {
+        if (!pathBook) pathBook = chapSuffixMatch[1];
+        if (pathChapter === null || pathChapter === undefined) {
+          pathChapter = parseInt(chapSuffixMatch[2], 10) + 1;
+        }
+      }
+    }
+
+    // Extract hash e.g. #para57, #para-57, #57, #pindex-134
+    const hash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
+    let hashParaNum = null;
+    let hashParaIndex = null;
+    if (hash) {
+      const numMatch = hash.match(/^(?:para-?|p)?(\d+)$/i);
+      if (numMatch) {
+        hashParaNum = numMatch[1];
+      } else if (hash.startsWith('pindex-')) {
+        hashParaIndex = parseInt(hash.replace('pindex-', ''), 10);
+      }
     }
 
     const bookParam =
@@ -86,13 +141,20 @@ export function MainAppContent({ params }) {
       urlParams.get('chapter') ||
       urlParams.get('c');
 
-    const paraParam = urlParams.get('para') || urlParams.get('p') || urlParams.get('pindex');
+    const explicitParaNum =
+      hashParaNum ||
+      urlParams.get('para') ||
+      urlParams.get('p') ||
+      urlParams.get('paranum');
+
+    const explicitParaIndex =
+      hashParaIndex ||
+      (urlParams.get('pindex') ? parseInt(urlParams.get('pindex'), 10) : undefined);
 
     if (query) {
       openSearchModal(query);
     } else if (bookParam) {
-      // 1-based index in URL (chapter=1 -> internal index 0)
-      let targetChapterIdx = 0;
+      let targetChapterIdx = undefined;
       if (chapterParam !== null && chapterParam !== undefined) {
         const parsed = parseInt(chapterParam, 10);
         targetChapterIdx = Math.max(0, parsed > 0 ? parsed - 1 : 0);
@@ -100,9 +162,12 @@ export function MainAppContent({ params }) {
 
       openBook(bookParam, {
         targetChapterIdx,
-        targetParaIndex: paraParam ? parseInt(paraParam, 10) : undefined,
+        targetParaNum: explicitParaNum,
+        targetParaIndex: explicitParaIndex,
       });
     }
+
+
   }, [openBook, openSearchModal, params]);
 
   return (
@@ -116,8 +181,8 @@ export function MainAppContent({ params }) {
       <Footer />
       <SearchModal />
       <SettingsModal />
-      <FloatingMenuBtn />
     </div>
+
   );
 }
 
