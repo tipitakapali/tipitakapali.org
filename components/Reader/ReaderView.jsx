@@ -132,6 +132,25 @@ export default function ReaderView() {
 
     let timerId = null;
 
+    // Safe DOM element finder by ID or data attributes (prevents selector SyntaxError on IDs with dots e.g. V3.0440)
+    const findElement = (id, fallbackSelector = '') => {
+      if (!containerRef.current) return null;
+      if (id) {
+        const byId = document.getElementById(id);
+        if (byId && containerRef.current.contains(byId)) return byId;
+        try {
+          const escaped = containerRef.current.querySelector(`[id="${CSS.escape(id)}"]`);
+          if (escaped) return escaped;
+        } catch (_) {}
+      }
+      if (fallbackSelector) {
+        try {
+          return containerRef.current.querySelector(fallbackSelector);
+        } catch (_) {}
+      }
+      return null;
+    };
+
     const attemptScroll = () => {
       if (!containerRef.current) return;
 
@@ -141,7 +160,7 @@ export default function ReaderView() {
         const ed = String(pageSystem).toUpperCase();
         let pbEl = null;
 
-        // Try direct ID lookup first (e.g. V0.0023, P3.0045, V1.0023)
+        // Direct ID lookup (e.g. V0.0023, P3.0045, V3.0440, V1.0023)
         if (cleanP.includes('.')) {
           const parts = cleanP.split('.');
           const vol = parseInt(parts[0], 10);
@@ -149,9 +168,10 @@ export default function ReaderView() {
           if (!isNaN(vol) && !isNaN(num)) {
             const padded = `${vol}.${String(num).padStart(4, '0')}`;
             pbEl =
-              containerRef.current.querySelector(`#${ed}${padded}`) ||
-              containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${padded}"]`) ||
-              containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+              findElement(`${ed}${padded}`) ||
+              findElement(`${ed}${cleanP}`) ||
+              findElement(null, `[data-ed="${ed}"][data-page="${padded}"]`) ||
+              findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
           }
         } else {
           const num = parseInt(cleanP, 10);
@@ -160,13 +180,13 @@ export default function ReaderView() {
             const knownAnchor =
               activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
             if (knownAnchor) {
-              pbEl = containerRef.current.querySelector(`#${knownAnchor}`);
+              pbEl = findElement(knownAnchor);
             }
             if (!pbEl) {
               pbEl =
-                containerRef.current.querySelector(`[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
-                containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
-                containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+                findElement(null, `[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
             }
           }
         }
@@ -200,9 +220,9 @@ export default function ReaderView() {
       // 2. Target paragraph by index
       if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
         const el =
-          containerRef.current.querySelector(`p[data-pindex="${paraIndex}"]`) ||
-          containerRef.current.querySelector(`#pindex-${paraIndex}`) ||
-          containerRef.current.querySelector(`[data-pindex="${paraIndex}"]`);
+          findElement(`pindex-${paraIndex}`) ||
+          findElement(null, `p[data-pindex="${paraIndex}"]`) ||
+          findElement(null, `[data-pindex="${paraIndex}"]`);
         if (el) {
           const targetEl =
             el.getClientRects().length > 0
@@ -234,12 +254,11 @@ export default function ReaderView() {
         const targetInt = parseInt(cleanPara, 10);
 
         let el =
-          containerRef.current.querySelector(`p#para${cleanPara}`) ||
-          containerRef.current.querySelector(`p[data-para="${cleanPara}"]`) ||
-          containerRef.current.querySelector(`#para${cleanPara}`) ||
-          containerRef.current.querySelector(`#para-${cleanPara}`) ||
-          containerRef.current.querySelector(`[data-para="${cleanPara}"]`) ||
-          containerRef.current.querySelector(`[id="${paraNum}"]`);
+          findElement(`para${cleanPara}`) ||
+          findElement(`para-${cleanPara}`) ||
+          findElement(cleanPara) ||
+          findElement(null, `p[data-para="${cleanPara}"]`) ||
+          findElement(null, `[data-para="${cleanPara}"]`);
 
         // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
         if (!el && !isNaN(targetInt)) {
@@ -296,6 +315,7 @@ export default function ReaderView() {
           return;
         }
       }
+
 
 
 
