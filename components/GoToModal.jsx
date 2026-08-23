@@ -369,7 +369,7 @@ export default function GoToModal({ isOpen, onClose }) {
               {/* Quick Paragraph Chips */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                  <span>Quick Jump:</span>
+                  <span>Quick Select:</span>
                   <span>{paraRange.total} total paras</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -404,7 +404,7 @@ export default function GoToModal({ isOpen, onClose }) {
                 type="submit"
                 className="w-full py-2.5 px-4 rounded-lg bg-[var(--accent)] text-white font-semibold text-xs flex items-center justify-center gap-2 hover:opacity-90 shadow-sm transition cursor-pointer"
               >
-                <span>Jump to Paragraph</span>
+                <span>Go to Paragraph</span>
                 <CornerDownLeft size={14} />
               </button>
             </form>
@@ -480,7 +480,7 @@ export default function GoToModal({ isOpen, onClose }) {
               {quickPageChips.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                    <span>Quick Page:</span>
+                    <span>Quick Select:</span>
                     <span>{currentEdRange.count} page breaks</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -517,7 +517,7 @@ export default function GoToModal({ isOpen, onClose }) {
                 disabled={!currentEdRange.available}
                 className="w-full py-2.5 px-4 rounded-lg bg-[var(--accent)] text-white font-semibold text-xs flex items-center justify-center gap-2 hover:opacity-90 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                <span>Jump to Page</span>
+                <span>Go to Page</span>
                 <CornerDownLeft size={14} />
               </button>
             </form>
@@ -526,7 +526,7 @@ export default function GoToModal({ isOpen, onClose }) {
 
         {/* Footer info tip */}
         <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex items-center justify-between">
-          <span>Press Enter to jump immediately</span>
+          <span>Press Enter to navigate immediately</span>
           <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono text-[9px]">
             Enter
           </kbd>

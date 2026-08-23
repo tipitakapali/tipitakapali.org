@@ -152,7 +152,7 @@ export default function BookTocModal({ isOpen, onClose }) {
               const isCurrentReading = originalIdx === activeTocIdx;
               const level = item.level;
 
-              // Clean typographic hierarchy without card boxes
+              // Clear, distinct indentation & typographic hierarchy
               let itemClass =
                 'w-full text-left py-1.5 px-2.5 rounded-md cursor-pointer transition flex items-center justify-between group ';
               let titleClass = 'truncate leading-snug ';
@@ -160,28 +160,28 @@ export default function BookTocModal({ isOpen, onClose }) {
 
               if (level === 0) {
                 // Book / Root Division
-                indentClass = 'pl-1';
-                titleClass += 'font-bold text-[13px] text-[var(--text-primary)]';
-                itemClass += 'hover:bg-[var(--accent-light)]/30 border-b border-[var(--border-color)]/30 mb-0.5 pb-1 ';
+                indentClass = 'pl-2.5';
+                titleClass += 'font-bold text-[13px] text-[var(--text-primary)] tracking-wide';
+                itemClass += 'bg-[var(--bg-secondary)]/50 hover:bg-[var(--bg-secondary)] mt-2 first:mt-0 py-2 border-y border-[var(--border-color)]/30 ';
               } else if (level === 1) {
                 // Chapter / Major Division / Sutta
-                indentClass = 'pl-3.5';
+                indentClass = 'pl-7';
                 titleClass += 'font-semibold text-[12.5px] text-[var(--accent)]';
-                itemClass += 'hover:bg-[var(--accent-light)]/40 ';
+                itemClass += 'hover:bg-[var(--accent-light)]/30 mt-0.5 ';
               } else if (level === 2) {
-                // Sutta / Section
-                indentClass = 'pl-6';
+                // Sutta / Section / Subhead
+                indentClass = 'pl-12';
                 titleClass += 'font-normal text-[12px] text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               } else {
                 // Subhead / Subsection
-                indentClass = 'pl-9';
+                indentClass = 'pl-16';
                 titleClass += 'text-[11.5px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               }
 
               if (isCurrentReading) {
-                itemClass += 'bg-[var(--accent-light)] text-[var(--accent)] font-semibold border-l-2 border-[var(--accent)] ';
+                itemClass += 'bg-[var(--accent-light)]! text-[var(--accent)]! font-semibold! border-l-[3px] border-l-[var(--accent)] ';
               }
 
               return (
@@ -191,15 +191,15 @@ export default function BookTocModal({ isOpen, onClose }) {
                   onClick={() => handleSelectTocItem(item)}
                   className={`${itemClass} ${indentClass}`}
                 >
-                  <div className="flex items-center gap-2 overflow-hidden mr-2">
+                  <div className="flex items-center gap-2.5 overflow-hidden mr-2">
                     {level === 0 ? (
-                      <BookOpen size={13} className="text-[var(--accent)] shrink-0" />
+                      <BookOpen size={14} className="text-[var(--accent)] shrink-0" />
                     ) : level === 1 ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0 shadow-xs" />
                     ) : level === 2 ? (
-                      <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">§</span>
+                      <span className="w-1.5 h-1.5 rotate-45 rounded-[1px] bg-[var(--text-muted)] shrink-0 opacity-75" />
                     ) : (
-                      <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]/50 shrink-0" />
+                      <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]/60 shrink-0" />
                     )}
                     <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
                   </div>
