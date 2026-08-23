@@ -592,7 +592,25 @@ export function TabProvider({ children }) {
     [updateUrlParams, persistTabs, setActiveParaNum]
   );
 
+  const reorderTabs = useCallback(
+    (fromIndex, toIndex) => {
+      if (fromIndex === toIndex || fromIndex === null || toIndex === null) return;
+      setOpenTabs((prev) => {
+        if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
+          return prev;
+        }
+        const next = [...prev];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        persistTabs(next, activeBookCodeRef.current);
+        return next;
+      });
+    },
+    [persistTabs]
+  );
+
   const setChapterForActiveTab = useCallback(
+
     (chapterIdx) => {
       const activeCode = activeBookCodeRef.current;
       if (!activeCode) return;
@@ -850,7 +868,9 @@ export function TabProvider({ children }) {
         bufferAdjacentChapters,
         switchTab,
         closeTab,
+        reorderTabs,
         setChapterForActiveTab,
+
         saveTabScroll,
         getSavedScroll,
         clearTargetScrollIntent,

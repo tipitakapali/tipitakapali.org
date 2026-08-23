@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Book, X, History, Menu } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
+
+
+
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
@@ -12,12 +15,17 @@ export default function BookTabsBar() {
     activeBookCode,
     switchTab,
     closeTab,
+    reorderTabs,
     recentHistory,
     setIsHistoryOpen,
     setIsSidebarOpen,
   } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
+
   const tabsScrollRef = useRef(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null); // 'left' | 'right'
 
   useEffect(() => {
     if (tabsScrollRef.current) {
@@ -43,8 +51,66 @@ export default function BookTabsBar() {
     }
   };
 
+  // Drag and Drop handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    if (draggedIndex === null || draggedIndex === index) {
+      if (dragOverIndex !== null) {
+        setDragOverIndex(null);
+        setDropPosition(null);
+      }
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const pos = e.clientX < midX ? 'left' : 'right';
+
+    if (dragOverIndex !== index || dropPosition !== pos) {
+      setDragOverIndex(index);
+      setDropPosition(pos);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    if (e.currentTarget && !e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverIndex(null);
+      setDropPosition(null);
+    }
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== targetIndex) {
+      let finalIndex = targetIndex;
+      if (dropPosition === 'right' && draggedIndex < targetIndex) {
+        finalIndex = targetIndex;
+      } else if (dropPosition === 'left' && draggedIndex > targetIndex) {
+        finalIndex = targetIndex;
+      }
+      reorderTabs(draggedIndex, finalIndex);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+  };
+
   return (
-    <div className="book-tabs-bar" onWheel={handleWheel}>
+    <div className="book-tabs-bar select-none" onWheel={handleWheel}>
       {/* Menu Icon before any tab when in Zen Mode */}
       {isZenMode && (
         <button
@@ -55,17 +121,33 @@ export default function BookTabsBar() {
         >
           <Menu size={16} />
         </button>
+
+
+
       )}
 
       <div className="tabs-scroll-container" ref={tabsScrollRef}>
-        {openTabs.map((tab) => {
+        {openTabs.map((tab, idx) => {
           const isActive = tab.bookCode === activeBookCode;
+          const isDragging = draggedIndex === idx;
+          const isOver = dragOverIndex === idx;
           const displayTitle = convertPaliScript(tab.title, settings?.paliScript);
+
           return (
             <div
               key={tab.bookCode}
-              className={`book-tab ${isActive ? 'active' : ''}`}
-              title={`${displayTitle} (${tab.bookCode})`}
+              draggable={true}
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, idx)}
+              onDragEnd={handleDragEnd}
+              className={`book-tab group cursor-grab active:cursor-grabbing ${isActive ? 'active' : ''} ${
+                isDragging ? 'is-dragging' : ''
+              } ${isOver && dropPosition === 'left' ? 'drag-over-left' : ''} ${
+                isOver && dropPosition === 'right' ? 'drag-over-right' : ''
+              }`}
+              title={`${displayTitle} (${tab.bookCode}) — Drag to reorder`}
               onClick={() => switchTab(tab.bookCode)}
               onAuxClick={(e) => {
                 if (e.button === 1) {
@@ -79,7 +161,11 @@ export default function BookTabsBar() {
               <button
                 className="tab-close-btn"
                 title="Close tab (Middle click)"
-                onClick={(e) => closeTab(tab.bookCode, e)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(tab.bookCode, e);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
               >
                 <X size={12} />
               </button>
@@ -104,4 +190,3 @@ export default function BookTabsBar() {
     </div>
   );
 }
-

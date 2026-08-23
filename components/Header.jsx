@@ -34,12 +34,15 @@ export default function Header() {
       {/* Brand & Menu */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         <button
-          className="p-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition"
+          className="p-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
           onClick={toggleSidebar}
           title="Toggle Navigation Tree (Ctrl+B)"
         >
           <Menu size={19} />
         </button>
+
+
+
         <a href="/" className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-90 transition">
           <span>TipitakaPali.org</span>
         </a>

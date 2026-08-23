@@ -92,6 +92,8 @@
   --tab-inactive-bg: #0d0d0d;
 }
 
+
+
 /* Custom Accent Colors */
 [data-accent="saffron"] {
   --accent: #b26a00;
@@ -225,6 +227,37 @@ body.no-indent .reader-container .bodytext { text-indent: 0 !important; }
   margin-bottom: -1px;
   z-index: 2;
 }
+
+.book-tab.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.96);
+  border: 1px dashed var(--accent) !important;
+}
+
+.book-tab.drag-over-left::before {
+  content: '';
+  position: absolute;
+  left: -2.5px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+.book-tab.drag-over-right::after {
+  content: '';
+  position: absolute;
+  right: -2.5px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
 
 .book-tab .tab-close-btn {
   width: 16px;
@@ -573,6 +606,8 @@ aside.app-sidebar.collapsed {
   border-left: 1.5px solid var(--tree-line);
   display: block;
 }
+
+
 
 /* Content Area */
 main.content-area {

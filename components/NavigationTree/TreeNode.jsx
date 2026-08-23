@@ -1,7 +1,7 @@
 'use client';
 
 import React, { memo, useMemo } from 'react';
-import { ChevronRight, Book, FileText, Folder, Landmark, Library } from 'lucide-react';
+import { ChevronRight, Book, FileText, Folder, FolderTree, Library } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
@@ -111,12 +111,13 @@ const TreeNode = memo(function TreeNode({
 
   const renderIcon = () => {
     if (depth === 0) return <Library size={15} className="tree-icon-cat" />;
-    if (depth === 1) return <Landmark size={14} className="tree-icon-pitaka" />;
+    if (depth === 1) return <FolderTree size={14} className="tree-icon-pitaka" />;
     if (isBookNode) return <Book size={13} className="tree-icon-book" />;
     if (isChapterNode) return <FileText size={12} className="tree-icon-chapter" />;
     if (hasChildren) return <Folder size={13} className="tree-icon-folder" />;
     return <FileText size={13} className="tree-icon-leaf" />;
   };
+
 
   return (
     <div
@@ -160,6 +161,8 @@ const TreeNode = memo(function TreeNode({
           ))}
         </div>
       )}
+
+
     </div>
   );
 });
