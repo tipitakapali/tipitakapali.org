@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Book, X, Plus } from 'lucide-react';
+import { Book, X, History } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
 export default function BookTabsBar() {
-  const { openTabs, activeBookCode, switchTab, closeTab } = useTabs();
+  const { openTabs, activeBookCode, switchTab, closeTab, recentHistory, setIsHistoryOpen } = useTabs();
   const { settings } = useThemeSettings();
   const tabsScrollRef = useRef(null);
 
@@ -24,13 +24,6 @@ export default function BookTabsBar() {
     if (tabsScrollRef.current && e.deltaY !== 0) {
       e.preventDefault();
       tabsScrollRef.current.scrollLeft += e.deltaY;
-    }
-  };
-
-  const handleNewTab = () => {
-    const treeInput = document.getElementById('treeFilterInput');
-    if (treeInput) {
-      treeInput.focus();
     }
   };
 
@@ -67,10 +60,20 @@ export default function BookTabsBar() {
         })}
       </div>
 
-      <button className="new-tab-btn" onClick={handleNewTab} title="Explore library & open books">
-        <Plus size={13} />
-        <span>Open Book</span>
+      <button
+        className="new-tab-btn flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer shrink-0"
+        onClick={() => setIsHistoryOpen(true)}
+        title="Recent Reading History"
+      >
+        <History size={13} className="text-[var(--accent)]" />
+        <span>History</span>
+        {recentHistory.length > 0 && (
+          <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-secondary)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
+            {recentHistory.length}
+          </span>
+        )}
       </button>
     </div>
   );
 }
+

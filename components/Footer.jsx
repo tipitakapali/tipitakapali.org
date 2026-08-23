@@ -22,14 +22,15 @@ export default function Footer() {
     activeTab,
     setChapterForActiveTab,
     bookmarks,
-    recentHistory,
+    isHistoryOpen,
+    setIsHistoryOpen,
+    isBookmarkOpen,
+    setIsBookmarkOpen,
   } = useTabs();
   const { settings, updateSetting } = useThemeSettings();
 
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
-  const [isBookmarkOpen, setIsBookmarkOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const totalChaps = activeTab?.chapters?.length || 1;
   const currentChapIdx = activeTab?.currentChapterIdx || 0;
@@ -97,7 +98,7 @@ export default function Footer() {
           </button>
         </div>
 
-        {/* Right: Dictionary, Bookmarks, Book TOC, Recent History */}
+        {/* Right: Dictionary, Bookmarks, Book TOC */}
         <div className="footer-right flex items-center gap-0.5 sm:gap-1.5 shrink-0">
           {/* Dictionary */}
           <button
@@ -140,21 +141,6 @@ export default function Footer() {
             )}
             <ChevronUp size={11} className="text-[var(--text-muted)] hidden sm:inline" />
           </button>
-
-          {/* Recent Reading History */}
-          <button
-            className="footer-nav-btn p-1 sm:px-2 sm:py-1"
-            onClick={() => setIsHistoryOpen(true)}
-            title="Recent Reading History"
-          >
-            <History size={14} className="text-[var(--text-secondary)]" />
-            <span className="hidden md:inline">History</span>
-            {recentHistory.length > 0 && (
-              <span className="hidden sm:inline text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-card)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
-                {recentHistory.length}
-              </span>
-            )}
-          </button>
         </div>
       </footer>
 
@@ -166,3 +152,4 @@ export default function Footer() {
     </>
   );
 }
+

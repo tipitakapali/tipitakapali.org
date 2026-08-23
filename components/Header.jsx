@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Menu, Search, Settings, BookOpen } from 'lucide-react';
+import { Menu, Search, Settings } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
@@ -40,9 +40,8 @@ export default function Header() {
         >
           <Menu size={19} />
         </button>
-        <a href="/" className="flex items-center gap-1.5 font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight">
-          <BookOpen size={18} className="shrink-0" />
-          <span>Tipiṭaka</span>
+        <a href="/" className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-90 transition">
+          <span>TipitakaPali.org</span>
         </a>
       </div>
 

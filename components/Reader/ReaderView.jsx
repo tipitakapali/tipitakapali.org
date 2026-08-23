@@ -277,7 +277,11 @@ export default function ReaderView() {
   };
 
   if (!activeTab) {
-    return <WelcomeView />;
+    return (
+      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
+        <WelcomeView />
+      </main>
+    );
   }
 
   const currentChap = activeTab.chapters?.[activeTab.currentChapterIdx || 0];
