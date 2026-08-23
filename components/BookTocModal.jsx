@@ -91,11 +91,11 @@ export default function BookTocModal({ isOpen, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:justify-start sm:pl-4 sm:pb-12 bg-black/45 backdrop-blur-xs animate-fade-in text-[var(--text-primary)]"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-[var(--text-primary)]"
       onClick={onClose}
     >
       <div
-        className="w-full sm:w-[460px] h-[85vh] sm:h-auto sm:max-h-[620px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-lg h-[85vh] sm:h-auto sm:max-h-[640px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

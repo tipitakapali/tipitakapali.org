@@ -983,12 +983,12 @@ mark.search-hit {
 
 /* Bottom Footer */
 footer.app-footer {
-  height: var(--footer-height);
+  height: 48px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center !important;
   padding: 0 16px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   font-size: 12px;
@@ -1001,21 +1001,12 @@ footer.app-footer {
   box-sizing: border-box;
 }
 
-.footer-left {
+.footer-nav-group {
   display: flex;
   align-items: center;
+  justify-content: center;
+  margin: 0 auto;
   gap: 8px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  flex-shrink: 0;
-}
-
-.footer-center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 .footer-nav-btn {

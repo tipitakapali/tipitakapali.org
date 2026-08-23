@@ -39,7 +39,7 @@ export default function Footer() {
   return (
     <>
       <footer className="app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border">
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2.5">
+        <div className="footer-nav-group mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5">
           {/* Font-Size Stepper */}
           <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md overflow-hidden text-xs shadow-xs shrink-0">
             <button
