@@ -1,0 +1,22 @@
+{
+  "name": "tipitaka-server-api",
+  "version": "1.0.0",
+  "description": "High-performance Node.js Fastify API server with built-in native SQLite engine for Tipiṭaka Roman Latin database",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "pm2:start": "npx pm2 start ecosystem.config.js",
+    "pm2:stop": "npx pm2 stop ecosystem.config.js",
+    "pm2:restart": "npx pm2 restart ecosystem.config.js",
+    "pm2:logs": "npx pm2 logs tipitaka-api",
+    "pm2:status": "npx pm2 status"
+  },
+  "dependencies": {
+    "@fastify/compress": "^7.0.3",
+    "@fastify/cors": "^9.0.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^4.28.1",
+    "pm2": "^5.4.3"
+  }
+}

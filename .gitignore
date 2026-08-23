@@ -1,5 +1,5 @@
-.db
-.zip
+*.db
+*.zip
 
 
 # Logs
