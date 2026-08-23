@@ -156,11 +156,12 @@ body.zen-mode .app-footer {
 }
 
 /* Display Toggles */
-body.hide-pb .reader-container span.pb { display: none !important; }
-body.hide-paranum .reader-container strong.paranum { display: none !important; }
-body.hide-footnotes .reader-container span.note { display: none !important; }
+body.hide-pb span.pb, body.hide-pb .pb { display: none !important; }
+body.hide-paranum strong.paranum, body.hide-paranum .paranum { display: none !important; }
+body.hide-footnotes span.note, body.hide-footnotes .note { display: none !important; }
 body.hide-chap-heading .reader-container .chapter-divider { display: none !important; }
 body.no-indent .reader-container .bodytext { text-indent: 0 !important; }
+
 
 /* Tabs Bar */
 .book-tabs-bar {

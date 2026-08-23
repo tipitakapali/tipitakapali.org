@@ -341,8 +341,8 @@ export default function SettingsModal() {
                 <div className="space-y-2.5">
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer hover:border-[var(--accent-border)] transition">
                     <div>
-                      <div className="text-xs font-semibold">Page Number Breaks</div>
-                      <div className="text-[11px] text-[var(--text-muted)]">Show [VRI 1.23], [PTS 2.45], [Thai 1.10] edition markers</div>
+                      <div className="text-xs font-semibold">Page Number Breaks (<code className="font-mono text-[var(--accent)] text-[11px]">pb</code>)</div>
+                      <div className="text-[11px] text-[var(--text-muted)]">Show or hide Roman & script edition markers e.g. [M 1.0029], [V 1.0031], [T 1.0042], [P 1.0010]</div>
                     </div>
                     <input
                       type="checkbox"
@@ -351,6 +351,7 @@ export default function SettingsModal() {
                       className="accent-[var(--accent)] w-4 h-4 rounded"
                     />
                   </label>
+
 
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer hover:border-[var(--accent-border)] transition">
                     <div>
