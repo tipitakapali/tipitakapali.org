@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { BookA, X, Search, Sparkles, ExternalLink } from 'lucide-react';
+import { BookA, X, Search, Sparkles, ExternalLink, HelpCircle, Keyboard } from 'lucide-react';
 import { typeVelthuis } from '../services/transliterate';
-
-const DIACRITICS = ['ā', 'ī', 'ū', 'ḍ', 'ṭ', 'ṇ', 'ṅ', 'ñ', 'ṃ', 'ḷ'];
 
 export default function DictionaryModal({ isOpen, onClose }) {
   const [word, setWord] = useState('');
+  const [showVelthuisHelp, setShowVelthuisHelp] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -17,11 +16,6 @@ export default function DictionaryModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const handleInsertChar = (char) => {
-    setWord((prev) => typeVelthuis(prev + char));
-    inputRef.current?.focus();
-  };
 
   return (
     <div
@@ -46,8 +40,8 @@ export default function DictionaryModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Search input & Pali diacritics bar */}
-        <div className="p-4 border-b border-[var(--border-color)] space-y-3">
+        {/* Search input & Velthuis typing support info */}
+        <div className="p-4 border-b border-[var(--border-color)] space-y-2.5">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
@@ -60,19 +54,67 @@ export default function DictionaryModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* Pali Diacritic Keypad */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-[var(--text-muted)] font-semibold">Pāli chars:</span>
-            {DIACRITICS.map((char) => (
-              <button
-                key={char}
-                onClick={() => handleInsertChar(char)}
-                className="w-6 h-6 rounded bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] border border-[var(--border-color)] text-xs font-mono font-bold transition flex items-center justify-center"
-              >
-                {char}
-              </button>
-            ))}
+          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] px-0.5">
+            <div className="flex items-center gap-1.5">
+              <Keyboard size={13} className="text-[var(--accent)]" />
+              <span>Velthuis typing is supported</span>
+            </div>
+            <button
+              onClick={() => setShowVelthuisHelp((prev) => !prev)}
+              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+              title="How to type Velthuis diacritics"
+            >
+              <HelpCircle size={13} />
+              <span>{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
+            </button>
           </div>
+
+          {/* Velthuis Scheme Guide Table */}
+          {showVelthuisHelp && (
+            <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[11px] space-y-2 animate-fade-in">
+              <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+                <span>Velthuis Pāḷi Typing Shortcuts</span>
+                <span className="text-[10px] font-normal text-[var(--text-muted)]">Type as you speak</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10.5px]">
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">aa, ii, uu</span>
+                  <span className="font-bold text-[var(--accent)]">ā, ī, ū</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">.m, m..</span>
+                  <span className="font-bold text-[var(--accent)]">ṃ, ṁ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">.t, .d</span>
+                  <span className="font-bold text-[var(--accent)]">ṭ, ḍ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">.n, .l</span>
+                  <span className="font-bold text-[var(--accent)]">ṇ, ḷ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">~n, ,,n</span>
+                  <span className="font-bold text-[var(--accent)]">ñ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">"n, n..</span>
+                  <span className="font-bold text-[var(--accent)]">ṅ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">.h, .r</span>
+                  <span className="font-bold text-[var(--accent)]">ḥ, ṛ</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
+                  <span className="text-[var(--text-muted)]">.s, "s</span>
+                  <span className="font-bold text-[var(--accent)]">ṣ, ś</span>
+                </div>
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)] italic">
+                * Uppercase is also supported (e.g. AA → Ā, .N → Ṇ).
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Dictionary Preview & Resources */}

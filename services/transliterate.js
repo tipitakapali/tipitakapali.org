@@ -149,11 +149,15 @@ export function transliterateHtml(html, targetScript = "roman") {
   const targetKey = SCRIPT_MAP[targetScript.toString().toLowerCase()];
   if (!targetKey || targetKey === "RO") return html;
 
-  // Transliterate only text nodes outside of HTML tags & entities
-  return html.replace(/(<[^>]*>|&[a-z0-9#]+;)|([^<>&]+)/gi, (match, tagOrEntity, textNode) => {
-    if (tagOrEntity) return tagOrEntity;
-    return convertPaliScript(textNode, targetScript);
-  });
+  // Transliterate only text nodes outside of HTML tags & entities,
+  // while preserving <span class="pb" ...>[...]</span> page number indicators completely untouched
+  return html.replace(
+    /(<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>[\s\S]*?<\/span>|<[^>]*>|&[a-z0-9#]+;)|([^<>&]+)/gi,
+    (match, nonTransliterated, textNode) => {
+      if (nonTransliterated) return nonTransliterated;
+      return convertPaliScript(textNode, targetScript);
+    }
+  );
 }
 
 export { CVT };

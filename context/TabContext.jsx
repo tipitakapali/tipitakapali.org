@@ -137,17 +137,35 @@ export function TabProvider({ children }) {
   }, []);
 
   // Helper to update URL search parameters without reloading (1-based chapter in URL)
+  // Helper to update URL search parameters and clean path without reloading (1-based chapter in URL)
   const updateUrlParams = useCallback((paramsToUpdate) => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location);
-    Object.entries(paramsToUpdate).forEach(([k, v]) => {
-      if (v === null || v === undefined) {
-        url.searchParams.delete(k);
-      } else {
-        url.searchParams.set(k, v);
+
+    if (paramsToUpdate) {
+      // If book is provided, set clean path /book/:bookCode
+      if (paramsToUpdate.book) {
+        url.pathname = `/book/${paramsToUpdate.book}`;
+        url.searchParams.delete('book');
+        url.searchParams.delete('book_code');
+      } else if (paramsToUpdate.book === null) {
+        url.pathname = '/';
+        url.searchParams.delete('book');
+        url.searchParams.delete('book_code');
       }
-    });
-    window.history.replaceState({}, '', url.toString());
+
+      Object.entries(paramsToUpdate).forEach(([k, v]) => {
+        if (k === 'book') return;
+        if (v === null || v === undefined) {
+          url.searchParams.delete(k);
+        } else {
+          url.searchParams.set(k, v);
+        }
+      });
+    }
+
+    const newUrl = url.pathname + (url.search || '');
+    window.history.replaceState({}, '', newUrl);
   }, []);
 
   // Save tabs list to localStorage for session resumption
