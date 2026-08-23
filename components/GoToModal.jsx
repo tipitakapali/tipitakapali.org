@@ -161,18 +161,21 @@ export default function GoToModal({ isOpen, onClose }) {
     }
 
     const intVal = parseInt(clean, 10);
-    if (isNaN(intVal)) {
-      setErrorMessage('Invalid paragraph number');
+    if (isNaN(intVal) || intVal <= 0) {
+      setErrorMessage('Please enter a valid positive paragraph number.');
       return;
     }
 
-    if (paraRange.total > 0) {
-      if (intVal < paraRange.min || intVal > paraRange.max) {
-        setErrorMessage(
-          `Paragraph ${intVal} is out of range. Please enter between ${paraRange.min} and ${paraRange.max}.`
-        );
-        return;
-      }
+    if (!paraRange || paraRange.total === 0) {
+      setErrorMessage('Paragraph navigation is not available for this book.');
+      return;
+    }
+
+    if (intVal < paraRange.min || intVal > paraRange.max) {
+      setErrorMessage(
+        `Paragraph ${intVal} is out of range. Please enter a paragraph between ${paraRange.min} and ${paraRange.max}.`
+      );
+      return;
     }
 
     openBook(activeTab.bookCode, { targetParaNum: clean });
@@ -191,8 +194,31 @@ export default function GoToModal({ isOpen, onClose }) {
     const edRange = editionRanges[ed];
 
     if (!edRange || !edRange.available) {
-      setErrorMessage(`${ed} edition is not available in this book.`);
+      setErrorMessage(`${ed} edition page numbers are not available for this book.`);
       return;
+    }
+
+    // Extract numerical page for range validation
+    let enteredNum = NaN;
+    if (clean.includes('.')) {
+      const parts = clean.split('.');
+      enteredNum = parseInt(parts[1], 10);
+    } else {
+      enteredNum = parseInt(clean, 10);
+    }
+
+    if (isNaN(enteredNum) || enteredNum <= 0) {
+      setErrorMessage('Please enter a valid positive page number.');
+      return;
+    }
+
+    if (edRange.minNum !== undefined && edRange.maxNum !== undefined) {
+      if (enteredNum < edRange.minNum || enteredNum > edRange.maxNum) {
+        setErrorMessage(
+          `Page ${enteredNum} is out of range for ${ed} edition. Please enter a page between ${edRange.minNum} and ${edRange.maxNum}.`
+        );
+        return;
+      }
     }
 
     const pageToChap = activeTab?.page_to_chapter?.[ed];
@@ -206,15 +232,25 @@ export default function GoToModal({ isOpen, onClose }) {
         targetChap = pageToChap[clean];
         targetPara = pageToPara?.[clean];
       } else {
-        // Look for partial or short-form match
+        const padded4 = String(enteredNum).padStart(4, '0');
         for (const [pKey, cIdx] of Object.entries(pageToChap)) {
-          if (pKey === clean || pKey.endsWith(`.${clean}`) || pKey.includes(clean)) {
+          if (
+            pKey === clean ||
+            pKey === String(enteredNum) ||
+            pKey.endsWith(`.${clean}`) ||
+            pKey.endsWith(`.${padded4}`)
+          ) {
             targetChap = cIdx;
             targetPara = pageToPara?.[pKey];
             break;
           }
         }
       }
+    }
+
+    if (targetChap === undefined && targetPara === undefined) {
+      setErrorMessage(`Page "${clean}" was not found in ${ed} edition for this book.`);
+      return;
     }
 
     openBook(activeTab.bookCode, {
@@ -225,6 +261,7 @@ export default function GoToModal({ isOpen, onClose }) {
     });
     onClose();
   };
+
 
 
   // Only return null after ALL hooks have executed unconditionally
