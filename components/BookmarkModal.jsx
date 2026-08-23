@@ -133,8 +133,9 @@ export default function BookmarkModal({ isOpen, onClose }) {
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               type="text"
-              placeholder="Search saved bookmarks (Velthuis supported)..."
+              placeholder="Search saved bookmarks..."
               value={filterText}
+
               onChange={(e) => setFilterText(typeVelthuis(e.target.value))}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md py-1.5 pl-8 pr-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />

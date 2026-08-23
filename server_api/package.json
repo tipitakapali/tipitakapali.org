@@ -13,10 +13,10 @@
     "pm2:status": "npx pm2 status"
   },
   "dependencies": {
-    "@fastify/compress": "^7.0.3",
-    "@fastify/cors": "^9.0.1",
-    "dotenv": "^16.4.7",
-    "fastify": "^4.28.1",
-    "pm2": "^5.4.3"
+    "@fastify/compress": "^9.2.0",
+    "@fastify/cors": "^11.3.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.1",
+    "pm2": "^7.0.3"
   }
 }

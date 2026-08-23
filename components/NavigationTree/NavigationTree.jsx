@@ -184,7 +184,7 @@ export default function NavigationTree() {
             <input
               type="text"
               id="treeFilterInput"
-              placeholder="Filter books & chapters (Velthuis supported)..."
+              placeholder="Filter books & chapters..."
               value={filterText}
               onChange={(e) => setFilterText(typeVelthuis(e.target.value))}
             />

@@ -118,7 +118,7 @@ export default function ReaderView() {
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
 
-    const { chapterIdx, paraIndex, paraNum } = targetScrollIntent;
+    const { chapterIdx, paraIndex, paraNum, page, pageSystem } = targetScrollIntent;
 
     if (chapterIdx !== undefined && chapterIdx !== null) {
       if (!activeTab.loadedChapters?.[chapterIdx]) {
@@ -128,22 +128,47 @@ export default function ReaderView() {
     }
 
     let retries = 0;
-    const maxRetries = 25; // Check every 60ms for up to 1.5 seconds
+    const maxRetries = 40; // Check every 60ms for up to 2.4 seconds
 
     let timerId = null;
 
     const attemptScroll = () => {
       if (!containerRef.current) return;
 
-      // 1. Target paragraph
+      // 1. Target page break
+      if (page && pageSystem) {
+        const cleanP = String(page).trim();
+        const pbEl =
+          containerRef.current.querySelector(`span.pb[data-ed="${pageSystem}"][data-page="${cleanP}"]`) ||
+          containerRef.current.querySelector(`span.pb[data-ed="${pageSystem}"][data-page*="${cleanP}"]`);
+        if (pbEl) {
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const rect = pbEl.getBoundingClientRect();
+          const currentScroll = containerRef.current.scrollTop;
+          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+          containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
+
+          if (settings.pulseAnimation) {
+            pbEl.classList.remove('pulse-highlight');
+            void pbEl.offsetWidth;
+            pbEl.classList.add('pulse-highlight');
+          }
+          saveTabScroll(activeTab.bookCode, offset);
+          clearTargetScrollIntent();
+          return;
+        }
+      }
+
+      // 2. Target paragraph by index
       if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
         const el =
           containerRef.current.querySelector(`#pindex-${paraIndex}`) ||
           containerRef.current.querySelector(`[data-pindex="${paraIndex}"]`);
         if (el) {
+          const containerRect = containerRef.current.getBoundingClientRect();
           const rect = el.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top + currentScroll - 80);
+          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
@@ -159,6 +184,7 @@ export default function ReaderView() {
         }
       }
 
+      // 3. Target paragraph by number
       if (paraNum) {
         const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
         let el =
@@ -190,9 +216,10 @@ export default function ReaderView() {
         }
 
         if (el) {
+          const containerRect = containerRef.current.getBoundingClientRect();
           const rect = el.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top + currentScroll - 80);
+          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
@@ -208,8 +235,8 @@ export default function ReaderView() {
         }
       }
 
-      // 2. Target chapter
-      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined) {
+      // 4. Target chapter
+      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined && !page) {
         if (chapterIdx === 0) {
           containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           saveTabScroll(activeTab.bookCode, 0);
@@ -227,9 +254,10 @@ export default function ReaderView() {
           containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`);
 
         if (target) {
+          const containerRect = containerRef.current.getBoundingClientRect();
           const rect = target.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top + currentScroll - 80);
+          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
@@ -264,6 +292,7 @@ export default function ReaderView() {
           return;
         }
       }
+
 
 
       retries++;

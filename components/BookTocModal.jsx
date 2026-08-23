@@ -128,8 +128,9 @@ export default function BookTocModal({ isOpen, onClose }) {
             <input
               ref={inputRef}
               type="text"
-              placeholder={`Filter ${tocList.length} sections (Velthuis supported)...`}
+              placeholder={`Filter ${tocList.length} sections...`}
               value={filterQuery}
+
               onChange={(e) => setFilterQuery(typeVelthuis(e.target.value))}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />

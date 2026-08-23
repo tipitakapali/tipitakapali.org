@@ -378,17 +378,20 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            page: options.targetPage,
+            pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
             timestamp: Date.now(),
           });
         } else {
           setTargetScrollIntent(null);
         }
+
 
         const activeChap = hasTargetChapter
           ? targetChapIdx
@@ -447,11 +450,14 @@ export function TabProvider({ children }) {
           mat: bookData.mat || null,
           para_to_chapter: bookData.para_to_chapter || {},
           para_to_index: bookData.para_to_index || {},
+          page_to_chapter: bookData.page_to_chapter || {},
+          page_to_para: bookData.page_to_para || {},
 
           loadedChapters: { ...bookData.chapters_data },
           loadingChapters: {},
           currentChapterIdx: targetChapIdx,
         };
+
 
         setOpenTabs((prev) => {
           if (prev.some((t) => t.bookCode === cleanCode)) return prev;
@@ -461,17 +467,20 @@ export function TabProvider({ children }) {
         });
         setActiveBookCode(cleanCode);
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            page: options.targetPage,
+            pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
             timestamp: Date.now(),
           });
         } else {
           setTargetScrollIntent(null);
         }
+
 
         setTreeSelectedNode({
           bookCode: cleanCode,
@@ -661,12 +670,30 @@ export function TabProvider({ children }) {
     isInitializedRef.current = true;
 
     const url = new URL(window.location);
-    const urlBook = url.searchParams.get('book');
-    const urlChapter = url.searchParams.get('chapter');
-    const targetChapIdx = urlChapter ? Math.max(0, parseInt(urlChapter, 10) - 1) : 0;
+    const pathname = url.pathname;
+    let urlBook = url.searchParams.get('book') || url.searchParams.get('book_code');
+    let urlChapter = url.searchParams.get('chapter') || url.searchParams.get('c');
+
+    if (!urlBook && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
+      const raw = pathname.replace(/^\/(?:book|chapter)\//, '');
+      const parts = raw.split('/');
+      if (parts[0]) urlBook = decodeURIComponent(parts[0]);
+      if (parts[1] && !urlChapter) urlChapter = decodeURIComponent(parts[1]);
+    }
 
     if (urlBook) {
-      openBook(urlBook, { targetChapterIdx: targetChapIdx });
+      const chapSuffixMatch = urlBook.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) {
+        urlBook = chapSuffixMatch[1];
+        if (!urlChapter) {
+          urlChapter = parseInt(chapSuffixMatch[2], 10) + 1;
+        }
+      }
+    }
+
+    if (urlBook) {
+      const targetChapIdx = urlChapter ? Math.max(0, parseInt(urlChapter, 10) - 1) : 0;
+      openBook(urlBook, { targetChapterIdx });
       return;
     }
 
@@ -701,6 +728,11 @@ export function TabProvider({ children }) {
                         chapter_count: bData.chapter_count,
                         chapters: bData.chapters || [],
                         toc: bData.toc || [],
+                        mat: bData.mat || null,
+                        para_to_chapter: bData.para_to_chapter || {},
+                        para_to_index: bData.para_to_index || {},
+                        page_to_chapter: bData.page_to_chapter || {},
+                        page_to_para: bData.page_to_para || {},
                         loadedChapters: { ...bData.chapters_data },
                         loadingChapters: {},
                         currentChapterIdx: item.currentChapterIdx || 0,
@@ -717,6 +749,7 @@ export function TabProvider({ children }) {
       console.warn('Failed to restore session tabs:', e);
     }
   }, [openBook]);
+
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 

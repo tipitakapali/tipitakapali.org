@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Navigation, Hash, BookOpen, CornerDownLeft, AlertCircle } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -18,27 +18,48 @@ export default function GoToModal({ isOpen, onClose }) {
 
   const inputRef = useRef(null);
 
-  // 1. Compute paragraph limits unconditionally
+  // 1. Safe compute paragraph limits without spread-overflow
   const paraRange = useMemo(() => {
-    const pKeys = Object.keys(activeTab?.para_to_chapter || {})
-      .map((k) => parseInt(k, 10))
-      .filter((n) => !isNaN(n));
-    if (pKeys.length === 0) return { min: 1, max: 1, total: 0 };
-    return {
-      min: Math.min(...pKeys),
-      max: Math.max(...pKeys),
-      total: pKeys.length,
-    };
+    const pMap = activeTab?.para_to_chapter || {};
+    let min = Infinity;
+    let max = -Infinity;
+    let count = 0;
+    for (const k of Object.keys(pMap)) {
+      const n = parseInt(k, 10);
+      if (!isNaN(n)) {
+        if (n < min) min = n;
+        if (n > max) max = n;
+        count++;
+      }
+    }
+    if (count === 0) return { min: 1, max: 1, total: 0 };
+    return { min, max, total: count };
   }, [activeTab]);
 
-  // 2. Compute page limits per edition unconditionally
+  // 2. Safe compute page limits per edition without spread-overflow
   const editionRanges = useMemo(() => {
     const res = {};
     const pageToChap = activeTab?.page_to_chapter || {};
     for (const sys of ['V', 'P', 'T', 'M']) {
       const pMap = pageToChap[sys] || {};
-      const rawKeys = Object.keys(pMap).filter((k) => k.includes('.'));
-      if (rawKeys.length === 0) {
+      const uniquePages = new Set();
+      let minNum = Infinity;
+      let maxNum = -Infinity;
+      for (const p of Object.keys(pMap)) {
+        let n = NaN;
+        if (p.includes('.')) {
+          const parts = p.split('.');
+          n = parseInt(parts[1], 10);
+        } else {
+          n = parseInt(p, 10);
+        }
+        if (!isNaN(n)) {
+          uniquePages.add(n);
+          if (n < minNum) minNum = n;
+          if (n > maxNum) maxNum = n;
+        }
+      }
+      if (uniquePages.size === 0) {
         res[sys] = {
           available: false,
           count: 0,
@@ -48,17 +69,9 @@ export default function GoToModal({ isOpen, onClose }) {
           hint: '1',
         };
       } else {
-        const nums = rawKeys
-          .map((p) => {
-            const parts = p.split('.');
-            return parseInt(parts[1], 10);
-          })
-          .filter((n) => !isNaN(n));
-        const minNum = Math.min(...nums);
-        const maxNum = Math.max(...nums);
         res[sys] = {
           available: true,
-          count: rawKeys.length,
+          count: uniquePages.size,
           minNum,
           maxNum,
           label: `Page ${minNum} – ${maxNum}`,
@@ -69,9 +82,10 @@ export default function GoToModal({ isOpen, onClose }) {
     return res;
   }, [activeTab]);
 
+
   const currentEdRange = editionRanges[pageSystem] || { available: false, label: 'Unavailable' };
 
-  // 3. Dynamic quick paragraph chips unconditionally
+  // 3. Dynamic quick paragraph chips
   const quickParaChips = useMemo(() => {
     if (!paraRange || paraRange.total === 0) return [1];
     const { min, max } = paraRange;
@@ -83,10 +97,11 @@ export default function GoToModal({ isOpen, onClose }) {
     const step1 = Math.round(min + (max - min) * 0.25);
     const step2 = Math.round(min + (max - min) * 0.5);
     const step3 = Math.round(min + (max - min) * 0.75);
-    return Array.from(new Set([min, step1, step2, step3, max])).sort((a, b) => a - b);
+    const set = new Set([min, step1, step2, step3, max]);
+    return Array.from(set).sort((a, b) => a - b);
   }, [paraRange]);
 
-  // 4. Dynamic quick page chips unconditionally
+  // 4. Dynamic quick page chips
   const quickPageChips = useMemo(() => {
     if (!currentEdRange.available) return [];
     const { minNum, maxNum } = currentEdRange;
@@ -98,7 +113,8 @@ export default function GoToModal({ isOpen, onClose }) {
     const step1 = Math.round(minNum + (maxNum - minNum) * 0.25);
     const step2 = Math.round(minNum + (maxNum - minNum) * 0.5);
     const step3 = Math.round(minNum + (maxNum - minNum) * 0.75);
-    return Array.from(new Set([minNum, step1, step2, step3, maxNum])).sort((a, b) => a - b);
+    const set = new Set([minNum, step1, step2, step3, maxNum]);
+    return Array.from(set).sort((a, b) => a - b);
   }, [currentEdRange]);
 
   useEffect(() => {
@@ -110,7 +126,7 @@ export default function GoToModal({ isOpen, onClose }) {
           inputRef.current.focus();
           inputRef.current.select();
         }
-      }, 80);
+      }, 60);
     }
   }, [isOpen, activeTabMode, activeParaNum]);
 
@@ -133,7 +149,7 @@ export default function GoToModal({ isOpen, onClose }) {
 
   const handleParaSubmit = (e) => {
     if (e) e.preventDefault();
-    const clean = paraInput.trim().replace(/^(?:para-?|p)/i, '');
+    const clean = String(paraInput || '').trim().replace(/^(?:para-?|p)/i, '');
     if (!clean) {
       setErrorMessage('Please enter a paragraph number');
       return;
@@ -148,7 +164,7 @@ export default function GoToModal({ isOpen, onClose }) {
     if (paraRange.total > 0) {
       if (intVal < paraRange.min || intVal > paraRange.max) {
         setErrorMessage(
-          `Paragraph ¶${intVal} is out of range. Please enter between ¶${paraRange.min} and ¶${paraRange.max}.`
+          `Paragraph ${intVal} is out of range. Please enter between ${paraRange.min} and ${paraRange.max}.`
         );
         return;
       }
@@ -160,7 +176,7 @@ export default function GoToModal({ isOpen, onClose }) {
 
   const handlePageSubmit = (e) => {
     if (e) e.preventDefault();
-    const clean = pageInput.trim();
+    const clean = String(pageInput || '').trim();
     if (!clean) {
       setErrorMessage('Please enter a page number');
       return;
@@ -169,19 +185,9 @@ export default function GoToModal({ isOpen, onClose }) {
     const ed = pageSystem.toUpperCase();
     const edRange = editionRanges[ed];
 
-    if (!edRange.available) {
+    if (!edRange || !edRange.available) {
       setErrorMessage(`${ed} edition is not available in this book.`);
       return;
-    }
-
-    const cleanNum = parseInt(clean.replace(/^[0-9]+\./, ''), 10);
-    if (!isNaN(cleanNum)) {
-      if (cleanNum < edRange.minNum || cleanNum > edRange.maxNum) {
-        setErrorMessage(
-          `Page ${clean} is out of range for ${ed}. Please enter between Page ${edRange.minNum} and ${edRange.maxNum}.`
-        );
-        return;
-      }
     }
 
     const pageToChap = activeTab?.page_to_chapter?.[ed];
@@ -260,7 +266,7 @@ export default function GoToModal({ isOpen, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition"
+            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -269,25 +275,27 @@ export default function GoToModal({ isOpen, onClose }) {
         {/* Mode Tabs */}
         <div className="flex border-b border-[var(--border-color)] bg-[var(--bg-card)] p-1 gap-1">
           <button
+            type="button"
             onClick={() => {
               setActiveTabMode('para');
               setErrorMessage('');
             }}
-            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTabMode === 'para'
                 ? 'bg-[var(--accent)] text-white shadow-xs'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
             }`}
           >
             <Hash size={14} />
-            <span>Paragraph (¶)</span>
+            <span>Paragraph</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setActiveTabMode('page');
               setErrorMessage('');
             }}
-            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTabMode === 'page'
                 ? 'bg-[var(--accent)] text-white shadow-xs'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
@@ -309,7 +317,7 @@ export default function GoToModal({ isOpen, onClose }) {
                   </label>
                   {paraRange.total > 0 && (
                     <span className="text-[11px] font-mono font-semibold text-[var(--accent)] bg-[var(--accent-light)] px-1.5 py-0.2 rounded border border-[var(--accent-border)]">
-                      ¶{paraRange.min} – ¶{paraRange.max}
+                      {paraRange.min} – {paraRange.max}
                     </span>
                   )}
                 </div>
@@ -326,11 +334,8 @@ export default function GoToModal({ isOpen, onClose }) {
                       setErrorMessage('');
                     }}
                     placeholder={`Enter paragraph (${paraRange.min} – ${paraRange.max})`}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition pr-10 font-mono"
+                    className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition font-mono"
                   />
-                  <span className="absolute right-3 text-xs text-[var(--text-muted)] font-mono">
-                    ¶
-                  </span>
                 </div>
               </div>
 
@@ -349,13 +354,13 @@ export default function GoToModal({ isOpen, onClose }) {
                         setParaInput(String(n));
                         setErrorMessage('');
                       }}
-                      className={`px-2 py-0.5 rounded-md border text-[11px] font-mono transition ${
+                      className={`px-2 py-0.5 rounded-md border text-[11px] font-mono transition cursor-pointer ${
                         String(n) === String(paraInput)
                           ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
                           : 'bg-[var(--bg-secondary)] hover:bg-[var(--accent)] hover:text-white border-[var(--border-color)] text-[var(--text-secondary)]'
                       }`}
                     >
-                      ¶{n}
+                      {n}
                     </button>
                   ))}
                 </div>
@@ -456,7 +461,7 @@ export default function GoToModal({ isOpen, onClose }) {
                           setPageInput(String(p));
                           setErrorMessage('');
                         }}
-                        className={`px-2 py-0.5 rounded-md border text-[11px] font-mono transition ${
+                        className={`px-2 py-0.5 rounded-md border text-[11px] font-mono transition cursor-pointer ${
                           String(p) === String(pageInput)
                             ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
                             : 'bg-[var(--bg-secondary)] hover:bg-[var(--accent)] hover:text-white border-[var(--border-color)] text-[var(--text-secondary)]'

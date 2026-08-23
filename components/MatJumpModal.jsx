@@ -118,7 +118,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
           </div>
           {activeParaNum && (
             <span className="font-mono font-bold px-2 py-0.5 rounded-md bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] shrink-0">
-              ¶ {activeParaNum}
+              Para {activeParaNum}
             </span>
           )}
         </div>
@@ -177,10 +177,10 @@ export default function MatJumpModal({ isOpen, onClose }) {
                       e.stopPropagation();
                       handleJump(item.layer);
                     }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
                   >
                     <span>Jump</span>
-                    {activeParaNum && <span className="font-mono font-normal opacity-80">¶{activeParaNum}</span>}
+                    {activeParaNum && <span className="font-mono font-normal opacity-80 text-[10px]">p.{activeParaNum}</span>}
                     <ArrowUpRight size={12} />
                   </button>
                 ) : (
@@ -191,6 +191,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
               </div>
             </div>
           ))}
+
         </div>
 
         {/* Footer info tip */}

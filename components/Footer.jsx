@@ -74,11 +74,12 @@ export default function Footer() {
             <Layers size={13} className="text-[var(--accent)]" />
             <span>MAT Jump</span>
             {activeParaNum && (
-              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold">
-                ¶{activeParaNum}
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold">
+                {activeParaNum}
               </span>
             )}
           </button>
+
 
           {/* Go To Button */}
           <button
