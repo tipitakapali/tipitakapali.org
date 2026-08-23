@@ -71,6 +71,8 @@ function parseBookChaptersHtml(xmlContent, chapters) {
 
   const pRegex = /<(p|head|trailer)\s+rend="([^"]+)"(?:\s+n="([^"]+)")?\s*>([\s\S]*?)<\/\1>/g;
   const chapterParas = new Map();
+  const paraToChapter = {};
+  const paraToIndex = {};
   let currentChapIdx = 0;
   let paraCounter = 0;
 
@@ -93,15 +95,23 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     let inner = match[4];
 
     inner = inner.replace(/<hi\s+rend="bold">([^<]+)<\/hi>/g, '<strong class="bld">$1</strong>');
-    inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, '<strong class="paranum">$1</strong>');
+    if (nAttr) {
+      inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, `<strong class="paranum" id="para-${nAttr}">$1</strong>`);
+    } else {
+      inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, '<strong class="paranum">$1</strong>');
+    }
     inner = inner.replace(/<hi\s+rend="dot">([^<]+)<\/hi>/g, '<span class="dot">$1</span>');
     inner = inner.replace(/<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g, '<span class="pb" title="Page $1 $2" data-ed="$1" data-page="$2">[$1 $2]</span>');
     inner = inner.replace(/<note>([\s\S]*?)<\/note>/g, '<span class="note" title="Footnote">[$1]</span>');
 
-    const attrParts = [`id="pindex-${paraCounter}"`, `data-pindex="${paraCounter}"`];
+    const attrParts = [`data-pindex="${paraCounter}"`];
     if (nAttr) {
-      attrParts.push(`id="para-${nAttr}"`);
+      attrParts.push(`id="para${nAttr}"`);
       attrParts.push(`data-para="${nAttr}"`);
+      paraToChapter[nAttr] = currentChapIdx;
+      paraToIndex[nAttr] = paraCounter;
+    } else {
+      attrParts.push(`id="pindex-${paraCounter}"`);
     }
     const attrs = ' ' + attrParts.join(' ');
     const pTag = `<p class="${rend || 'bodytext'}"${attrs}>${inner}</p>`;
@@ -121,7 +131,7 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     result.set(chIdx, `${headerHtml}\n${paras.join('\n')}`);
   }
 
-  return result;
+  return { chapterHtmls: result, paraToChapter, paraToIndex };
 }
 
 function getOrParseBook(cleanCode) {
@@ -134,7 +144,7 @@ function getOrParseBook(cleanCode) {
 
   const chapters = stmtGetChapters.all(cleanCode);
   const toc = stmtGetToc.all(cleanCode);
-  const chapterHtmls = parseBookChaptersHtml(book.xml_content, chapters);
+  const parsedData = parseBookChaptersHtml(book.xml_content, chapters);
 
   const parsed = {
     metadata: {
@@ -145,13 +155,16 @@ function getOrParseBook(cleanCode) {
       chapter_count: book.chapter_count,
       chapters: chapters,
       toc: toc,
+      para_to_chapter: parsedData.paraToChapter,
+      para_to_index: parsedData.paraToIndex,
     },
-    chapterHtmls: chapterHtmls,
+    chapterHtmls: parsedData.chapterHtmls,
   };
 
   bookParsedCache.set(cleanCode, parsed);
   return parsed;
 }
+
 
 // Clean top-level Tipiṭaka root if present
 function cleanTree(data) {
