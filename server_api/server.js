@@ -85,7 +85,11 @@ const stmtSearch = db.prepare(`
   LIMIT ? OFFSET ?
 `);
 
+// In-Memory Book Chapter Cache for sub-millisecond lazy loading and buffering
+const bookParsedCache = new Map();
+
 // Load CST4 Authoritative Books Catalog
+
 const CST_CATALOG_PATH = path.join(__dirname, 'cst_books_catalog.json');
 let cstCatalog = {};
 if (fs.existsSync(CST_CATALOG_PATH)) {

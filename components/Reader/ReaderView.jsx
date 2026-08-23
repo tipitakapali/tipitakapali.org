@@ -172,17 +172,25 @@ export default function ReaderView() {
         }
 
         if (pbEl) {
+          // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph
+          const targetEl =
+            pbEl.getClientRects().length > 0
+              ? pbEl
+              : pbEl.closest('p') || pbEl.parentElement || pbEl;
+
           const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = pbEl.getBoundingClientRect();
+          const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
-            pbEl.classList.remove('pulse-highlight');
-            void pbEl.offsetWidth;
-            pbEl.classList.add('pulse-highlight');
+            targetEl.classList.remove('pulse-highlight');
+            void targetEl.offsetWidth;
+            targetEl.classList.add('pulse-highlight');
           }
+          const foundPNum = targetEl.getAttribute?.('data-para') || pbEl.getAttribute?.('data-para');
+          if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
           clearTargetScrollIntent();
           return;
@@ -192,21 +200,27 @@ export default function ReaderView() {
       // 2. Target paragraph by index
       if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
         const el =
+          containerRef.current.querySelector(`p[data-pindex="${paraIndex}"]`) ||
           containerRef.current.querySelector(`#pindex-${paraIndex}`) ||
           containerRef.current.querySelector(`[data-pindex="${paraIndex}"]`);
         if (el) {
+          const targetEl =
+            el.getClientRects().length > 0
+              ? el
+              : el.closest('p') || el.parentElement || el;
+
           const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = el.getBoundingClientRect();
+          const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
-            el.classList.remove('pulse-highlight');
-            void el.offsetWidth;
-            el.classList.add('pulse-highlight');
+            targetEl.classList.remove('pulse-highlight');
+            void targetEl.offsetWidth;
+            targetEl.classList.add('pulse-highlight');
           }
-          const foundPNum = el.getAttribute('data-para');
+          const foundPNum = targetEl.getAttribute?.('data-para');
           if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
           clearTargetScrollIntent();
@@ -220,10 +234,11 @@ export default function ReaderView() {
         const targetInt = parseInt(cleanPara, 10);
 
         let el =
+          containerRef.current.querySelector(`p#para${cleanPara}`) ||
+          containerRef.current.querySelector(`p[data-para="${cleanPara}"]`) ||
           containerRef.current.querySelector(`#para${cleanPara}`) ||
           containerRef.current.querySelector(`#para-${cleanPara}`) ||
           containerRef.current.querySelector(`[data-para="${cleanPara}"]`) ||
-          containerRef.current.querySelector(`strong.paranum[id="para-${cleanPara}"]`) ||
           containerRef.current.querySelector(`[id="${paraNum}"]`);
 
         // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
@@ -258,24 +273,30 @@ export default function ReaderView() {
         }
 
         if (el) {
+          const targetEl =
+            el.getClientRects().length > 0
+              ? el
+              : el.closest('p') || el.parentElement || el;
+
           const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = el.getBoundingClientRect();
+          const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
 
           if (settings.pulseAnimation) {
-            el.classList.remove('pulse-highlight');
-            void el.offsetWidth;
-            el.classList.add('pulse-highlight');
+            targetEl.classList.remove('pulse-highlight');
+            void targetEl.offsetWidth;
+            targetEl.classList.add('pulse-highlight');
           }
-          const foundPNum = el.getAttribute('data-para') || cleanPara;
+          const foundPNum = targetEl.getAttribute?.('data-para') || cleanPara;
           if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
           clearTargetScrollIntent();
           return;
         }
       }
+
 
 
       // 4. Target chapter
