@@ -367,14 +367,17 @@ export function TabProvider({ children }) {
                           para_to_index: bData.para_to_index || {},
                           page_to_chapter: bData.page_to_chapter || {},
                           page_to_para: bData.page_to_para || {},
+                          page_anchors: bData.page_anchors || {},
                           para_range: bData.para_range || t.para_range,
                           edition_ranges: bData.edition_ranges || t.edition_ranges,
+                          book_type: bData.book_type || t.book_type || 'Whole',
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                           loadedChapters: { ...t.loadedChapters, ...bData.chapters_data },
                         }
                       : t
                   )
+
                 );
               }
             })
@@ -481,10 +484,13 @@ export function TabProvider({ children }) {
           para_to_index: bookData.para_to_index || {},
           page_to_chapter: bookData.page_to_chapter || {},
           page_to_para: bookData.page_to_para || {},
+          page_anchors: bookData.page_anchors || {},
           para_range: bookData.para_range || null,
           edition_ranges: bookData.edition_ranges || null,
+          book_type: bookData.book_type || 'Whole',
 
           loadedChapters: { ...bookData.chapters_data },
+
           loadingChapters: {},
           currentChapterIdx: targetChapIdx,
         };
@@ -576,13 +582,16 @@ export function TabProvider({ children }) {
                           para_to_index: bData.para_to_index || {},
                           page_to_chapter: bData.page_to_chapter || {},
                           page_to_para: bData.page_to_para || {},
+                          page_anchors: bData.page_anchors || {},
                           para_range: bData.para_range || t.para_range,
                           edition_ranges: bData.edition_ranges || t.edition_ranges,
+                          book_type: bData.book_type || t.book_type || 'Whole',
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                         }
                       : t
                   )
+
                 );
               }
             })

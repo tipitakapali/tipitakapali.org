@@ -85,11 +85,58 @@ const stmtSearch = db.prepare(`
   LIMIT ? OFFSET ?
 `);
 
-// In-Memory Book Chapter Cache for sub-millisecond lazy loading and buffering
-const bookParsedCache = new Map();
+// Load CST4 Authoritative Books Catalog
+const CST_CATALOG_PATH = path.join(__dirname, 'cst_books_catalog.json');
+let cstCatalog = {};
+if (fs.existsSync(CST_CATALOG_PATH)) {
+  try {
+    cstCatalog = JSON.parse(fs.readFileSync(CST_CATALOG_PATH, 'utf8'));
+    console.log(`[CST4 Catalog] Loaded ${Object.keys(cstCatalog).length} books metadata`);
+  } catch (e) {
+    console.warn('[CST4 Catalog] Failed to parse cst_books_catalog.json:', e.message);
+  }
+}
 
 /**
- * Splits and converts Tipitaka XML into clean chapter HTML snippets.
+ * CST4-compliant Paragraph Span Parser (Ported from CST.Core.Search.BookMarkers)
+ * Expands full ranges (16-26) and abbreviated continuation ranges (196-7 -> 196..197, 266-7-8 -> 266..268)
+ */
+function tryParseParagraphSpan(n) {
+  if (!n || typeof n !== 'string') return null;
+  const rawParts = n.split('-');
+  let previous = null;
+  let first = 0;
+  let last = 0;
+  let any = false;
+
+  for (const raw of rawParts) {
+    const part = raw.trim();
+    if (!part) continue;
+    if (!/^\d+$/.test(part)) break;
+
+    // Expand abbreviated continuation: e.g. "196-7" -> 196 to 197
+    let expanded = part;
+    if (previous && part.length < previous.length) {
+      expanded = previous.slice(0, previous.length - part.length) + part;
+    }
+    const val = parseInt(expanded, 10);
+    if (isNaN(val)) break;
+
+    if (!any) {
+      first = val;
+      any = true;
+    }
+    last = val;
+    previous = expanded;
+  }
+
+  if (any && last < first) last = first;
+  if (!any) return null;
+  return { first, last };
+}
+
+/**
+ * Splits and converts Tipitaka XML into clean chapter HTML snippets with exact CST4 anchors.
  */
 function parseBookChaptersHtml(xmlContent, chapters) {
   const m = xmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/);
@@ -104,8 +151,9 @@ function parseBookChaptersHtml(xmlContent, chapters) {
   const chapterParas = new Map();
   const paraToChapter = {};
   const paraToIndex = {};
-  const pageToChapter = { V: {}, P: {}, T: {}, M: {} };
-  const pageToPara = { V: {}, P: {}, T: {}, M: {} };
+  const pageToChapter = { V: {}, P: {}, T: {}, M: {}, O: {} };
+  const pageToPara = { V: {}, P: {}, T: {}, M: {}, O: {} };
+  const pageAnchors = { V: {}, P: {}, T: {}, M: {}, O: {} };
   let currentChapIdx = 0;
   let paraCounter = 0;
 
@@ -127,27 +175,36 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     const nAttr = match[3];
     let inner = match[4];
 
-    // Index page breaks before HTML conversion
+    // Index page breaks before HTML conversion with exact CST4 anchors (e.g. V0.0023, P3.0045)
     const pbRegex = /<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g;
     let pbMatch;
     while ((pbMatch = pbRegex.exec(inner)) !== null) {
       const ed = pbMatch[1].toUpperCase();
-      const page = pbMatch[2];
+      const page = pbMatch[2]; // e.g. "0.0023" or "3.0045"
       if (!pageToChapter[ed]) pageToChapter[ed] = {};
       if (!pageToPara[ed]) pageToPara[ed] = {};
+      if (!pageAnchors[ed]) pageAnchors[ed] = {};
 
+      const pbAnchorId = `${ed}${page}`;
       pageToChapter[ed][page] = currentChapIdx;
+      pageAnchors[ed][page] = pbAnchorId;
       if (nAttr) pageToPara[ed][page] = nAttr;
 
       if (page.includes('.')) {
         const parts = page.split('.');
-        const shortNum = String(parseInt(parts[1], 10));
-        const shortDotted = `${parts[0]}.${shortNum}`;
-        pageToChapter[ed][shortNum] = currentChapIdx;
-        pageToChapter[ed][shortDotted] = currentChapIdx;
-        if (nAttr) {
-          pageToPara[ed][shortNum] = nAttr;
-          pageToPara[ed][shortDotted] = nAttr;
+        const vol = parseInt(parts[0], 10);
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num)) {
+          const shortNum = String(num); // e.g. "23"
+          const volDotNum = `${vol}.${shortNum}`; // e.g. "0.23" or "3.45"
+          pageToChapter[ed][volDotNum] = currentChapIdx;
+          pageToChapter[ed][shortNum] = currentChapIdx;
+          pageAnchors[ed][volDotNum] = pbAnchorId;
+          if (!pageAnchors[ed][shortNum]) pageAnchors[ed][shortNum] = pbAnchorId;
+          if (nAttr) {
+            pageToPara[ed][volDotNum] = nAttr;
+            if (!pageToPara[ed][shortNum]) pageToPara[ed][shortNum] = nAttr;
+          }
         }
       }
     }
@@ -159,15 +216,32 @@ function parseBookChaptersHtml(xmlContent, chapters) {
       inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, '<strong class="paranum">$1</strong>');
     }
     inner = inner.replace(/<hi\s+rend="dot">([^<]+)<\/hi>/g, '<span class="dot">$1</span>');
-    inner = inner.replace(/<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g, '<span class="pb" title="Page $1 $2" data-ed="$1" data-page="$2">[$1 $2]</span>');
+    inner = inner.replace(/<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g, (m, ed, n) => {
+      const uEd = ed.toUpperCase();
+      return `<span id="${uEd}${n}" class="pb" title="Page ${uEd} ${n}" data-ed="${uEd}" data-page="${n}">[${uEd} ${n}]</span>`;
+    });
     inner = inner.replace(/<note>([\s\S]*?)<\/note>/g, '<span class="note" title="Footnote">[$1]</span>');
 
     const attrParts = [`data-pindex="${paraCounter}"`];
     if (nAttr) {
       attrParts.push(`id="para${nAttr}"`);
       attrParts.push(`data-para="${nAttr}"`);
-      paraToChapter[nAttr] = currentChapIdx;
-      paraToIndex[nAttr] = paraCounter;
+
+      const span = tryParseParagraphSpan(nAttr);
+      if (span) {
+        attrParts.push(`data-para-first="${span.first}"`);
+        attrParts.push(`data-para-last="${span.last}"`);
+        for (let pNum = span.first; pNum <= span.last; pNum++) {
+          const strNum = String(pNum);
+          if (paraToChapter[strNum] === undefined) {
+            paraToChapter[strNum] = currentChapIdx;
+            paraToIndex[strNum] = paraCounter;
+          }
+        }
+      } else {
+        paraToChapter[nAttr] = currentChapIdx;
+        paraToIndex[nAttr] = paraCounter;
+      }
     } else {
       attrParts.push(`id="pindex-${paraCounter}"`);
     }
@@ -189,7 +263,7 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     result.set(chIdx, `${headerHtml}\n${paras.join('\n')}`);
   }
 
-  // Precompute paragraph range directly in backend
+  // Precompute paragraph range directly in backend (excluding non-integer page attributes)
   let paraMin = Infinity;
   let paraMax = -Infinity;
   let paraCount = 0;
@@ -208,7 +282,7 @@ function parseBookChaptersHtml(xmlContent, chapters) {
 
   // Precompute edition ranges directly in backend
   const editionRanges = {};
-  for (const sys of ['V', 'P', 'T', 'M']) {
+  for (const sys of ['V', 'P', 'T', 'M', 'O']) {
     const pMap = pageToChapter[sys] || {};
     const uniquePages = new Set();
     let minNum = Infinity;
@@ -254,10 +328,12 @@ function parseBookChaptersHtml(xmlContent, chapters) {
     paraToIndex,
     pageToChapter,
     pageToPara,
+    pageAnchors,
     paraRange,
     editionRanges,
   };
 }
+
 
 function getOrParseBook(cleanCode) {
   if (bookParsedCache.has(cleanCode)) {
@@ -284,12 +360,15 @@ function getOrParseBook(cleanCode) {
       para_to_index: parsedData.paraToIndex,
       page_to_chapter: parsedData.pageToChapter,
       page_to_para: parsedData.pageToPara,
+      page_anchors: parsedData.pageAnchors,
       para_range: parsedData.paraRange,
       edition_ranges: parsedData.editionRanges,
-      mat: stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null,
+      book_type: cstCatalog[cleanCode]?.bookType || 'Whole',
+      mat: cstCatalog[cleanCode]?.mat || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
     },
     chapterHtmls: parsedData.chapterHtmls,
   };
+
 
   bookParsedCache.set(cleanCode, parsed);
   return parsed;
@@ -500,18 +579,24 @@ async function main() {
       cleanCode = chapSuffixMatch[1];
     }
 
-    if (!stmtGetMat) {
-      reply.code(500);
-      return { error: 'MAT database index not initialized' };
+    const cstMat = cstCatalog[cleanCode]?.mat;
+    if (cstMat) {
+      return {
+        book_code: cleanCode,
+        category: cstCatalog[cleanCode]?.matn?.toLowerCase() || '',
+        ...cstMat,
+      };
     }
 
-    const mat = stmtGetMat.get(cleanCode);
-    if (!mat) {
-      reply.code(404);
-      return { error: `No MAT relationship found for '${cleanCode}'` };
+    if (stmtGetMat) {
+      const mat = stmtGetMat.get(cleanCode);
+      if (mat) return mat;
     }
-    return mat;
+
+    reply.code(404);
+    return { error: `No MAT relationship found for '${cleanCode}'` };
   });
+
 
   // Get full MAT matrix for all books
   fastify.get('/api/mat', async (req, reply) => {

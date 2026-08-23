@@ -19,7 +19,9 @@ import {
   Keyboard,
   BookOpen,
   Search,
+  Layers,
 } from 'lucide-react';
+
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 
 const TABS = [
@@ -540,6 +542,54 @@ export default function SettingsModal() {
                   </div>
                 </div>
 
+                {/* Page Editions Legend */}
+                <div className="pt-2 border-t border-[var(--border-color)]">
+                  <h4 className="font-bold text-sm text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
+                    <Layers size={15} className="text-[var(--accent)]" />
+                    <span>Page Numbering & Edition Abbreviations</span>
+                  </h4>
+                  <p className="text-[11.5px] text-[var(--text-muted)] mb-2.5">
+                    These letter codes appear in inline page breaks e.g. <code className="font-mono text-[var(--accent)] bg-[var(--bg-secondary)] px-1 py-0.5 rounded">[V 1.0023]</code> and are used in the <strong>Go To Page</strong> dialog:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11.5px]">
+                    <div className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-2">
+                      <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">V</span>
+                      <div>
+                        <strong className="text-[var(--text-primary)]">VRI</strong>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">Vipassana Research Institute</div>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-2">
+                      <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">M</span>
+                      <div>
+                        <strong className="text-[var(--text-primary)]">Myanmar</strong>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">Chaṭṭha Saṅgāyana (Burmese)</div>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-2">
+                      <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">P</span>
+                      <div>
+                        <strong className="text-[var(--text-primary)]">PTS</strong>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">Pali Text Society (London)</div>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-2">
+                      <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">T</span>
+                      <div>
+                        <strong className="text-[var(--text-primary)]">Thai</strong>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">Royal Thai Edition</div>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center gap-2 sm:col-span-2">
+                      <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">O</span>
+                      <div>
+                        <strong className="text-[var(--text-primary)]">Other</strong>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">Other Extra-canonical & Special Editions</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-2 border-t border-[var(--border-color)]">
                   <h4 className="font-bold text-sm text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
                     <BookOpen size={15} className="text-[var(--accent)]" />
@@ -548,6 +598,7 @@ export default function SettingsModal() {
                   <ul className="space-y-1.5 list-disc pl-4 text-[11.5px] leading-relaxed text-[var(--text-secondary)] mt-2">
                     <li><strong>Lazy Loading & Streaming</strong>: Large multi-megabyte books are streamed chapter-by-chapter with zero lag and predictive pre-buffering.</li>
                     <li><strong>Session Resumption</strong>: All open tabs and your reading progress are automatically saved and restored when you revisit the app.</li>
+                    <li><strong>MAT Jump</strong>: Instantly jump between Mūla (Root text), Aṭṭhakathā (Commentary), and Ṭīkā (Sub-commentary) with exact paragraph tracking.</li>
                     <li><strong>Bookmarking</strong>: Click the bookmark icon in the breadcrumb header or footer to save your reading location with timestamps.</li>
                     <li><strong>Pāḷi Dictionary Look-up</strong>: Click the <em>Dict</em> button in the footer to search PTS, DPD, and CPED dictionaries with virtual diacritic keys.</li>
                     <li><strong>Table of Contents (TOC)</strong>: Click <em>TOC</em> in the footer to view clean hierarchical headings with live reading position tracking.</li>
@@ -555,6 +606,7 @@ export default function SettingsModal() {
                 </div>
               </div>
             )}
+
           </div>
         </div>
 

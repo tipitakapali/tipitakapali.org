@@ -43,33 +43,34 @@ export default function MatJumpModal({ isOpen, onClose }) {
       layer: 'mula',
       label: 'Mūla',
       desc: 'Pāḷi Canon (Root Text)',
-      code: mat?.mula_code || (isCurrentMula ? currentCode : `${prefix}m.mul`),
+      code: mat?.mula_code || (isCurrentMula ? currentCode : null),
       title: mat?.mula_title || (isCurrentMula ? activeTab.title : 'Mūlapāḷi'),
-      isCurrent: isCurrentMula,
-      available: Boolean(mat?.mula_code) || isCurrentMula || currentCode.endsWith('.att') || currentCode.endsWith('.tik'),
+      isCurrent: isCurrentMula || currentCode === mat?.mula_code,
+      available: Boolean(mat?.mula_code),
       badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
     },
     {
       layer: 'attha',
       label: 'Aṭṭhakathā',
       desc: 'Commentary (Aṭṭhakathā)',
-      code: mat?.attha_code || (isCurrentAttha ? currentCode : `${prefix}a.att`),
+      code: mat?.attha_code || (isCurrentAttha ? currentCode : null),
       title: mat?.attha_title || (isCurrentAttha ? activeTab.title : 'Aṭṭhakathā'),
-      isCurrent: isCurrentAttha,
-      available: Boolean(mat?.attha_code) || isCurrentAttha || currentCode.endsWith('.mul') || currentCode.endsWith('.tik'),
+      isCurrent: isCurrentAttha || currentCode === mat?.attha_code,
+      available: Boolean(mat?.attha_code),
       badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',
     },
     {
       layer: 'tika',
       label: 'Ṭīkā',
       desc: 'Sub-commentary (Ṭīkā / Anuṭīkā)',
-      code: mat?.tika_code || (isCurrentTika ? currentCode : `${prefix}t.tik`),
+      code: mat?.tika_code || (isCurrentTika ? currentCode : null),
       title: mat?.tika_title || (isCurrentTika ? activeTab.title : 'Ṭīkā'),
-      isCurrent: isCurrentTika,
-      available: Boolean(mat?.tika_code) || isCurrentTika || currentCode.endsWith('.mul') || currentCode.endsWith('.att'),
+      isCurrent: isCurrentTika || currentCode === mat?.tika_code,
+      available: Boolean(mat?.tika_code),
       badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
     },
   ];
+
 
   // Simplify Jump list by showing only other connected layers
   const jumpTargets = connectedBooks.filter((item) => !item.isCurrent);

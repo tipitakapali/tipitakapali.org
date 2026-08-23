@@ -145,10 +145,12 @@ export default function GoToModal({ isOpen, onClose }) {
 
   const pageSystems = [
     { code: 'V', label: 'VRI', name: 'Vipassana Research Institute' },
+    { code: 'M', label: 'Myanmar', name: 'Chaṭṭha Saṅgāyana' },
     { code: 'P', label: 'PTS', name: 'Pali Text Society' },
     { code: 'T', label: 'Thai', name: 'Royal Thai Edition' },
-    { code: 'M', label: 'Myanmar', name: 'Chaṭṭha Saṅgāyana (Myanmar)' },
+    { code: 'O', label: 'Other', name: 'Other Extra-canonical' },
   ];
+
 
   const handleParaSubmit = (e) => {
     if (e) e.preventDefault();
@@ -215,30 +217,15 @@ export default function GoToModal({ isOpen, onClose }) {
       }
     }
 
-    if (targetChap !== undefined || targetPara !== undefined) {
-      openBook(activeTab.bookCode, {
-        targetChapterIdx: targetChap,
-        targetParaNum: targetPara,
-      });
-      onClose();
-      return;
-    }
-
-    // Fallback: try searching in reader DOM
-    if (typeof document !== 'undefined') {
-      const pbEl =
-        document.querySelector(`span.pb[data-ed="${ed}"][data-page="${clean}"]`) ||
-        document.querySelector(`span.pb[data-ed="${ed}"][data-page*="${clean}"]`);
-      if (pbEl) {
-        pbEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        pbEl.classList.add('pulse-highlight');
-        onClose();
-        return;
-      }
-    }
-
-    setErrorMessage(`Page "${clean}" not found for ${pageSystem} edition in this book.`);
+    openBook(activeTab.bookCode, {
+      targetChapterIdx: targetChap,
+      targetParaNum: targetPara,
+      targetPage: clean,
+      targetPageSystem: ed,
+    });
+    onClose();
   };
+
 
   // Only return null after ALL hooks have executed unconditionally
   if (!isOpen || !activeTab) return null;
@@ -390,7 +377,7 @@ export default function GoToModal({ isOpen, onClose }) {
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
                   Page Numbering Edition
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {pageSystems.map((sys) => {
                     const rangeInfo = editionRanges[sys.code] || { available: false, label: 'Unavailable' };
                     return (
@@ -421,7 +408,11 @@ export default function GoToModal({ isOpen, onClose }) {
                     );
                   })}
                 </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1.5 leading-normal">
+                  <span className="font-semibold text-[var(--text-primary)]">Editions:</span> <strong>V</strong> = VRI (Vipassana Research Inst.) • <strong>M</strong> = Myanmar • <strong>P</strong> = PTS (Pali Text Society) • <strong>T</strong> = Thai • <strong>O</strong> = Other
+                </p>
               </div>
+
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">

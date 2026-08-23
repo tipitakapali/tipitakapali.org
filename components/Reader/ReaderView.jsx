@@ -138,9 +138,39 @@ export default function ReaderView() {
       // 1. Target page break
       if (page && pageSystem) {
         const cleanP = String(page).trim();
-        const pbEl =
-          containerRef.current.querySelector(`span.pb[data-ed="${pageSystem}"][data-page="${cleanP}"]`) ||
-          containerRef.current.querySelector(`span.pb[data-ed="${pageSystem}"][data-page*="${cleanP}"]`);
+        const ed = String(pageSystem).toUpperCase();
+        let pbEl = null;
+
+        // Try direct ID lookup first (e.g. V0.0023, P3.0045, V1.0023)
+        if (cleanP.includes('.')) {
+          const parts = cleanP.split('.');
+          const vol = parseInt(parts[0], 10);
+          const num = parseInt(parts[1], 10);
+          if (!isNaN(vol) && !isNaN(num)) {
+            const padded = `${vol}.${String(num).padStart(4, '0')}`;
+            pbEl =
+              containerRef.current.querySelector(`#${ed}${padded}`) ||
+              containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${padded}"]`) ||
+              containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+          }
+        } else {
+          const num = parseInt(cleanP, 10);
+          if (!isNaN(num)) {
+            const paddedNum = String(num).padStart(4, '0');
+            const knownAnchor =
+              activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
+            if (knownAnchor) {
+              pbEl = containerRef.current.querySelector(`#${knownAnchor}`);
+            }
+            if (!pbEl) {
+              pbEl =
+                containerRef.current.querySelector(`[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
+                containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
+                containerRef.current.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+            }
+          }
+        }
+
         if (pbEl) {
           const containerRect = containerRef.current.getBoundingClientRect();
           const rect = pbEl.getBoundingClientRect();
@@ -187,6 +217,8 @@ export default function ReaderView() {
       // 3. Target paragraph by number
       if (paraNum) {
         const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
+        const targetInt = parseInt(cleanPara, 10);
+
         let el =
           containerRef.current.querySelector(`#para${cleanPara}`) ||
           containerRef.current.querySelector(`#para-${cleanPara}`) ||
@@ -194,25 +226,35 @@ export default function ReaderView() {
           containerRef.current.querySelector(`strong.paranum[id="para-${cleanPara}"]`) ||
           containerRef.current.querySelector(`[id="${paraNum}"]`);
 
-        // If exact paragraph element not found yet, check nearest available <= cleanPara
-        if (!el) {
-          const targetInt = parseInt(cleanPara, 10);
-          if (!isNaN(targetInt)) {
-            const allParas = containerRef.current.querySelectorAll('[data-para]');
-            let bestEl = null;
-            let bestDiff = Infinity;
-            for (const p of allParas) {
-              const pNum = parseInt(p.getAttribute('data-para'), 10);
-              if (!isNaN(pNum) && pNum <= targetInt) {
-                const diff = targetInt - pNum;
-                if (diff < bestDiff) {
-                  bestDiff = diff;
-                  bestEl = p;
-                }
+        // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
+        if (!el && !isNaN(targetInt)) {
+          const rangedParas = containerRef.current.querySelectorAll('[data-para-first]');
+          for (const p of rangedParas) {
+            const first = parseInt(p.getAttribute('data-para-first'), 10);
+            const last = parseInt(p.getAttribute('data-para-last'), 10);
+            if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
+              el = p;
+              break;
+            }
+          }
+        }
+
+        // Fallback: nearest paragraph <= targetInt
+        if (!el && !isNaN(targetInt)) {
+          const allParas = containerRef.current.querySelectorAll('[data-para]');
+          let bestEl = null;
+          let bestDiff = Infinity;
+          for (const p of allParas) {
+            const pNum = parseInt(p.getAttribute('data-para'), 10);
+            if (!isNaN(pNum) && pNum <= targetInt) {
+              const diff = targetInt - pNum;
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestEl = p;
               }
             }
-            if (bestEl) el = bestEl;
           }
+          if (bestEl) el = bestEl;
         }
 
         if (el) {
@@ -234,6 +276,7 @@ export default function ReaderView() {
           return;
         }
       }
+
 
       // 4. Target chapter
       if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined && !page) {

@@ -1,0 +1,4125 @@
+{
+  "s0101m.mul": {
+    "index": 0,
+    "fileName": "s0101m.mul.xml",
+    "code": "s0101m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/दीघ निकाय/सीलक्खन्धवग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/सीलक्खन्धवग्गपाळि",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0101m.mul",
+      "mula_title": "सीलक्खन्धवग्गपाळि",
+      "attha_code": "s0101a.att",
+      "attha_title": "सीलक्खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0101t.tik",
+      "tika_title": "सीलक्खन्धवग्ग-टीका"
+    }
+  },
+  "s0102m.mul": {
+    "index": 1,
+    "fileName": "s0102m.mul.xml",
+    "code": "s0102m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/दीघ निकाय/महावग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/महावग्गपाळि",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0102m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0102a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0102t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0103m.mul": {
+    "index": 2,
+    "fileName": "s0103m.mul.xml",
+    "code": "s0103m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/दीघ निकाय/पाथिकवग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/पाथिकवग्गपाळि",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0103m.mul",
+      "mula_title": "पाथिकवग्गपाळि",
+      "attha_code": "s0103a.att",
+      "attha_title": "पाथिकवग्ग-अट्ठकथा",
+      "tika_code": "s0103t.tik",
+      "tika_title": "पाथिकवग्ग-टीका"
+    }
+  },
+  "s0201m.mul": {
+    "index": 3,
+    "fileName": "s0201m.mul.xml",
+    "code": "s0201m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/मज्झिम निकाय/मूलपण्णासपाळि",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मूलपण्णासपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0201m.mul",
+      "mula_title": "मूलपण्णासपाळि",
+      "attha_code": "s0201a.att",
+      "attha_title": "मूलपण्णास-अट्ठकथा",
+      "tika_code": "s0201t.tik",
+      "tika_title": "मूलपण्णास-टीका"
+    }
+  },
+  "s0202m.mul": {
+    "index": 4,
+    "fileName": "s0202m.mul.xml",
+    "code": "s0202m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/मज्झिम निकाय/मज्झिमपण्णासपाळि",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मज्झिमपण्णासपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0202m.mul",
+      "mula_title": "मज्झिमपण्णासपाळि",
+      "attha_code": "s0202a.att",
+      "attha_title": "मज्झिमपण्णास-अट्ठकथा",
+      "tika_code": "s0202t.tik",
+      "tika_title": "मज्झिमपण्णास-टीका"
+    }
+  },
+  "s0203m.mul": {
+    "index": 5,
+    "fileName": "s0203m.mul.xml",
+    "code": "s0203m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/मज्झिम निकाय/उपरिपण्णासपाळि",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/उपरिपण्णासपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0203m.mul",
+      "mula_title": "उपरिपण्णासपाळि",
+      "attha_code": "s0203a.att",
+      "attha_title": "उपरिपण्णास-अट्ठकथा",
+      "tika_code": "s0203t.tik",
+      "tika_title": "उपरिपण्णास-टीका"
+    }
+  },
+  "s0301m.mul": {
+    "index": 6,
+    "fileName": "s0301m.mul.xml",
+    "code": "s0301m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/संयुत्त निकाय/सगाथावग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सगाथावग्गपाळि",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0301m.mul",
+      "mula_title": "सगाथावग्गपाळि",
+      "attha_code": "s0301a.att",
+      "attha_title": "सगाथावग्ग-अट्ठकथा",
+      "tika_code": "s0301t.tik",
+      "tika_title": "सगाथावग्ग-टीका"
+    }
+  },
+  "s0302m.mul": {
+    "index": 7,
+    "fileName": "s0302m.mul.xml",
+    "code": "s0302m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/संयुत्त निकाय/निदानवग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/निदानवग्गपाळि",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0302m.mul",
+      "mula_title": "निदानवग्गपाळि",
+      "attha_code": "s0302a.att",
+      "attha_title": "निदानवग्ग-अट्ठकथा",
+      "tika_code": "s0302t.tik",
+      "tika_title": "निदानवग्ग-टीका"
+    }
+  },
+  "s0303m.mul": {
+    "index": 8,
+    "fileName": "s0303m.mul.xml",
+    "code": "s0303m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/संयुत्त निकाय/खन्धवग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/खन्धवग्गपाळि",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0303m.mul",
+      "mula_title": "खन्धवग्गपाळि",
+      "attha_code": "s0303a.att",
+      "attha_title": "खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0303t.tik",
+      "tika_title": "खन्धवग्ग-टीका"
+    }
+  },
+  "s0304m.mul": {
+    "index": 9,
+    "fileName": "s0304m.mul.xml",
+    "code": "s0304m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/संयुत्त निकाय/सळायतनवग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सळायतनवग्गपाळि",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0304m.mul",
+      "mula_title": "सळायतनवग्गपाळि",
+      "attha_code": "s0304a.att",
+      "attha_title": "सळायतनवग्ग-अट्ठकथा",
+      "tika_code": "s0304t.tik",
+      "tika_title": "सळायतनवग्ग-टीका"
+    }
+  },
+  "s0305m.mul": {
+    "index": 10,
+    "fileName": "s0305m.mul.xml",
+    "code": "s0305m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/संयुत्त निकाय/महावग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/महावग्गपाळि",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0305m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0305a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0305t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0401m.mul": {
+    "index": 11,
+    "fileName": "s0401m.mul.xml",
+    "code": "s0401m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/एककनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/एककनिपातपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0401m.mul",
+      "mula_title": "एककनिपातपाळि",
+      "attha_code": "s0401a.att",
+      "attha_title": "एककनिपात-अट्ठकथा",
+      "tika_code": "s0401t.tik",
+      "tika_title": "एककनिपात-टीका"
+    }
+  },
+  "s0402m1.mul": {
+    "index": 12,
+    "fileName": "s0402m1.mul.xml",
+    "code": "s0402m1.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/दुकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/दुकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0402m1.mul",
+      "mula_title": "दुकनिपातपाळि",
+      "attha_code": "s0402a.att",
+      "attha_title": "दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+      "tika_code": "s0402t.tik",
+      "tika_title": "दुक-तिक-चतुक्कनिपात-टीका"
+    }
+  },
+  "s0402m2.mul": {
+    "index": 13,
+    "fileName": "s0402m2.mul.xml",
+    "code": "s0402m2.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/तिकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/तिकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga",
+    "mat": {
+      "mula_code": "s0402m2.mul",
+      "mula_title": "तिकनिपातपाळि",
+      "attha_code": "s0402a.att",
+      "attha_title": "दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+      "tika_code": "s0402t.tik",
+      "tika_title": "दुक-तिक-चतुक्कनिपात-टीका"
+    }
+  },
+  "s0402m3.mul": {
+    "index": 14,
+    "fileName": "s0402m3.mul.xml",
+    "code": "s0402m3.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/चतुक्कनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/चतुक्कनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga",
+    "mat": {
+      "mula_code": "s0402m3.mul",
+      "mula_title": "चतुक्कनिपातपाळि",
+      "attha_code": "s0402a.att",
+      "attha_title": "दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+      "tika_code": "s0402t.tik",
+      "tika_title": "दुक-तिक-चतुक्कनिपात-टीका"
+    }
+  },
+  "s0403m1.mul": {
+    "index": 15,
+    "fileName": "s0403m1.mul.xml",
+    "code": "s0403m1.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/पञ्चकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/पञ्चकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0403m1.mul",
+      "mula_title": "पञ्चकनिपातपाळि",
+      "attha_code": "s0403a.att",
+      "attha_title": "पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+      "tika_code": "s0403t.tik",
+      "tika_title": "पञ्चक-छक्क-सत्तकनिपात-टीका"
+    }
+  },
+  "s0403m2.mul": {
+    "index": 16,
+    "fileName": "s0403m2.mul.xml",
+    "code": "s0403m2.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/छक्कनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/छक्कनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0403m2.mul",
+      "mula_title": "छक्कनिपातपाळि",
+      "attha_code": "s0403a.att",
+      "attha_title": "पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+      "tika_code": "s0403t.tik",
+      "tika_title": "पञ्चक-छक्क-सत्तकनिपात-टीका"
+    }
+  },
+  "s0403m3.mul": {
+    "index": 17,
+    "fileName": "s0403m3.mul.xml",
+    "code": "s0403m3.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/सत्तकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/सत्तकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0403m3.mul",
+      "mula_title": "सत्तकनिपातपाळि",
+      "attha_code": "s0403a.att",
+      "attha_title": "पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+      "tika_code": "s0403t.tik",
+      "tika_title": "पञ्चक-छक्क-सत्तकनिपात-टीका"
+    }
+  },
+  "s0404m1.mul": {
+    "index": 18,
+    "fileName": "s0404m1.mul.xml",
+    "code": "s0404m1.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/अट्ठकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/अट्ठकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0404m1.mul",
+      "mula_title": "अट्ठकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0404m2.mul": {
+    "index": 19,
+    "fileName": "s0404m2.mul.xml",
+    "code": "s0404m2.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/नवकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/नवकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0404m2.mul",
+      "mula_title": "नवकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0404m3.mul": {
+    "index": 20,
+    "fileName": "s0404m3.mul.xml",
+    "code": "s0404m3.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/दसकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/दसकनिपातपाळि",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0404m3.mul",
+      "mula_title": "दसकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0404m4.mul": {
+    "index": 21,
+    "fileName": "s0404m4.mul.xml",
+    "code": "s0404m4.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/अङ्गुत्तर निकाय/एकादसकनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/एकादसकनिपातपाळि",
+    "chapterListTypes": "book,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0404m4.mul",
+      "mula_title": "एकादसकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0501m.mul": {
+    "index": 22,
+    "fileName": "s0501m.mul.xml",
+    "code": "s0501m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/खुद्दकपाठपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/खुद्दकपाठपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0501m.mul",
+      "mula_title": "खुद्दकपाठपाळि",
+      "attha_code": "s0501a.att",
+      "attha_title": "खुद्दकपाठ-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0502m.mul": {
+    "index": 23,
+    "fileName": "s0502m.mul.xml",
+    "code": "s0502m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/धम्मपदपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/धम्मपदपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0502m.mul",
+      "mula_title": "धम्मपदपाळि",
+      "attha_code": "s0502a.att",
+      "attha_title": "धम्मपद-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0503m.mul": {
+    "index": 24,
+    "fileName": "s0503m.mul.xml",
+    "code": "s0503m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/उदानपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/उदानपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0503m.mul",
+      "mula_title": "उदानपाळि",
+      "attha_code": "s0503a.att",
+      "attha_title": "उदान-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0504m.mul": {
+    "index": 25,
+    "fileName": "s0504m.mul.xml",
+    "code": "s0504m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/इतिवुत्तकपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/इतिवुत्तकपाळि",
+    "chapterListTypes": "book,nipata",
+    "mat": {
+      "mula_code": "s0504m.mul",
+      "mula_title": "इतिवुत्तकपाळि",
+      "attha_code": "s0504a.att",
+      "attha_title": "इतिवुत्तक-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0505m.mul": {
+    "index": 26,
+    "fileName": "s0505m.mul.xml",
+    "code": "s0505m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/सुत्तनिपातपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/सुत्तनिपातपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0505m.mul",
+      "mula_title": "सुत्तनिपातपाळि",
+      "attha_code": "s0505a.att",
+      "attha_title": "सुत्तनिपात-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0506m.mul": {
+    "index": 27,
+    "fileName": "s0506m.mul.xml",
+    "code": "s0506m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/विमानवत्थुपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/विमानवत्थुपाळि",
+    "chapterListTypes": "book,vimana",
+    "mat": {
+      "mula_code": "s0506m.mul",
+      "mula_title": "विमानवत्थुपाळि",
+      "attha_code": "s0506a.att",
+      "attha_title": "विमानवत्थु-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0507m.mul": {
+    "index": 28,
+    "fileName": "s0507m.mul.xml",
+    "code": "s0507m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/पेतवत्थुपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/पेतवत्थुपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0507m.mul",
+      "mula_title": "पेतवत्थुपाळि",
+      "attha_code": "s0507a.att",
+      "attha_title": "पेतवत्थु-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0508m.mul": {
+    "index": 29,
+    "fileName": "s0508m.mul.xml",
+    "code": "s0508m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/थेरगाथापाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/थेरगाथापाळि",
+    "chapterListTypes": "book,nipata",
+    "mat": {
+      "mula_code": "s0508m.mul",
+      "mula_title": "थेरगाथापाळि",
+      "attha_code": "s0508a1.att",
+      "attha_title": "थेरगाथा-अट्ठकथा-१",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0509m.mul": {
+    "index": 30,
+    "fileName": "s0509m.mul.xml",
+    "code": "s0509m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/थेरीगाथापाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/थेरीगाथापाळि",
+    "chapterListTypes": "book,nipata",
+    "mat": {
+      "mula_code": "s0509m.mul",
+      "mula_title": "थेरीगाथापाळि",
+      "attha_code": "s0509a.att",
+      "attha_title": "थेरीगाथा-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0510m1.mul": {
+    "index": 31,
+    "fileName": "s0510m1.mul.xml",
+    "code": "s0510m1.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Split",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/अपदानपाळि-१",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/अपदानपाळि-१",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0510m1.mul",
+      "mula_title": "अपदानपाळि-१",
+      "attha_code": "s0510a.att",
+      "attha_title": "अपदान-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0510m2.mul": {
+    "index": 32,
+    "fileName": "s0510m2.mul.xml",
+    "code": "s0510m2.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Split",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/अपदानपाळि-२",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/अपदानपाळि-२",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0510m2.mul",
+      "mula_title": "अपदानपाळि-२",
+      "attha_code": "s0510a.att",
+      "attha_title": "अपदान-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0511m.mul": {
+    "index": 33,
+    "fileName": "s0511m.mul.xml",
+    "code": "s0511m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/बुद्धवंसपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/बुद्धवंसपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0511m.mul",
+      "mula_title": "बुद्धवंसपाळि",
+      "attha_code": "s0511a.att",
+      "attha_title": "बुद्धवंस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0512m.mul": {
+    "index": 34,
+    "fileName": "s0512m.mul.xml",
+    "code": "s0512m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/चरियापिटकपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/चरियापिटकपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0512m.mul",
+      "mula_title": "चरियापिटकपाळि",
+      "attha_code": "s0512a.att",
+      "attha_title": "चरियापिटक-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0513m.mul": {
+    "index": 35,
+    "fileName": "s0513m.mul.xml",
+    "code": "s0513m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/जातकपाळि-१",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातकपाळि-१",
+    "chapterListTypes": "book,nipata",
+    "mat": {
+      "mula_code": "s0513m.mul",
+      "mula_title": "जातकपाळि-१",
+      "attha_code": "s0513a1.att",
+      "attha_title": "जातक-अट्ठकथा-१",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0514m.mul": {
+    "index": 36,
+    "fileName": "s0514m.mul.xml",
+    "code": "s0514m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/जातकपाळि-२",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातकपाळि-२",
+    "chapterListTypes": "book,nipata",
+    "mat": {
+      "mula_code": "s0514m.mul",
+      "mula_title": "जातकपाळि-२",
+      "attha_code": "s0514a1.att",
+      "attha_title": "जातक-अट्ठकथा-५",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0515m.mul": {
+    "index": 37,
+    "fileName": "s0515m.mul.xml",
+    "code": "s0515m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/महानिद्देसपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/महानिद्देसपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0515m.mul",
+      "mula_title": "महानिद्देसपाळि",
+      "attha_code": "s0515a.att",
+      "attha_title": "महानिद्देस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0516m.mul": {
+    "index": 38,
+    "fileName": "s0516m.mul.xml",
+    "code": "s0516m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/चूळनिद्देसपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/चूळनिद्देसपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0516m.mul",
+      "mula_title": "चूळनिद्देसपाळि",
+      "attha_code": "s0516a.att",
+      "attha_title": "चूळनिद्देस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0517m.mul": {
+    "index": 39,
+    "fileName": "s0517m.mul.xml",
+    "code": "s0517m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/पटिसम्भिदामग्गपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/पटिसम्भिदामग्गपाळि",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0517m.mul",
+      "mula_title": "पटिसम्भिदामग्गपाळि",
+      "attha_code": "s0517a.att",
+      "attha_title": "पटिसम्भिदामग्ग-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0519m.mul": {
+    "index": 40,
+    "fileName": "s0519m.mul.xml",
+    "code": "s0519m.mul",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/नेत्तिप्पकरणपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/नेत्तिप्पकरणपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0519m.mul",
+      "mula_title": "नेत्तिप्पकरणपाळि",
+      "attha_code": "s0519a.att",
+      "attha_title": "नेत्तिप्पकरण-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0518m.nrf": {
+    "index": 41,
+    "fileName": "s0518m.nrf.xml",
+    "code": "s0518m.nrf",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/मिलिन्दपञ्हपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/मिलिन्दपञ्हपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0518m.nrf",
+      "mula_title": "मिलिन्दपञ्हपाळि",
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0520m.nrf": {
+    "index": 42,
+    "fileName": "s0520m.nrf.xml",
+    "code": "s0520m.nrf",
+    "pitaka": "Sutta",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/सुत्त पिटक/खुद्दक निकाय/पेटकोपदेसपाळि",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/पेटकोपदेसपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "s0520m.nrf",
+      "mula_title": "पेटकोपदेसपाळि",
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "vin01m.mul": {
+    "index": 43,
+    "fileName": "vin01m.mul.xml",
+    "code": "vin01m.mul",
+    "pitaka": "Vinaya",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/विनय पिटक/पाराजिकपाळि",
+    "shortNavPath": "वि॰ पि॰/पाराजिकपाळि",
+    "chapterListTypes": "book,kanda",
+    "mat": {
+      "mula_code": "vin01m.mul",
+      "mula_title": "पाराजिकपाळि",
+      "attha_code": "vin01a.att",
+      "attha_title": "पाराजिककण्ड-अट्ठकथा",
+      "tika_code": "vin01t1.tik",
+      "tika_title": "सारत्थदीपनी-टीका-१"
+    }
+  },
+  "vin02m1.mul": {
+    "index": 44,
+    "fileName": "vin02m1.mul.xml",
+    "code": "vin02m1.mul",
+    "pitaka": "Vinaya",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/विनय पिटक/पाचित्तियपाळि",
+    "shortNavPath": "वि॰ पि॰/पाचित्तियपाळि",
+    "chapterListTypes": "book,subbook,kanda",
+    "mat": {
+      "mula_code": "vin02m1.mul",
+      "mula_title": "पाचित्तियपाळि",
+      "attha_code": "vin02a1.att",
+      "attha_title": "पाचित्तिय-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02m2.mul": {
+    "index": 45,
+    "fileName": "vin02m2.mul.xml",
+    "code": "vin02m2.mul",
+    "pitaka": "Vinaya",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/विनय पिटक/महावग्गपाळि",
+    "shortNavPath": "वि॰ पि॰/महावग्गपाळि",
+    "chapterListTypes": "book,khandaka",
+    "mat": {
+      "mula_code": "vin02m2.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "vin02a2.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02m3.mul": {
+    "index": 46,
+    "fileName": "vin02m3.mul.xml",
+    "code": "vin02m3.mul",
+    "pitaka": "Vinaya",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/विनय पिटक/चूळवग्गपाळि",
+    "shortNavPath": "वि॰ पि॰/चूळवग्गपाळि",
+    "chapterListTypes": "book,khandaka",
+    "mat": {
+      "mula_code": "vin02m3.mul",
+      "mula_title": "चूळवग्गपाळि",
+      "attha_code": "vin02a3.att",
+      "attha_title": "चूळवग्ग-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02m4.mul": {
+    "index": 47,
+    "fileName": "vin02m4.mul.xml",
+    "code": "vin02m4.mul",
+    "pitaka": "Vinaya",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/विनय पिटक/परिवारपाळि",
+    "shortNavPath": "वि॰ पि॰/परिवारपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "vin02m4.mul",
+      "mula_title": "परिवारपाळि",
+      "attha_code": "vin02a4.att",
+      "attha_title": "परिवार-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "abh01m.mul": {
+    "index": 48,
+    "fileName": "abh01m.mul.xml",
+    "code": "abh01m.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/धम्मसङ्गणीपाळि",
+    "shortNavPath": "अभि॰ पि॰/धम्मसङ्गणीपाळि",
+    "chapterListTypes": "book,chapter",
+    "mat": {
+      "mula_code": "abh01m.mul",
+      "mula_title": "धम्मसङ्गणीपाळि",
+      "attha_code": "abh01a.att",
+      "attha_title": "धम्मसङ्गणि-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "abh02m.mul": {
+    "index": 49,
+    "fileName": "abh02m.mul.xml",
+    "code": "abh02m.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/विभङ्गपाळि",
+    "shortNavPath": "अभि॰ पि॰/विभङ्गपाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh02m.mul",
+      "mula_title": "विभङ्गपाळि",
+      "attha_code": "abh02a.att",
+      "attha_title": "सम्मोहविनोदनी-अट्ठकथा",
+      "tika_code": "abh02t.tik",
+      "tika_title": "विभङ्ग-मूलटीका"
+    }
+  },
+  "abh03m1.mul": {
+    "index": 50,
+    "fileName": "abh03m1.mul.xml",
+    "code": "abh03m1.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/धातुकथापाळि",
+    "shortNavPath": "अभि॰ पि॰/धातुकथापाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m1.mul",
+      "mula_title": "धातुकथापाळि",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m2.mul": {
+    "index": 51,
+    "fileName": "abh03m2.mul.xml",
+    "code": "abh03m2.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पुग्गलपञ्ञत्तिपाळि",
+    "shortNavPath": "अभि॰ पि॰/पुग्गलपञ्ञत्तिपाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m2.mul",
+      "mula_title": "पुग्गलपञ्ञत्तिपाळि",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m3.mul": {
+    "index": 52,
+    "fileName": "abh03m3.mul.xml",
+    "code": "abh03m3.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/कथावत्थुपाळि",
+    "shortNavPath": "अभि॰ पि॰/कथावत्थुपाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m3.mul",
+      "mula_title": "कथावत्थुपाळि",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "abh03m4.mul": {
+    "index": 53,
+    "fileName": "abh03m4.mul.xml",
+    "code": "abh03m4.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/यमकपाळि-१",
+    "shortNavPath": "अभि॰ पि॰/यमकपाळि-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m4.mul",
+      "mula_title": "यमकपाळि-१",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m5.mul": {
+    "index": 54,
+    "fileName": "abh03m5.mul.xml",
+    "code": "abh03m5.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/यमकपाळि-२",
+    "shortNavPath": "अभि॰ पि॰/यमकपाळि-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m5.mul",
+      "mula_title": "यमकपाळि-२",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m6.mul": {
+    "index": 55,
+    "fileName": "abh03m6.mul.xml",
+    "code": "abh03m6.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/यमकपाळि-३",
+    "shortNavPath": "अभि॰ पि॰/यमकपाळि-३",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m6.mul",
+      "mula_title": "यमकपाळि-३",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m7.mul": {
+    "index": 56,
+    "fileName": "abh03m7.mul.xml",
+    "code": "abh03m7.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पट्ठानपाळि-१",
+    "shortNavPath": "अभि॰ पि॰/पट्ठानपाळि-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m7.mul",
+      "mula_title": "पट्ठानपाळि-१",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "abh03m8.mul": {
+    "index": 57,
+    "fileName": "abh03m8.mul.xml",
+    "code": "abh03m8.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पट्ठानपाळि-२",
+    "shortNavPath": "अभि॰ पि॰/पट्ठानपाळि-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m8.mul",
+      "mula_title": "पट्ठानपाळि-२",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m9.mul": {
+    "index": 58,
+    "fileName": "abh03m9.mul.xml",
+    "code": "abh03m9.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पट्ठानपाळि-३",
+    "shortNavPath": "अभि॰ पि॰/पट्ठानपाळि-३",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m9.mul",
+      "mula_title": "पट्ठानपाळि-३",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh03m10.mul": {
+    "index": 59,
+    "fileName": "abh03m10.mul.xml",
+    "code": "abh03m10.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पट्ठानपाळि-४",
+    "shortNavPath": "अभि॰ पि॰/पट्ठानपाळि-४",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m10.mul",
+      "mula_title": "पट्ठानपाळि-४",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "abh03m11.mul": {
+    "index": 60,
+    "fileName": "abh03m11.mul.xml",
+    "code": "abh03m11.mul",
+    "pitaka": "Abhidhamma",
+    "matn": "Mula",
+    "bookType": "Whole",
+    "longNavPath": "तिपिटक (मूल)/अभिधम्म पिटक/पट्ठानपाळि-५",
+    "shortNavPath": "अभि॰ पि॰/पट्ठानपाळि-५",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m11.mul",
+      "mula_title": "पट्ठानपाळि-५",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "s0101a.att": {
+    "index": 61,
+    "fileName": "s0101a.att.xml",
+    "code": "s0101a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/दीघ निकाय (अट्ठकथा)/सीलक्खन्धवग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/सीलक्खन्धवग्ग-अट्ठकथा",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0101m.mul",
+      "mula_title": "सीलक्खन्धवग्गपाळि",
+      "attha_code": "s0101a.att",
+      "attha_title": "सीलक्खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0101t.tik",
+      "tika_title": "सीलक्खन्धवग्ग-टीका"
+    }
+  },
+  "s0102a.att": {
+    "index": 62,
+    "fileName": "s0102a.att.xml",
+    "code": "s0102a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/दीघ निकाय (अट्ठकथा)/महावग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/महावग्ग-अट्ठकथा",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0102m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0102a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0102t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0103a.att": {
+    "index": 63,
+    "fileName": "s0103a.att.xml",
+    "code": "s0103a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/दीघ निकाय (अट्ठकथा)/पाथिकवग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/पाथिकवग्ग-अट्ठकथा",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0103m.mul",
+      "mula_title": "पाथिकवग्गपाळि",
+      "attha_code": "s0103a.att",
+      "attha_title": "पाथिकवग्ग-अट्ठकथा",
+      "tika_code": "s0103t.tik",
+      "tika_title": "पाथिकवग्ग-टीका"
+    }
+  },
+  "s0201a.att": {
+    "index": 64,
+    "fileName": "s0201a.att.xml",
+    "code": "s0201a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/मज्झिम निकाय (अट्ठकथा)/मूलपण्णास-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मूलपण्णास-अट्ठकथा",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0201m.mul",
+      "mula_title": "मूलपण्णासपाळि",
+      "attha_code": "s0201a.att",
+      "attha_title": "मूलपण्णास-अट्ठकथा",
+      "tika_code": "s0201t.tik",
+      "tika_title": "मूलपण्णास-टीका"
+    }
+  },
+  "s0202a.att": {
+    "index": 65,
+    "fileName": "s0202a.att.xml",
+    "code": "s0202a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/मज्झिम निकाय (अट्ठकथा)/मज्झिमपण्णास-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मज्झिमपण्णास-अट्ठकथा",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0202m.mul",
+      "mula_title": "मज्झिमपण्णासपाळि",
+      "attha_code": "s0202a.att",
+      "attha_title": "मज्झिमपण्णास-अट्ठकथा",
+      "tika_code": "s0202t.tik",
+      "tika_title": "मज्झिमपण्णास-टीका"
+    }
+  },
+  "s0203a.att": {
+    "index": 66,
+    "fileName": "s0203a.att.xml",
+    "code": "s0203a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/मज्झिम निकाय (अट्ठकथा)/उपरिपण्णास-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/उपरिपण्णास-अट्ठकथा",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0203m.mul",
+      "mula_title": "उपरिपण्णासपाळि",
+      "attha_code": "s0203a.att",
+      "attha_title": "उपरिपण्णास-अट्ठकथा",
+      "tika_code": "s0203t.tik",
+      "tika_title": "उपरिपण्णास-टीका"
+    }
+  },
+  "s0301a.att": {
+    "index": 67,
+    "fileName": "s0301a.att.xml",
+    "code": "s0301a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/संयुत्त निकाय (अट्ठकथा)/सगाथावग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सगाथावग्ग-अट्ठकथा",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0301m.mul",
+      "mula_title": "सगाथावग्गपाळि",
+      "attha_code": "s0301a.att",
+      "attha_title": "सगाथावग्ग-अट्ठकथा",
+      "tika_code": "s0301t.tik",
+      "tika_title": "सगाथावग्ग-टीका"
+    }
+  },
+  "s0302a.att": {
+    "index": 68,
+    "fileName": "s0302a.att.xml",
+    "code": "s0302a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/संयुत्त निकाय (अट्ठकथा)/निदानवग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/निदानवग्ग-अट्ठकथा",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0302m.mul",
+      "mula_title": "निदानवग्गपाळि",
+      "attha_code": "s0302a.att",
+      "attha_title": "निदानवग्ग-अट्ठकथा",
+      "tika_code": "s0302t.tik",
+      "tika_title": "निदानवग्ग-टीका"
+    }
+  },
+  "s0303a.att": {
+    "index": 69,
+    "fileName": "s0303a.att.xml",
+    "code": "s0303a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/संयुत्त निकाय (अट्ठकथा)/खन्धवग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/खन्धवग्ग-अट्ठकथा",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0303m.mul",
+      "mula_title": "खन्धवग्गपाळि",
+      "attha_code": "s0303a.att",
+      "attha_title": "खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0303t.tik",
+      "tika_title": "खन्धवग्ग-टीका"
+    }
+  },
+  "s0304a.att": {
+    "index": 70,
+    "fileName": "s0304a.att.xml",
+    "code": "s0304a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/संयुत्त निकाय (अट्ठकथा)/सळायतनवग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सळायतनवग्ग-अट्ठकथा",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0304m.mul",
+      "mula_title": "सळायतनवग्गपाळि",
+      "attha_code": "s0304a.att",
+      "attha_title": "सळायतनवग्ग-अट्ठकथा",
+      "tika_code": "s0304t.tik",
+      "tika_title": "सळायतनवग्ग-टीका"
+    }
+  },
+  "s0305a.att": {
+    "index": 71,
+    "fileName": "s0305a.att.xml",
+    "code": "s0305a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/संयुत्त निकाय (अट्ठकथा)/महावग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/महावग्ग-अट्ठकथा",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0305m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0305a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0305t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0401a.att": {
+    "index": 72,
+    "fileName": "s0401a.att.xml",
+    "code": "s0401a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/अङ्गुत्तर निकाय (अट्ठकथा)/एककनिपात-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/एककनिपात-अट्ठकथा",
+    "chapterListTypes": "book,intro,vagga",
+    "mat": {
+      "mula_code": "s0401m.mul",
+      "mula_title": "एककनिपातपाळि",
+      "attha_code": "s0401a.att",
+      "attha_title": "एककनिपात-अट्ठकथा",
+      "tika_code": "s0401t.tik",
+      "tika_title": "एककनिपात-टीका"
+    }
+  },
+  "s0402a.att": {
+    "index": 73,
+    "fileName": "s0402a.att.xml",
+    "code": "s0402a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Multi",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/अङ्गुत्तर निकाय (अट्ठकथा)/दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+    "chapterListTypes": "book,pannasaka,vagga",
+    "mat": {
+      "mula_code": "s0402m1.mul",
+      "mula_title": "दुकनिपातपाळि",
+      "attha_code": "s0402a.att",
+      "attha_title": "दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+      "tika_code": "s0402t.tik",
+      "tika_title": "दुक-तिक-चतुक्कनिपात-टीका"
+    }
+  },
+  "s0403a.att": {
+    "index": 74,
+    "fileName": "s0403a.att.xml",
+    "code": "s0403a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Multi",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/अङ्गुत्तर निकाय (अट्ठकथा)/पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0403m1.mul",
+      "mula_title": "पञ्चकनिपातपाळि",
+      "attha_code": "s0403a.att",
+      "attha_title": "पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+      "tika_code": "s0403t.tik",
+      "tika_title": "पञ्चक-छक्क-सत्तकनिपात-टीका"
+    }
+  },
+  "s0404a.att": {
+    "index": 75,
+    "fileName": "s0404a.att.xml",
+    "code": "s0404a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Multi",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/अङ्गुत्तर निकाय (अट्ठकथा)/अट्ठकादिनिपात-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/अट्ठकादिनिपात-अट्ठकथा",
+    "chapterListTypes": "book,pannasaka,vagga,peyyala",
+    "mat": {
+      "mula_code": "s0404m1.mul",
+      "mula_title": "अट्ठकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0501a.att": {
+    "index": 76,
+    "fileName": "s0501a.att.xml",
+    "code": "s0501a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/खुद्दकपाठ-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/खुद्दकपाठ-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0501m.mul",
+      "mula_title": "खुद्दकपाठपाळि",
+      "attha_code": "s0501a.att",
+      "attha_title": "खुद्दकपाठ-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0502a.att": {
+    "index": 77,
+    "fileName": "s0502a.att.xml",
+    "code": "s0502a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/धम्मपद-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/धम्मपद-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0502m.mul",
+      "mula_title": "धम्मपदपाळि",
+      "attha_code": "s0502a.att",
+      "attha_title": "धम्मपद-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0503a.att": {
+    "index": 78,
+    "fileName": "s0503a.att.xml",
+    "code": "s0503a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/उदान-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/उदान-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0503m.mul",
+      "mula_title": "उदानपाळि",
+      "attha_code": "s0503a.att",
+      "attha_title": "उदान-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0504a.att": {
+    "index": 79,
+    "fileName": "s0504a.att.xml",
+    "code": "s0504a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/इतिवुत्तक-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/इतिवुत्तक-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0504m.mul",
+      "mula_title": "इतिवुत्तकपाळि",
+      "attha_code": "s0504a.att",
+      "attha_title": "इतिवुत्तक-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0505a.att": {
+    "index": 80,
+    "fileName": "s0505a.att.xml",
+    "code": "s0505a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/सुत्तनिपात-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/सुत्तनिपात-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0505m.mul",
+      "mula_title": "सुत्तनिपातपाळि",
+      "attha_code": "s0505a.att",
+      "attha_title": "सुत्तनिपात-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0506a.att": {
+    "index": 81,
+    "fileName": "s0506a.att.xml",
+    "code": "s0506a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/विमानवत्थु-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/विमानवत्थु-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0506m.mul",
+      "mula_title": "विमानवत्थुपाळि",
+      "attha_code": "s0506a.att",
+      "attha_title": "विमानवत्थु-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0507a.att": {
+    "index": 82,
+    "fileName": "s0507a.att.xml",
+    "code": "s0507a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/पेतवत्थु-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/पेतवत्थु-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0507m.mul",
+      "mula_title": "पेतवत्थुपाळि",
+      "attha_code": "s0507a.att",
+      "attha_title": "पेतवत्थु-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0508a1.att": {
+    "index": 83,
+    "fileName": "s0508a1.att.xml",
+    "code": "s0508a1.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/थेरगाथा-अट्ठकथा-१",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/थेरगाथा-अट्ठकथा-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0508m.mul",
+      "mula_title": "थेरगाथापाळि",
+      "attha_code": "s0508a1.att",
+      "attha_title": "थेरगाथा-अट्ठकथा-१",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0508a2.att": {
+    "index": 84,
+    "fileName": "s0508a2.att.xml",
+    "code": "s0508a2.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/थेरगाथा-अट्ठकथा-२",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/थेरगाथा-अट्ठकथा-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0508m.mul",
+      "mula_title": "थेरगाथापाळि",
+      "attha_code": "s0508a2.att",
+      "attha_title": "थेरगाथा-अट्ठकथा-२",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0509a.att": {
+    "index": 85,
+    "fileName": "s0509a.att.xml",
+    "code": "s0509a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/थेरीगाथा-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/थेरीगाथा-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0509m.mul",
+      "mula_title": "थेरीगाथापाळि",
+      "attha_code": "s0509a.att",
+      "attha_title": "थेरीगाथा-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0510a.att": {
+    "index": 86,
+    "fileName": "s0510a.att.xml",
+    "code": "s0510a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/अपदान-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/अपदान-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0510m1.mul",
+      "mula_title": "अपदानपाळि-१",
+      "attha_code": "s0510a.att",
+      "attha_title": "अपदान-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0511a.att": {
+    "index": 87,
+    "fileName": "s0511a.att.xml",
+    "code": "s0511a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/बुद्धवंस-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/बुद्धवंस-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0511m.mul",
+      "mula_title": "बुद्धवंसपाळि",
+      "attha_code": "s0511a.att",
+      "attha_title": "बुद्धवंस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0512a.att": {
+    "index": 88,
+    "fileName": "s0512a.att.xml",
+    "code": "s0512a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/चरियापिटक-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/चरियापिटक-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0512m.mul",
+      "mula_title": "चरियापिटकपाळि",
+      "attha_code": "s0512a.att",
+      "attha_title": "चरियापिटक-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0513a1.att": {
+    "index": 89,
+    "fileName": "s0513a1.att.xml",
+    "code": "s0513a1.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-१",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0513m.mul",
+      "mula_title": "जातकपाळि-१",
+      "attha_code": "s0513a1.att",
+      "attha_title": "जातक-अट्ठकथा-१",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0513a2.att": {
+    "index": 90,
+    "fileName": "s0513a2.att.xml",
+    "code": "s0513a2.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-२",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0513m.mul",
+      "mula_title": "जातकपाळि-१",
+      "attha_code": "s0513a2.att",
+      "attha_title": "जातक-अट्ठकथा-२",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0513a3.att": {
+    "index": 91,
+    "fileName": "s0513a3.att.xml",
+    "code": "s0513a3.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-३",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-३",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0513m.mul",
+      "mula_title": "जातकपाळि-१",
+      "attha_code": "s0513a3.att",
+      "attha_title": "जातक-अट्ठकथा-३",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0513a4.att": {
+    "index": 92,
+    "fileName": "s0513a4.att.xml",
+    "code": "s0513a4.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-४",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-४",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0513m.mul",
+      "mula_title": "जातकपाळि-१",
+      "attha_code": "s0513a4.att",
+      "attha_title": "जातक-अट्ठकथा-४",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0514a1.att": {
+    "index": 93,
+    "fileName": "s0514a1.att.xml",
+    "code": "s0514a1.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-५",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-५",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0514m.mul",
+      "mula_title": "जातकपाळि-२",
+      "attha_code": "s0514a1.att",
+      "attha_title": "जातक-अट्ठकथा-५",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0514a2.att": {
+    "index": 94,
+    "fileName": "s0514a2.att.xml",
+    "code": "s0514a2.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-६",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-६",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0514m.mul",
+      "mula_title": "जातकपाळि-२",
+      "attha_code": "s0514a2.att",
+      "attha_title": "जातक-अट्ठकथा-६",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0514a3.att": {
+    "index": 95,
+    "fileName": "s0514a3.att.xml",
+    "code": "s0514a3.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Split",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/जातक-अट्ठकथा-७",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/जातक-अट्ठकथा-७",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0514m.mul",
+      "mula_title": "जातकपाळि-२",
+      "attha_code": "s0514a3.att",
+      "attha_title": "जातक-अट्ठकथा-७",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0515a.att": {
+    "index": 96,
+    "fileName": "s0515a.att.xml",
+    "code": "s0515a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/महानिद्देस-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/महानिद्देस-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0515m.mul",
+      "mula_title": "महानिद्देसपाळि",
+      "attha_code": "s0515a.att",
+      "attha_title": "महानिद्देस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0516a.att": {
+    "index": 97,
+    "fileName": "s0516a.att.xml",
+    "code": "s0516a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/चूळनिद्देस-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/चूळनिद्देस-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0516m.mul",
+      "mula_title": "चूळनिद्देसपाळि",
+      "attha_code": "s0516a.att",
+      "attha_title": "चूळनिद्देस-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0517a.att": {
+    "index": 98,
+    "fileName": "s0517a.att.xml",
+    "code": "s0517a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/पटिसम्भिदामग्ग-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/पटिसम्भिदामग्ग-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0517m.mul",
+      "mula_title": "पटिसम्भिदामग्गपाळि",
+      "attha_code": "s0517a.att",
+      "attha_title": "पटिसम्भिदामग्ग-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "s0519a.att": {
+    "index": 99,
+    "fileName": "s0519a.att.xml",
+    "code": "s0519a.att",
+    "pitaka": "Sutta",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/सुत्त पिटक (अट्ठकथा)/खुद्दक निकाय (अट्ठकथा)/नेत्तिप्पकरण-अट्ठकथा",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/नेत्तिप्पकरण-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0519m.mul",
+      "mula_title": "नेत्तिप्पकरणपाळि",
+      "attha_code": "s0519a.att",
+      "attha_title": "नेत्तिप्पकरण-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "vin01a.att": {
+    "index": 100,
+    "fileName": "vin01a.att.xml",
+    "code": "vin01a.att",
+    "pitaka": "Vinaya",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/विनय पिटक (अट्ठकथा)/पाराजिककण्ड-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/पाराजिककण्ड-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin01m.mul",
+      "mula_title": "पाराजिकपाळि",
+      "attha_code": "vin01a.att",
+      "attha_title": "पाराजिककण्ड-अट्ठकथा",
+      "tika_code": "vin01t1.tik",
+      "tika_title": "सारत्थदीपनी-टीका-१"
+    }
+  },
+  "vin02a1.att": {
+    "index": 101,
+    "fileName": "vin02a1.att.xml",
+    "code": "vin02a1.att",
+    "pitaka": "Vinaya",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/विनय पिटक (अट्ठकथा)/पाचित्तिय-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/पाचित्तिय-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin02m1.mul",
+      "mula_title": "पाचित्तियपाळि",
+      "attha_code": "vin02a1.att",
+      "attha_title": "पाचित्तिय-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02a2.att": {
+    "index": 102,
+    "fileName": "vin02a2.att.xml",
+    "code": "vin02a2.att",
+    "pitaka": "Vinaya",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/विनय पिटक (अट्ठकथा)/महावग्ग-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/महावग्ग-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin02m2.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "vin02a2.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02a3.att": {
+    "index": 103,
+    "fileName": "vin02a3.att.xml",
+    "code": "vin02a3.att",
+    "pitaka": "Vinaya",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/विनय पिटक (अट्ठकथा)/चूळवग्ग-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/चूळवग्ग-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin02m3.mul",
+      "mula_title": "चूळवग्गपाळि",
+      "attha_code": "vin02a3.att",
+      "attha_title": "चूळवग्ग-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin02a4.att": {
+    "index": 104,
+    "fileName": "vin02a4.att.xml",
+    "code": "vin02a4.att",
+    "pitaka": "Vinaya",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/विनय पिटक (अट्ठकथा)/परिवार-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/परिवार-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin02m4.mul",
+      "mula_title": "परिवारपाळि",
+      "attha_code": "vin02a4.att",
+      "attha_title": "परिवार-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "abh01a.att": {
+    "index": 105,
+    "fileName": "abh01a.att.xml",
+    "code": "abh01a.att",
+    "pitaka": "Abhidhamma",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/अभिधम्म पिटक (अट्ठकथा)/धम्मसङ्गणि-अट्ठकथा",
+    "shortNavPath": "अभि॰ पि॰/धम्मसङ्गणि-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh01m.mul",
+      "mula_title": "धम्मसङ्गणीपाळि",
+      "attha_code": "abh01a.att",
+      "attha_title": "धम्मसङ्गणि-अट्ठकथा",
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "abh02a.att": {
+    "index": 106,
+    "fileName": "abh02a.att.xml",
+    "code": "abh02a.att",
+    "pitaka": "Abhidhamma",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/अभिधम्म पिटक (अट्ठकथा)/सम्मोहविनोदनी-अट्ठकथा",
+    "shortNavPath": "अभि॰ पि॰/सम्मोहविनोदनी-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh02m.mul",
+      "mula_title": "विभङ्गपाळि",
+      "attha_code": "abh02a.att",
+      "attha_title": "सम्मोहविनोदनी-अट्ठकथा",
+      "tika_code": "abh02t.tik",
+      "tika_title": "विभङ्ग-मूलटीका"
+    }
+  },
+  "abh03a.att": {
+    "index": 107,
+    "fileName": "abh03a.att.xml",
+    "code": "abh03a.att",
+    "pitaka": "Abhidhamma",
+    "matn": "Atthakatha",
+    "bookType": "Whole",
+    "longNavPath": "अट्ठकथा/अभिधम्म पिटक (अट्ठकथा)/पञ्चपकरण-अट्ठकथा",
+    "shortNavPath": "अभि॰ पि॰/पञ्चपकरण-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m1.mul",
+      "mula_title": "धातुकथापाळि",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "s0101t.tik": {
+    "index": 108,
+    "fileName": "s0101t.tik.xml",
+    "code": "s0101t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/दीघ निकाय (टीका)/सीलक्खन्धवग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/सीलक्खन्धवग्ग-टीका",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0101m.mul",
+      "mula_title": "सीलक्खन्धवग्गपाळि",
+      "attha_code": "s0101a.att",
+      "attha_title": "सीलक्खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0101t.tik",
+      "tika_title": "सीलक्खन्धवग्ग-टीका"
+    }
+  },
+  "s0102t.tik": {
+    "index": 109,
+    "fileName": "s0102t.tik.xml",
+    "code": "s0102t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/दीघ निकाय (टीका)/महावग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/महावग्ग-टीका",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0102m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0102a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0102t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0103t.tik": {
+    "index": 110,
+    "fileName": "s0103t.tik.xml",
+    "code": "s0103t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/दीघ निकाय (टीका)/पाथिकवग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/पाथिकवग्ग-टीका",
+    "chapterListTypes": "book,sutta",
+    "mat": {
+      "mula_code": "s0103m.mul",
+      "mula_title": "पाथिकवग्गपाळि",
+      "attha_code": "s0103a.att",
+      "attha_title": "पाथिकवग्ग-अट्ठकथा",
+      "tika_code": "s0103t.tik",
+      "tika_title": "पाथिकवग्ग-टीका"
+    }
+  },
+  "s0104t.nrf": {
+    "index": 111,
+    "fileName": "s0104t.nrf.xml",
+    "code": "s0104t.nrf",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/दीघ निकाय (टीका)/सीलक्खन्धवग्ग-अभिनवटीका-१",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/सीलक्खन्धवग्ग-अभिनवटीका-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "s0104t.nrf",
+      "tika_title": "सीलक्खन्धवग्ग-अभिनवटीका-१"
+    }
+  },
+  "s0105t.nrf": {
+    "index": 112,
+    "fileName": "s0105t.nrf.xml",
+    "code": "s0105t.nrf",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/दीघ निकाय (टीका)/सीलक्खन्धवग्ग-अभिनवटीका-२",
+    "shortNavPath": "सु॰ पि॰/दी॰ नि॰/सीलक्खन्धवग्ग-अभिनवटीका-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "s0105t.nrf",
+      "tika_title": "सीलक्खन्धवग्ग-अभिनवटीका-२"
+    }
+  },
+  "s0201t.tik": {
+    "index": 113,
+    "fileName": "s0201t.tik.xml",
+    "code": "s0201t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/मज्झिम निकाय (टीका)/मूलपण्णास-टीका",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मूलपण्णास-टीका",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0201m.mul",
+      "mula_title": "मूलपण्णासपाळि",
+      "attha_code": "s0201a.att",
+      "attha_title": "मूलपण्णास-अट्ठकथा",
+      "tika_code": "s0201t.tik",
+      "tika_title": "मूलपण्णास-टीका"
+    }
+  },
+  "s0202t.tik": {
+    "index": 114,
+    "fileName": "s0202t.tik.xml",
+    "code": "s0202t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/मज्झिम निकाय (टीका)/मज्झिमपण्णास-टीका",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/मज्झिमपण्णास-टीका",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0202m.mul",
+      "mula_title": "मज्झिमपण्णासपाळि",
+      "attha_code": "s0202a.att",
+      "attha_title": "मज्झिमपण्णास-अट्ठकथा",
+      "tika_code": "s0202t.tik",
+      "tika_title": "मज्झिमपण्णास-टीका"
+    }
+  },
+  "s0203t.tik": {
+    "index": 115,
+    "fileName": "s0203t.tik.xml",
+    "code": "s0203t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/मज्झिम निकाय (टीका)/उपरिपण्णास-टीका",
+    "shortNavPath": "सु॰ पि॰/म॰ नि॰/उपरिपण्णास-टीका",
+    "chapterListTypes": "book,vagga",
+    "mat": {
+      "mula_code": "s0203m.mul",
+      "mula_title": "उपरिपण्णासपाळि",
+      "attha_code": "s0203a.att",
+      "attha_title": "उपरिपण्णास-अट्ठकथा",
+      "tika_code": "s0203t.tik",
+      "tika_title": "उपरिपण्णास-टीका"
+    }
+  },
+  "s0301t.tik": {
+    "index": 116,
+    "fileName": "s0301t.tik.xml",
+    "code": "s0301t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/संयुत्त निकाय (टीका)/सगाथावग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सगाथावग्ग-टीका",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0301m.mul",
+      "mula_title": "सगाथावग्गपाळि",
+      "attha_code": "s0301a.att",
+      "attha_title": "सगाथावग्ग-अट्ठकथा",
+      "tika_code": "s0301t.tik",
+      "tika_title": "सगाथावग्ग-टीका"
+    }
+  },
+  "s0302t.tik": {
+    "index": 117,
+    "fileName": "s0302t.tik.xml",
+    "code": "s0302t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/संयुत्त निकाय (टीका)/निदानवग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/निदानवग्ग-टीका",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0302m.mul",
+      "mula_title": "निदानवग्गपाळि",
+      "attha_code": "s0302a.att",
+      "attha_title": "निदानवग्ग-अट्ठकथा",
+      "tika_code": "s0302t.tik",
+      "tika_title": "निदानवग्ग-टीका"
+    }
+  },
+  "s0303t.tik": {
+    "index": 118,
+    "fileName": "s0303t.tik.xml",
+    "code": "s0303t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/संयुत्त निकाय (टीका)/खन्धवग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/खन्धवग्ग-टीका",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0303m.mul",
+      "mula_title": "खन्धवग्गपाळि",
+      "attha_code": "s0303a.att",
+      "attha_title": "खन्धवग्ग-अट्ठकथा",
+      "tika_code": "s0303t.tik",
+      "tika_title": "खन्धवग्ग-टीका"
+    }
+  },
+  "s0304t.tik": {
+    "index": 119,
+    "fileName": "s0304t.tik.xml",
+    "code": "s0304t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/संयुत्त निकाय (टीका)/सळायतनवग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/सळायतनवग्ग-टीका",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0304m.mul",
+      "mula_title": "सळायतनवग्गपाळि",
+      "attha_code": "s0304a.att",
+      "attha_title": "सळायतनवग्ग-अट्ठकथा",
+      "tika_code": "s0304t.tik",
+      "tika_title": "सळायतनवग्ग-टीका"
+    }
+  },
+  "s0305t.tik": {
+    "index": 120,
+    "fileName": "s0305t.tik.xml",
+    "code": "s0305t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/संयुत्त निकाय (टीका)/महावग्ग-टीका",
+    "shortNavPath": "सु॰ पि॰/सं॰ नि॰/महावग्ग-टीका",
+    "chapterListTypes": "book,samyutta",
+    "mat": {
+      "mula_code": "s0305m.mul",
+      "mula_title": "महावग्गपाळि",
+      "attha_code": "s0305a.att",
+      "attha_title": "महावग्ग-अट्ठकथा",
+      "tika_code": "s0305t.tik",
+      "tika_title": "महावग्ग-टीका"
+    }
+  },
+  "s0401t.tik": {
+    "index": 121,
+    "fileName": "s0401t.tik.xml",
+    "code": "s0401t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/अङ्गुत्तरनिकाय (टीका)/एककनिपात-टीका",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/एककनिपात-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0401m.mul",
+      "mula_title": "एककनिपातपाळि",
+      "attha_code": "s0401a.att",
+      "attha_title": "एककनिपात-अट्ठकथा",
+      "tika_code": "s0401t.tik",
+      "tika_title": "एककनिपात-टीका"
+    }
+  },
+  "s0402t.tik": {
+    "index": 122,
+    "fileName": "s0402t.tik.xml",
+    "code": "s0402t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Multi",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/अङ्गुत्तरनिकाय (टीका)/दुक-तिक-चतुक्कनिपात-टीका",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/दुक-तिक-चतुक्कनिपात-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0402m1.mul",
+      "mula_title": "दुकनिपातपाळि",
+      "attha_code": "s0402a.att",
+      "attha_title": "दुक-तिक-चतुक्कनिपात-अट्ठकथा",
+      "tika_code": "s0402t.tik",
+      "tika_title": "दुक-तिक-चतुक्कनिपात-टीका"
+    }
+  },
+  "s0403t.tik": {
+    "index": 123,
+    "fileName": "s0403t.tik.xml",
+    "code": "s0403t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Multi",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/अङ्गुत्तरनिकाय (टीका)/पञ्चक-छक्क-सत्तकनिपात-टीका",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/पञ्चक-छक्क-सत्तकनिपात-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0403m1.mul",
+      "mula_title": "पञ्चकनिपातपाळि",
+      "attha_code": "s0403a.att",
+      "attha_title": "पञ्चक-छक्क-सत्तकनिपात-अट्ठकथा",
+      "tika_code": "s0403t.tik",
+      "tika_title": "पञ्चक-छक्क-सत्तकनिपात-टीका"
+    }
+  },
+  "s0404t.tik": {
+    "index": 124,
+    "fileName": "s0404t.tik.xml",
+    "code": "s0404t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Multi",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/अङ्गुत्तरनिकाय (टीका)/अट्ठकादिनिपात-टीका",
+    "shortNavPath": "सु॰ पि॰/अ॰ नि॰/अट्ठकादिनिपात-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "s0404m1.mul",
+      "mula_title": "अट्ठकनिपातपाळि",
+      "attha_code": "s0404a.att",
+      "attha_title": "अट्ठकादिनिपात-अट्ठकथा",
+      "tika_code": "s0404t.tik",
+      "tika_title": "अट्ठकादिनिपात-टीका"
+    }
+  },
+  "s0519t.tik": {
+    "index": 125,
+    "fileName": "s0519t.tik.xml",
+    "code": "s0519t.tik",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/खुद्दकनिकाय (टीका)/नेत्तिप्पकरण-टीका",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/नेत्तिप्पकरण-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "s0519t.tik",
+      "tika_title": "नेत्तिप्पकरण-टीका"
+    }
+  },
+  "s0501t.nrf": {
+    "index": 126,
+    "fileName": "s0501t.nrf.xml",
+    "code": "s0501t.nrf",
+    "pitaka": "Sutta",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/सुत्त पिटक (टीका)/खुद्दकनिकाय (टीका)/नेत्तिविभाविनी",
+    "shortNavPath": "सु॰ पि॰/खु॰ नि॰/नेत्तिविभाविनी",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "s0501t.nrf",
+      "tika_title": "नेत्तिविभाविनी"
+    }
+  },
+  "vin01t1.tik": {
+    "index": 127,
+    "fileName": "vin01t1.tik.xml",
+    "code": "vin01t1.tik",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Split",
+    "longNavPath": "टीका/विनयपिटक (टीका)/सारत्थदीपनी-टीका-१",
+    "shortNavPath": "वि॰ पि॰/सारत्थदीपनी-टीका-१",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin01m.mul",
+      "mula_title": "पाराजिकपाळि",
+      "attha_code": "vin01a.att",
+      "attha_title": "पाराजिककण्ड-अट्ठकथा",
+      "tika_code": "vin01t1.tik",
+      "tika_title": "सारत्थदीपनी-टीका-१"
+    }
+  },
+  "vin01t2.tik": {
+    "index": 128,
+    "fileName": "vin01t2.tik.xml",
+    "code": "vin01t2.tik",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Split",
+    "longNavPath": "टीका/विनयपिटक (टीका)/सारत्थदीपनी-टीका-२",
+    "shortNavPath": "वि॰ पि॰/सारत्थदीपनी-टीका-२",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin01m.mul",
+      "mula_title": "पाराजिकपाळि",
+      "attha_code": "vin01a.att",
+      "attha_title": "पाराजिककण्ड-अट्ठकथा",
+      "tika_code": "vin01t2.tik",
+      "tika_title": "सारत्थदीपनी-टीका-२"
+    }
+  },
+  "vin02t.tik": {
+    "index": 129,
+    "fileName": "vin02t.tik.xml",
+    "code": "vin02t.tik",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Multi",
+    "longNavPath": "टीका/विनयपिटक (टीका)/सारत्थदीपनी-टीका-३",
+    "shortNavPath": "वि॰ पि॰/सारत्थदीपनी-टीका-३",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "vin02m1.mul",
+      "mula_title": "पाचित्तियपाळि",
+      "attha_code": "vin02a1.att",
+      "attha_title": "पाचित्तिय-अट्ठकथा",
+      "tika_code": "vin02t.tik",
+      "tika_title": "सारत्थदीपनी-टीका-३"
+    }
+  },
+  "vin04t.nrf": {
+    "index": 130,
+    "fileName": "vin04t.nrf.xml",
+    "code": "vin04t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/द्वेमातिकापाळि",
+    "shortNavPath": "वि॰ पि॰/द्वेमातिकापाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin04t.nrf",
+      "tika_title": "द्वेमातिकापाळि"
+    }
+  },
+  "vin05t.nrf": {
+    "index": 131,
+    "fileName": "vin05t.nrf.xml",
+    "code": "vin05t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/विनयसङ्गह-अट्ठकथा",
+    "shortNavPath": "वि॰ पि॰/विनयसङ्गह-अट्ठकथा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin05t.nrf",
+      "tika_title": "विनयसङ्गह-अट्ठकथा"
+    }
+  },
+  "vin06t.nrf": {
+    "index": 132,
+    "fileName": "vin06t.nrf.xml",
+    "code": "vin06t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/वजिरबुद्धि-टीका",
+    "shortNavPath": "वि॰ पि॰/वजिरबुद्धि-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin06t.nrf",
+      "tika_title": "वजिरबुद्धि-टीका"
+    }
+  },
+  "vin07t.nrf": {
+    "index": 133,
+    "fileName": "vin07t.nrf.xml",
+    "code": "vin07t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/विमतिविनोदनी-टीका",
+    "shortNavPath": "वि॰ पि॰/विमतिविनोदनी-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin07t.nrf",
+      "tika_title": "विमतिविनोदनी-टीका"
+    }
+  },
+  "vin08t.nrf": {
+    "index": 134,
+    "fileName": "vin08t.nrf.xml",
+    "code": "vin08t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/विनयालङ्कार-टीका",
+    "shortNavPath": "वि॰ पि॰/विनयालङ्कार-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin08t.nrf",
+      "tika_title": "विनयालङ्कार-टीका"
+    }
+  },
+  "vin09t.nrf": {
+    "index": 135,
+    "fileName": "vin09t.nrf.xml",
+    "code": "vin09t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/कङ्खावितरणीपुराण-टीका",
+    "shortNavPath": "वि॰ पि॰/कङ्खावितरणीपुराण-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin09t.nrf",
+      "tika_title": "कङ्खावितरणीपुराण-टीका"
+    }
+  },
+  "vin10t.nrf": {
+    "index": 136,
+    "fileName": "vin10t.nrf.xml",
+    "code": "vin10t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/विनयविनिच्छय-उत्तरविनिच्छय",
+    "shortNavPath": "वि॰ पि॰/विनयविनिच्छय-उत्तरविनिच्छय",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin10t.nrf",
+      "tika_title": "विनयविनिच्छय-उत्तरविनिच्छय"
+    }
+  },
+  "vin11t.nrf": {
+    "index": 137,
+    "fileName": "vin11t.nrf.xml",
+    "code": "vin11t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/विनयविनिच्छय-टीका",
+    "shortNavPath": "वि॰ पि॰/विनयविनिच्छय-टीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin11t.nrf",
+      "tika_title": "विनयविनिच्छय-टीका"
+    }
+  },
+  "vin12t.nrf": {
+    "index": 138,
+    "fileName": "vin12t.nrf.xml",
+    "code": "vin12t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/पाचित्यादियोजनापाळि",
+    "shortNavPath": "वि॰ पि॰/पाचित्यादियोजनापाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin12t.nrf",
+      "tika_title": "पाचित्यादियोजनापाळि"
+    }
+  },
+  "vin13t.nrf": {
+    "index": 139,
+    "fileName": "vin13t.nrf.xml",
+    "code": "vin13t.nrf",
+    "pitaka": "Vinaya",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/विनयपिटक (टीका)/खुद्दसिक्खा-मूलसिक्खा",
+    "shortNavPath": "वि॰ पि॰/खुद्दसिक्खा-मूलसिक्खा",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "vin13t.nrf",
+      "tika_title": "खुद्दसिक्खा-मूलसिक्खा"
+    }
+  },
+  "abh01t.tik": {
+    "index": 140,
+    "fileName": "abh01t.tik.xml",
+    "code": "abh01t.tik",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/धम्मसङ्गणी-मूलटीका",
+    "shortNavPath": "अभि॰ पि॰/धम्मसङ्गणी-मूलटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh01t.tik",
+      "tika_title": "धम्मसङ्गणी-मूलटीका"
+    }
+  },
+  "abh02t.tik": {
+    "index": 141,
+    "fileName": "abh02t.tik.xml",
+    "code": "abh02t.tik",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/विभङ्ग-मूलटीका",
+    "shortNavPath": "अभि॰ पि॰/विभङ्ग-मूलटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh02m.mul",
+      "mula_title": "विभङ्गपाळि",
+      "attha_code": "abh02a.att",
+      "attha_title": "सम्मोहविनोदनी-अट्ठकथा",
+      "tika_code": "abh02t.tik",
+      "tika_title": "विभङ्ग-मूलटीका"
+    }
+  },
+  "abh03t.tik": {
+    "index": 142,
+    "fileName": "abh03t.tik.xml",
+    "code": "abh03t.tik",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/पञ्चपकरण-मूलटीका",
+    "shortNavPath": "अभि॰ पि॰/पञ्चपकरण-मूलटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": "abh03m1.mul",
+      "mula_title": "धातुकथापाळि",
+      "attha_code": "abh03a.att",
+      "attha_title": "पञ्चपकरण-अट्ठकथा",
+      "tika_code": "abh03t.tik",
+      "tika_title": "पञ्चपकरण-मूलटीका"
+    }
+  },
+  "abh04t.nrf": {
+    "index": 143,
+    "fileName": "abh04t.nrf.xml",
+    "code": "abh04t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/धम्मसङ्गणी-अनुटीका",
+    "shortNavPath": "अभि॰ पि॰/धम्मसङ्गणी-अनुटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh04t.nrf",
+      "tika_title": "धम्मसङ्गणी-अनुटीका"
+    }
+  },
+  "abh05t.nrf": {
+    "index": 144,
+    "fileName": "abh05t.nrf.xml",
+    "code": "abh05t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/पञ्चपकरण-अनुटीका",
+    "shortNavPath": "अभि॰ पि॰/पञ्चपकरण-अनुटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh05t.nrf",
+      "tika_title": "पञ्चपकरण-अनुटीका"
+    }
+  },
+  "abh06t.nrf": {
+    "index": 145,
+    "fileName": "abh06t.nrf.xml",
+    "code": "abh06t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/अभिधम्मावतारो-नामरूपपरिच्छेदो",
+    "shortNavPath": "अभि॰ पि॰/अभिधम्मावतारो-नामरूपपरिच्छेदो",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh06t.nrf",
+      "tika_title": "अभिधम्मावतारो-नामरूपपरिच्छेदो"
+    }
+  },
+  "abh07t.nrf": {
+    "index": 146,
+    "fileName": "abh07t.nrf.xml",
+    "code": "abh07t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/अभिधम्मत्थसङ्गहो",
+    "shortNavPath": "अभि॰ पि॰/अभिधम्मत्थसङ्गहो",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh07t.nrf",
+      "tika_title": "अभिधम्मत्थसङ्गहो"
+    }
+  },
+  "abh08t.nrf": {
+    "index": 147,
+    "fileName": "abh08t.nrf.xml",
+    "code": "abh08t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/अभिधम्मावतार-पुराणटीका",
+    "shortNavPath": "अभि॰ पि॰/अभिधम्मावतार-पुराणटीका",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh08t.nrf",
+      "tika_title": "अभिधम्मावतार-पुराणटीका"
+    }
+  },
+  "abh09t.nrf": {
+    "index": 148,
+    "fileName": "abh09t.nrf.xml",
+    "code": "abh09t.nrf",
+    "pitaka": "Abhidhamma",
+    "matn": "Tika",
+    "bookType": "Whole",
+    "longNavPath": "टीका/अभिधम्म पिटक (टीका)/अभिधम्ममातिकापाळि",
+    "shortNavPath": "अभि॰ पि॰/अभिधम्ममातिकापाळि",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": "abh09t.nrf",
+      "tika_title": "अभिधम्ममातिकापाळि"
+    }
+  },
+  "e0101n.mul": {
+    "index": 149,
+    "fileName": "e0101n.mul.xml",
+    "code": "e0101n.mul",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/विसुद्धिमग्ग/विसुद्धिमग्ग-१",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0102n.mul": {
+    "index": 150,
+    "fileName": "e0102n.mul.xml",
+    "code": "e0102n.mul",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/विसुद्धिमग्ग/विसुद्धिमग्ग-२",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0103n.att": {
+    "index": 151,
+    "fileName": "e0103n.att.xml",
+    "code": "e0103n.att",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/विसुद्धिमग्ग/विसुद्धिमग्ग-महाटीका-१",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0104n.att": {
+    "index": 152,
+    "fileName": "e0104n.att.xml",
+    "code": "e0104n.att",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/विसुद्धिमग्ग/विसुद्धिमग्ग-महाटीका-२",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0105n.nrf": {
+    "index": 153,
+    "fileName": "e0105n.nrf.xml",
+    "code": "e0105n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/विसुद्धिमग्ग/विसुद्धिमग्ग-निदानकथा",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0901n.nrf": {
+    "index": 154,
+    "fileName": "e0901n.nrf.xml",
+    "code": "e0901n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/दीघनिकाय (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0902n.nrf": {
+    "index": 155,
+    "fileName": "e0902n.nrf.xml",
+    "code": "e0902n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/मज्झिमनिकाय (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0903n.nrf": {
+    "index": 156,
+    "fileName": "e0903n.nrf.xml",
+    "code": "e0903n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/संयुत्तनिकाय (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0904n.nrf": {
+    "index": 157,
+    "fileName": "e0904n.nrf.xml",
+    "code": "e0904n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/अङ्गुत्तरनिकाय (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0905n.nrf": {
+    "index": 158,
+    "fileName": "e0905n.nrf.xml",
+    "code": "e0905n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/विनयपिटक (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0906n.nrf": {
+    "index": 159,
+    "fileName": "e0906n.nrf.xml",
+    "code": "e0906n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/अभिधम्मपिटक (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0907n.nrf": {
+    "index": 160,
+    "fileName": "e0907n.nrf.xml",
+    "code": "e0907n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/संगायन-पुच्छा विस्सज्‍जना/अट्ठकथा (पु-वि)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0201n.nrf": {
+    "index": 161,
+    "fileName": "e0201n.nrf.xml",
+    "code": "e0201n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/लेडी सयाडो गन्थ-सङ्गहो/निरुत्तिदीपनी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0301n.nrf": {
+    "index": 162,
+    "fileName": "e0301n.nrf.xml",
+    "code": "e0301n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/लेडी सयाडो गन्थ-सङ्गहो/परमत्थदीपनी सङ्गहमहाटीकापाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0401n.nrf": {
+    "index": 163,
+    "fileName": "e0401n.nrf.xml",
+    "code": "e0401n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/लेडी सयाडो गन्थ-सङ्गहो/अनुदीपनीपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0501n.nrf": {
+    "index": 164,
+    "fileName": "e0501n.nrf.xml",
+    "code": "e0501n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/लेडी सयाडो गन्थ-सङ्गहो/पट्ठानुद्देसदीपनीपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0601n.nrf": {
+    "index": 165,
+    "fileName": "e0601n.nrf.xml",
+    "code": "e0601n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/नमक्‍कारटीका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0602n.nrf": {
+    "index": 166,
+    "fileName": "e0602n.nrf.xml",
+    "code": "e0602n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/महापणामपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0603n.nrf": {
+    "index": 167,
+    "fileName": "e0603n.nrf.xml",
+    "code": "e0603n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/लक्खणातो बुद्धथोमनागाथा",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0604n.nrf": {
+    "index": 168,
+    "fileName": "e0604n.nrf.xml",
+    "code": "e0604n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/सुतवन्दना",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0605n.nrf": {
+    "index": 169,
+    "fileName": "e0605n.nrf.xml",
+    "code": "e0605n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/जिनालङ्कार",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0606n.nrf": {
+    "index": 170,
+    "fileName": "e0606n.nrf.xml",
+    "code": "e0606n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/कमलाञ्‍जलि",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0607n.nrf": {
+    "index": 171,
+    "fileName": "e0607n.nrf.xml",
+    "code": "e0607n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/पज्‍जमधु",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0608n.nrf": {
+    "index": 172,
+    "fileName": "e0608n.nrf.xml",
+    "code": "e0608n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/बुद्ध-वन्दना गन्थ-सङ्गहो/बुद्धगुणगाथावली",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0701n.nrf": {
+    "index": 173,
+    "fileName": "e0701n.nrf.xml",
+    "code": "e0701n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/वंस-गन्थ-सङ्गहो/चूळगन्थवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0702n.nrf": {
+    "index": 174,
+    "fileName": "e0702n.nrf.xml",
+    "code": "e0702n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/वंस-गन्थ-सङ्गहो/सासनवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0703n.nrf": {
+    "index": 175,
+    "fileName": "e0703n.nrf.xml",
+    "code": "e0703n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/वंस-गन्थ-सङ्गहो/महावंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0801n.nrf": {
+    "index": 176,
+    "fileName": "e0801n.nrf.xml",
+    "code": "e0801n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/मोग्गल्‍लानब्याकरणं",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0802n.nrf": {
+    "index": 177,
+    "fileName": "e0802n.nrf.xml",
+    "code": "e0802n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/कच्‍चायनब्याकरणं",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0803n.nrf": {
+    "index": 178,
+    "fileName": "e0803n.nrf.xml",
+    "code": "e0803n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/सद्दनीतिप्पकरणं (पदमाला)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0804n.nrf": {
+    "index": 179,
+    "fileName": "e0804n.nrf.xml",
+    "code": "e0804n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/सद्दनीतिप्पकरणं (धातुमाला)",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0805n.nrf": {
+    "index": 180,
+    "fileName": "e0805n.nrf.xml",
+    "code": "e0805n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/पदरूपसिद्धि",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0806n.nrf": {
+    "index": 181,
+    "fileName": "e0806n.nrf.xml",
+    "code": "e0806n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/मोगल्‍लानपञ्‍चिका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0807n.nrf": {
+    "index": 182,
+    "fileName": "e0807n.nrf.xml",
+    "code": "e0807n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/पयोगसिद्धिपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0808n.nrf": {
+    "index": 183,
+    "fileName": "e0808n.nrf.xml",
+    "code": "e0808n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/वुत्तोदयपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0809n.nrf": {
+    "index": 184,
+    "fileName": "e0809n.nrf.xml",
+    "code": "e0809n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/अभिधानप्पदापिकापाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0810n.nrf": {
+    "index": 185,
+    "fileName": "e0810n.nrf.xml",
+    "code": "e0810n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/अभिधानप्पदापिकाटीका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0811n.nrf": {
+    "index": 186,
+    "fileName": "e0811n.nrf.xml",
+    "code": "e0811n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/सुबोधालङ्कारपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0812n.nrf": {
+    "index": 187,
+    "fileName": "e0812n.nrf.xml",
+    "code": "e0812n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/सुबोधालङ्कारटीका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e0813n.nrf": {
+    "index": 188,
+    "fileName": "e0813n.nrf.xml",
+    "code": "e0813n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/ब्याकरण गन्थ-सङ्गहो/बालावतार गण्ठिपदत्थविनिच्छयसार",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1001n.nrf": {
+    "index": 189,
+    "fileName": "e1001n.nrf.xml",
+    "code": "e1001n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/कविदप्पणनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1002n.nrf": {
+    "index": 190,
+    "fileName": "e1002n.nrf.xml",
+    "code": "e1002n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/नीतिमञ्‍जरी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1003n.nrf": {
+    "index": 191,
+    "fileName": "e1003n.nrf.xml",
+    "code": "e1003n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/धम्मनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1004n.nrf": {
+    "index": 192,
+    "fileName": "e1004n.nrf.xml",
+    "code": "e1004n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/महारहनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1005n.nrf": {
+    "index": 193,
+    "fileName": "e1005n.nrf.xml",
+    "code": "e1005n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/लोकनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1006n.nrf": {
+    "index": 194,
+    "fileName": "e1006n.nrf.xml",
+    "code": "e1006n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/सुत्तन्तनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1007n.nrf": {
+    "index": 195,
+    "fileName": "e1007n.nrf.xml",
+    "code": "e1007n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/सूरस्सतिनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1008n.nrf": {
+    "index": 196,
+    "fileName": "e1008n.nrf.xml",
+    "code": "e1008n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/चाणक्यनीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1009n.nrf": {
+    "index": 197,
+    "fileName": "e1009n.nrf.xml",
+    "code": "e1009n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/नरदक्खदीपनी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1010n.nrf": {
+    "index": 198,
+    "fileName": "e1010n.nrf.xml",
+    "code": "e1010n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/नीति-गन्थ-सङ्गहो/चतुरारक्खदीपनी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1101n.nrf": {
+    "index": 199,
+    "fileName": "e1101n.nrf.xml",
+    "code": "e1101n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/पकिण्णक-गन्थ-सङ्गहो/रसवाहिनी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1102n.nrf": {
+    "index": 200,
+    "fileName": "e1102n.nrf.xml",
+    "code": "e1102n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/पकिण्णक-गन्थ-सङ्गहो/सीमविसोधनीपाठ",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1103n.nrf": {
+    "index": 201,
+    "fileName": "e1103n.nrf.xml",
+    "code": "e1103n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/पकिण्णक-गन्थ-सङ्गहो/वेस्सन्तरगीति",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1201n.nrf": {
+    "index": 202,
+    "fileName": "e1201n.nrf.xml",
+    "code": "e1201n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/मोग्गल्‍लान वुत्तिविवरणपञ्‍चिका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1202n.nrf": {
+    "index": 203,
+    "fileName": "e1202n.nrf.xml",
+    "code": "e1202n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/थूपवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1203n.nrf": {
+    "index": 204,
+    "fileName": "e1203n.nrf.xml",
+    "code": "e1203n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/दाठवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1204n.nrf": {
+    "index": 205,
+    "fileName": "e1204n.nrf.xml",
+    "code": "e1204n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/धातुपाठविलासिनिया",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1205n.nrf": {
+    "index": 206,
+    "fileName": "e1205n.nrf.xml",
+    "code": "e1205n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/धातुवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1206n.nrf": {
+    "index": 207,
+    "fileName": "e1206n.nrf.xml",
+    "code": "e1206n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/हत्थवनगल्‍लविहारवंस",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1207n.nrf": {
+    "index": 208,
+    "fileName": "e1207n.nrf.xml",
+    "code": "e1207n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/जिनचरितय",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1208n.nrf": {
+    "index": 209,
+    "fileName": "e1208n.nrf.xml",
+    "code": "e1208n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/जिनवंसदीपं",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1209n.nrf": {
+    "index": 210,
+    "fileName": "e1209n.nrf.xml",
+    "code": "e1209n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/तेलकटाहगाथा",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1210n.nrf": {
+    "index": 211,
+    "fileName": "e1210n.nrf.xml",
+    "code": "e1210n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/मिलिदटीका",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1211n.nrf": {
+    "index": 212,
+    "fileName": "e1211n.nrf.xml",
+    "code": "e1211n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/पदमञ्‍जरी",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1212n.nrf": {
+    "index": 213,
+    "fileName": "e1212n.nrf.xml",
+    "code": "e1212n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/पदसाधनं",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1213n.nrf": {
+    "index": 214,
+    "fileName": "e1213n.nrf.xml",
+    "code": "e1213n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/सद्दबिन्दुपकरणं",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1214n.nrf": {
+    "index": 215,
+    "fileName": "e1214n.nrf.xml",
+    "code": "e1214n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/कच्‍चायनधातुमञ्‍जुसा",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  },
+  "e1215n.nrf": {
+    "index": 216,
+    "fileName": "e1215n.nrf.xml",
+    "code": "e1215n.nrf",
+    "pitaka": "Other",
+    "matn": "Other",
+    "bookType": "Whole",
+    "longNavPath": "अञ्‍ञ/सिहळ-गन्थ-सङ्गहो/सामन्तकूटवण्णना",
+    "shortNavPath": "",
+    "chapterListTypes": "",
+    "mat": {
+      "mula_code": null,
+      "mula_title": null,
+      "attha_code": null,
+      "attha_title": null,
+      "tika_code": null,
+      "tika_title": null
+    }
+  }
+}
