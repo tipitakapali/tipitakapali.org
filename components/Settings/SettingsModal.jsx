@@ -218,17 +218,6 @@ export default function SettingsModal() {
                     </label>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => updateSetting('textAlign', 'justify')}
-                        className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium border flex items-center justify-center gap-1.5 transition ${
-                          settings.textAlign === 'justify'
-                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)]'
-                        }`}
-                      >
-                        <AlignJustify size={14} />
-                        <span>Justified</span>
-                      </button>
-                      <button
                         onClick={() => updateSetting('textAlign', 'left')}
                         className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium border flex items-center justify-center gap-1.5 transition ${
                           settings.textAlign === 'left'
@@ -238,6 +227,17 @@ export default function SettingsModal() {
                       >
                         <AlignLeft size={14} />
                         <span>Left</span>
+                      </button>
+                      <button
+                        onClick={() => updateSetting('textAlign', 'justify')}
+                        className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium border flex items-center justify-center gap-1.5 transition ${
+                          settings.textAlign === 'justify'
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <AlignJustify size={14} />
+                        <span>Justified</span>
                       </button>
                     </div>
                   </div>

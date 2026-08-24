@@ -96,6 +96,7 @@ export default function ReaderView() {
     activeEditionPages,
     setActiveEditionPages,
     openGoToModal,
+    addToHistory,
   } = useTabs();
 
 
@@ -121,7 +122,7 @@ export default function ReaderView() {
     }
   }, [activeTab?.bookCode, getSavedScroll, targetScrollIntent]);
 
-  // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping)
+  // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
 
@@ -161,7 +162,87 @@ export default function ReaderView() {
     const attemptScroll = () => {
       if (!containerRef.current) return;
 
-      // 1. Target page break
+      // 1. Target paragraph by number (Highest Priority for Bookmarks, History, MAT, and GoTo)
+      if (paraNum) {
+        const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
+        const targetInt = parseInt(cleanPara, 10);
+
+        // Ensure the chapter containing this paragraph is loaded
+        if (activeTab.para_to_chapter && activeTab.para_to_chapter[cleanPara] !== undefined) {
+          const chapForPara = activeTab.para_to_chapter[cleanPara];
+          if (!activeTab.loadedChapters?.[chapForPara]) {
+            loadChapter(activeTab.bookCode, chapForPara);
+            bufferAdjacentChapters(activeTab.bookCode, chapForPara);
+          }
+        }
+
+        let el =
+          findElement(`para${cleanPara}`) ||
+          findElement(`para-${cleanPara}`) ||
+          findElement(cleanPara) ||
+          findElement(null, `p[data-para="${cleanPara}"]`) ||
+          findElement(null, `[data-para="${cleanPara}"]`);
+
+        // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
+        if (!el && !isNaN(targetInt)) {
+          const rangedParas = containerRef.current.querySelectorAll('[data-para-first]');
+          for (const p of rangedParas) {
+            const first = parseInt(p.getAttribute('data-para-first'), 10);
+            const last = parseInt(p.getAttribute('data-para-last'), 10);
+            if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
+              el = p;
+              break;
+            }
+          }
+        }
+
+        // Fallback: nearest paragraph <= targetInt
+        if (!el && !isNaN(targetInt)) {
+          const scope = (chapterIdx !== undefined && chapterIdx !== null)
+            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
+            : containerRef.current;
+          const allParas = scope.querySelectorAll('[data-para]');
+          let bestEl = null;
+          let bestDiff = Infinity;
+          for (const p of allParas) {
+            const pNum = parseInt(p.getAttribute('data-para'), 10);
+            if (!isNaN(pNum) && pNum <= targetInt) {
+              const diff = targetInt - pNum;
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestEl = p;
+              }
+            }
+          }
+          if (bestEl) el = bestEl;
+        }
+
+        if (el) {
+          const targetEl =
+            el.getClientRects().length > 0
+              ? el
+              : el.closest('p') || el.parentElement || el;
+
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const rect = targetEl.getBoundingClientRect();
+          const currentScroll = containerRef.current.scrollTop;
+          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+          if (settings.pulseAnimation) {
+            targetEl.classList.remove('pulse-highlight');
+            void targetEl.offsetWidth;
+            targetEl.classList.add('pulse-highlight');
+          }
+          const foundPNum = targetEl.getAttribute?.('data-para') || cleanPara;
+          if (foundPNum) setActiveParaNum(foundPNum);
+          saveTabScroll(activeTab.bookCode, offset);
+          clearTargetScrollIntent();
+          return;
+        }
+      }
+
+      // 2. Target page break
       if (page && pageSystem) {
         const cleanP = String(page).trim();
         const ed = String(pageSystem).toUpperCase();
@@ -224,12 +305,17 @@ export default function ReaderView() {
         }
       }
 
-      // 2. Target paragraph by index
+      // 3. Target paragraph by index (within chapter if given)
       if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
+        const scope = (chapterIdx !== undefined && chapterIdx !== null)
+          ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
+          : containerRef.current;
         const el =
-          findElement(`pindex-${paraIndex}`) ||
-          findElement(null, `p[data-pindex="${paraIndex}"]`) ||
-          findElement(null, `[data-pindex="${paraIndex}"]`);
+          scope.querySelector(`[id="pindex-${paraIndex}"]`) ||
+          scope.querySelector(`p[data-pindex="${paraIndex}"]`) ||
+          scope.querySelector(`[data-pindex="${paraIndex}"]`) ||
+          findElement(`pindex-${paraIndex}`);
+
         if (el) {
           const targetEl =
             el.getClientRects().length > 0
@@ -255,78 +341,7 @@ export default function ReaderView() {
         }
       }
 
-      // 3. Target paragraph by number
-      if (paraNum) {
-        const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
-        const targetInt = parseInt(cleanPara, 10);
-
-        let el =
-          findElement(`para${cleanPara}`) ||
-          findElement(`para-${cleanPara}`) ||
-          findElement(cleanPara) ||
-          findElement(null, `p[data-para="${cleanPara}"]`) ||
-          findElement(null, `[data-para="${cleanPara}"]`);
-
-        // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
-        if (!el && !isNaN(targetInt)) {
-          const rangedParas = containerRef.current.querySelectorAll('[data-para-first]');
-          for (const p of rangedParas) {
-            const first = parseInt(p.getAttribute('data-para-first'), 10);
-            const last = parseInt(p.getAttribute('data-para-last'), 10);
-            if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
-              el = p;
-              break;
-            }
-          }
-        }
-
-        // Fallback: nearest paragraph <= targetInt
-        if (!el && !isNaN(targetInt)) {
-          const allParas = containerRef.current.querySelectorAll('[data-para]');
-          let bestEl = null;
-          let bestDiff = Infinity;
-          for (const p of allParas) {
-            const pNum = parseInt(p.getAttribute('data-para'), 10);
-            if (!isNaN(pNum) && pNum <= targetInt) {
-              const diff = targetInt - pNum;
-              if (diff < bestDiff) {
-                bestDiff = diff;
-                bestEl = p;
-              }
-            }
-          }
-          if (bestEl) el = bestEl;
-        }
-
-        if (el) {
-          const targetEl =
-            el.getClientRects().length > 0
-              ? el
-              : el.closest('p') || el.parentElement || el;
-
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = targetEl.getBoundingClientRect();
-          const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-
-          if (settings.pulseAnimation) {
-            targetEl.classList.remove('pulse-highlight');
-            void targetEl.offsetWidth;
-            targetEl.classList.add('pulse-highlight');
-          }
-          const foundPNum = targetEl.getAttribute?.('data-para') || cleanPara;
-          if (foundPNum) setActiveParaNum(foundPNum);
-          saveTabScroll(activeTab.bookCode, offset);
-          clearTargetScrollIntent();
-          return;
-        }
-      }
-
-
-
-
-      // 4. Target chapter
+      // 4. Target chapter header
       if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined && !page) {
         if (chapterIdx === 0) {
           smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
@@ -383,8 +398,6 @@ export default function ReaderView() {
           return;
         }
       }
-
-
 
       retries++;
       if (retries < maxRetries) {
@@ -499,23 +512,42 @@ export default function ReaderView() {
 
           const paraElements = container.querySelectorAll('p[data-pindex]');
           let foundParaNum = null;
+          let foundPIndex = null;
+          let foundSnippet = '';
+          let foundChapterIdx = activeTab.currentChapterIdx || 0;
 
           for (const p of paraElements) {
             const rect = p.getBoundingClientRect();
             if (rect.bottom >= targetY) {
-              const paraNum = p.getAttribute('data-para');
-              if (paraNum) {
-                foundParaNum = paraNum;
-                break;
-              }
-              let prev = p.previousElementSibling;
-              while (prev) {
-                const prevNum = prev.getAttribute('data-para');
-                if (prevNum) {
-                  foundParaNum = prevNum;
-                  break;
+              foundPIndex = p.getAttribute('data-pindex');
+              foundParaNum = p.getAttribute('data-para');
+              if (!foundParaNum) {
+                let prev = p.previousElementSibling;
+                while (prev) {
+                  const prevNum = prev.getAttribute('data-para');
+                  if (prevNum) {
+                    foundParaNum = prevNum;
+                    break;
+                  }
+                  prev = prev.previousElementSibling;
                 }
-                prev = prev.previousElementSibling;
+              }
+
+              // Extract text snippet
+              const text = p.textContent?.replace(/\s+/g, ' ').trim() || '';
+              if (text) {
+                foundSnippet = text.length > 130 ? text.slice(0, 130) + '...' : text;
+              }
+
+              // Detect chapter
+              if (foundParaNum && activeTab.para_to_chapter?.[foundParaNum] !== undefined) {
+                foundChapterIdx = activeTab.para_to_chapter[foundParaNum];
+              } else {
+                const chapBlock = p.closest('[data-chapter]');
+                if (chapBlock) {
+                  const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
+                  if (!isNaN(cIdx)) foundChapterIdx = cIdx;
+                }
               }
               break;
             }
@@ -525,16 +557,32 @@ export default function ReaderView() {
             setActiveParaNum(foundParaNum);
           }
 
+          // Automatically record user's exact reading position into History
+          addToHistory({
+            bookCode: activeTab.bookCode,
+            bookTitle: activeTab.title,
+            nikaya: activeTab.nikaya,
+            chapterIdx: foundChapterIdx,
+            chapterTitle: activeTab.chapters?.[foundChapterIdx]?.title || '',
+            paraNum: foundParaNum || undefined,
+            paraIndex: foundPIndex ? parseInt(foundPIndex, 10) : undefined,
+            snippet:
+              foundSnippet ||
+              `${activeTab.title} — ${activeTab.chapters?.[foundChapterIdx]?.title || `Chapter ${foundChapterIdx + 1}`}${
+                foundParaNum ? ` (Para ${foundParaNum})` : ''
+              }`,
+          });
+
           detectActiveEditionPages();
         }
-      }, 100);
+      }, 120);
     },
-    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible]
+    [activeTab, saveTabScroll, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory]
   );
 
   const handleReaderClick = useCallback((e) => {
     const pEl = e.target.closest('p[data-pindex]');
-    if (pEl) {
+    if (pEl && activeTab) {
       let pNum = pEl.getAttribute('data-para');
       if (!pNum) {
         let prev = pEl.previousElementSibling;
@@ -547,8 +595,25 @@ export default function ReaderView() {
       if (pNum) {
         setActiveParaNum(pNum);
       }
+      const pIdx = pEl.getAttribute('data-pindex');
+      let chapIdx = activeTab.currentChapterIdx || 0;
+      if (pNum && activeTab.para_to_chapter?.[pNum] !== undefined) {
+        chapIdx = activeTab.para_to_chapter[pNum];
+      }
+      const text = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
+      const snip = text.length > 130 ? text.slice(0, 130) + '...' : text;
+      addToHistory({
+        bookCode: activeTab.bookCode,
+        bookTitle: activeTab.title,
+        nikaya: activeTab.nikaya,
+        chapterIdx: chapIdx,
+        chapterTitle: activeTab.chapters?.[chapIdx]?.title || '',
+        paraNum: pNum || undefined,
+        paraIndex: pIdx ? parseInt(pIdx, 10) : undefined,
+        snippet: snip || `${activeTab.title} — ${activeTab.chapters?.[chapIdx]?.title || `Chapter ${chapIdx + 1}`}`,
+      });
     }
-  }, [setActiveParaNum]);
+  }, [activeTab, setActiveParaNum, addToHistory]);
 
 
 
@@ -601,18 +666,82 @@ export default function ReaderView() {
 
   const handleQuickBookmark = () => {
     if (!activeTab) return;
-    const currentChapIdx = activeTab.currentChapterIdx || 0;
+    
+    // Find current paragraph & snippet robustly
+    let currentPara = activeParaNum;
+    let currentChapIdx = activeTab.currentChapterIdx || 0;
+    let paraSnippet = '';
+
+    if (!currentPara && typeof document !== 'undefined' && containerRef.current) {
+      const targetY = containerRef.current.getBoundingClientRect().top + 80;
+      const paraElements = containerRef.current.querySelectorAll('p[data-pindex]');
+      for (const p of paraElements) {
+        const rect = p.getBoundingClientRect();
+        if (rect.bottom >= targetY) {
+          let pNum = p.getAttribute('data-para');
+          if (!pNum) {
+            let prev = p.previousElementSibling;
+            while (prev) {
+              pNum = prev.getAttribute('data-para');
+              if (pNum) break;
+              prev = prev.previousElementSibling;
+            }
+          }
+          if (pNum) {
+            currentPara = pNum;
+            break;
+          }
+        }
+      }
+    }
+
+    if (currentPara && activeTab.para_to_chapter?.[currentPara] !== undefined) {
+      currentChapIdx = activeTab.para_to_chapter[currentPara];
+    }
+
     const currentChap = activeTab.chapters?.[currentChapIdx];
 
-    addBookmark({
-      bookCode: activeTab.bookCode,
-      bookTitle: activeTab.title,
-      nikaya: activeTab.nikaya,
-      chapterIdx: currentChapIdx,
-      chapterTitle: currentChap?.title || '',
-      paraIndex: currentChap?.para_index || 0,
-      snippet: `${activeTab.title} — ${currentChap?.title || `Chapter ${currentChapIdx + 1}`}`,
-    });
+    if (typeof document !== 'undefined' && currentPara) {
+      const pEl =
+        containerRef.current?.querySelector(`[data-para="${currentPara}"]`) ||
+        document.querySelector(`[data-para="${currentPara}"]`);
+      if (pEl) {
+        paraSnippet = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
+        if (paraSnippet.length > 130) paraSnippet = paraSnippet.slice(0, 130) + '...';
+      }
+    }
+
+    const isAlreadyBookmarked = bookmarks.some(
+      (b) =>
+        b.bookCode === activeTab.bookCode &&
+        b.chapterIdx === currentChapIdx &&
+        (currentPara ? String(b.paraNum) === String(currentPara) : true)
+    );
+
+    if (isAlreadyBookmarked) {
+      const existing = bookmarks.find(
+        (b) =>
+          b.bookCode === activeTab.bookCode &&
+          b.chapterIdx === currentChapIdx &&
+          (currentPara ? String(b.paraNum) === String(currentPara) : true)
+      );
+      if (existing) removeBookmark(existing.id);
+    } else {
+      addBookmark({
+        id: `${activeTab.bookCode}_${currentChapIdx}_${currentPara || '0'}`,
+        bookCode: activeTab.bookCode,
+        bookTitle: activeTab.title,
+        nikaya: activeTab.nikaya,
+        chapterIdx: currentChapIdx,
+        chapterTitle: currentChap?.title || '',
+        paraNum: currentPara || undefined,
+        snippet:
+          paraSnippet ||
+          `${activeTab.title} — ${currentChap?.title || `Chapter ${currentChapIdx + 1}`}${
+            currentPara ? ` (Para ${currentPara})` : ''
+          }`,
+      });
+    }
   };
 
   if (!activeTab) {
@@ -625,7 +754,10 @@ export default function ReaderView() {
 
   const currentChap = activeTab.chapters?.[activeTab.currentChapterIdx || 0];
   const isCurrentBookmarked = bookmarks.some(
-    (b) => b.bookCode === activeTab.bookCode && b.chapterIdx === (activeTab.currentChapterIdx || 0)
+    (b) =>
+      b.bookCode === activeTab.bookCode &&
+      b.chapterIdx === (activeTab.currentChapterIdx || 0) &&
+      (activeParaNum ? String(b.paraNum) === String(activeParaNum) : true)
   );
 
   return (
@@ -696,7 +828,11 @@ export default function ReaderView() {
           <button
             className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
             onClick={handleQuickBookmark}
-            title={isCurrentBookmarked ? 'Bookmarked' : 'Bookmark this chapter'}
+            title={
+              isCurrentBookmarked
+                ? `Bookmarked${activeParaNum ? ` (Para ${activeParaNum})` : ''} — Click to remove`
+                : `Bookmark this place${activeParaNum ? ` (Para ${activeParaNum})` : ''}`
+            }
           >
             {isCurrentBookmarked ? (
               <BookmarkCheck size={14} className="text-[var(--accent)]" />

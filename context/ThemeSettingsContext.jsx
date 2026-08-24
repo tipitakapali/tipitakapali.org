@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS = {
   fontFamily: 'gentium',
   fontSize: 25,
   lineHeight: 1.85,
-  textAlign: 'justify',
+  textAlign: 'left',
   paragraphIndent: true,
   readerMaxWidth: '880px',
   showPageBreaks: false,

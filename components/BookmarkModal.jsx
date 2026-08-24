@@ -7,7 +7,7 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertPaliScript } from '../services/transliterate';
 
 export default function BookmarkModal({ isOpen, onClose }) {
-  const { bookmarks, addBookmark, removeBookmark, openBook, activeTab } = useTabs();
+  const { bookmarks, addBookmark, removeBookmark, openBook, activeTab, activeParaNum } = useTabs();
   const { settings } = useThemeSettings();
   const [filterText, setFilterText] = useState('');
 
@@ -15,26 +15,83 @@ export default function BookmarkModal({ isOpen, onClose }) {
 
   const currentChapIdx = activeTab?.currentChapterIdx || 0;
   const currentChap = activeTab?.chapters?.[currentChapIdx];
-  const isCurrentBookmarked = activeTab && bookmarks.some(
-    (b) => b.bookCode === activeTab.bookCode && b.chapterIdx === currentChapIdx
-  );
+  const isCurrentBookmarked =
+    activeTab &&
+    bookmarks.some(
+      (b) =>
+        b.bookCode === activeTab.bookCode &&
+        b.chapterIdx === currentChapIdx &&
+        (activeParaNum ? String(b.paraNum) === String(activeParaNum) : true)
+    );
 
   const handleToggleCurrentPage = () => {
     if (!activeTab) return;
+    let currentPara = activeParaNum;
+    let currentChapIdx = activeTab.currentChapterIdx || 0;
+    let paraSnippet = '';
+
+    if (!currentPara && typeof document !== 'undefined') {
+      const readerEl = document.querySelector('.reader-container') || document.querySelector('main');
+      if (readerEl) {
+        const targetY = (readerEl.getBoundingClientRect?.().top || 0) + 80;
+        const paraElements = readerEl.querySelectorAll('p[data-pindex]');
+        for (const p of paraElements) {
+          const rect = p.getBoundingClientRect();
+          if (rect.bottom >= targetY) {
+            let pNum = p.getAttribute('data-para');
+            if (!pNum) {
+              let prev = p.previousElementSibling;
+              while (prev) {
+                pNum = prev.getAttribute('data-para');
+                if (pNum) break;
+                prev = prev.previousElementSibling;
+              }
+            }
+            if (pNum) {
+              currentPara = pNum;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (currentPara && activeTab.para_to_chapter?.[currentPara] !== undefined) {
+      currentChapIdx = activeTab.para_to_chapter[currentPara];
+    }
+
+    const currentChap = activeTab.chapters?.[currentChapIdx];
+
+    if (typeof document !== 'undefined' && currentPara) {
+      const pEl = document.querySelector(`[data-para="${currentPara}"]`);
+      if (pEl) {
+        paraSnippet = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
+        if (paraSnippet.length > 130) paraSnippet = paraSnippet.slice(0, 130) + '...';
+      }
+    }
+
     if (isCurrentBookmarked) {
       const existing = bookmarks.find(
-        (b) => b.bookCode === activeTab.bookCode && b.chapterIdx === currentChapIdx
+        (b) =>
+          b.bookCode === activeTab.bookCode &&
+          b.chapterIdx === currentChapIdx &&
+          (currentPara ? String(b.paraNum) === String(currentPara) : true)
       );
       if (existing) removeBookmark(existing.id);
     } else {
       addBookmark({
+        id: `${activeTab.bookCode}_${currentChapIdx}_${currentPara || '0'}`,
         bookCode: activeTab.bookCode,
         bookTitle: activeTab.title,
         nikaya: activeTab.nikaya,
         chapterIdx: currentChapIdx,
         chapterTitle: currentChap?.title || '',
-        paraIndex: currentChap?.para_index || 0,
-        snippet: `${activeTab.title} — ${currentChap?.title || `Chapter ${currentChapIdx + 1}`}`,
+        paraNum: currentPara || undefined,
+        snippet:
+          paraSnippet ||
+          `${activeTab.title} — ${currentChap?.title || `Chapter ${currentChapIdx + 1}`}${
+            currentPara ? ` (Para ${currentPara})` : ''
+          }`,
       });
     }
   };
@@ -53,8 +110,8 @@ export default function BookmarkModal({ isOpen, onClose }) {
   const handleJump = (item) => {
     openBook(item.bookCode, {
       targetChapterIdx: item.chapterIdx || 0,
-      targetParaIndex: item.paraIndex,
       targetParaNum: item.paraNum,
+      targetParaIndex: item.paraNum ? undefined : item.paraIndex,
     });
     onClose();
   };
@@ -92,12 +149,17 @@ export default function BookmarkModal({ isOpen, onClose }) {
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                 Current Reading Page:
               </div>
-              <div className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                {convertPaliScript(activeTab.title, settings?.paliScript)}
+              <div className="text-xs font-semibold text-[var(--text-primary)] truncate flex items-center gap-1.5 flex-wrap">
+                <span>{convertPaliScript(activeTab.title, settings?.paliScript)}</span>
                 {currentChap?.title && currentChap.title !== activeTab.title && (
                   <span className="text-[var(--text-muted)] font-normal">
                     {' › '}
                     {convertPaliScript(currentChap.title, settings?.paliScript)}
+                  </span>
+                )}
+                {activeParaNum && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold shrink-0">
+                    Para {activeParaNum}
                   </span>
                 )}
               </div>
@@ -161,11 +223,16 @@ export default function BookmarkModal({ isOpen, onClose }) {
                   onClick={() => handleJump(item)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)]">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] flex-wrap">
                       <span className="truncate">{displayBookTitle}</span>
                       <span className="text-[10px] text-[var(--text-muted)] font-normal">
                         › {displayChapterTitle || `Ch ${item.chapterIdx + 1}`}
                       </span>
+                      {item.paraNum && (
+                        <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold shrink-0">
+                          Para {item.paraNum}
+                        </span>
+                      )}
                     </div>
                     {displaySnippet && (
                       <div className="text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">

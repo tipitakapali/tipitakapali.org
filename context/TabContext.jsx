@@ -125,7 +125,7 @@ export function TabProvider({ children }) {
 
   const addBookmark = useCallback((item) => {
     const newEntry = {
-      id: `${item.bookCode}_${item.chapterIdx || 0}_${item.paraIndex || Date.now()}`,
+      id: item.id || `${item.bookCode}_${item.chapterIdx || 0}_${item.paraNum || item.paraIndex || Date.now()}`,
       bookCode: item.bookCode,
       bookTitle: item.bookTitle,
       nikaya: item.nikaya || '',
@@ -138,7 +138,9 @@ export function TabProvider({ children }) {
     };
 
     setBookmarks((prev) => {
-      const filtered = prev.filter((b) => b.id !== newEntry.id);
+      const filtered = prev.filter(
+        (b) => !(b.bookCode === newEntry.bookCode && b.chapterIdx === newEntry.chapterIdx && b.paraNum === newEntry.paraNum)
+      );
       const updated = [newEntry, ...filtered];
       try {
         localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify(updated));
@@ -157,25 +159,31 @@ export function TabProvider({ children }) {
     });
   }, []);
 
-  const isBookmarked = useCallback((bookCode, paraIndex) => {
+  const isBookmarked = useCallback((bookCode, chapterIdx, paraNum) => {
     if (!bookCode) return false;
-    return bookmarks.some((b) => b.bookCode === bookCode && b.paraIndex === paraIndex);
+    return bookmarks.some(
+      (b) =>
+        b.bookCode === bookCode &&
+        b.chapterIdx === (chapterIdx || 0) &&
+        (paraNum ? b.paraNum === paraNum : true)
+    );
   }, [bookmarks]);
 
   // Save Recent History to localStorage
   const addToHistory = useCallback((item) => {
     if (!item?.bookCode) return;
     setRecentHistory((prev) => {
-      const filtered = prev.filter(
-        (h) => !(h.bookCode === item.bookCode && h.chapterIdx === (item.chapterIdx || 0))
-      );
+      const filtered = prev.filter((h) => h.bookCode !== item.bookCode);
       const newEntry = {
-        id: `${item.bookCode}_${item.chapterIdx || 0}`,
+        id: `${item.bookCode}_${item.chapterIdx || 0}_${item.paraNum || item.paraIndex || Date.now()}`,
         bookCode: item.bookCode,
         bookTitle: item.bookTitle,
         nikaya: item.nikaya || '',
         chapterIdx: item.chapterIdx || 0,
         chapterTitle: item.chapterTitle || '',
+        paraNum: item.paraNum,
+        paraIndex: item.paraIndex,
+        snippet: item.snippet || item.chapterTitle || item.bookTitle,
         lastReadTime: Date.now(),
       };
       const updated = [newEntry, ...filtered].slice(0, 50); // Keep latest 50

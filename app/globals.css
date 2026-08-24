@@ -30,7 +30,7 @@
   --font-size-base: 25px;
   --line-height-base: 1.85;
   --reader-max-width: 880px;
-  --reader-text-align: justify;
+  --reader-text-align: left;
 }
 
 [data-theme="sepia"] {

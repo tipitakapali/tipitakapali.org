@@ -26,6 +26,8 @@ export default function HistoryModal({ isOpen, onClose }) {
   const handleJump = (item) => {
     openBook(item.bookCode, {
       targetChapterIdx: item.chapterIdx || 0,
+      targetParaNum: item.paraNum,
+      targetParaIndex: item.paraNum ? undefined : item.paraIndex,
     });
     onClose();
   };
@@ -79,7 +81,6 @@ export default function HistoryModal({ isOpen, onClose }) {
               type="text"
               placeholder="Search recent books..."
               value={filterText}
-
               onChange={(e) => setFilterText(typeVelthuis(e.target.value))}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md py-1.5 pl-8 pr-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />
@@ -87,7 +88,7 @@ export default function HistoryModal({ isOpen, onClose }) {
         </div>
 
         {/* History List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {filtered.length === 0 ? (
             <div className="text-center py-12 text-xs text-[var(--text-muted)]">
               {filterText ? 'No matching history found.' : 'No recent reading history recorded yet.'}
@@ -96,21 +97,32 @@ export default function HistoryModal({ isOpen, onClose }) {
             filtered.map((item) => {
               const displayBookTitle = convertPaliScript(item.bookTitle, settings?.paliScript);
               const displayChapterTitle = convertPaliScript(item.chapterTitle, settings?.paliScript);
+              const displaySnippet = convertPaliScript(item.snippet, settings?.paliScript);
               const displayNikaya = convertPaliScript(item.nikaya, settings?.paliScript);
               return (
                 <div
                   key={item.id}
-                  className="p-2.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-center justify-between gap-3 cursor-pointer"
+                  className="group p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-start justify-between gap-3 cursor-pointer"
                   onClick={() => handleJump(item)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)] flex-wrap">
                       <span className="truncate">{displayBookTitle}</span>
                       <span className="text-[10.5px] text-[var(--accent)] font-medium shrink-0">
                         › {displayChapterTitle || `Ch ${(item.chapterIdx || 0) + 1}`}
                       </span>
+                      {item.paraNum && (
+                        <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold shrink-0">
+                          Para {item.paraNum}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10.5px] text-[var(--text-muted)] mt-0.5">
+                    {displaySnippet && (
+                      <div className="text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">
+                        {displaySnippet}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] mt-1.5">
                       <span className="flex items-center gap-1">
                         <Clock size={10} />
                         {formatTimeAgo(item.lastReadTime)}
@@ -122,7 +134,7 @@ export default function HistoryModal({ isOpen, onClose }) {
                   <button
                     className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-secondary)] transition shrink-0"
                     onClick={() => handleJump(item)}
-                    title="Resume reading"
+                    title="Resume reading from this place"
                   >
                     <ExternalLink size={13} />
                   </button>
