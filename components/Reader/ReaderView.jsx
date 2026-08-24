@@ -97,6 +97,7 @@ export default function ReaderView() {
     setActiveEditionPages,
     openGoToModal,
     addToHistory,
+    saveTabPosition,
   } = useTabs();
 
 
@@ -557,6 +558,9 @@ export default function ReaderView() {
             setActiveParaNum(foundParaNum);
           }
 
+          // Continuously save tab reading position (chapter, paragraph, scroll offset)
+          saveTabPosition(activeTab.bookCode, foundChapterIdx, foundParaNum, top);
+
           // Automatically record user's exact reading position into History
           addToHistory({
             bookCode: activeTab.bookCode,
@@ -577,7 +581,7 @@ export default function ReaderView() {
         }
       }, 120);
     },
-    [activeTab, saveTabScroll, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory]
+    [activeTab, saveTabScroll, saveTabPosition, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory]
   );
 
   const handleReaderClick = useCallback((e) => {
@@ -602,6 +606,9 @@ export default function ReaderView() {
       }
       const text = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
       const snip = text.length > 130 ? text.slice(0, 130) + '...' : text;
+
+      saveTabPosition(activeTab.bookCode, chapIdx, pNum, containerRef.current?.scrollTop);
+
       addToHistory({
         bookCode: activeTab.bookCode,
         bookTitle: activeTab.title,
@@ -613,7 +620,7 @@ export default function ReaderView() {
         snippet: snip || `${activeTab.title} — ${activeTab.chapters?.[chapIdx]?.title || `Chapter ${chapIdx + 1}`}`,
       });
     }
-  }, [activeTab, setActiveParaNum, addToHistory]);
+  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory]);
 
 
 

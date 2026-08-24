@@ -86,12 +86,14 @@ export function TabProvider({ children }) {
 
   const openTabsRef = useRef([]);
   const activeBookCodeRef = useRef(null);
+  const activeParaNumRef = useRef(null);
 
   const tabScrollMemoryRef = useRef({});
   const isInitializedRef = useRef(false);
 
   openTabsRef.current = openTabs;
   activeBookCodeRef.current = activeBookCode;
+  activeParaNumRef.current = activeParaNum;
 
   // Load saved bookmarks, history, and scroll positions from localStorage & handle mobile layout
   useEffect(() => {
@@ -242,6 +244,7 @@ export function TabProvider({ children }) {
       const minifiedTabs = tabs.map((t) => ({
         bookCode: t.bookCode,
         currentChapterIdx: t.currentChapterIdx || 0,
+        lastParaNum: t.lastParaNum || (t.bookCode === activeBookCodeRef.current ? activeParaNumRef.current : undefined),
       }));
       localStorage.setItem(STORAGE_KEYS.TABS, JSON.stringify(minifiedTabs));
       if (activeCode) {
@@ -251,6 +254,31 @@ export function TabProvider({ children }) {
       }
     } catch (e) {}
   }, []);
+
+  // Save exact tab position (chapter, paragraph, and pixel scroll)
+  const saveTabPosition = useCallback((bookCode, chapterIdx, paraNum, scrollTop) => {
+    if (!bookCode) return;
+    if (scrollTop !== undefined && scrollTop !== null) {
+      tabScrollMemoryRef.current[bookCode] = scrollTop;
+      try {
+        localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+      } catch (e) {}
+    }
+
+    setOpenTabs((prev) => {
+      const updated = prev.map((t) =>
+        t.bookCode === bookCode
+          ? {
+              ...t,
+              currentChapterIdx: chapterIdx !== undefined ? chapterIdx : t.currentChapterIdx,
+              lastParaNum: paraNum || t.lastParaNum,
+            }
+          : t
+      );
+      persistTabs(updated, activeBookCodeRef.current);
+      return updated;
+    });
+  }, [persistTabs]);
 
   // Load a single chapter into an open tab (on demand / lazy loading)
   const loadChapter = useCallback(async (bookCode, chapterIdx) => {
@@ -614,9 +642,13 @@ export function TabProvider({ children }) {
         }
 
 
-        const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx || 0);
-        if (firstP) {
-          setActiveParaNum(firstP);
+        if (tab.lastParaNum) {
+          setActiveParaNum(tab.lastParaNum);
+        } else {
+          const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx || 0);
+          if (firstP) {
+            setActiveParaNum(firstP);
+          }
         }
         setTreeSelectedNode({
           bookCode: tab.bookCode,
@@ -832,6 +864,7 @@ export function TabProvider({ children }) {
     try {
       const savedTabsRaw = localStorage.getItem(STORAGE_KEYS.TABS);
       const savedActive = localStorage.getItem(STORAGE_KEYS.ACTIVE);
+      const savedHistoryRaw = localStorage.getItem(STORAGE_KEYS.HISTORY);
 
       if (savedTabsRaw) {
         const parsedTabs = JSON.parse(savedTabsRaw);
@@ -839,8 +872,26 @@ export function TabProvider({ children }) {
           const activeToOpen = savedActive || parsedTabs[0].bookCode;
           const activeItem = parsedTabs.find((p) => p.bookCode === activeToOpen) || parsedTabs[0];
 
-          // Open active book first
-          openBook(activeItem.bookCode, { targetChapterIdx: activeItem.currentChapterIdx || 0 });
+          let resumeParaNum = activeItem.lastParaNum;
+          let resumeChapIdx = activeItem.currentChapterIdx || 0;
+
+          if (!resumeParaNum && savedHistoryRaw) {
+            try {
+              const parsedHist = JSON.parse(savedHistoryRaw);
+              const histItem = parsedHist.find((h) => h.bookCode === activeItem.bookCode);
+              if (histItem?.paraNum) {
+                resumeParaNum = histItem.paraNum;
+                if (histItem.chapterIdx !== undefined) resumeChapIdx = histItem.chapterIdx;
+              }
+            } catch (_) {}
+          }
+
+          // Open active book first to exact paragraph / chapter
+          openBook(activeItem.bookCode, {
+            targetChapterIdx: resumeChapIdx,
+            targetParaNum: resumeParaNum || undefined,
+            isResume: true,
+          });
 
           // Load rest in background
           parsedTabs.forEach((item) => {
@@ -867,6 +918,7 @@ export function TabProvider({ children }) {
                         loadedChapters: { ...bData.chapters_data },
                         loadingChapters: {},
                         currentChapterIdx: item.currentChapterIdx || 0,
+                        lastParaNum: item.lastParaNum,
                       },
                     ];
                   });
@@ -1004,7 +1056,7 @@ export function TabProvider({ children }) {
         closeTab,
         reorderTabs,
         setChapterForActiveTab,
-
+        saveTabPosition,
         saveTabScroll,
         getSavedScroll,
         clearTargetScrollIntent,
