@@ -163,7 +163,9 @@ body.hide-pb span.pb, body.hide-pb .pb { display: none !important; }
 body.hide-paranum strong.paranum, body.hide-paranum .paranum { display: none !important; }
 body.hide-footnotes span.note, body.hide-footnotes .note { display: none !important; }
 body.hide-chap-heading .reader-container .chapter-divider { display: none !important; }
-body.no-indent .reader-container .bodytext { text-indent: 0 !important; }
+body.no-indent .reader-container .bodytext,
+body.no-indent .reader-container .indent { text-indent: 0 !important; }
+body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-left: 0 !important; }
 
 
 /* Tabs Bar */
@@ -805,23 +807,35 @@ main.content-area {
 
 .reader-container {
   width: 100%;
+  max-width: var(--reader-max-width, 880px);
   margin: 0 auto;
   padding: 32px 28px 80px 28px;
   font-family: var(--font-reader);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
   color: var(--text-primary);
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 /* Tipitaka Pali Typography */
 .reader-container p {
   margin-bottom: 1.25em;
   transition: background 0.3s ease;
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
 }
 
 .reader-container .book {
   font-size: 1.85em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   color: var(--accent);
   margin: 1.2em 0 0.4em 0;
@@ -830,7 +844,8 @@ main.content-area {
 
 .reader-container .nikaya {
   font-size: 1.5em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   color: var(--text-secondary);
   margin-bottom: 0.4em;
@@ -838,7 +853,8 @@ main.content-area {
 
 .reader-container .chapter {
   font-size: 1.4em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   color: var(--text-primary);
   margin: 1.2em 0 0.6em 0;
@@ -846,55 +862,76 @@ main.content-area {
 
 .reader-container .title {
   font-size: 1.25em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   margin: 1em 0 0.5em 0;
 }
 
 .reader-container .subhead {
   font-size: 1.15em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   margin: 0.8em 0 0.4em 0;
 }
 
 .reader-container .subsubhead {
   font-size: 1.05em;
-  text-align: center;
+  text-align: center !important;
+  text-indent: 0 !important;
   font-weight: bold;
   margin: 0.6em 0 0.3em 0;
 }
 
 .reader-container .bodytext {
   text-indent: 2em;
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
+}
+
+.reader-container .indent {
+  text-indent: 2em;
+  margin-left: 3em;
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
 }
 
 .reader-container .hangnum {
   text-indent: -2em;
   padding-left: 2em;
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
+}
+
+.reader-container .unindented {
+  text-indent: 0;
+  text-align: var(--reader-text-align, justify);
+  text-justify: inter-word;
+}
+
+.reader-container .centre,
+.reader-container .centered {
+  text-align: center !important;
+  text-indent: 0 !important;
 }
 
 .reader-container .gatha1,
 .reader-container .gatha2,
 .reader-container .gatha3 {
-  padding-left: 3em;
-  text-indent: -1em;
+  margin-left: 3.5em;
+  padding-left: 0;
+  text-indent: 0;
+  text-align: left;
   margin-bottom: 0.25em;
 }
 
 .reader-container .gathalast {
-  padding-left: 3em;
-  text-indent: -1em;
+  margin-left: 3.5em;
+  padding-left: 0;
+  text-indent: 0;
+  text-align: left;
   margin-bottom: 1.2em;
-}
-
-.reader-container .unindented {
-  text-indent: 0;
-}
-
-.reader-container .centered {
-  text-align: center;
-  text-indent: 0;
 }
 
 .reader-container strong.bld {

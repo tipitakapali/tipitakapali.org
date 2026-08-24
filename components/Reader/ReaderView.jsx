@@ -570,7 +570,10 @@ export default function ReaderView() {
 
       {/* Lazy-Loaded Chapter Content Stream */}
       <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6" onClick={handleReaderClick}>
-        <div className="reader-container max-w-[860px] w-full">
+        <div
+          className="reader-container w-full"
+          style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
+        >
 
           {activeTab.chapters && activeTab.chapters.length > 0 ? (
             activeTab.chapters.map((chap) => (
