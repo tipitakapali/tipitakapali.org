@@ -450,9 +450,42 @@ export default function SettingsModal() {
                   </div>
                 </div>
 
+                <div className="pt-3 border-t border-[var(--border-color)]">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
+                    Scroll Navigation & Motion Sickness Reduction
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'fast', label: '⚡ Fast & Smooth', desc: 'Rapid 150ms ease-out, zero motion sickness' },
+                      { id: 'instant', label: '🚀 Instant (0ms)', desc: 'Direct jump, zero motion' },
+                      { id: 'smooth', label: '🌊 Standard', desc: 'Standard browser smooth scrolling' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => updateSetting('scrollMotion', m.id)}
+                        className={`p-2.5 text-left rounded-lg border transition flex flex-col justify-between ${
+                          (settings.scrollMotion || 'fast') === m.id
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold shadow-xs'
+                            : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-gray-400'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{m.label}</div>
+                        <div
+                          className={`text-[10px] mt-1 leading-tight ${
+                            (settings.scrollMotion || 'fast') === m.id ? 'text-white/80' : 'text-[var(--text-muted)]'
+                          }`}
+                        >
+                          {m.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="pt-3 border-t border-[var(--border-color)] space-y-2.5">
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
-                    <span className="text-xs font-semibold">Pulsing animation on search jump</span>
+                    <span className="text-xs font-semibold">Pulsing animation on target highlight</span>
                     <input
                       type="checkbox"
                       checked={settings.pulseAnimation}

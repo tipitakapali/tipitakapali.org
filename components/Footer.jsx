@@ -201,7 +201,7 @@ export default function Footer() {
             <div className="pt-2 border-t border-[var(--border-color)]/60">
               <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick Presets</div>
               <div className="grid grid-cols-6 gap-1">
-                {[16, 18, 20, 22, 25, 28].map((sz) => (
+                {[16, 18, 20, 22, 24, 28].map((sz) => (
                   <button
                     key={sz}
                     onClick={() => updateSetting('fontSize', sz)}

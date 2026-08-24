@@ -7,6 +7,7 @@ import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 
 import { transliterateHtml, convertPaliScript } from '../../services/transliterate';
+import { smartScrollTo } from '../../services/scroll';
 
 // Memoized Chapter Block with Pre-Buffering Intersection Observer
 const ChapterBlock = memo(function ChapterBlock({
@@ -202,7 +203,7 @@ export default function ReaderView() {
           const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
+          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           if (settings.pulseAnimation) {
             targetEl.classList.remove('pulse-highlight');
@@ -233,7 +234,7 @@ export default function ReaderView() {
           const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
+          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           if (settings.pulseAnimation) {
             targetEl.classList.remove('pulse-highlight');
@@ -301,7 +302,7 @@ export default function ReaderView() {
           const rect = targetEl.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
+          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           if (settings.pulseAnimation) {
             targetEl.classList.remove('pulse-highlight');
@@ -322,7 +323,7 @@ export default function ReaderView() {
       // 4. Target chapter
       if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined && !page) {
         if (chapterIdx === 0) {
-          containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+          smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
           saveTabScroll(activeTab.bookCode, 0);
           const firstP = containerRef.current.querySelector('[data-para]');
           if (firstP) {
@@ -342,7 +343,7 @@ export default function ReaderView() {
           const rect = target.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          containerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
+          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           if (settings.pulseAnimation) {
             target.classList.remove('pulse-highlight');

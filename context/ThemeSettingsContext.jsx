@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   treeDensity: 'normal',
   highlightSearchTerms: true,
   pulseAnimation: true,
+  scrollMotion: 'fast', // 'fast' | 'instant' | 'smooth'
   paliScript: 'roman',
   translations: {
     english: false,

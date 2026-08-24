@@ -692,7 +692,6 @@ main.content-area {
   position: relative;
   display: flex;
   flex-direction: column;
-  scroll-behavior: smooth;
 }
 
 .content-header {
