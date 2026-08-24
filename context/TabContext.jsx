@@ -77,6 +77,7 @@ export function TabProvider({ children }) {
   const [isBookmarkOpen, setIsBookmarkOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
+  const [searchHighlight, setSearchHighlight] = useState(null);
   const [targetScrollIntent, setTargetScrollIntent] = useState(null);
   const [treeSelectedNode, setTreeSelectedNode] = useState(null);
   const [activeEditionPages, setActiveEditionPages] = useState({});
@@ -474,6 +475,15 @@ export function TabProvider({ children }) {
           : currentTabs[existingTabIndex].currentChapterIdx || 0;
 
         const qParam = options.searchQuery || options.highlightQuery || null;
+        if (qParam) {
+          setSearchHighlight({
+            query: qParam,
+            paraIndex: options.targetParaIndex,
+            paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
+          });
+        } else {
+          setSearchHighlight(null);
+        }
         setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: activeChap });
         updateUrlParams({ book: cleanCode, chapter: activeChap + 1, q: qParam, search: null });
         persistTabs(openTabsRef.current, cleanCode);
@@ -578,6 +588,15 @@ export function TabProvider({ children }) {
         });
 
         const qParam = options.searchQuery || options.highlightQuery || null;
+        if (qParam) {
+          setSearchHighlight({
+            query: qParam,
+            paraIndex: options.targetParaIndex,
+            paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
+          });
+        } else {
+          setSearchHighlight(null);
+        }
         updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, q: qParam, search: null });
         bufferAdjacentChapters(cleanCode, targetChapIdx);
 
@@ -654,6 +673,7 @@ export function TabProvider({ children }) {
           bookCode: tab.bookCode,
           chapterIdx: tab.currentChapterIdx || 0,
         });
+        setSearchHighlight(null);
         updateUrlParams({
           book: tab.bookCode,
           chapter: (tab.currentChapterIdx || 0) + 1,
@@ -775,6 +795,7 @@ export function TabProvider({ children }) {
 
       loadChapter(activeCode, chapterIdx);
       bufferAdjacentChapters(activeCode, chapterIdx);
+      setSearchHighlight(null);
       updateUrlParams({ book: activeCode, chapter: chapterIdx + 1, q: null, search: null });
     },
     [updateUrlParams, persistTabs, loadChapter, bufferAdjacentChapters, addToHistory, setActiveParaNum]
@@ -1037,6 +1058,10 @@ export function TabProvider({ children }) {
         setIsBookmarkOpen,
         setIsHistoryOpen,
         searchInitialQuery,
+        searchHighlight,
+        setSearchHighlight,
+        searchHighlightQuery: searchHighlight?.query || '',
+        setSearchHighlightQuery: (q) => setSearchHighlight(q ? { query: q } : null),
         targetScrollIntent,
         treeSelectedNode,
         activeEditionPages,

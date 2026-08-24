@@ -179,5 +179,153 @@ export function transliterateHtml(html, targetScript = "roman") {
   );
 }
 
+export function highlightHtmlText(
+  html,
+  query,
+  targetScript = "roman",
+  targetParaIndex = null,
+  targetParaNum = null
+) {
+  if (!html || !query) return html;
+  const rawQ = String(query).trim();
+  if (rawQ.length < 2) return html;
+
+  const romanQ = convertAnyToRoman(rawQ).trim();
+  const baseTerms = [romanQ, rawQ, ...romanQ.split(/\s+/), ...rawQ.split(/\s+/)].filter(
+    (t) => t && t.trim().length >= 2
+  );
+  const uniqueTerms = Array.from(new Set(baseTerms));
+
+  if (uniqueTerms.length === 0) return html;
+
+  const diacriticMap = {
+    'a': '[aāAĀ]', 'ā': '[aāAĀ]',
+    'i': '[iīIĪ]', 'ī': '[iīIĪ]',
+    'u': '[uūUŪ]', 'ū': '[uūUŪ]',
+    'e': '[eE]',
+    'o': '[oO]',
+    'm': '[mṁṃMṀṂ]', 'ṁ': '[mṁṃMṀṂ]', 'ṃ': '[mṁṃMṀṂ]',
+    'n': '[nṅñṇNṄÑṆ]', 'ṅ': '[nṅñṇNṄÑṆ]', 'ñ': '[nṅñṇNṄÑṆ]', 'ṇ': '[nṅñṇNṄÑṆ]',
+    't': '[tṭTṬ]', 'ṭ': '[tṭTṬ]',
+    'd': '[dḍDḌ]', 'ḍ': '[dḍDḌ]',
+    'l': '[lḷLḶ]', 'ḷ': '[lḷLḶ]',
+    's': '[sṣśSṢŚ]', 'ṣ': '[sṣśSṢŚ]', 'ś': '[sṣśSṢŚ]',
+    'r': '[rṛṝRṚṜ]', 'ṛ': '[rṛṝRṚṜ]', 'ṝ': '[rṛṝRṚṜ]',
+    'h': '[hH]', 'k': '[kK]', 'g': '[gG]', 'c': '[cC]', 'j': '[jJ]',
+    'p': '[pP]', 'b': '[bB]', 'y': '[yY]', 'v': '[vV]'
+  };
+
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const buildPaliRegex = (term) => {
+    if (/[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(term)) {
+      return escapeRegex(term);
+    }
+    let regexStr = '';
+    for (let i = 0; i < term.length; i++) {
+      const char = term[i].toLowerCase();
+      if (diacriticMap[char]) {
+        regexStr += diacriticMap[char];
+      } else {
+        regexStr += escapeRegex(term[i]);
+      }
+    }
+    return regexStr;
+  };
+
+  const patterns = [];
+  for (const term of uniqueTerms) {
+    if (!term || term.length < 2) continue;
+    if (targetScript && targetScript !== 'roman') {
+      const converted = convertPaliScript(term, targetScript);
+      if (converted && converted.trim()) {
+        patterns.push(escapeRegex(converted.trim()));
+      }
+      patterns.push(escapeRegex(term));
+    } else {
+      patterns.push(buildPaliRegex(term));
+    }
+  }
+
+  if (patterns.length === 0) return html;
+
+  // Sort patterns descending by length
+  patterns.sort((a, b) => b.length - a.length);
+
+  const combinedRegex = new RegExp(`(${patterns.join('|')})`, 'gi');
+
+  const highlightTextInside = (innerHtml) => {
+    return innerHtml.replace(
+      /(<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>[\s\S]*?<\/span>|<[^>]*>|&[a-z0-9#]+;)|([^<>&]+)/gi,
+      (match, nonText, textNode) => {
+        if (nonText) return nonText;
+        return textNode.replace(combinedRegex, '<mark class="search-hit">$1</mark>');
+      }
+    );
+  };
+
+  // If specific paragraph target is specified (paraIndex or paraNum), highlight ONLY inside that matching paragraph
+  const hasParaTarget =
+    (targetParaIndex !== undefined && targetParaIndex !== null && targetParaIndex !== '') ||
+    (targetParaNum !== undefined && targetParaNum !== null && targetParaNum !== '');
+
+  if (hasParaTarget) {
+    const cleanTargetPara = targetParaNum
+      ? String(targetParaNum).replace(/^(?:para-?|p)/i, '').trim()
+      : null;
+    const targetPIndexStr =
+      targetParaIndex !== null && targetParaIndex !== undefined
+        ? String(targetParaIndex).trim()
+        : null;
+    const targetInt = cleanTargetPara ? parseInt(cleanTargetPara, 10) : NaN;
+
+    return html.replace(
+      /(<p\b[^>]*>)([\s\S]*?)(<\/p>)/gi,
+      (fullMatch, openTag, innerContent, closeTag) => {
+        let isMatch = false;
+
+        // 1. Check data-pindex or id with pindex
+        if (targetPIndexStr) {
+          const pindexMatch =
+            openTag.match(/data-pindex="([^"]+)"/i) || openTag.match(/id="pindex-([^"]+)"/i);
+          if (pindexMatch && pindexMatch[1] === targetPIndexStr) {
+            isMatch = true;
+          }
+        }
+
+        // 2. Check data-para or id with para
+        if (!isMatch && cleanTargetPara) {
+          const paraMatch =
+            openTag.match(/data-para="([^"]+)"/i) || openTag.match(/id="para-?([^"]+)"/i);
+          if (paraMatch && paraMatch[1] === cleanTargetPara) {
+            isMatch = true;
+          }
+
+          // Check ranged para attributes: data-para-first and data-para-last
+          if (!isMatch && !isNaN(targetInt)) {
+            const firstMatch = openTag.match(/data-para-first="(\d+)"/i);
+            const lastMatch = openTag.match(/data-para-last="(\d+)"/i);
+            if (firstMatch && lastMatch) {
+              const first = parseInt(firstMatch[1], 10);
+              const last = parseInt(lastMatch[1], 10);
+              if (targetInt >= first && targetInt <= last) {
+                isMatch = true;
+              }
+            }
+          }
+        }
+
+        if (isMatch) {
+          return openTag + highlightTextInside(innerContent) + closeTag;
+        }
+        return fullMatch;
+      }
+    );
+  }
+
+  // Fallback: If no specific paragraph targeted, highlight text throughout
+  return highlightTextInside(html);
+}
+
 export { CVT };
 

@@ -6,7 +6,7 @@ import WelcomeView from './WelcomeView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 
-import { transliterateHtml, convertPaliScript } from '../../services/transliterate';
+import { transliterateHtml, convertPaliScript, highlightHtmlText } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
 
 // Memoized Chapter Block with Pre-Buffering Intersection Observer
@@ -16,6 +16,8 @@ const ChapterBlock = memo(function ChapterBlock({
   isLoading,
   onVisible,
   paliScript = 'roman',
+  searchHighlight = null,
+  highlightSearchTerms = true,
 }) {
   const sentinelRef = useRef(null);
 
@@ -37,11 +39,21 @@ const ChapterBlock = memo(function ChapterBlock({
 
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
+    let processed = html;
     if (paliScript && paliScript !== 'roman') {
-      return transliterateHtml(html, paliScript);
+      processed = transliterateHtml(processed, paliScript);
     }
-    return html;
-  }, [html, paliScript]);
+    if (highlightSearchTerms && searchHighlight?.query && searchHighlight.query.trim()) {
+      processed = highlightHtmlText(
+        processed,
+        searchHighlight.query.trim(),
+        paliScript,
+        searchHighlight.paraIndex,
+        searchHighlight.paraNum
+      );
+    }
+    return processed;
+  }, [html, paliScript, searchHighlight, highlightSearchTerms]);
 
   if (displayHtml) {
     return <div dangerouslySetInnerHTML={{ __html: displayHtml }} />;
@@ -99,6 +111,7 @@ export default function ReaderView() {
     openGoToModal,
     addToHistory,
     saveTabPosition,
+    searchHighlight,
   } = useTabs();
 
 
@@ -879,11 +892,33 @@ export default function ReaderView() {
                   html={activeTab.loadedChapters?.[chap.chapter_index]}
                   isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
                   onVisible={handleChapterVisible}
-                  paliScript={settings.paliScript}
+                  paliScript={settings?.paliScript}
+                  searchHighlight={searchHighlight}
+                  highlightSearchTerms={settings?.highlightSearchTerms ?? true}
                 />
               ))
             ) : (
-              <div dangerouslySetInnerHTML={{ __html: activeTab.html }} />
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: (function () {
+                    if (!activeTab.html) return '';
+                    let processed = activeTab.html;
+                    if (settings?.paliScript && settings.paliScript !== 'roman') {
+                      processed = transliterateHtml(processed, settings.paliScript);
+                    }
+                    if ((settings?.highlightSearchTerms ?? true) && searchHighlight?.query && searchHighlight.query.trim()) {
+                      processed = highlightHtmlText(
+                        processed,
+                        searchHighlight.query.trim(),
+                        settings?.paliScript,
+                        searchHighlight.paraIndex,
+                        searchHighlight.paraNum
+                      );
+                    }
+                    return processed;
+                  })(),
+                }}
+              />
             )}
           </div>
         </div>
