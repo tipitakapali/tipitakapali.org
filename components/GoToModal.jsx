@@ -13,10 +13,21 @@ export default function GoToModal({ isOpen, onClose }) {
   const [activeTabMode, setActiveTabMode] = useState('para'); // 'para' | 'page'
   const [paraInput, setParaInput] = useState('');
   const [pageInput, setPageInput] = useState('');
-  const [pageSystem, setPageSystem] = useState('V'); // 'V' | 'P' | 'T' | 'M'
+  const [pageSystem, setPageSystem] = useState('M'); // Default to 'M' (Myanmar)
   const [errorMessage, setErrorMessage] = useState('');
 
   const inputRef = useRef(null);
+
+  // Load saved edition preference (defaults to 'M' for Myanmar)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedEd = localStorage.getItem('tipitaka_goto_edition');
+      if (savedEd && ['M', 'V', 'P', 'T', 'O'].includes(savedEd)) {
+        setPageSystem(savedEd);
+      }
+    } catch (e) {}
+  }, []);
 
   // 1. Direct precomputed paragraph limits (from server DB/JSON, 0ms compute)
   const paraRange = useMemo(() => {
@@ -42,7 +53,7 @@ export default function GoToModal({ isOpen, onClose }) {
     if (activeTab?.edition_ranges) return activeTab.edition_ranges;
     const res = {};
     const pageToChap = activeTab?.page_to_chapter || {};
-    for (const sys of ['V', 'P', 'T', 'M']) {
+    for (const sys of ['M', 'V', 'P', 'T', 'O']) {
       const pMap = pageToChap[sys] || {};
       const uniquePages = new Set();
       let minNum = Infinity;
@@ -144,8 +155,8 @@ export default function GoToModal({ isOpen, onClose }) {
 
 
   const pageSystems = [
+    { code: 'M', label: 'Myanmar', name: 'Chaṭṭha Saṅgāyana Edition' },
     { code: 'V', label: 'VRI', name: 'Vipassana Research Institute' },
-    { code: 'M', label: 'Myanmar', name: 'Chaṭṭha Saṅgāyana' },
     { code: 'P', label: 'PTS', name: 'Pali Text Society' },
     { code: 'T', label: 'Thai', name: 'Royal Thai Edition' },
     { code: 'O', label: 'Other', name: 'Other Extra-canonical' },
@@ -425,6 +436,9 @@ export default function GoToModal({ isOpen, onClose }) {
                         onClick={() => {
                           setPageSystem(sys.code);
                           setErrorMessage('');
+                          try {
+                            localStorage.setItem('tipitaka_goto_edition', sys.code);
+                          } catch (e) {}
                         }}
                         className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${
                           pageSystem === sys.code
@@ -446,7 +460,7 @@ export default function GoToModal({ isOpen, onClose }) {
                   })}
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1.5 leading-normal">
-                  <span className="font-semibold text-[var(--text-primary)]">Editions:</span> <strong>V</strong> = VRI (Vipassana Research Inst.) • <strong>M</strong> = Myanmar • <strong>P</strong> = PTS (Pali Text Society) • <strong>T</strong> = Thai • <strong>O</strong> = Other
+                  <span className="font-semibold text-[var(--text-primary)]">Editions:</span> <strong>M</strong> = Myanmar (Chaṭṭha Saṅgāyana) • <strong>V</strong> = VRI • <strong>P</strong> = PTS (Pali Text Society) • <strong>T</strong> = Thai • <strong>O</strong> = Other
                 </p>
               </div>
 
