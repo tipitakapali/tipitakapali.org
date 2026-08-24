@@ -85,8 +85,11 @@ export default function ReaderView() {
     targetScrollIntent,
     clearTargetScrollIntent,
     setIsSidebarOpen,
+    isSidebarOpen,
+    setIsHeaderVisible,
     addBookmark,
     removeBookmark,
+    isBookmarked,
     bookmarks,
     activeParaNum,
     setActiveParaNum,
@@ -461,6 +464,17 @@ export default function ReaderView() {
       const delta = top - lastScrollTopRef.current;
       lastScrollTopRef.current = top;
 
+      // When navigation tree is closed: hide header on scroll down, restore on scroll up
+      if (!isSidebarOpen) {
+        if (top <= 30) {
+          setIsHeaderVisible(true);
+        } else if (delta > 6 && top > 60) {
+          setIsHeaderVisible(false);
+        } else if (delta < -6) {
+          setIsHeaderVisible(true);
+        }
+      }
+
       if (contentHeaderRef.current) {
         contentHeaderRef.current.classList.remove('hidden-scroll');
       }
@@ -509,7 +523,7 @@ export default function ReaderView() {
         }
       }, 100);
     },
-    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum, detectActiveEditionPages]
+    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible]
   );
 
   const handleReaderClick = useCallback((e) => {

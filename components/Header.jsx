@@ -12,6 +12,8 @@ export default function Header() {
   const { settings, updateSetting, openSettingsModal } = useThemeSettings();
   const {
     toggleSidebar,
+    isSidebarOpen,
+    isHeaderVisible,
     openSearchModal,
     isDictOpen,
     setIsDictOpen,
@@ -75,8 +77,14 @@ export default function Header() {
       ? '🌌'
       : '☀️';
 
+  const isHidden = !isHeaderVisible && !isSidebarOpen;
+
   return (
-    <header className="app-header h-[50px] sm:h-[52px] bg-[var(--bg-secondary)] border-b border-[var(--border-color)] px-2.5 sm:px-4 flex items-center justify-between shrink-0 z-50 select-none">
+    <header
+      className={`app-header h-[50px] sm:h-[52px] bg-[var(--bg-secondary)] border-b border-[var(--border-color)] px-2.5 sm:px-4 flex items-center justify-between shrink-0 z-50 select-none ${
+        isHidden ? 'hidden-header' : ''
+      }`}
+    >
       {/* Brand & Menu */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         <button

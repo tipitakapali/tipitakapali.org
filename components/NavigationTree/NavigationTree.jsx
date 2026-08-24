@@ -31,7 +31,7 @@ export default function NavigationTree() {
   const [floatPos, setFloatPos] = useState({ x: 80, y: 100, width: 380, height: 600 });
   const [isResizing, setIsResizing] = useState(false);
 
-  const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
+  const { isSidebarOpen, setIsSidebarOpen, setIsHeaderVisible, treeSelectedNode } = useTabs();
   const { setIsZenMode } = useThemeSettings();
   const treeContainerRef = useRef(null);
 
@@ -404,7 +404,10 @@ export default function NavigationTree() {
               {/* Hide / Close Button */}
               <button
                 className="tree-action-btn p-1 hover:text-red-500 transition"
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => {
+                  setIsSidebarOpen(false);
+                  setIsHeaderVisible(false);
+                }}
                 title="Close Navigation Tree"
               >
                 <X size={12} />

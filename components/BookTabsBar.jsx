@@ -18,7 +18,9 @@ export default function BookTabsBar() {
     reorderTabs,
     recentHistory,
     setIsHistoryOpen,
+    isSidebarOpen,
     setIsSidebarOpen,
+    setIsHeaderVisible,
   } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
 
@@ -46,6 +48,7 @@ export default function BookTabsBar() {
   const handleOpenNavAndExitZen = () => {
     setIsZenMode(false);
     setIsSidebarOpen(true);
+    setIsHeaderVisible(true);
     if (typeof document !== 'undefined') {
       document.body.classList.remove('zen-mode');
     }
@@ -111,19 +114,16 @@ export default function BookTabsBar() {
 
   return (
     <div className="book-tabs-bar select-none" onWheel={handleWheel}>
-      {/* Menu Icon before any tab when in Zen Mode */}
-      {isZenMode && (
+      {/* Menu Icon before tabs when Navigation is closed or in Zen Mode */}
+      {(!isSidebarOpen || isZenMode) && (
         <button
           className="zen-menu-btn flex items-center justify-center h-[28px] px-2 mb-[3px] rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition shrink-0 cursor-pointer"
           onClick={handleOpenNavAndExitZen}
-          title="Open Navigation & Menu (Exit Zen Mode)"
-          aria-label="Open Navigation & Menu"
+          title="Open Navigation Tree (Ctrl+B)"
+          aria-label="Open Navigation Tree"
         >
           <Menu size={16} />
         </button>
-
-
-
       )}
 
       <div className="tabs-scroll-container" ref={tabsScrollRef}>

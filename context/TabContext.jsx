@@ -68,6 +68,7 @@ export function TabProvider({ children }) {
   const [activeParaNum, setActiveParaNum] = useState(null);
   const [loadingBook, setLoadingBook] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [isGoToOpen, setIsGoToOpen] = useState(false);
@@ -761,7 +762,11 @@ export function TabProvider({ children }) {
   }, []);
 
   const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen((prev) => !prev);
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      setIsHeaderVisible(next);
+      return next;
+    });
   }, []);
 
   // Automatic Session Resumption on page load / revisit
@@ -981,7 +986,10 @@ export function TabProvider({ children }) {
         openSearchModal,
         closeSearchModal,
         toggleSidebar,
+        isSidebarOpen,
         setIsSidebarOpen,
+        isHeaderVisible,
+        setIsHeaderVisible,
         updateUrlParams,
       }}
     >
