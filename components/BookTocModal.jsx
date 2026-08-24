@@ -95,18 +95,18 @@ export default function BookTocModal({ isOpen, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg h-[85vh] sm:h-auto sm:max-h-[640px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-2xl h-[85vh] sm:h-auto sm:max-h-[700px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <ListTree size={16} className="text-[var(--accent)] shrink-0" />
+        <div className="px-5 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <ListTree size={18} className="text-[var(--accent)] shrink-0" />
             <div className="overflow-hidden">
-              <h3 className="text-xs font-bold text-[var(--text-primary)] truncate">
+              <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">
                 {convertPaliScript(activeTab.title, settings?.paliScript)}
               </h3>
-              <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5">
+              <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
                 <span>Table of Contents</span>
                 <span>•</span>
                 <span>{tocList.length} sections</span>
@@ -115,35 +115,35 @@ export default function BookTocModal({ isOpen, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition"
+            className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
+            title="Close (Esc)"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Minimalist Filter Bar */}
-        <div className="px-3 py-2 border-b border-[var(--border-color)]/60 bg-[var(--bg-primary)] shrink-0">
+        <div className="px-4 py-2.5 border-b border-[var(--border-color)]/60 bg-[var(--bg-primary)] shrink-0">
           <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               ref={inputRef}
               type="text"
               placeholder={`Filter ${tocList.length} sections...`}
               value={filterQuery}
-
               onChange={(e) => setFilterQuery(typeVelthuis(e.target.value))}
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-2 pl-9 pr-3 text-[14px] outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
           </div>
         </div>
 
-        {/* Clean Typographic TOC Content (No heavy boxes or borders) */}
+        {/* Typographic TOC Content matching Navigation Tree Typography */}
         <div
           ref={listContainerRef}
-          className="flex-1 overflow-y-auto px-2 py-2.5 space-y-0.5 scroll-smooth select-none"
+          className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scroll-smooth select-none"
         >
           {filteredToc.length === 0 ? (
-            <div className="text-center py-10 text-xs text-[var(--text-muted)]">
+            <div className="text-center py-12 text-sm text-[var(--text-muted)]">
               No matching sections found.
             </div>
           ) : (
@@ -152,36 +152,36 @@ export default function BookTocModal({ isOpen, onClose }) {
               const isCurrentReading = originalIdx === activeTocIdx;
               const level = item.level;
 
-              // Clear, distinct indentation & typographic hierarchy
+              // Clear, distinct indentation & typographic hierarchy matching Navigation Tree
               let itemClass =
-                'w-full text-left py-1.5 px-2.5 rounded-md cursor-pointer transition flex items-center justify-between group ';
-              let titleClass = 'truncate leading-snug ';
+                'w-full text-left rounded-lg cursor-pointer transition flex items-center justify-between group ';
+              let titleClass = 'truncate leading-relaxed ';
               let indentClass = '';
 
               if (level === 0) {
-                // Book / Root Division
-                indentClass = 'pl-2.5';
-                titleClass += 'font-bold text-[13px] text-[var(--text-primary)] tracking-wide';
-                itemClass += 'bg-[var(--bg-secondary)]/50 hover:bg-[var(--bg-secondary)] mt-2 first:mt-0 py-2 border-y border-[var(--border-color)]/30 ';
+                // Book / Root Division (Level 0: 15.5px Bold)
+                indentClass = 'pl-3 pr-3 py-2.5';
+                titleClass += 'font-bold text-[15.5px] text-[var(--text-primary)] tracking-wide';
+                itemClass += 'bg-[var(--bg-secondary)]/70 hover:bg-[var(--bg-secondary)] mt-3 first:mt-0 border-y border-[var(--border-color)]/40 ';
               } else if (level === 1) {
-                // Chapter / Major Division / Sutta
-                indentClass = 'pl-7';
-                titleClass += 'font-semibold text-[12.5px] text-[var(--accent)]';
-                itemClass += 'hover:bg-[var(--accent-light)]/30 mt-0.5 ';
+                // Chapter / Major Division (Level 1: 15px Semibold)
+                indentClass = 'pl-8 pr-3 py-2';
+                titleClass += 'font-semibold text-[15px] text-[var(--accent)]';
+                itemClass += 'hover:bg-[var(--bg-secondary)] mt-1 ';
               } else if (level === 2) {
-                // Sutta / Section / Subhead
-                indentClass = 'pl-12';
-                titleClass += 'font-normal text-[12px] text-[var(--text-primary)]';
+                // Sutta / Section / Subhead (Level 2: 14.5px Medium)
+                indentClass = 'pl-13 pr-3 py-2';
+                titleClass += 'font-medium text-[14.5px] text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               } else {
-                // Subhead / Subsection
-                indentClass = 'pl-16';
-                titleClass += 'text-[11.5px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
+                // Subhead / Subsection (Level 3+: 14px Regular)
+                indentClass = 'pl-18 pr-3 py-1.5';
+                titleClass += 'text-[14px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               }
 
               if (isCurrentReading) {
-                itemClass += 'bg-[var(--accent-light)]! text-[var(--accent)]! font-semibold! border-l-[3px] border-l-[var(--accent)] ';
+                itemClass += 'bg-[var(--accent-light)]! text-[var(--accent)]! font-semibold! border-l-[3.5px] border-l-[var(--accent)] shadow-xs ';
               }
 
               return (
@@ -193,25 +193,25 @@ export default function BookTocModal({ isOpen, onClose }) {
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden mr-2">
                     {level === 0 ? (
-                      <BookOpen size={14} className="text-[var(--accent)] shrink-0" />
+                      <BookOpen size={16} className="text-[var(--accent)] shrink-0" />
                     ) : level === 1 ? (
-                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0 shadow-xs" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0 shadow-xs" />
                     ) : level === 2 ? (
-                      <span className="w-1.5 h-1.5 rotate-45 rounded-[1px] bg-[var(--text-muted)] shrink-0 opacity-75" />
+                      <span className="w-2 h-2 rotate-45 rounded-[1px] bg-[var(--text-muted)] shrink-0 opacity-80" />
                     ) : (
-                      <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]/60 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]/70 shrink-0" />
                     )}
                     <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
                   </div>
 
                   {isCurrentReading ? (
-                    <span className="text-[9.5px] font-bold text-[var(--accent)] shrink-0 tracking-tight flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-ping" />
+                    <span className="text-[11px] font-bold text-[var(--accent)] shrink-0 tracking-tight flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-ping" />
                       <span>Reading</span>
                     </span>
                   ) : (
                     <ChevronRight
-                      size={11}
+                      size={14}
                       className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     />
                   )}
