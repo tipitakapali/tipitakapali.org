@@ -1363,6 +1363,11 @@ footer.app-footer {
 }
 
 @media (max-width: 768px) {
+  .tree-action-dock,
+  .tree-action-btn.tree-action-dock {
+    display: none !important;
+  }
+
   aside.app-sidebar {
     position: fixed;
     height: calc(100vh - var(--header-height) - var(--footer-height));
