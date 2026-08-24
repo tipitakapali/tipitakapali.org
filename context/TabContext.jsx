@@ -437,8 +437,9 @@ export function TabProvider({ children }) {
           ? targetChapIdx
           : currentTabs[existingTabIndex].currentChapterIdx || 0;
 
+        const qParam = options.searchQuery || options.highlightQuery || null;
         setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: activeChap });
-        updateUrlParams({ book: cleanCode, chapter: activeChap + 1 });
+        updateUrlParams({ book: cleanCode, chapter: activeChap + 1, q: qParam, search: null });
         persistTabs(openTabsRef.current, cleanCode);
 
         addToHistory({
@@ -540,7 +541,8 @@ export function TabProvider({ children }) {
           chapterIdx: targetChapIdx,
         });
 
-        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1 });
+        const qParam = options.searchQuery || options.highlightQuery || null;
+        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, q: qParam, search: null });
         bufferAdjacentChapters(cleanCode, targetChapIdx);
 
 
@@ -615,6 +617,8 @@ export function TabProvider({ children }) {
         updateUrlParams({
           book: tab.bookCode,
           chapter: (tab.currentChapterIdx || 0) + 1,
+          q: null,
+          search: null,
         });
         persistTabs(openTabsRef.current, tab.bookCode);
 
@@ -658,12 +662,14 @@ export function TabProvider({ children }) {
           updateUrlParams({
             book: nextTab.bookCode,
             chapter: (nextTab.currentChapterIdx || 0) + 1,
+            q: null,
+            search: null,
           });
           persistTabs(newTabs, nextTab.bookCode);
         } else {
           setActiveBookCode(null);
           setTreeSelectedNode(null);
-          updateUrlParams({ book: null, chapter: null });
+          updateUrlParams({ book: null, chapter: null, q: null, search: null });
           persistTabs([], null);
           setIsZenMode(false);
           setIsSidebarOpen(true);
@@ -729,7 +735,7 @@ export function TabProvider({ children }) {
 
       loadChapter(activeCode, chapterIdx);
       bufferAdjacentChapters(activeCode, chapterIdx);
-      updateUrlParams({ book: activeCode, chapter: chapterIdx + 1 });
+      updateUrlParams({ book: activeCode, chapter: chapterIdx + 1, q: null, search: null });
     },
     [updateUrlParams, persistTabs, loadChapter, bufferAdjacentChapters, addToHistory, setActiveParaNum]
   );
@@ -752,8 +758,12 @@ export function TabProvider({ children }) {
     setTargetScrollIntent(null);
   }, []);
 
-  const openSearchModal = useCallback((query = '') => {
-    setSearchInitialQuery(query);
+  const openSearchModal = useCallback((query = null) => {
+    if (query !== null && query !== undefined && query !== '') {
+      setSearchInitialQuery(query);
+    } else {
+      setSearchInitialQuery(null);
+    }
     setIsSearchOpen(true);
   }, []);
 
@@ -778,6 +788,8 @@ export function TabProvider({ children }) {
     const pathname = url.pathname;
     let urlBook = url.searchParams.get('book') || url.searchParams.get('book_code');
     let urlChapter = url.searchParams.get('chapter') || url.searchParams.get('c');
+    let urlQuery = url.searchParams.get('q') || url.searchParams.get('search');
+    let urlPara = url.searchParams.get('para') || url.searchParams.get('p');
 
     if (!urlBook && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
       const raw = pathname.replace(/^\/(?:book|chapter)\//, '');
@@ -798,7 +810,12 @@ export function TabProvider({ children }) {
 
     if (urlBook) {
       const targetChapIdx = urlChapter ? Math.max(0, parseInt(urlChapter, 10) - 1) : 0;
-      openBook(urlBook, { targetChapterIdx: targetChapIdx });
+      openBook(urlBook, {
+        targetChapterIdx: targetChapIdx,
+        targetParaNum: urlPara || undefined,
+        highlightQuery: urlQuery || undefined,
+        searchQuery: urlQuery || undefined,
+      });
       return;
     }
 

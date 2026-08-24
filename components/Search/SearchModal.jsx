@@ -23,20 +23,24 @@ export default function SearchModal() {
 
   useEffect(() => {
     if (isSearchOpen) {
-      const raw = searchInitialQuery || '';
-      const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-      const displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
-      setQuery(displayedVal);
+      if (searchInitialQuery) {
+        const raw = searchInitialQuery;
+        const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+        const displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
+        setQuery(displayedVal);
 
-      const romanQuery = convertAnyToRoman(displayedVal).trim();
-      if (romanQuery.length >= 2) {
-        performSearch(romanQuery);
-      } else {
-        setResults([]);
-        setTotal(0);
+        const romanQuery = convertAnyToRoman(displayedVal).trim();
+        if (romanQuery.length >= 2) {
+          performSearch(romanQuery);
+        }
       }
+
       setTimeout(() => {
-        if (inputRef.current) inputRef.current.focus();
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const len = inputRef.current.value.length;
+          inputRef.current.setSelectionRange(len, len);
+        }
       }, 50);
     }
   }, [isSearchOpen, searchInitialQuery]);
@@ -102,6 +106,7 @@ export default function SearchModal() {
       targetParaIndex: result.para_index,
       targetParaNum: result.para_num,
       highlightQuery: romanQuery,
+      searchQuery: query.trim() || romanQuery,
     });
   };
 
