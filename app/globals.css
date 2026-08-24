@@ -135,6 +135,10 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  hyphens: none !important;
 }
 
 html, body {
@@ -147,6 +151,10 @@ html, body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  hyphens: none !important;
 }
 
 /* Zen Mode (Header & Footer Hidden) */
@@ -805,6 +813,14 @@ main.content-area {
 }
 
 
+.reader-container,
+.reader-container * {
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  hyphens: none !important;
+}
+
 .reader-container {
   width: 100%;
   max-width: var(--reader-max-width, 880px);
@@ -816,8 +832,10 @@ main.content-area {
   color: var(--text-primary);
   text-align: var(--reader-text-align, justify);
   text-justify: inter-word;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  hyphens: none !important;
   word-break: normal;
   overflow-wrap: break-word;
 }
@@ -828,8 +846,10 @@ main.content-area {
   transition: background 0.3s ease;
   text-align: var(--reader-text-align, justify);
   text-justify: inter-word;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  hyphens: none !important;
 }
 
 .reader-container .book {
