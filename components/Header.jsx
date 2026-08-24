@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Search, Settings, Bookmark } from 'lucide-react';
+import { Menu, Search, Settings, Bookmark, HelpCircle } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
+import HelpModal from './HelpModal';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
 
@@ -16,6 +17,7 @@ export default function Header() {
   } = useTabs();
 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const themeRef = useRef(null);
 
   useEffect(() => {
@@ -48,6 +50,14 @@ export default function Header() {
         e.preventDefault();
         openSearchModal('');
       }
+      if (
+        (e.key === '?' || e.key === 'F1') &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        setIsHelpOpen(true);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -74,9 +84,13 @@ export default function Header() {
           <Menu size={19} />
         </button>
 
-        <a href="/" className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-90 transition">
+        <button
+          onClick={() => setIsHelpOpen(true)}
+          className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1.5 focus:outline-none"
+          title="Tipiṭaka Reader — Help & Guide (Press ?)"
+        >
           <span>TipitakaPali.org</span>
-        </a>
+        </button>
       </div>
 
       {/* Desktop Search Bar */}
@@ -180,6 +194,8 @@ export default function Header() {
           <span className="hidden sm:inline">Settings</span>
         </button>
       </div>
+
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </header>
   );
 }

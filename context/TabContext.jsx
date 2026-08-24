@@ -216,7 +216,9 @@ export function TabProvider({ children }) {
     }
 
     const newUrl = url.pathname + (url.search || '');
-    window.history.replaceState({}, '', newUrl);
+    if (window.location.pathname + window.location.search !== newUrl) {
+      window.history.replaceState({}, '', newUrl);
+    }
   }, []);
 
   // Save tabs list to localStorage for session resumption
@@ -399,13 +401,11 @@ export function TabProvider({ children }) {
         }
 
         if (hasTargetChapter) {
-          setOpenTabs((prev) => {
-            const next = prev.map((t) =>
-              t.bookCode === cleanCode ? { ...t, currentChapterIdx: targetChapIdx } : t
-            );
-            persistTabs(next, cleanCode);
-            return next;
-          });
+          const nextTabs = currentTabs.map((t) =>
+            t.bookCode === cleanCode ? { ...t, currentChapterIdx: targetChapIdx } : t
+          );
+          setOpenTabs(nextTabs);
+          persistTabs(nextTabs, cleanCode);
 
           if (!tab.loadedChapters?.[targetChapIdx]) {
             loadChapter(cleanCode, targetChapIdx);
@@ -433,7 +433,7 @@ export function TabProvider({ children }) {
 
         setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: activeChap });
         updateUrlParams({ book: cleanCode, chapter: activeChap + 1 });
-        persistTabs(currentTabs, cleanCode);
+        persistTabs(openTabsRef.current, cleanCode);
 
         addToHistory({
           bookCode: cleanCode,
@@ -495,24 +495,23 @@ export function TabProvider({ children }) {
           currentChapterIdx: targetChapIdx,
         };
 
-
-        setOpenTabs((prev) => {
-          const idx = prev.findIndex((t) => t.bookCode === cleanCode);
-          if (idx !== -1) {
-            const next = [...prev];
-            next[idx] = {
-              ...next[idx],
-              ...newTab,
-              loadedChapters: { ...next[idx].loadedChapters, ...newTab.loadedChapters },
-            };
-            persistTabs(next, cleanCode);
-            return next;
-          }
-          const next = [...prev, newTab];
-          persistTabs(next, cleanCode);
-          return next;
-        });
+        const currentTabsNow = openTabsRef.current;
+        const idx = currentTabsNow.findIndex((t) => t.bookCode === cleanCode);
+        let nextTabs;
+        if (idx !== -1) {
+          nextTabs = [...currentTabsNow];
+          nextTabs[idx] = {
+            ...nextTabs[idx],
+            ...newTab,
+            loadedChapters: { ...nextTabs[idx].loadedChapters, ...newTab.loadedChapters },
+          };
+        } else {
+          nextTabs = [...currentTabsNow, newTab];
+        }
+        setOpenTabs(nextTabs);
+        persistTabs(nextTabs, cleanCode);
         setActiveBookCode(cleanCode);
+
 
 
         if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
@@ -630,82 +629,76 @@ export function TabProvider({ children }) {
     (bookCode, e) => {
       if (e) e.stopPropagation();
 
-      setOpenTabs((prev) => {
-        const idx = prev.findIndex((t) => t.bookCode === bookCode);
-        if (idx === -1) return prev;
+      const currentTabs = openTabsRef.current;
+      const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
+      if (idx === -1) return;
 
-        const newTabs = prev.filter((t) => t.bookCode !== bookCode);
+      const newTabs = currentTabs.filter((t) => t.bookCode !== bookCode);
+      setOpenTabs(newTabs);
 
-        if (activeBookCodeRef.current === bookCode) {
-          if (newTabs.length > 0) {
-            const nextIdx = Math.min(idx, newTabs.length - 1);
-            const nextTab = newTabs[nextIdx];
-            setActiveBookCode(nextTab.bookCode);
-            const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
-            if (firstP) {
-              setActiveParaNum(firstP);
-            }
-            setTreeSelectedNode({
-              bookCode: nextTab.bookCode,
-              chapterIdx: nextTab.currentChapterIdx || 0,
-            });
-            updateUrlParams({
-              book: nextTab.bookCode,
-              chapter: (nextTab.currentChapterIdx || 0) + 1,
-            });
-            persistTabs(newTabs, nextTab.bookCode);
-          } else {
-            setActiveBookCode(null);
-            setTreeSelectedNode(null);
-            updateUrlParams({ book: null, chapter: null });
-            persistTabs([], null);
-            setIsZenMode(false);
-            setIsSidebarOpen(true);
-            if (typeof document !== 'undefined') {
-              document.body.classList.remove('zen-mode');
-            }
+      if (activeBookCodeRef.current === bookCode) {
+        if (newTabs.length > 0) {
+          const nextIdx = Math.min(idx, newTabs.length - 1);
+          const nextTab = newTabs[nextIdx];
+          setActiveBookCode(nextTab.bookCode);
+          const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
+          if (firstP) {
+            setActiveParaNum(firstP);
           }
-
+          setTreeSelectedNode({
+            bookCode: nextTab.bookCode,
+            chapterIdx: nextTab.currentChapterIdx || 0,
+          });
+          updateUrlParams({
+            book: nextTab.bookCode,
+            chapter: (nextTab.currentChapterIdx || 0) + 1,
+          });
+          persistTabs(newTabs, nextTab.bookCode);
         } else {
-          persistTabs(newTabs, activeBookCodeRef.current);
+          setActiveBookCode(null);
+          setTreeSelectedNode(null);
+          updateUrlParams({ book: null, chapter: null });
+          persistTabs([], null);
+          setIsZenMode(false);
+          setIsSidebarOpen(true);
+          if (typeof document !== 'undefined') {
+            document.body.classList.remove('zen-mode');
+          }
         }
-
-        return newTabs;
-      });
+      } else {
+        persistTabs(newTabs, activeBookCodeRef.current);
+      }
     },
-    [updateUrlParams, persistTabs, setActiveParaNum]
+    [updateUrlParams, persistTabs, setActiveParaNum, setIsZenMode, setIsSidebarOpen]
   );
 
   const reorderTabs = useCallback(
     (fromIndex, toIndex) => {
       if (fromIndex === toIndex || fromIndex === null || toIndex === null) return;
-      setOpenTabs((prev) => {
-        if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) {
-          return prev;
-        }
-        const next = [...prev];
-        const [moved] = next.splice(fromIndex, 1);
-        next.splice(toIndex, 0, moved);
-        persistTabs(next, activeBookCodeRef.current);
-        return next;
-      });
+      const currentTabs = openTabsRef.current;
+      if (fromIndex < 0 || fromIndex >= currentTabs.length || toIndex < 0 || toIndex >= currentTabs.length) {
+        return;
+      }
+      const next = [...currentTabs];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      setOpenTabs(next);
+      persistTabs(next, activeBookCodeRef.current);
     },
     [persistTabs]
   );
 
   const setChapterForActiveTab = useCallback(
-
     (chapterIdx) => {
       const activeCode = activeBookCodeRef.current;
       if (!activeCode) return;
 
-      setOpenTabs((prev) => {
-        const next = prev.map((t) =>
-          t.bookCode === activeCode ? { ...t, currentChapterIdx: chapterIdx } : t
-        );
-        persistTabs(next, activeCode);
-        return next;
-      });
+      const currentTabs = openTabsRef.current;
+      const next = currentTabs.map((t) =>
+        t.bookCode === activeCode ? { ...t, currentChapterIdx: chapterIdx } : t
+      );
+      setOpenTabs(next);
+      persistTabs(next, activeCode);
 
       const currentTab = openTabsRef.current.find((t) => t.bookCode === activeCode);
       if (currentTab) {
