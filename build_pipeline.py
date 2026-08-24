@@ -3455,11 +3455,26 @@ def build_sqlite_database():
     );
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS book_mat (
+        book_code TEXT PRIMARY KEY,
+        category TEXT,
+        mula_code TEXT,
+        mula_title TEXT,
+        attha_code TEXT,
+        attha_title TEXT,
+        tika_code TEXT,
+        tika_title TEXT
+    );
+    """)
+
+
     cur.execute("CREATE INDEX IF NOT EXISTS idx_books_code ON books(code);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chapters_book ON chapters(book_code);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chapters_book_idx ON chapters(book_code, chapter_index);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chapters_chunk ON chapters(chunk_name);")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_book_toc_code_idx ON book_toc(book_code, item_index);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_book_mat_code ON book_mat(book_code);")
+
 
     # Read tree.json for authentic book titles
     latn_tree_path = os.path.join(P_LATIN_PRESPLIT_DIR, 'tree.json')
@@ -3668,6 +3683,77 @@ def build_sqlite_database():
 
         insert_nodes(tree_data)
 
+    # 5. Build and populate MAT (Mūla - Aṭṭhakathā - Ṭīkā) cross-reference relationships
+    log_step("Building MAT (Mūla - Aṭṭhakathā - Ṭīkā) relationship index...")
+    books_rows = cur.execute("SELECT code, title, nikaya, category FROM books;").fetchall()
+    all_books_map = {b[0]: {"title": b[1], "nikaya": b[2], "category": b[3]} for b in books_rows}
+
+    export_path = os.path.join(ROOT_DIR, 'epitaka.org', 'web_server', 'scripts', 'books_export.json')
+    id_to_vri = {}
+    vri_to_info = {}
+    if os.path.exists(export_path):
+        with open(export_path, 'r', encoding='utf-8') as f:
+            export_data = json.load(f)
+        for item in export_data:
+            if item.get('vri_id') and item.get('book_id'):
+                id_to_vri[item['book_id']] = item['vri_id']
+                vri_to_info[item['vri_id']] = item
+
+    def resolve_mat_ref(ref_str, default_code=None):
+        if not ref_str:
+            return default_code
+        parts = ref_str.strip().split()
+        for p in parts:
+            if p in id_to_vri and id_to_vri[p] in all_books_map:
+                return id_to_vri[p]
+            if p in all_books_map:
+                return p
+        return default_code
+
+    mat_count = 0
+    for code, b in all_books_map.items():
+        cat = b["category"]
+        exp = vri_to_info.get(code, {})
+
+        mula_raw = exp.get("mula_ref")
+        mula_code = resolve_mat_ref(mula_raw, code if code.endswith(".mul") else None)
+
+        attha_raw = exp.get("attha_ref")
+        attha_code = resolve_mat_ref(attha_raw, code if code.endswith(".att") else None)
+
+        tika_raw = exp.get("tika_ref")
+        tika_code = resolve_mat_ref(tika_raw, code if code.endswith(".tik") else None)
+
+        # Canonical heuristics for Suttas, Vinaya, Abhidhamma
+        base = code.split(".")[0]
+        prefix = base[:-1] if (len(base) > 1 and base[-1] in "matn" and not base[-2].isdigit()) or (len(base) > 2 and base[-2] in "matn" and base[-1].isdigit()) else base
+
+        if not mula_code:
+            for cand in [base[:-1] + "m.mul", prefix + "m.mul", prefix + "m1.mul", base + ".mul"]:
+                if cand in all_books_map:
+                    mula_code = cand
+                    break
+        if not attha_code:
+            for cand in [base[:-1] + "a.att", prefix + "a.att", prefix + "a1.att", base + ".att"]:
+                if cand in all_books_map:
+                    attha_code = cand
+                    break
+        if not tika_code:
+            for cand in [base[:-1] + "t.tik", prefix + "t.tik", prefix + "t1.tik", base + ".tik"]:
+                if cand in all_books_map:
+                    tika_code = cand
+                    break
+
+        mula_title = all_books_map.get(mula_code, {}).get("title") if mula_code else None
+        attha_title = all_books_map.get(attha_code, {}).get("title") if attha_code else None
+        tika_title = all_books_map.get(tika_code, {}).get("title") if tika_code else None
+
+        cur.execute("""
+        INSERT OR REPLACE INTO book_mat (book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """, (code, cat, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title))
+        mat_count += 1
+
     conn.commit()
     conn.close()
 
@@ -3683,7 +3769,13 @@ def build_sqlite_database():
     if os.path.abspath(WEB_DB_FILE) != os.path.abspath(default_web_db) and os.path.exists(os.path.join(ROOT_DIR, 'web_app')):
         shutil.copy2(DB_FILE, default_web_db)
 
-    log_step(f"Database built successfully: {len(book_files)} books, {total_chapters_mapped} chapters, {total_paras_indexed} indexed paragraphs in FTS5.")
+    # Sync to Next.js server_api/tipitaka.db
+    next_server_db = os.path.join(ROOT_DIR, 'web_app_next', 'server_api', 'tipitaka.db')
+    if os.path.exists(os.path.dirname(next_server_db)):
+        shutil.copy2(DB_FILE, next_server_db)
+
+    log_step(f"Database built successfully: {len(book_files)} books, {total_chapters_mapped} chapters, {total_paras_indexed} indexed paragraphs, {mat_count} MAT relations.")
+
 
 
 # ---------------------------------------------------------------------------
