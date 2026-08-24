@@ -31,11 +31,17 @@ console.log(`[Database] Using SQLite database at: ${DB_PATH}`);
 // Initialize SQLite database connection (Native Fast Synchronous Engine)
 const db = new DatabaseSync(DB_PATH, { readOnly: true });
 
-// Prepared Statements for ultra-low latency execution
+// Prepared Statements for ultra-low latency direct execution (Zero runtime parsing)
 const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 'tree_json'");
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
-const stmtGetBook = db.prepare('SELECT id, code, title, nikaya, category, xml_content, chapter_count FROM books WHERE code = ?');
+const stmtGetBook = db.prepare('SELECT id, code, title, nikaya, category, chapter_count, meta_json FROM books WHERE code = ?');
 const stmtGetChapters = db.prepare('SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index');
+const stmtGetChapterHtml = db.prepare('SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ?');
+const stmtGetChaptersRangeHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index');
+const stmtGetAllChaptersHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index');
+const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
+const stmtGetBookXml = db.prepare('SELECT xml_filename, xml_content FROM books_xml WHERE book_code = ?');
+
 function formatChapterTitle(title) {
   if (!title) return '';
   return title
@@ -43,11 +49,6 @@ function formatChapterTitle(title) {
     .replace(/(\d+\.\s*)([a-zñāīūṃṅṭḍṇḷ])/gi, (m, p1, p2) => `${p1}${p2.toUpperCase()}`)
     .replace(/([\(\-\/\s])([a-zñāīūṃṅṭḍṇḷ])/gi, (m, p1, p2) => `${p1}${p2.toUpperCase()}`);
 }
-
-const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
-
-
-
 
 let stmtGetMat = null;
 let stmtGetAllMat = null;
@@ -74,301 +75,6 @@ const stmtSearch = db.prepare(`
   ORDER BY rank
   LIMIT ? OFFSET ?
 `);
-
-// In-Memory Book Chapter Cache for sub-millisecond lazy loading and buffering
-const bookParsedCache = new Map();
-
-// Load CST4 Authoritative Books Catalog
-
-const CST_CATALOG_PATH = path.join(__dirname, 'cst_books_catalog.json');
-let cstCatalog = {};
-if (fs.existsSync(CST_CATALOG_PATH)) {
-  try {
-    cstCatalog = JSON.parse(fs.readFileSync(CST_CATALOG_PATH, 'utf8'));
-    console.log(`[CST4 Catalog] Loaded ${Object.keys(cstCatalog).length} books metadata`);
-  } catch (e) {
-    console.warn('[CST4 Catalog] Failed to parse cst_books_catalog.json:', e.message);
-  }
-}
-
-/**
- * CST4-compliant Paragraph Span Parser (Ported from CST.Core.Search.BookMarkers)
- * Expands full ranges (16-26) and abbreviated continuation ranges (196-7 -> 196..197, 266-7-8 -> 266..268)
- */
-function tryParseParagraphSpan(n) {
-  if (!n || typeof n !== 'string') return null;
-  const rawParts = n.split('-');
-  let previous = null;
-  let first = 0;
-  let last = 0;
-  let any = false;
-
-  for (const raw of rawParts) {
-    const part = raw.trim();
-    if (!part) continue;
-    if (!/^\d+$/.test(part)) break;
-
-    // Expand abbreviated continuation: e.g. "196-7" -> 196 to 197
-    let expanded = part;
-    if (previous && part.length < previous.length) {
-      expanded = previous.slice(0, previous.length - part.length) + part;
-    }
-    const val = parseInt(expanded, 10);
-    if (isNaN(val)) break;
-
-    if (!any) {
-      first = val;
-      any = true;
-    }
-    last = val;
-    previous = expanded;
-  }
-
-  if (any && last < first) last = first;
-  if (!any) return null;
-  return { first, last };
-}
-
-/**
- * Splits and converts Tipitaka XML into clean chapter HTML snippets with exact CST4 anchors.
- */
-function parseBookChaptersHtml(xmlContent, chapters) {
-  const m = xmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/);
-  let body = m ? m[1] : xmlContent;
-
-  const chapterByPara = new Map();
-  for (const c of chapters) {
-    chapterByPara.set(c.para_index || 0, c);
-  }
-
-  const pRegex = /<(p|head|trailer)\s+rend="([^"]+)"(?:\s+n="([^"]+)")?\s*>([\s\S]*?)<\/\1>/g;
-  const chapterParas = new Map();
-  const paraToChapter = {};
-  const paraToIndex = {};
-  const pageToChapter = { V: {}, P: {}, T: {}, M: {}, O: {} };
-  const pageToPara = { V: {}, P: {}, T: {}, M: {}, O: {} };
-  const pageAnchors = { V: {}, P: {}, T: {}, M: {}, O: {} };
-  let currentChapIdx = 0;
-  let paraCounter = 0;
-
-  for (const c of chapters) {
-    chapterParas.set(c.chapter_index, []);
-  }
-  if (!chapterParas.has(0)) {
-    chapterParas.set(0, []);
-  }
-
-  let match;
-  while ((match = pRegex.exec(body)) !== null) {
-    if (chapterByPara.has(paraCounter)) {
-      currentChapIdx = chapterByPara.get(paraCounter).chapter_index || 0;
-    }
-
-    const tag = match[1];
-    const rend = match[2];
-    const nAttr = match[3];
-    let inner = match[4];
-
-    // Index page breaks before HTML conversion with exact CST4 anchors (e.g. V0.0023, P3.0045)
-    const pbRegex = /<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g;
-    let pbMatch;
-    while ((pbMatch = pbRegex.exec(inner)) !== null) {
-      const ed = pbMatch[1].toUpperCase();
-      const page = pbMatch[2]; // e.g. "0.0023" or "3.0045"
-      if (!pageToChapter[ed]) pageToChapter[ed] = {};
-      if (!pageToPara[ed]) pageToPara[ed] = {};
-      if (!pageAnchors[ed]) pageAnchors[ed] = {};
-
-      const pbAnchorId = `${ed}${page}`;
-      pageToChapter[ed][page] = currentChapIdx;
-      pageAnchors[ed][page] = pbAnchorId;
-      if (nAttr) pageToPara[ed][page] = nAttr;
-
-      if (page.includes('.')) {
-        const parts = page.split('.');
-        const vol = parseInt(parts[0], 10);
-        const num = parseInt(parts[1], 10);
-        if (!isNaN(num)) {
-          const shortNum = String(num); // e.g. "23"
-          const volDotNum = `${vol}.${shortNum}`; // e.g. "0.23" or "3.45"
-          pageToChapter[ed][volDotNum] = currentChapIdx;
-          pageToChapter[ed][shortNum] = currentChapIdx;
-          pageAnchors[ed][volDotNum] = pbAnchorId;
-          if (!pageAnchors[ed][shortNum]) pageAnchors[ed][shortNum] = pbAnchorId;
-          if (nAttr) {
-            pageToPara[ed][volDotNum] = nAttr;
-            if (!pageToPara[ed][shortNum]) pageToPara[ed][shortNum] = nAttr;
-          }
-        }
-      }
-    }
-
-    inner = inner.replace(/<hi\s+rend="bold">([^<]+)<\/hi>/g, '<strong class="bld">$1</strong>');
-    if (nAttr) {
-      inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, `<strong class="paranum" id="para-${nAttr}">$1</strong>`);
-    } else {
-      inner = inner.replace(/<hi\s+rend="paranum">([^<]+)<\/hi>/g, '<strong class="paranum">$1</strong>');
-    }
-    inner = inner.replace(/<hi\s+rend="dot">([^<]+)<\/hi>/g, '<span class="dot">$1</span>');
-    inner = inner.replace(/<pb\s+ed="([^"]+)"\s+n="([^"]+)"\s*\/?>/g, (m, ed, n) => {
-      const uEd = ed.toUpperCase();
-      return `<span id="${uEd}${n}" class="pb" title="Page ${uEd} ${n}" data-ed="${uEd}" data-page="${n}">[${uEd} ${n}]</span>`;
-    });
-    inner = inner.replace(/<note>([\s\S]*?)<\/note>/g, '<span class="note" title="Footnote">[$1]</span>');
-
-    const attrParts = [`data-pindex="${paraCounter}"`];
-    if (nAttr) {
-      attrParts.push(`id="para${nAttr}"`);
-      attrParts.push(`data-para="${nAttr}"`);
-
-      const span = tryParseParagraphSpan(nAttr);
-      if (span) {
-        attrParts.push(`data-para-first="${span.first}"`);
-        attrParts.push(`data-para-last="${span.last}"`);
-        for (let pNum = span.first; pNum <= span.last; pNum++) {
-          const strNum = String(pNum);
-          if (paraToChapter[strNum] === undefined) {
-            paraToChapter[strNum] = currentChapIdx;
-            paraToIndex[strNum] = paraCounter;
-          }
-        }
-      } else {
-        paraToChapter[nAttr] = currentChapIdx;
-        paraToIndex[nAttr] = paraCounter;
-      }
-    } else {
-      attrParts.push(`id="pindex-${paraCounter}"`);
-    }
-    const attrs = ' ' + attrParts.join(' ');
-    const pTag = `<p class="${rend || 'bodytext'}"${attrs}>${inner}</p>`;
-
-    if (!chapterParas.has(currentChapIdx)) {
-      chapterParas.set(currentChapIdx, []);
-    }
-    chapterParas.get(currentChapIdx).push(pTag);
-    paraCounter++;
-  }
-
-  const result = new Map();
-  for (const c of chapters) {
-    const chIdx = c.chapter_index;
-    const paras = chapterParas.get(chIdx) || [];
-    const headerHtml = `<div id="chap-${chIdx}" class="chapter-anchor" data-chapter="${chIdx}"></div>`;
-    result.set(chIdx, `${headerHtml}\n${paras.join('\n')}`);
-  }
-
-  // Precompute paragraph range directly in backend (excluding non-integer page attributes)
-  let paraMin = Infinity;
-  let paraMax = -Infinity;
-  let paraCount = 0;
-  for (const k of Object.keys(paraToChapter)) {
-    const n = parseInt(k, 10);
-    if (!isNaN(n)) {
-      if (n < paraMin) paraMin = n;
-      if (n > paraMax) paraMax = n;
-      paraCount++;
-    }
-  }
-  const paraRange =
-    paraCount === 0
-      ? { min: 1, max: 1, total: 0 }
-      : { min: paraMin, max: paraMax, total: paraCount };
-
-  // Precompute edition ranges directly in backend
-  const editionRanges = {};
-  for (const sys of ['V', 'P', 'T', 'M', 'O']) {
-    const pMap = pageToChapter[sys] || {};
-    const uniquePages = new Set();
-    let minNum = Infinity;
-    let maxNum = -Infinity;
-    for (const p of Object.keys(pMap)) {
-      let n = NaN;
-      if (p.includes('.')) {
-        const parts = p.split('.');
-        n = parseInt(parts[1], 10);
-      } else {
-        n = parseInt(p, 10);
-      }
-      if (!isNaN(n)) {
-        uniquePages.add(n);
-        if (n < minNum) minNum = n;
-        if (n > maxNum) maxNum = n;
-      }
-    }
-    if (uniquePages.size === 0) {
-      editionRanges[sys] = {
-        available: false,
-        count: 0,
-        minNum: 1,
-        maxNum: 1,
-        label: 'Unavailable',
-        hint: '1',
-      };
-    } else {
-      editionRanges[sys] = {
-        available: true,
-        count: uniquePages.size,
-        minNum,
-        maxNum,
-        label: `Page ${minNum} – ${maxNum}`,
-        hint: `e.g. ${minNum} to ${maxNum}`,
-      };
-    }
-  }
-
-  return {
-    chapterHtmls: result,
-    paraToChapter,
-    paraToIndex,
-    pageToChapter,
-    pageToPara,
-    pageAnchors,
-    paraRange,
-    editionRanges,
-  };
-}
-
-
-function getOrParseBook(cleanCode) {
-  if (bookParsedCache.has(cleanCode)) {
-    return bookParsedCache.get(cleanCode);
-  }
-
-  const book = stmtGetBook.get(cleanCode);
-  if (!book) return null;
-
-  const chapters = stmtGetChapters.all(cleanCode);
-  const toc = stmtGetToc.all(cleanCode);
-  const parsedData = parseBookChaptersHtml(book.xml_content, chapters);
-
-  const parsed = {
-    metadata: {
-      code: book.code,
-      title: book.title,
-      nikaya: book.nikaya,
-      category: book.category,
-      chapter_count: book.chapter_count,
-      chapters: chapters,
-      toc: toc,
-      para_to_chapter: parsedData.paraToChapter,
-      para_to_index: parsedData.paraToIndex,
-      page_to_chapter: parsedData.pageToChapter,
-      page_to_para: parsedData.pageToPara,
-      page_anchors: parsedData.pageAnchors,
-      para_range: parsedData.paraRange,
-      edition_ranges: parsedData.editionRanges,
-      book_type: cstCatalog[cleanCode]?.bookType || 'Whole',
-      mat: cstCatalog[cleanCode]?.mat || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
-    },
-    chapterHtmls: parsedData.chapterHtmls,
-  };
-
-
-  bookParsedCache.set(cleanCode, parsed);
-  return parsed;
-}
-
-
 
 // Clean top-level Tipiṭaka root if present
 function cleanTree(data) {
@@ -406,14 +112,17 @@ async function main() {
     return {
       name: 'Chaṭṭha Saṅgāyana Tipiṭaka Fastify API',
       status: 'online',
-      version: '2.0.0',
-      features: ['lazy-loading', 'chapter-buffering', 'full-text-search'],
+      version: '2.1.0',
+      features: ['precomputed-chapters', 'sub-millisecond-serving', 'raw-xml-isolated', 'full-text-search'],
       endpoints: [
         'GET /api/tree',
         'GET /api/books',
         'GET /api/book/:code?chapter=0&buffer=1',
         'GET /api/book/:code/chapter/:chapterIndex',
         'GET /api/book/:code/toc',
+        'GET /api/book/:code/xml',
+        'GET /api/book/:code/mat',
+        'GET /api/mat',
         'GET /api/search?q=...',
         'GET /api/health',
       ],
@@ -464,26 +173,35 @@ async function main() {
     };
   });
 
-  // Get specific book with lazy-load and chapter buffering support
+  // Get specific book with precomputed chapters and instant buffering support
   fastify.get('/api/book/:code', async (req, reply) => {
     reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     const rawCode = req.params.code;
     let cleanCode = rawCode.replace('.xml', '');
     let resolvedChapFromCode = undefined;
 
-    let parsed = getOrParseBook(cleanCode);
-    if (!parsed) {
+    let book = stmtGetBook.get(cleanCode);
+    if (!book) {
       const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
       if (chapSuffixMatch) {
         cleanCode = chapSuffixMatch[1];
         resolvedChapFromCode = parseInt(chapSuffixMatch[2], 10);
-        parsed = getOrParseBook(cleanCode);
+        book = stmtGetBook.get(cleanCode);
       }
     }
 
-    if (!parsed) {
+    if (!book) {
       reply.code(404);
       return { error: `Book '${cleanCode}' not found` };
+    }
+
+    const chapters = stmtGetChapters.all(cleanCode);
+    const toc = stmtGetToc.all(cleanCode);
+    let meta = {};
+    if (book.meta_json) {
+      try {
+        meta = JSON.parse(book.meta_json);
+      } catch (e) {}
     }
 
     const isFullRequested = req.query.full === 'true';
@@ -492,53 +210,66 @@ async function main() {
       : (resolvedChapFromCode !== undefined ? resolvedChapFromCode : 0);
     const bufferCount = req.query.buffer !== undefined ? parseInt(req.query.buffer, 10) : 1;
 
-
     const chaptersData = {};
-    const totalChaps = parsed.metadata.chapters.length;
+    const totalChaps = chapters.length;
 
     if (isFullRequested) {
-      // Return all chapters
-      for (const [idx, html] of parsed.chapterHtmls.entries()) {
-        chaptersData[idx] = html;
+      const allRows = stmtGetAllChaptersHtml.all(cleanCode);
+      for (const r of allRows) {
+        chaptersData[r.chapter_index] = r.html;
       }
     } else {
-      // Include target chapter + buffer chapters (e.g. idx-1, idx, idx+1, idx+2)
       const startIdx = Math.max(0, reqChap - bufferCount);
       const endIdx = Math.min(totalChaps - 1, reqChap + bufferCount);
-
-      for (let i = startIdx; i <= endIdx; i++) {
-        if (parsed.chapterHtmls.has(i)) {
-          chaptersData[i] = parsed.chapterHtmls.get(i);
-        }
+      const rangeRows = stmtGetChaptersRangeHtml.all(cleanCode, startIdx, endIdx);
+      for (const r of rangeRows) {
+        chaptersData[r.chapter_index] = r.html;
       }
     }
 
-    // Build unified html string from loaded chapters
     const loadedHtmlArray = Object.keys(chaptersData)
       .sort((a, b) => Number(a) - Number(b))
       .map((k) => chaptersData[k]);
 
     return {
-      ...parsed.metadata,
+      code: book.code,
+      title: book.title,
+      nikaya: book.nikaya,
+      category: book.category,
+      chapter_count: book.chapter_count,
+      chapters: chapters,
+      toc: toc,
+      para_to_chapter: meta.para_to_chapter || {},
+      para_to_index: meta.para_to_index || {},
+      page_to_chapter: meta.page_to_chapter || {},
+      page_to_para: meta.page_to_para || {},
+      page_anchors: meta.page_anchors || {},
+      para_range: meta.para_range || { min: 1, max: 1, total: 0 },
+      edition_ranges: meta.edition_ranges || {},
+      book_type: meta.book_type || 'Whole',
+      mat: meta.mat || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
       initial_chapter: reqChap,
       chapters_data: chaptersData,
       html: loadedHtmlArray.join('\n'),
     };
   });
 
-  // Get specific chapter HTML for instant on-demand loading
+  // Get specific chapter HTML instantly from precomputed table (< 0.1ms)
   fastify.get('/api/book/:code/chapter/:chapterIndex', async (req, reply) => {
     reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
-    const cleanCode = req.params.code.replace('.xml', '');
+    let cleanCode = req.params.code.replace('.xml', '');
     const chapIdx = parseInt(req.params.chapterIndex, 10);
 
-    const parsed = getOrParseBook(cleanCode);
-    if (!parsed) {
-      reply.code(404);
-      return { error: `Book '${cleanCode}' not found` };
+    let row = stmtGetChapterHtml.get(cleanCode, chapIdx);
+    if (!row) {
+      const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) {
+        cleanCode = chapSuffixMatch[1];
+        row = stmtGetChapterHtml.get(cleanCode, chapIdx);
+      }
     }
 
-    if (!parsed.chapterHtmls.has(chapIdx)) {
+    if (!row || row.html === null || row.html === undefined) {
       reply.code(404);
       return { error: `Chapter ${chapIdx} not found in book '${cleanCode}'` };
     }
@@ -546,8 +277,21 @@ async function main() {
     return {
       book_code: cleanCode,
       chapter_index: chapIdx,
-      html: parsed.chapterHtmls.get(chapIdx),
+      html: row.html,
     };
+  });
+
+  // Get raw TEI XML source for a book (isolated from reader path)
+  fastify.get('/api/book/:code/xml', async (req, reply) => {
+    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    const cleanCode = req.params.code.replace('.xml', '');
+    const xmlRow = stmtGetBookXml.get(cleanCode);
+    if (!xmlRow) {
+      reply.code(404);
+      return { error: `Raw XML for '${cleanCode}' not found` };
+    }
+    reply.header('Content-Type', 'application/xml; charset=utf-8');
+    return xmlRow.xml_content;
   });
 
   // Get hierarchical TOC for a book
@@ -659,6 +403,7 @@ async function main() {
     const memory = process.memoryUsage();
     return {
       status: 'healthy',
+      mode: 'precomputed-sqlite',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
       memory: {
@@ -666,7 +411,6 @@ async function main() {
         heap_used_mb: Math.round(memory.heapUsed / (1024 * 1024)),
         heap_total_mb: Math.round(memory.heapTotal / (1024 * 1024)),
       },
-      cached_books: bookParsedCache.size,
     };
   });
 
