@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   textAlign: 'justify',
   paragraphIndent: true,
   readerMaxWidth: '880px',
-  showPageBreaks: true,
+  showPageBreaks: false,
   showParaNumbers: true,
   showFootnotes: true,
   showChapterHeadings: true,
