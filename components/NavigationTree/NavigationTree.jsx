@@ -1,7 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, PlusSquare, MinusSquare } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Search,
+  X,
+  PlusSquare,
+  MinusSquare,
+  PanelLeft,
+  PanelRight,
+  Move,
+  GripHorizontal,
+} from 'lucide-react';
 import TreeNode from './TreeNode';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
@@ -16,9 +25,47 @@ export default function NavigationTree() {
   const [expandedMap, setExpandedMap] = useState({});
   const [isTreeExpandedAll, setIsTreeExpandedAll] = useState(false);
 
+  // Docking & Resizing State
+  const [dockPosition, setDockPosition] = useState('left'); // 'left' | 'right' | 'float'
+  const [sidebarWidth, setSidebarWidth] = useState(360);
+  const [floatPos, setFloatPos] = useState({ x: 80, y: 100, width: 380, height: 600 });
+  const [isResizing, setIsResizing] = useState(false);
+
   const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
   const { setIsZenMode } = useThemeSettings();
   const treeContainerRef = useRef(null);
+
+  // Load saved preferences
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedDock = localStorage.getItem('tipitaka_tree_dock');
+      if (savedDock === 'left' || savedDock === 'right' || savedDock === 'float') {
+        setDockPosition(savedDock);
+      }
+      const savedWidth = localStorage.getItem('tipitaka_sidebar_width');
+      if (savedWidth) {
+        const parsedW = parseInt(savedWidth, 10);
+        if (!isNaN(parsedW) && parsedW >= 220 && parsedW <= 900) {
+          setSidebarWidth(parsedW);
+        }
+      }
+      const savedFloatPos = localStorage.getItem('tipitaka_tree_float_pos');
+      if (savedFloatPos) {
+        const parsedPos = JSON.parse(savedFloatPos);
+        if (parsedPos && parsedPos.width && parsedPos.height) {
+          setFloatPos(parsedPos);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Update CSS variable --sidebar-width on root
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+    }
+  }, [sidebarWidth]);
 
   useEffect(() => {
     async function load() {
@@ -109,10 +156,125 @@ export default function NavigationTree() {
     setExpandedMap(newMap);
   };
 
-  const handleHideAll = () => {
-    setIsSidebarOpen(false);
-    setIsZenMode(true);
+  const handleSetDock = (newPos) => {
+    setDockPosition(newPos);
+    try {
+      localStorage.setItem('tipitaka_tree_dock', newPos);
+    } catch (e) {}
   };
+
+  // Resize handler for docked sidebar (left or right)
+  const startResizing = useCallback(
+    (mouseDownEvent) => {
+      mouseDownEvent.preventDefault();
+      setIsResizing(true);
+      const startX = mouseDownEvent.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMouseMove = (mouseMoveEvent) => {
+        let newWidth;
+        if (dockPosition === 'right') {
+          newWidth = startWidth - (mouseMoveEvent.clientX - startX);
+        } else {
+          newWidth = startWidth + (mouseMoveEvent.clientX - startX);
+        }
+        const maxW = Math.min(850, typeof window !== 'undefined' ? window.innerWidth * 0.7 : 800);
+        const clampedWidth = Math.max(220, Math.min(newWidth, maxW));
+        setSidebarWidth(clampedWidth);
+        try {
+          localStorage.setItem('tipitaka_sidebar_width', String(clampedWidth));
+        } catch (e) {}
+      };
+
+      const onMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [sidebarWidth, dockPosition]
+  );
+
+  // Drag handler for floating mode
+  const startDragging = useCallback(
+    (mouseDownEvent) => {
+      if (dockPosition !== 'float') return;
+      if (mouseDownEvent.target.closest('button') || mouseDownEvent.target.closest('input')) return;
+      mouseDownEvent.preventDefault();
+
+      const startX = mouseDownEvent.clientX;
+      const startY = mouseDownEvent.clientY;
+      const startPosX = floatPos.x;
+      const startPosY = floatPos.y;
+
+      const onMouseMove = (mouseMoveEvent) => {
+        const newX = Math.max(10, Math.min(window.innerWidth - floatPos.width - 10, startPosX + (mouseMoveEvent.clientX - startX)));
+        const newY = Math.max(50, Math.min(window.innerHeight - 100, startPosY + (mouseMoveEvent.clientY - startY)));
+        setFloatPos((prev) => {
+          const next = { ...prev, x: newX, y: newY };
+          try {
+            localStorage.setItem('tipitaka_tree_float_pos', JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [dockPosition, floatPos]
+  );
+
+  // Corner resize handler for floating mode
+  const startFloatingResize = useCallback(
+    (mouseDownEvent) => {
+      mouseDownEvent.preventDefault();
+      mouseDownEvent.stopPropagation();
+      const startX = mouseDownEvent.clientX;
+      const startY = mouseDownEvent.clientY;
+      const startW = floatPos.width;
+      const startH = floatPos.height;
+
+      const onMouseMove = (mouseMoveEvent) => {
+        const newW = Math.max(260, Math.min(window.innerWidth - floatPos.x - 10, startW + (mouseMoveEvent.clientX - startX)));
+        const newH = Math.max(280, Math.min(window.innerHeight - floatPos.y - 10, startH + (mouseMoveEvent.clientY - startY)));
+        setFloatPos((prev) => {
+          const next = { ...prev, width: newW, height: newH };
+          try {
+            localStorage.setItem('tipitaka_tree_float_pos', JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'se-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [floatPos]
+  );
 
   const matchingNodeIds = React.useMemo(() => {
     const q = filterText.trim().toLowerCase();
@@ -143,38 +305,109 @@ export default function NavigationTree() {
     return matched;
   }, [treeData, filterText]);
 
+  // Floating Window inline style
+  const floatStyle =
+    dockPosition === 'float'
+      ? {
+          left: `${floatPos.x}px`,
+          top: `${floatPos.y}px`,
+          width: `${floatPos.width}px`,
+          height: `${floatPos.height}px`,
+        }
+      : {
+          width: `${sidebarWidth}px`,
+        };
+
   return (
     <>
       {/* Mobile Backdrop Overlay */}
-      {isSidebarOpen && (
+      {isSidebarOpen && dockPosition !== 'float' && (
         <div
           className="fixed inset-0 bg-black/45 z-40 sm:hidden animate-fade-in"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      <aside className={`app-sidebar ${isSidebarOpen ? '' : 'collapsed'}`}>
-        <div className="sidebar-header">
+      <aside
+        style={floatStyle}
+        className={`app-sidebar dock-${dockPosition} ${isSidebarOpen ? '' : 'collapsed'} ${
+          isResizing ? 'select-none' : ''
+        }`}
+      >
+        {/* Docked Resizer Handle on Left Edge (when docked right) */}
+        {dockPosition === 'right' && (
+          <div
+            className={`tree-resizer-handle tree-resizer-handle-left ${isResizing ? 'resizing' : ''}`}
+            onMouseDown={startResizing}
+            title="Drag to resize sidebar width"
+          />
+        )}
+
+        {/* Sidebar Header / Drag Handle */}
+        <div
+          className={`sidebar-header ${dockPosition === 'float' ? 'cursor-move select-none' : ''}`}
+          onMouseDown={dockPosition === 'float' ? startDragging : undefined}
+        >
           <div className="sidebar-title-row">
-            <div className="sidebar-title">
+            <div className="sidebar-title flex items-center gap-1.5">
+              {dockPosition === 'float' && (
+                <GripHorizontal size={14} className="text-[var(--text-muted)] cursor-move" />
+              )}
               <span>Navigation</span>
               <span className="sidebar-stats">217 books</span>
             </div>
-            <div className="tree-actions">
+
+            {/* Tree & Dock Actions */}
+            <div className="tree-actions flex items-center gap-1">
+              {/* Expand / Collapse All */}
               <button
-                className="tree-action-btn"
+                className="tree-action-btn p-1"
                 onClick={handleToggleExpandAll}
                 title={isTreeExpandedAll ? 'Collapse All Folders' : 'Expand All Folders'}
               >
-                {isTreeExpandedAll ? <MinusSquare size={11} /> : <PlusSquare size={11} />}
-                <span>{isTreeExpandedAll ? 'Collapse' : 'Expand'}</span>
+                {isTreeExpandedAll ? <MinusSquare size={12} /> : <PlusSquare size={12} />}
               </button>
+
+              {/* Dock Left */}
               <button
-                className="tree-action-btn flex items-center gap-1"
-                onClick={() => setIsSidebarOpen(false)}
-                title="Hide Navigation"
+                className={`tree-action-btn p-1 ${
+                  dockPosition === 'left' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
+                }`}
+                onClick={() => handleSetDock('left')}
+                title="Dock to Left"
               >
-                <span>◖ Hide</span>
+                <PanelLeft size={12} />
+              </button>
+
+              {/* Float Window */}
+              <button
+                className={`tree-action-btn p-1 ${
+                  dockPosition === 'float' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
+                }`}
+                onClick={() => handleSetDock('float')}
+                title="Float / Moveable Window"
+              >
+                <Move size={12} />
+              </button>
+
+              {/* Dock Right */}
+              <button
+                className={`tree-action-btn p-1 ${
+                  dockPosition === 'right' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
+                }`}
+                onClick={() => handleSetDock('right')}
+                title="Dock to Right"
+              >
+                <PanelRight size={12} />
+              </button>
+
+              {/* Hide / Close Button */}
+              <button
+                className="tree-action-btn p-1 hover:text-red-500 transition"
+                onClick={() => setIsSidebarOpen(false)}
+                title="Close Navigation Tree"
+              >
+                <X size={12} />
               </button>
             </div>
           </div>
@@ -200,6 +433,7 @@ export default function NavigationTree() {
           </div>
         </div>
 
+        {/* Tree Container */}
         <div className="tree-container" ref={treeContainerRef}>
           {loading && (
             <div className="loading-view">
@@ -230,6 +464,24 @@ export default function NavigationTree() {
             </div>
           )}
         </div>
+
+        {/* Docked Resizer Handle on Right Edge (when docked left) */}
+        {dockPosition === 'left' && (
+          <div
+            className={`tree-resizer-handle tree-resizer-handle-right ${isResizing ? 'resizing' : ''}`}
+            onMouseDown={startResizing}
+            title="Drag to resize sidebar width"
+          />
+        )}
+
+        {/* Floating Corner Resizer (when in float mode) */}
+        {dockPosition === 'float' && (
+          <div
+            className="tree-float-resizer"
+            onMouseDown={startFloatingResize}
+            title="Drag corner to resize window"
+          />
+        )}
       </aside>
     </>
   );

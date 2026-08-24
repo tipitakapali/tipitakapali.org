@@ -317,16 +317,88 @@ body.no-indent .reader-container .bodytext { text-indent: 0 !important; }
 aside.app-sidebar {
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: transform 0.25s ease, margin-left 0.25s ease;
   z-index: 30;
+  position: relative;
 }
 
-aside.app-sidebar.collapsed {
-  margin-left: calc(-1 * var(--sidebar-width));
+aside.app-sidebar.dock-left {
+  border-right: 1px solid var(--border-color);
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+aside.app-sidebar.dock-left.collapsed {
+  margin-left: calc(-1 * var(--sidebar-width, 360px));
+}
+
+aside.app-sidebar.dock-right {
+  order: 99;
+  border-left: 1px solid var(--border-color);
+  transition: margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+aside.app-sidebar.dock-right.collapsed {
+  margin-right: calc(-1 * var(--sidebar-width, 360px));
+}
+
+aside.app-sidebar.dock-float {
+  position: fixed !important;
+  z-index: 60 !important;
+  background: var(--bg-sidebar) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+aside.app-sidebar.dock-float.collapsed {
+  display: none !important;
+}
+
+/* Vertical Resizer Handle for Docked Sidebar */
+.tree-resizer-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 40;
+  transition: background-color 0.15s ease;
+}
+
+.tree-resizer-handle:hover,
+.tree-resizer-handle.resizing {
+  background-color: var(--accent);
+}
+
+.tree-resizer-handle-right {
+  right: -3px;
+}
+
+.tree-resizer-handle-left {
+  left: -3px;
+}
+
+/* Floating Window Corner Resizer */
+.tree-float-resizer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: se-resize;
+  z-index: 50;
+  background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+  opacity: 0.7;
+  border-bottom-right-radius: 11px;
+}
+
+.tree-float-resizer:hover {
+  opacity: 1;
 }
 
 .sidebar-header {
