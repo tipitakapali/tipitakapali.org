@@ -6,6 +6,28 @@ import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertPaliScript } from '../services/transliterate';
 
+// Compute accurate hierarchy depth: Book/Nikāya (0) > Chapter (1) > Title (2) > Subhead (3) > Subsubhead (4)
+function getTocItemHierarchy(item) {
+  const t = (item.type || '').toLowerCase();
+  const r = (item.rend || '').toLowerCase();
+  const level = item.level;
+  const title = item.title || '';
+
+  if (t === 'nikaya' || t === 'book' || level === 0) {
+    return { depth: 0, type: 'book' };
+  }
+  if (t === 'chapter' || r === 'chapter' || (level === 1 && t !== 'title' && t !== 'subhead')) {
+    return { depth: 1, type: 'chapter' };
+  }
+  if (t === 'title' || r === 'title' || (t === 'subhead' && /^\d+[\.\s]/i.test(title))) {
+    return { depth: 2, type: 'title' };
+  }
+  if (t === 'subhead' || r === 'subhead' || level === 2) {
+    return { depth: 3, type: 'subhead' };
+  }
+  return { depth: 4, type: 'subsubhead' };
+}
+
 export default function BookTocModal({ isOpen, onClose }) {
   const { activeTab, openBook } = useTabs();
   const { settings } = useThemeSettings();
@@ -150,33 +172,38 @@ export default function BookTocModal({ isOpen, onClose }) {
             filteredToc.map((item) => {
               const originalIdx = item.originalIdx;
               const isCurrentReading = originalIdx === activeTocIdx;
-              const level = item.level;
+              const { depth, type } = getTocItemHierarchy(item);
 
-              // Clear, distinct indentation & typographic hierarchy matching Navigation Tree
+              // Distinct indentation & typographic hierarchy for Chapter > Title > Subhead
               let itemClass =
                 'w-full text-left rounded-lg cursor-pointer transition flex items-center justify-between group ';
               let titleClass = 'truncate leading-relaxed ';
               let indentClass = '';
 
-              if (level === 0) {
-                // Book / Root Division (Level 0: 15.5px Bold)
+              if (depth === 0) {
+                // Book / Root Division (Depth 0)
                 indentClass = 'pl-3 pr-3 py-2.5';
                 titleClass += 'font-bold text-[15.5px] text-[var(--text-primary)] tracking-wide';
                 itemClass += 'bg-[var(--bg-secondary)]/70 hover:bg-[var(--bg-secondary)] mt-3 first:mt-0 border-y border-[var(--border-color)]/40 ';
-              } else if (level === 1) {
-                // Chapter / Major Division (Level 1: 15px Semibold)
-                indentClass = 'pl-8 pr-3 py-2';
-                titleClass += 'font-semibold text-[15px] text-[var(--accent)]';
-                itemClass += 'hover:bg-[var(--bg-secondary)] mt-1 ';
-              } else if (level === 2) {
-                // Sutta / Section / Subhead (Level 2: 14.5px Medium)
-                indentClass = 'pl-13 pr-3 py-2';
-                titleClass += 'font-medium text-[14.5px] text-[var(--text-primary)]';
+              } else if (depth === 1) {
+                // Chapter (Depth 1)
+                indentClass = 'pl-6 pr-3 py-2';
+                titleClass += 'font-bold text-[15px] text-[var(--accent)]';
+                itemClass += 'hover:bg-[var(--bg-secondary)] mt-1.5 ';
+              } else if (depth === 2) {
+                // Title (Depth 2)
+                indentClass = 'pl-11 pr-3 py-2';
+                titleClass += 'font-semibold text-[14.5px] text-[var(--text-primary)]';
+                itemClass += 'hover:bg-[var(--bg-secondary)] mt-0.5 ';
+              } else if (depth === 3) {
+                // Subhead (Depth 3)
+                indentClass = 'pl-16 pr-3 py-1.5';
+                titleClass += 'font-normal text-[14px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               } else {
-                // Subhead / Subsection (Level 3+: 14px Regular)
-                indentClass = 'pl-18 pr-3 py-1.5';
-                titleClass += 'text-[14px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]';
+                // Subsubhead (Depth 4+)
+                indentClass = 'pl-21 pr-3 py-1.5';
+                titleClass += 'font-normal text-[13.5px] text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]';
                 itemClass += 'hover:bg-[var(--bg-secondary)] ';
               }
 
@@ -193,14 +220,16 @@ export default function BookTocModal({ isOpen, onClose }) {
                   className={`${itemClass} ${indentClass}`}
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden mr-2">
-                    {level === 0 ? (
+                    {depth === 0 ? (
                       <BookOpen size={16} className="text-[var(--accent)] shrink-0" />
-                    ) : level === 1 ? (
+                    ) : depth === 1 ? (
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ${isCurrentReading ? 'bg-[var(--accent)] ring-2 ring-[var(--accent)]/30' : 'bg-[var(--accent)]'}`} />
-                    ) : level === 2 ? (
-                      <span className={`w-2 h-2 rotate-45 rounded-[1px] shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)] opacity-80'}`} />
+                    ) : depth === 2 ? (
+                      <span className={`w-2 h-2 rotate-45 rounded-[1px] shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-secondary)] opacity-90'}`} />
+                    ) : depth === 3 ? (
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]'}`} />
                     ) : (
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/70'}`} />
+                      <span className={`w-1 h-1 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/60'}`} />
                     )}
                     <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
                   </div>
