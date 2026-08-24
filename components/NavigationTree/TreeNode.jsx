@@ -110,12 +110,12 @@ const TreeNode = memo(function TreeNode({
   };
 
   const renderIcon = () => {
-    if (depth === 0) return <Library size={15} className="tree-icon-cat" />;
-    if (depth === 1) return <FolderTree size={14} className="tree-icon-pitaka" />;
-    if (isBookNode) return <Book size={13} className="tree-icon-book" />;
-    if (isChapterNode) return <FileText size={12} className="tree-icon-chapter" />;
-    if (hasChildren) return <Folder size={13} className="tree-icon-folder" />;
-    return <FileText size={13} className="tree-icon-leaf" />;
+    if (depth === 0) return <Library size={16} className="tree-icon-cat" />;
+    if (depth === 1) return <FolderTree size={15} className="tree-icon-pitaka" />;
+    if (isBookNode) return <Book size={14.5} className="tree-icon-book" />;
+    if (isChapterNode) return <FileText size={13.5} className="tree-icon-chapter" />;
+    if (hasChildren) return <Folder size={14.5} className="tree-icon-folder" />;
+    return <FileText size={14} className="tree-icon-leaf" />;
   };
 
 
@@ -136,7 +136,7 @@ const TreeNode = memo(function TreeNode({
             onClick={toggleExpand}
             aria-label={isExpanded ? 'Collapse' : 'Expand'}
           >
-            <ChevronRight size={13} />
+            <ChevronRight size={14} />
           </button>
         ) : (
           <span className="tree-expander-spacer" />

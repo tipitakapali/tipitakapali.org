@@ -6,7 +6,7 @@ const DEFAULT_SETTINGS = {
   theme: 'light',
   accentColor: 'burgundy',
   fontFamily: 'gentium',
-  fontSize: 18,
+  fontSize: 25,
   lineHeight: 1.85,
   textAlign: 'justify',
   paragraphIndent: true,

@@ -26,7 +26,8 @@
   --header-height: 52px;
   --tabs-height: 38px;
   --footer-height: 34px;
-  --font-size-base: 18px;
+  --font-serif: 'Gentium Plus', 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --font-size-base: 25px;
   --line-height-base: 1.85;
   --reader-max-width: 880px;
   --reader-text-align: justify;
@@ -127,8 +128,8 @@
 [data-font="system"] { --font-reader: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
 /* Tree Density */
-[data-density="compact"] .tree-row { padding: 2px 4px !important; font-size: 12px !important; }
-[data-density="spacious"] .tree-row { padding: 6px 8px !important; font-size: 14.5px !important; }
+[data-density="compact"] .tree-row { padding: 3px 5px !important; font-size: 13.5px !important; }
+[data-density="spacious"] .tree-row { padding: 7px 10px !important; font-size: 16.5px !important; }
 
 * {
   box-sizing: border-box;
@@ -432,22 +433,24 @@ aside.app-sidebar.collapsed {
   flex: 1;
   overflow-y: auto;
   padding: 8px 6px;
-  font-size: 13.5px;
+  font-size: 15px;
 }
 
 .tree-node {
   user-select: none;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
 .tree-row {
   display: flex;
   align-items: center;
-  padding: 4px 6px;
-  border-radius: 5px;
+  padding: 5px 7px;
+  border-radius: 6px;
   cursor: pointer;
-  gap: 5px;
+  gap: 6px;
   color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.4;
   transition: background 0.12s ease, color 0.12s ease;
   position: relative;
 }
@@ -458,8 +461,8 @@ aside.app-sidebar.collapsed {
 
 /* Level 0: Primary Root Categories */
 .tree-node.level-0 {
-  margin-top: 8px;
-  margin-bottom: 4px;
+  margin-top: 10px;
+  margin-bottom: 5px;
 }
 
 .tree-node.level-0:first-child {
@@ -469,10 +472,10 @@ aside.app-sidebar.collapsed {
 .tree-node.level-0 > .tree-row {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  padding: 6px 8px;
+  padding: 7px 9px;
   font-weight: 700;
   color: var(--accent);
-  font-size: 13.5px;
+  font-size: 15.5px;
 }
 
 .tree-node.level-0 > .tree-row:hover {
@@ -482,24 +485,24 @@ aside.app-sidebar.collapsed {
 
 /* Level 1: Pitakas */
 .tree-node.level-1 > .tree-row {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 650;
+  font-size: 15px;
   color: var(--text-primary);
-  padding: 5px 6px;
+  padding: 5.5px 7px;
 }
 
 /* Level 2: Nikayas */
 .tree-node.level-2 > .tree-row {
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 14.5px;
   color: var(--text-secondary);
-  padding: 4px 6px;
+  padding: 5px 7px;
 }
 
 /* Books */
 .tree-row.is-book {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-primary);
 }
 
@@ -509,8 +512,8 @@ aside.app-sidebar.collapsed {
 
 /* Chapters */
 .tree-row.is-chapter {
-  padding-left: 18px;
-  font-size: 12px;
+  padding-left: 20px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 

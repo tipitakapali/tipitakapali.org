@@ -57,7 +57,7 @@ export default function Footer() {
             </span>
           </button>
 
-          {/* Jump Button */}
+          {/* MAT Button */}
           <button
             onClick={() => setIsMatModalOpen(true)}
             disabled={!activeTab}
@@ -65,7 +65,7 @@ export default function Footer() {
             title="Jump to Connected Mūla, Aṭṭhakathā, Ṭīkā"
           >
             <Layers size={13} className="text-[var(--accent)]" />
-            <span>Jump</span>
+            <span>MAT</span>
             {activeParaNum && (
               <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold">
                 {activeParaNum}
@@ -84,22 +84,6 @@ export default function Footer() {
             <span>Go</span>
           </button>
 
-          {/* Book TOC */}
-          <button
-            onClick={() => setIsTocOpen(true)}
-            disabled={!activeTab}
-            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
-            title="Open Book Table of Contents"
-          >
-            <ListTree size={14} className="text-[var(--accent)]" />
-            <span>TOC</span>
-            {activeTab?.toc && activeTab.toc.length > 0 && (
-              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-card)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
-                {activeTab.toc.length}
-              </span>
-            )}
-          </button>
-
           {/* Dictionary */}
           <button
             className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
@@ -110,17 +94,18 @@ export default function Footer() {
             <span>Dict</span>
           </button>
 
-          {/* Bookmarks */}
+          {/* Book Toc (Far Right) */}
           <button
+            onClick={() => setIsTocOpen(true)}
+            disabled={!activeTab}
             className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
-            onClick={() => setIsBookmarkOpen(true)}
-            title="Saved Bookmarks"
+            title="Open Book Table of Contents"
           >
-            <Bookmark size={14} className="text-[var(--accent)]" />
-            <span>Saved</span>
-            {bookmarks.length > 0 && (
-              <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
-                {bookmarks.length}
+            <ListTree size={14} className="text-[var(--accent)]" />
+            <span>Toc</span>
+            {activeTab?.toc && activeTab.toc.length > 0 && (
+              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-card)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
+                {activeTab.toc.length}
               </span>
             )}
           </button>
@@ -146,9 +131,21 @@ export default function Footer() {
                 <span className="font-bold text-xs text-[var(--text-primary)]">Text Size</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-[var(--accent)] bg-[var(--accent-light)] px-2 py-0.5 rounded border border-[var(--accent-border)]">
-                  {settings.fontSize}px
-                </span>
+                <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-1.5 py-0.5 focus-within:border-[var(--accent)] transition">
+                  <input
+                    type="number"
+                    min="8"
+                    value={settings.fontSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val > 0) {
+                        updateSetting('fontSize', val);
+                      }
+                    }}
+                    className="w-10 bg-transparent text-center font-mono text-xs font-bold text-[var(--accent)] outline-none"
+                  />
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">px</span>
+                </div>
                 <button
                   onClick={() => setIsFontSizeOpen(false)}
                   className="p-1 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
@@ -161,21 +158,21 @@ export default function Footer() {
             {/* Stepper Buttons */}
             <div className="flex items-center justify-between gap-2">
               <button
-                onClick={() => updateSetting('fontSize', Math.max(14, settings.fontSize - 1))}
+                onClick={() => updateSetting('fontSize', Math.max(8, settings.fontSize - 1))}
                 className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
                 title="Decrease font size"
               >
                 A−
               </button>
               <button
-                onClick={() => updateSetting('fontSize', 18)}
+                onClick={() => updateSetting('fontSize', 25)}
                 className="px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer shadow-2xs"
-                title="Reset to default (18px)"
+                title="Reset to default (25px)"
               >
-                Reset
+                Reset (25)
               </button>
               <button
-                onClick={() => updateSetting('fontSize', Math.min(32, settings.fontSize + 1))}
+                onClick={() => updateSetting('fontSize', settings.fontSize + 1)}
                 className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
                 title="Increase font size"
               >
@@ -186,15 +183,15 @@ export default function Footer() {
             {/* Slider */}
             <div className="space-y-1">
               <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                <span>14px</span>
-                <span>32px</span>
+                <span>12px</span>
+                <span>48px</span>
               </div>
               <input
                 type="range"
-                min="14"
-                max="32"
+                min="12"
+                max="48"
                 step="1"
-                value={settings.fontSize}
+                value={Math.min(48, Math.max(12, settings.fontSize))}
                 onChange={(e) => updateSetting('fontSize', parseInt(e.target.value, 10))}
                 className="w-full accent-[var(--accent)] cursor-pointer h-1.5 bg-[var(--bg-secondary)] rounded-lg"
               />
@@ -204,7 +201,7 @@ export default function Footer() {
             <div className="pt-2 border-t border-[var(--border-color)]/60">
               <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick Presets</div>
               <div className="grid grid-cols-6 gap-1">
-                {[15, 17, 18, 20, 24, 28].map((sz) => (
+                {[16, 18, 20, 22, 25, 28].map((sz) => (
                   <button
                     key={sz}
                     onClick={() => updateSetting('fontSize', sz)}

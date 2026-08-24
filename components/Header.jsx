@@ -1,14 +1,38 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { Menu, Search, Settings } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Menu, Search, Settings, Bookmark } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
 
 export default function Header() {
   const { settings, updateSetting, openSettingsModal } = useThemeSettings();
-  const { toggleSidebar, openSearchModal } = useTabs();
+  const {
+    toggleSidebar,
+    openSearchModal,
+    setIsBookmarkOpen,
+    bookmarks,
+  } = useTabs();
+
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const themeRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (themeRef.current && !themeRef.current.contains(e.target)) {
+        setIsThemeOpen(false);
+      }
+    };
+    if (isThemeOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isThemeOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -29,6 +53,15 @@ export default function Header() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleSidebar, openSearchModal]);
 
+  const currentThemeIcon =
+    settings.theme === 'sepia'
+      ? '📜'
+      : settings.theme === 'dark'
+      ? '🌙'
+      : settings.theme === 'oled'
+      ? '🌌'
+      : '☀️';
+
   return (
     <header className="app-header h-[50px] sm:h-[52px] bg-[var(--bg-secondary)] border-b border-[var(--border-color)] px-2.5 sm:px-4 flex items-center justify-between shrink-0 z-50 select-none">
       {/* Brand & Menu */}
@@ -40,8 +73,6 @@ export default function Header() {
         >
           <Menu size={19} />
         </button>
-
-
 
         <a href="/" className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-90 transition">
           <span>TipitakaPali.org</span>
@@ -81,21 +112,67 @@ export default function Header() {
         {/* Language & Multi-Translation Menu */}
         <LanguageMenu />
 
-        {/* Theme Dropdown */}
-        <select
-          value={settings.theme}
-          onChange={(e) => updateSetting('theme', e.target.value)}
-          className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md px-1.5 sm:px-2 py-1 text-xs text-[var(--text-secondary)] cursor-pointer outline-none"
+        {/* Saved (Bookmarks) Button */}
+        <button
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          onClick={() => setIsBookmarkOpen(true)}
+          title="Saved Bookmarks"
         >
-          <option value="light">☀️ Light</option>
-          <option value="sepia">📜 Sepia</option>
-          <option value="dark">🌙 Dark</option>
-          <option value="oled">🌌 OLED</option>
-        </select>
+          <Bookmark size={14} className="text-[var(--accent)]" />
+          <span className="hidden md:inline">Saved</span>
+          {bookmarks.length > 0 && (
+            <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
+              {bookmarks.length}
+            </span>
+          )}
+        </button>
+
+        {/* Theme Menu (Icon-only on button, labels inside dropdown) */}
+        <div className="relative shrink-0" ref={themeRef}>
+          <button
+            onClick={() => setIsThemeOpen((prev) => !prev)}
+            className={`flex items-center justify-center p-1.5 sm:px-2 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
+              isThemeOpen ? 'border-[var(--accent)] bg-[var(--accent-light)]' : ''
+            }`}
+            title="Theme Selection"
+          >
+            <span className="text-sm leading-none">{currentThemeIcon}</span>
+          </button>
+
+          {isThemeOpen && (
+            <div className="absolute right-0 top-full mt-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl p-1.5 w-32 z-50 text-xs animate-fade-in select-none">
+              <div className="text-[10px] font-bold text-[var(--text-muted)] px-2 py-1 uppercase tracking-wider">
+                Theme
+              </div>
+              {[
+                { id: 'light', icon: '☀️', label: 'Light' },
+                { id: 'sepia', icon: '📜', label: 'Sepia' },
+                { id: 'dark', icon: '🌙', label: 'Dark' },
+                { id: 'oled', icon: '🌌', label: 'OLED' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    updateSetting('theme', t.id);
+                    setIsThemeOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition cursor-pointer text-left ${
+                    settings.theme === t.id
+                      ? 'bg-[var(--accent-light)] text-[var(--accent)] font-bold'
+                      : 'text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                  }`}
+                >
+                  <span className="text-sm">{t.icon}</span>
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Settings Button */}
         <button
-          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition"
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={openSettingsModal}
           title="Advanced Reader Settings"
         >
