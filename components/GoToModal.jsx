@@ -6,28 +6,45 @@ import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript } from '../services/transliterate';
 
-export default function GoToModal({ isOpen, onClose }) {
+export default function GoToModal({ isOpen, onClose, initialTab = 'para', initialEdition = null }) {
   const { activeTab, openBook, activeParaNum } = useTabs();
   const { settings } = useThemeSettings();
 
-  const [activeTabMode, setActiveTabMode] = useState('para'); // 'para' | 'page'
+  const [activeTabMode, setActiveTabMode] = useState(initialTab || 'para'); // 'para' | 'page'
   const [paraInput, setParaInput] = useState('');
   const [pageInput, setPageInput] = useState('');
-  const [pageSystem, setPageSystem] = useState('M'); // Default to 'M' (Myanmar)
+  const [pageSystem, setPageSystem] = useState(initialEdition || 'M'); // Default to 'M' (Myanmar)
   const [errorMessage, setErrorMessage] = useState('');
 
   const inputRef = useRef(null);
 
-  // Load saved edition preference (defaults to 'M' for Myanmar)
+  // Load saved edition preference or initialEdition
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (initialEdition && ['M', 'V', 'P', 'T', 'O'].includes(initialEdition)) {
+      setPageSystem(initialEdition);
+      return;
+    }
     try {
       const savedEd = localStorage.getItem('tipitaka_goto_edition');
       if (savedEd && ['M', 'V', 'P', 'T', 'O'].includes(savedEd)) {
         setPageSystem(savedEd);
       }
     } catch (e) {}
-  }, []);
+  }, [initialEdition]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialTab) {
+        setActiveTabMode(initialTab);
+      }
+      if (initialEdition && ['M', 'V', 'P', 'T', 'O'].includes(initialEdition)) {
+        setPageSystem(initialEdition);
+      }
+      setErrorMessage('');
+      setTimeout(() => inputRef.current?.focus(), 60);
+    }
+  }, [isOpen, initialTab, initialEdition]);
 
   // 1. Direct precomputed paragraph limits (from server DB/JSON, 0ms compute)
   const paraRange = useMemo(() => {

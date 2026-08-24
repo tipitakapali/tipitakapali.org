@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Search, Settings, Bookmark, HelpCircle } from 'lucide-react';
+import { Menu, Search, Settings, Bookmark, HelpCircle, BookA } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import HelpModal from './HelpModal';
+import DictionaryModal from './DictionaryModal';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
 
@@ -12,6 +13,8 @@ export default function Header() {
   const {
     toggleSidebar,
     openSearchModal,
+    isDictOpen,
+    setIsDictOpen,
     setIsBookmarkOpen,
     bookmarks,
   } = useTabs();
@@ -123,6 +126,16 @@ export default function Header() {
           <Search size={17} />
         </button>
 
+        {/* Dictionary Button */}
+        <button
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          onClick={() => setIsDictOpen(true)}
+          title="Pāḷi Dictionary Look-up"
+        >
+          <BookA size={14} className="text-[var(--accent)]" />
+          <span className="hidden md:inline">Dict</span>
+        </button>
+
         {/* Language & Multi-Translation Menu */}
         <LanguageMenu />
 
@@ -196,6 +209,8 @@ export default function Header() {
       </div>
 
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <DictionaryModal isOpen={isDictOpen} onClose={() => setIsDictOpen(false)} />
     </header>
   );
 }
+

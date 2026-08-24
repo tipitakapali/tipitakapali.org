@@ -69,11 +69,16 @@ export function TabProvider({ children }) {
   const [loadingBook, setLoadingBook] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDictOpen, setIsDictOpen] = useState(false);
+  const [isGoToOpen, setIsGoToOpen] = useState(false);
+  const [goToInitialTab, setGoToInitialTab] = useState('para');
+  const [goToInitialEdition, setGoToInitialEdition] = useState(null);
   const [isBookmarkOpen, setIsBookmarkOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [targetScrollIntent, setTargetScrollIntent] = useState(null);
   const [treeSelectedNode, setTreeSelectedNode] = useState(null);
+  const [activeEditionPages, setActiveEditionPages] = useState({});
 
   const [bookmarks, setBookmarks] = useState([]);
   const [recentHistory, setRecentHistory] = useState([]);
@@ -913,6 +918,15 @@ export function TabProvider({ children }) {
     [activeTab, activeParaNum, openBook]
   );
 
+  const openGoToModal = useCallback((tab = 'para', edition = null) => {
+    setGoToInitialTab(tab);
+    setGoToInitialEdition(edition);
+    setIsGoToOpen(true);
+  }, []);
+
+  const closeGoToModal = useCallback(() => {
+    setIsGoToOpen(false);
+  }, []);
 
   return (
     <TabContext.Provider
@@ -926,6 +940,16 @@ export function TabProvider({ children }) {
         loadingBook,
         isSidebarOpen,
         isSearchOpen,
+        isDictOpen,
+        setIsDictOpen,
+        isGoToOpen,
+        setIsGoToOpen,
+        goToInitialTab,
+        setGoToInitialTab,
+        goToInitialEdition,
+        setGoToInitialEdition,
+        openGoToModal,
+        closeGoToModal,
         isBookmarkOpen,
         isHistoryOpen,
         setIsBookmarkOpen,
@@ -933,6 +957,8 @@ export function TabProvider({ children }) {
         searchInitialQuery,
         targetScrollIntent,
         treeSelectedNode,
+        activeEditionPages,
+        setActiveEditionPages,
         tabScrollMemoryRef,
         bookmarks,
         recentHistory,

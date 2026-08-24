@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import {
   ListTree,
-  BookA,
   Bookmark,
   Layers,
   Navigation,
@@ -12,7 +11,6 @@ import {
 } from 'lucide-react';
 
 import BookTocModal from './BookTocModal';
-import DictionaryModal from './DictionaryModal';
 import BookmarkModal from './BookmarkModal';
 import HistoryModal from './HistoryModal';
 import MatJumpModal from './MatJumpModal';
@@ -25,6 +23,11 @@ export default function Footer() {
     activeTab,
     activeParaNum,
     bookmarks,
+    isGoToOpen,
+    openGoToModal,
+    closeGoToModal,
+    goToInitialTab,
+    goToInitialEdition,
     isHistoryOpen,
     setIsHistoryOpen,
     isBookmarkOpen,
@@ -34,14 +37,13 @@ export default function Footer() {
 
   const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [isDictOpen, setIsDictOpen] = useState(false);
   const [isMatModalOpen, setIsMatModalOpen] = useState(false);
-  const [isGoToModalOpen, setIsGoToModalOpen] = useState(false);
 
   return (
     <>
       <footer className="app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border">
-        <div className="footer-nav-group mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5">
+        {/* Navigation Buttons Group */}
+        <div className="footer-nav-group mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Text Size Button */}
           <button
             onClick={() => setIsFontSizeOpen(true)}
@@ -75,7 +77,7 @@ export default function Footer() {
 
           {/* Go Button */}
           <button
-            onClick={() => setIsGoToModalOpen(true)}
+            onClick={() => openGoToModal('para')}
             disabled={!activeTab}
             className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
             title="Go to Paragraph or Page Number"
@@ -84,17 +86,7 @@ export default function Footer() {
             <span>Go</span>
           </button>
 
-          {/* Dictionary */}
-          <button
-            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
-            onClick={() => setIsDictOpen(true)}
-            title="Pāḷi Dictionary Look-up"
-          >
-            <BookA size={14} className="text-[var(--accent)]" />
-            <span>Dict</span>
-          </button>
-
-          {/* Book Toc (Far Right) */}
+          {/* Book Toc */}
           <button
             onClick={() => setIsTocOpen(true)}
             disabled={!activeTab}
@@ -222,13 +214,19 @@ export default function Footer() {
 
       {/* Modals */}
       <MatJumpModal isOpen={isMatModalOpen} onClose={() => setIsMatModalOpen(false)} />
-      <GoToModal isOpen={isGoToModalOpen} onClose={() => setIsGoToModalOpen(false)} />
+      <GoToModal
+        isOpen={isGoToOpen}
+        onClose={closeGoToModal}
+        initialTab={goToInitialTab}
+        initialEdition={goToInitialEdition}
+      />
       <BookTocModal isOpen={isTocOpen} onClose={() => setIsTocOpen(false)} />
-      <DictionaryModal isOpen={isDictOpen} onClose={() => setIsDictOpen(false)} />
       <BookmarkModal isOpen={isBookmarkOpen} onClose={() => setIsBookmarkOpen(false)} />
       <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </>
   );
 }
+
+
 
 

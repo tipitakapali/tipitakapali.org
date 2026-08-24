@@ -90,6 +90,9 @@ export default function ReaderView() {
     bookmarks,
     activeParaNum,
     setActiveParaNum,
+    activeEditionPages,
+    setActiveEditionPages,
+    openGoToModal,
   } = useTabs();
 
 
@@ -402,6 +405,55 @@ export default function ReaderView() {
   ]);
 
 
+  // Detect active edition page numbers across loaded chapters
+  const detectActiveEditionPages = useCallback(() => {
+    if (!containerRef.current || !activeTab) return;
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const targetY = containerRect.top + 80;
+
+    const pbElements = container.querySelectorAll('span.pb[data-ed][data-page]');
+    if (pbElements.length === 0) return;
+
+    const pages = {};
+    const firstSeen = {};
+
+    for (const pb of pbElements) {
+      const ed = pb.getAttribute('data-ed');
+      const page = pb.getAttribute('data-page');
+      if (!firstSeen[ed]) {
+        firstSeen[ed] = page;
+      }
+      const rect = pb.getBoundingClientRect();
+      if (rect.top <= targetY) {
+        pages[ed] = page;
+      }
+    }
+
+    for (const [ed, firstPage] of Object.entries(firstSeen)) {
+      if (!pages[ed]) {
+        pages[ed] = firstPage;
+      }
+    }
+
+    if (Object.keys(pages).length > 0) {
+      setActiveEditionPages((prev) => {
+        const isDiff =
+          Object.keys(pages).some((k) => prev[k] !== pages[k]) ||
+          Object.keys(prev).some((k) => prev[k] !== pages[k]);
+        return isDiff ? pages : prev;
+      });
+    }
+  }, [activeTab, setActiveEditionPages]);
+
+  // Initial and chapter content change detection
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      detectActiveEditionPages();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [activeTab?.bookCode, activeTab?.loadedChapters, detectActiveEditionPages]);
+
   // Direct fast scroll listener
   const handleScroll = useCallback(
     (e) => {
@@ -414,7 +466,6 @@ export default function ReaderView() {
       }
 
       if (scrollTimeoutRef.current) {
-
         clearTimeout(scrollTimeoutRef.current);
       }
       scrollTimeoutRef.current = setTimeout(() => {
@@ -453,10 +504,12 @@ export default function ReaderView() {
           if (foundParaNum) {
             setActiveParaNum(foundParaNum);
           }
+
+          detectActiveEditionPages();
         }
       }, 100);
     },
-    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum]
+    [activeTab, saveTabScroll, setIsZenMode, setActiveParaNum, detectActiveEditionPages]
   );
 
   const handleReaderClick = useCallback((e) => {
@@ -496,6 +549,36 @@ export default function ReaderView() {
     [activeTab, loadChapter, bufferAdjacentChapters]
   );
 
+  const editionStatsList = React.useMemo(() => {
+    if (!activeEditionPages || Object.keys(activeEditionPages).length === 0) return [];
+    const EDITION_LABELS = {
+      M: 'Myanmar',
+      V: 'VRI',
+      P: 'PTS',
+      T: 'Thai',
+      O: 'Other',
+    };
+    return ['M', 'V', 'P', 'T', 'O']
+      .filter((ed) => activeEditionPages[ed])
+      .map((ed) => {
+        const rawPage = String(activeEditionPages[ed]);
+        let formatted = rawPage;
+        if (rawPage.includes('.')) {
+          const parts = rawPage.split('.');
+          const vol = parseInt(parts[0], 10);
+          const pNum = parseInt(parts[1], 10);
+          if (!isNaN(vol) && !isNaN(pNum)) {
+            formatted = vol === 0 ? String(pNum) : `${vol}.${pNum}`;
+          }
+        }
+        return {
+          ed,
+          page: formatted,
+          label: EDITION_LABELS[ed] || ed,
+        };
+      });
+  }, [activeEditionPages]);
+
   const handleQuickBookmark = () => {
     if (!activeTab) return;
     const currentChapIdx = activeTab.currentChapterIdx || 0;
@@ -534,38 +617,74 @@ export default function ReaderView() {
       {/* Dynamic Auto-Hiding Breadcrumbs Bar */}
       <div
         ref={contentHeaderRef}
-        className="content-header sticky top-0 z-30 transition-all duration-200 flex items-center justify-between"
+        className="content-header sticky top-0 z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none"
       >
         <div
-          className="breadcrumbs truncate text-xs flex-1 cursor-pointer"
+          className="breadcrumbs truncate text-xs flex-1 cursor-pointer flex items-center gap-1.5"
           onClick={handleBreadcrumbClick}
-          title="Click to reveal full navigation and header"
+          title="Click to reveal full navigation and sidebar"
         >
           <span>{convertPaliScript('Tipiṭaka', settings?.paliScript)}</span>
-          <span>›</span>
-          <span className="truncate">{convertPaliScript(activeTab.nikaya || activeTab.category || '', settings?.paliScript)}</span>
-          <span>›</span>
+          <span className="opacity-40">›</span>
+          <span className="truncate opacity-75">{convertPaliScript(activeTab.nikaya || activeTab.category || '', settings?.paliScript)}</span>
+          <span className="opacity-40">›</span>
           <span className="current truncate font-semibold text-[var(--accent)]">{convertPaliScript(activeTab.title, settings?.paliScript)}</span>
           {currentChap && currentChap.title !== activeTab.title && (
             <>
-              <span>›</span>
+              <span className="opacity-40">›</span>
               <span className="truncate text-[var(--text-muted)]">{convertPaliScript(currentChap.title, settings?.paliScript)}</span>
             </>
           )}
         </div>
 
-        {/* Quick Bookmark Button in Breadcrumb Header */}
-        <button
-          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 ml-2 cursor-pointer"
-          onClick={handleQuickBookmark}
-          title={isCurrentBookmarked ? 'Bookmarked' : 'Bookmark this chapter'}
-        >
-          {isCurrentBookmarked ? (
-            <BookmarkCheck size={14} className="text-[var(--accent)]" />
-          ) : (
-            <Bookmark size={14} />
+        {/* Right Controls: Live Edition Page Stats + Quick Bookmark */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Subtle Live Page Statistics for all editions */}
+          {editionStatsList.length > 0 && (
+            <div
+              onClick={() => openGoToModal('page', null)}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)]/60 hover:border-[var(--border-color)] transition cursor-pointer shrink-0 select-none font-mono"
+              title="Current Reading Page across Editions • Click to Go to Page"
+            >
+              <span className="text-[9px] sm:text-[9.5px] font-sans font-semibold uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
+                Page:
+              </span>
+              <div className="flex items-center gap-1">
+                {editionStatsList.map(({ ed, page, label }, idx) => (
+                  <React.Fragment key={ed}>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGoToModal('page', ed);
+                      }}
+                      className="inline-flex items-center gap-0.5 hover:text-[var(--accent)] hover:underline transition"
+                      title={`${label}: Page ${page}`}
+                    >
+                      <strong className="font-semibold text-[var(--text-secondary)]">{ed}</strong>
+                      <span className="opacity-90">{page}</span>
+                    </span>
+                    {idx < editionStatsList.length - 1 && (
+                      <span className="opacity-30 text-[8px]">•</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
           )}
-        </button>
+
+          {/* Quick Bookmark Button in Breadcrumb Header */}
+          <button
+            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+            onClick={handleQuickBookmark}
+            title={isCurrentBookmarked ? 'Bookmarked' : 'Bookmark this chapter'}
+          >
+            {isCurrentBookmarked ? (
+              <BookmarkCheck size={14} className="text-[var(--accent)]" />
+            ) : (
+              <Bookmark size={14} />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Lazy-Loaded Chapter Content Stream */}

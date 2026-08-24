@@ -31,8 +31,8 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="light" className="w-full max-w-full overflow-x-hidden">
-      <body className="w-full max-w-full overflow-x-hidden">
+    <html lang="en" data-theme="light" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
+      <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
         <ThemeSettingsProvider>
           <TabProvider>
             {children}
