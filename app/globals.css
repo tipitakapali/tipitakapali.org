@@ -735,10 +735,11 @@ main.content-area {
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+  overflow: hidden !important;
 }
 
 .breadcrumbs {
@@ -1140,6 +1141,15 @@ footer.app-footer {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  transition: margin-bottom 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+}
+
+footer.app-footer.hidden-footer,
+.app-footer.hidden-footer {
+  margin-bottom: calc(-1 * var(--footer-height, 48px)) !important;
+  transform: translateY(100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .footer-nav-group {

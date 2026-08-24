@@ -495,10 +495,6 @@ export default function ReaderView() {
         }
       }
 
-      if (contentHeaderRef.current) {
-        contentHeaderRef.current.classList.remove('hidden-scroll');
-      }
-
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -627,9 +623,7 @@ export default function ReaderView() {
   const handleBreadcrumbClick = () => {
     document.body.classList.remove('zen-mode');
     setIsSidebarOpen(true);
-    if (contentHeaderRef.current) {
-      contentHeaderRef.current.classList.remove('hidden-scroll');
-    }
+    setIsHeaderVisible(true);
   };
 
   const handleChapterVisible = useCallback(
@@ -767,6 +761,8 @@ export default function ReaderView() {
       (activeParaNum ? String(b.paraNum) === String(activeParaNum) : true)
   );
 
+  const isContentHeaderHidden = !isHeaderVisible && !isSidebarOpen;
+
   return (
     <main
       className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
@@ -776,7 +772,9 @@ export default function ReaderView() {
       {/* Dynamic Auto-Hiding Breadcrumbs Bar */}
       <div
         ref={contentHeaderRef}
-        className="content-header sticky top-0 z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none"
+        className={`content-header sticky top-0 z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none ${
+          isContentHeaderHidden ? 'hidden-scroll' : ''
+        }`}
       >
         <div
           className="breadcrumbs truncate text-xs flex-1 cursor-pointer flex items-center gap-1.5"

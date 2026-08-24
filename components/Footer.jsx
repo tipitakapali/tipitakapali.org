@@ -32,6 +32,8 @@ export default function Footer() {
     setIsHistoryOpen,
     isBookmarkOpen,
     setIsBookmarkOpen,
+    isHeaderVisible,
+    isSidebarOpen,
   } = useTabs();
   const { settings, updateSetting } = useThemeSettings();
 
@@ -39,9 +41,13 @@ export default function Footer() {
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isMatModalOpen, setIsMatModalOpen] = useState(false);
 
+  const isHidden = !isHeaderVisible && !isSidebarOpen;
+
   return (
     <>
-      <footer className="app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border">
+      <footer className={`app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border ${
+        isHidden ? 'hidden-footer' : ''
+      }`}>
         {/* Navigation Buttons Group */}
         <div className="footer-nav-group mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Text Size Button */}
