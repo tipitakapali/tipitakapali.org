@@ -209,7 +209,7 @@ export default function BookTocModal({ isOpen, onClose }) {
 
               if (isCurrentReading) {
                 itemClass += 'bg-[var(--accent-light)] text-[var(--accent)] rounded-lg ring-1 ring-[var(--accent-border)]/80 shadow-xs ';
-                titleClass += ' underline decoration-[var(--accent)] decoration-[1.5px] underline-offset-[5px] font-bold text-[var(--accent)] ';
+                titleClass += ' font-bold text-[var(--accent)] ';
               }
 
               return (
@@ -221,15 +221,35 @@ export default function BookTocModal({ isOpen, onClose }) {
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden mr-2">
                     {depth === 0 ? (
-                      <BookOpen size={16} className="text-[var(--accent)] shrink-0" />
+                      <BookOpen size={15} className="text-[var(--accent)] shrink-0" />
                     ) : depth === 1 ? (
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ${isCurrentReading ? 'bg-[var(--accent)] ring-2 ring-[var(--accent)]/30' : 'bg-[var(--accent)]'}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isCurrentReading
+                            ? 'bg-[var(--accent)] ring-2 ring-[var(--accent)]/30'
+                            : 'bg-[var(--accent)]'
+                        }`}
+                      />
                     ) : depth === 2 ? (
-                      <span className={`w-2 h-2 rotate-45 rounded-[1px] shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-secondary)] opacity-90'}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full border-[1.5px] shrink-0 transition-colors ${
+                          isCurrentReading
+                            ? 'border-[var(--accent)] bg-[var(--accent)]'
+                            : 'border-[var(--text-secondary)] bg-transparent'
+                        }`}
+                      />
                     ) : depth === 3 ? (
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]'}`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]'
+                        }`}
+                      />
                     ) : (
-                      <span className={`w-1 h-1 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/60'}`} />
+                      <span
+                        className={`w-1 h-1 rounded-full shrink-0 ${
+                          isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/50'
+                        }`}
+                      />
                     )}
                     <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
                   </div>
