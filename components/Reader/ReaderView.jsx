@@ -424,10 +424,16 @@ export default function ReaderView() {
     for (const pb of pbElements) {
       const ed = pb.getAttribute('data-ed');
       const page = pb.getAttribute('data-page');
+      if (!ed || !page) continue;
+
       if (!firstSeen[ed]) {
         firstSeen[ed] = page;
       }
-      const rect = pb.getBoundingClientRect();
+
+      // If span.pb is hidden with display:none (hide-pb setting), getBoundingClientRect() on pb returns 0.
+      // Measuring the parent paragraph element gives the exact viewport position in both visible and hidden modes!
+      const hostEl = pb.closest('p[data-pindex], .chapter-divider, p') || pb.parentElement || pb;
+      const rect = hostEl.getBoundingClientRect();
       if (rect.top <= targetY) {
         pages[ed] = page;
       }
