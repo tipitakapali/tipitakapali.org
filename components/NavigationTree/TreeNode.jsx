@@ -110,6 +110,14 @@ const TreeNode = memo(function TreeNode({
   };
 
   const renderIcon = () => {
+    if (isActiveChapter) {
+      return (
+        <span className="relative flex h-2.5 w-2.5 mx-0.5" title="Currently Reading Chapter">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)]" />
+        </span>
+      );
+    }
     if (depth === 0) return <Library size={16} className="tree-icon-cat" />;
     if (depth === 1) return <FolderTree size={15} className="tree-icon-pitaka" />;
     if (isBookNode) return <Book size={14.5} className="tree-icon-book" />;
@@ -142,8 +150,8 @@ const TreeNode = memo(function TreeNode({
           <span className="tree-expander-spacer" />
         )}
 
-        <span className="tree-icon">{renderIcon()}</span>
-        <span className="tree-label truncate">{displayText}</span>
+        <span className="tree-icon flex items-center justify-center w-4 shrink-0">{renderIcon()}</span>
+        <span className="tree-label truncate flex-1">{displayText}</span>
       </div>
 
       {hasChildren && isExpanded && (

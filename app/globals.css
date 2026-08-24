@@ -627,16 +627,14 @@ aside.app-sidebar.dock-float.collapsed {
   background-color: var(--accent-light);
   color: var(--accent);
   font-weight: 700;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 5px 5px 0;
+  border-radius: 6px;
 }
 
 .tree-row.active-chapter {
   color: var(--accent);
-  background-color: rgba(139, 37, 0, 0.12);
+  background-color: var(--accent-light);
   font-weight: 600;
-  border-left: 2px solid var(--accent);
-  border-radius: 0 4px 4px 0;
+  border-radius: 6px;
 }
 
 .tree-expander {
