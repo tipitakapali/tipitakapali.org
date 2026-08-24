@@ -354,7 +354,6 @@ export default function NavigationTree() {
                 <GripHorizontal size={14} className="text-[var(--text-muted)] cursor-move" />
               )}
               <span>Navigation</span>
-              <span className="sidebar-stats">217 books</span>
             </div>
 
             {/* Tree & Dock Actions */}
