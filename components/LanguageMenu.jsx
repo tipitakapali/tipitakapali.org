@@ -43,16 +43,19 @@ export default function LanguageMenu() {
 
   return (
     <div className="relative" ref={menuRef}>
-      {/* Icon-Only Trigger Button */}
+      {/* Trigger Button: Icon + Language */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative p-1.5 sm:px-2 sm:py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition shadow-xs flex items-center justify-center"
+        className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
+          isOpen ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
+        }`}
         title="Pali script and translation Language"
         aria-label="Pali script and translation Language"
       >
-        <Languages size={15} className="text-[var(--accent)]" />
+        <Languages size={14} className="text-[var(--accent)]" />
+        <span className="hidden md:inline">Language</span>
         {activeTranslationCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[var(--accent)] text-white text-[9px] flex items-center justify-center font-bold">
+          <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
             {activeTranslationCount}
           </span>
         )}

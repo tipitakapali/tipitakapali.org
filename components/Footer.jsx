@@ -54,9 +54,6 @@ export default function Footer() {
           >
             <Type size={13} className="text-[var(--accent)]" />
             <span>Size</span>
-            <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-card)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
-              {settings.fontSize}
-            </span>
           </button>
 
           {/* MAT Button */}
@@ -95,11 +92,6 @@ export default function Footer() {
           >
             <ListTree size={14} className="text-[var(--accent)]" />
             <span>Toc</span>
-            {activeTab?.toc && activeTab.toc.length > 0 && (
-              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-card)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
-                {activeTab.toc.length}
-              </span>
-            )}
           </button>
         </div>
       </footer>
