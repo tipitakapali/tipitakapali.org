@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { BookA, X, Search, Sparkles, ExternalLink, HelpCircle, Keyboard } from 'lucide-react';
-import { typeVelthuis } from '../services/transliterate';
+import { typeVelthuis, convertAnyToRoman } from '../services/transliterate';
 
 export default function DictionaryModal({ isOpen, onClose }) {
   const [word, setWord] = useState('');
@@ -47,25 +47,29 @@ export default function DictionaryModal({ isOpen, onClose }) {
             <input
               ref={inputRef}
               type="text"
-              placeholder="Type Pali word (e.g. nibbaana, dhamma, anatta)..."
+              placeholder="Type or paste in any script (e.g. nibbaana, ဓမ္မ, dhamma)..."
               value={word}
-              onChange={(e) => setWord(typeVelthuis(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+                setWord(hasNonLatin ? raw : typeVelthuis(raw));
+              }}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-3 text-xs outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
             />
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] px-0.5">
-            <div className="flex items-center gap-1.5">
-              <Keyboard size={13} className="text-[var(--accent)]" />
-              <span>Velthuis typing is supported</span>
+          <div className="flex items-center justify-between gap-3 sm:gap-4 text-[11px] text-[var(--text-muted)] px-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Keyboard size={13} className="text-[var(--accent)] shrink-0" />
+              <span className="truncate sm:whitespace-normal">Velthuis & 17 scripts input accepted</span>
             </div>
             <button
               onClick={() => setShowVelthuisHelp((prev) => !prev)}
-              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer shrink-0 ml-auto"
               title="How to type Velthuis diacritics"
             >
-              <HelpCircle size={13} />
-              <span>{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
+              <HelpCircle size={13} className="shrink-0" />
+              <span className="whitespace-nowrap">{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
             </button>
           </div>
 
@@ -129,33 +133,43 @@ export default function DictionaryModal({ isOpen, onClose }) {
             </p>
           </div>
 
-          {word.trim().length > 0 && (
-            <div className="space-y-2">
-              <div className="font-bold text-[var(--text-primary)]">
-                External Dictionary Lookups for "{word.trim()}":
+          {word.trim().length > 0 && (() => {
+            const romanWord = convertAnyToRoman(word).trim();
+            const lookupTerm = romanWord || word.trim();
+            return (
+              <div className="space-y-2">
+                <div className="font-bold text-[var(--text-primary)]">
+                  External Dictionary Lookups for &ldquo;{word.trim()}&rdquo;
+                  {romanWord && romanWord !== word.trim() && (
+                    <span className="text-[var(--text-muted)] font-normal text-xs ml-1 font-mono">
+                      ({romanWord})
+                    </span>
+                  )}
+                  :
+                </div>
+                <div className="space-y-1.5">
+                  <a
+                    href={`https://suttacentral.net/define/${encodeURIComponent(lookupTerm)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)] flex items-center justify-between transition group"
+                  >
+                    <span className="font-semibold">SuttaCentral DPD Dictionary</span>
+                    <ExternalLink size={13} className="text-[var(--text-muted)] group-hover:text-[var(--accent)]" />
+                  </a>
+                  <a
+                    href={`https://dsal.uchicago.edu/cgi-bin/app/pali_query.py?qs=${encodeURIComponent(lookupTerm)}&searchhws=yes`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)] flex items-center justify-between transition group"
+                  >
+                    <span className="font-semibold">PTS Pali-English Dictionary</span>
+                    <ExternalLink size={13} className="text-[var(--text-muted)] group-hover:text-[var(--accent)]" />
+                  </a>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <a
-                  href={`https://suttacentral.net/define/${encodeURIComponent(word.trim())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)] flex items-center justify-between transition group"
-                >
-                  <span className="font-semibold">SuttaCentral DPD Dictionary</span>
-                  <ExternalLink size={13} className="text-[var(--text-muted)] group-hover:text-[var(--accent)]" />
-                </a>
-                <a
-                  href={`https://dsal.uchicago.edu/cgi-bin/app/pali_query.py?qs=${encodeURIComponent(word.trim())}&searchhws=yes`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2.5 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)] flex items-center justify-between transition group"
-                >
-                  <span className="font-semibold">PTS Pali-English Dictionary</span>
-                  <ExternalLink size={13} className="text-[var(--text-muted)] group-hover:text-[var(--accent)]" />
-                </a>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

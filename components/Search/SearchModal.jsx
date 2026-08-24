@@ -5,7 +5,7 @@ import { Search, X, Loader2, HelpCircle, Keyboard } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
 import { searchTipitaka } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
-import { typeVelthuis } from '../../services/transliterate';
+import { typeVelthuis, convertAnyToRoman } from '../../services/transliterate';
 
 export default function SearchModal() {
   const { isSearchOpen, searchInitialQuery, closeSearchModal, openBook, updateUrlParams } =
@@ -23,10 +23,14 @@ export default function SearchModal() {
 
   useEffect(() => {
     if (isSearchOpen) {
-      const q = typeVelthuis(searchInitialQuery || '');
-      setQuery(q);
-      if (q.trim().length >= 2) {
-        performSearch(q);
+      const raw = searchInitialQuery || '';
+      const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+      const displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
+      setQuery(displayedVal);
+
+      const romanQuery = convertAnyToRoman(displayedVal).trim();
+      if (romanQuery.length >= 2) {
+        performSearch(romanQuery);
       } else {
         setResults([]);
         setTotal(0);
@@ -71,12 +75,14 @@ export default function SearchModal() {
 
   const handleInputChange = (e) => {
     const raw = e.target.value;
-    const val = typeVelthuis(raw);
-    setQuery(val);
+    const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+    const displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
+    setQuery(displayedVal);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
-    if (val.trim().length < 2) {
+    const romanQuery = convertAnyToRoman(displayedVal).trim();
+    if (romanQuery.length < 2) {
       setResults([]);
       setTotal(0);
       setLoading(false);
@@ -85,16 +91,17 @@ export default function SearchModal() {
 
     setLoading(true);
     debounceTimerRef.current = setTimeout(() => {
-      performSearch(val.trim());
+      performSearch(romanQuery);
     }, 250);
   };
 
   const handleResultClick = async (result) => {
     closeSearchModal();
+    const romanQuery = convertAnyToRoman(query).trim();
     await openBook(result.book_code, {
       targetParaIndex: result.para_index,
       targetParaNum: result.para_num,
-      highlightQuery: query.trim(),
+      highlightQuery: romanQuery,
     });
   };
 
@@ -109,7 +116,7 @@ export default function SearchModal() {
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search Pali words (e.g. kusalā, nibbāna, dukkha)..."
+              placeholder='Full text Search (e.g. kusalā, nibbāna, dhamma)...'
               value={query}
               onChange={handleInputChange}
               autoComplete="off"
@@ -138,19 +145,21 @@ export default function SearchModal() {
             </button>
           </div>
 
-          {/* Velthuis Typing Support Info & Expandable Guide */}
-          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-1.5 border-t border-[var(--border-color)]/60 px-0.5">
-            <div className="flex items-center gap-1.5">
-              <Keyboard size={13} className="text-[var(--accent)]" />
-              <span>Velthuis typing is supported</span>
+          {/* Velthuis & 17 Multi-Script Typing Support Info & Guide */}
+          <div className="flex items-center justify-between gap-3 sm:gap-4 text-[11px] text-[var(--text-muted)] pt-1.5 border-t border-[var(--border-color)]/60 px-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Keyboard size={13} className="text-[var(--accent)] shrink-0" />
+              <span className="truncate sm:whitespace-normal">
+                Velthuis & 17 scripts input accepted (Auto-converted to Roman)
+              </span>
             </div>
             <button
               onClick={() => setShowVelthuisHelp((prev) => !prev)}
-              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer shrink-0 ml-auto"
               title="How to type Velthuis diacritics"
             >
-              <HelpCircle size={13} />
-              <span>{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
+              <HelpCircle size={13} className="shrink-0" />
+              <span className="whitespace-nowrap">{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
             </button>
           </div>
 
@@ -223,7 +232,12 @@ export default function SearchModal() {
 
           {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
             <div className="search-empty-state">
-              No results found for &ldquo;<strong>{query}</strong>&rdquo;.
+              No results found for &ldquo;<strong>{query}</strong>&rdquo;
+              {convertAnyToRoman(query).trim() !== query.trim() && (
+                <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
+                  ({convertAnyToRoman(query).trim()})
+                </span>
+              )}.
             </div>
           )}
 
@@ -231,7 +245,13 @@ export default function SearchModal() {
             <>
               <div className="search-summary-bar">
                 <span>
-                  Found <strong>{total}</strong> matches (showing top {results.length}):
+                  Found <strong>{total}</strong> matches for &ldquo;<strong>{query}</strong>&rdquo;
+                  {convertAnyToRoman(query).trim() !== query.trim() && (
+                    <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
+                      ({convertAnyToRoman(query).trim()})
+                    </span>
+                  )}
+                  :
                 </span>
                 <span>Click any result to jump</span>
               </div>

@@ -49,6 +49,25 @@ export function typeVelthuis(uType) {
     .replace(/N\.\./g, "Ṅ");
 }
 
+/**
+ * Convert any of the 17 supported scripts or Velthuis input to standard Roman Pāḷi
+ */
+export function convertAnyToRoman(text) {
+  if (!text || typeof text !== 'string') return '';
+  let converted = typeVelthuis(text);
+  try {
+    const isNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(converted);
+    if (isNonLatin) {
+      const roman = CVT.convertAny(converted, CVT.Script.RO);
+      if (roman && roman.trim()) {
+        converted = roman;
+      }
+    }
+  } catch (e) {}
+  return converted;
+}
+
+
 
 // Map script aliases to CVT Script enum keys
 export const SCRIPT_MAP = {

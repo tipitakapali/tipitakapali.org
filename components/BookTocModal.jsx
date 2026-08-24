@@ -181,7 +181,8 @@ export default function BookTocModal({ isOpen, onClose }) {
               }
 
               if (isCurrentReading) {
-                itemClass += 'bg-[var(--accent-light)]! text-[var(--accent)]! font-semibold! border-l-[3.5px] border-l-[var(--accent)] shadow-xs ';
+                itemClass += 'bg-[var(--accent-light)] text-[var(--accent)] rounded-lg ring-1 ring-[var(--accent-border)]/80 shadow-xs ';
+                titleClass += ' underline decoration-[var(--accent)] decoration-[1.5px] underline-offset-[5px] font-bold text-[var(--accent)] ';
               }
 
               return (
@@ -195,18 +196,21 @@ export default function BookTocModal({ isOpen, onClose }) {
                     {level === 0 ? (
                       <BookOpen size={16} className="text-[var(--accent)] shrink-0" />
                     ) : level === 1 ? (
-                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0 shadow-xs" />
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ${isCurrentReading ? 'bg-[var(--accent)] ring-2 ring-[var(--accent)]/30' : 'bg-[var(--accent)]'}`} />
                     ) : level === 2 ? (
-                      <span className="w-2 h-2 rotate-45 rounded-[1px] bg-[var(--text-muted)] shrink-0 opacity-80" />
+                      <span className={`w-2 h-2 rotate-45 rounded-[1px] shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)] opacity-80'}`} />
                     ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]/70 shrink-0" />
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/70'}`} />
                     )}
                     <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
                   </div>
 
                   {isCurrentReading ? (
-                    <span className="text-[11px] font-bold text-[var(--accent)] shrink-0 tracking-tight flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20">
-                      <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-ping" />
+                    <span className="text-[11px] font-semibold text-[var(--accent)] shrink-0 tracking-tight flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--bg-primary)] border border-[var(--accent-border)] shadow-2xs">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]" />
+                      </span>
                       <span>Reading</span>
                     </span>
                   ) : (
