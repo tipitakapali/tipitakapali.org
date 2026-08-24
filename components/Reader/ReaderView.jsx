@@ -86,6 +86,7 @@ export default function ReaderView() {
     clearTargetScrollIntent,
     setIsSidebarOpen,
     isSidebarOpen,
+    isHeaderVisible,
     setIsHeaderVisible,
     addBookmark,
     removeBookmark,
@@ -105,6 +106,7 @@ export default function ReaderView() {
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
+  const scrollAccDeltaRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
   const prevBookCodeRef = useRef(null);
 
@@ -477,22 +479,35 @@ export default function ReaderView() {
     return () => clearTimeout(timer);
   }, [activeTab?.bookCode, activeTab?.loadedChapters, detectActiveEditionPages]);
 
-  // Direct fast scroll listener
+  // Direct fast scroll listener with hysteresis to prevent shaking/blinking
   const handleScroll = useCallback(
     (e) => {
       const top = e.target.scrollTop;
       const delta = top - lastScrollTopRef.current;
       lastScrollTopRef.current = top;
 
-      // When navigation tree is closed: hide header on scroll down, restore on scroll up
+      // When navigation tree is closed: smooth hysteresis directional auto-hide
       if (!isSidebarOpen) {
-        if (top <= 30) {
+        if (top <= 40) {
+          scrollAccDeltaRef.current = 0;
           setIsHeaderVisible(true);
-        } else if (delta > 6 && top > 60) {
-          setIsHeaderVisible(false);
-        } else if (delta < -6) {
-          setIsHeaderVisible(true);
+        } else {
+          // Accumulate delta in current scroll direction
+          if ((delta > 0 && scrollAccDeltaRef.current < 0) || (delta < 0 && scrollAccDeltaRef.current > 0)) {
+            scrollAccDeltaRef.current = delta;
+          } else {
+            scrollAccDeltaRef.current += delta;
+          }
+
+          if (scrollAccDeltaRef.current > 30 && top > 70) {
+            setIsHeaderVisible(false);
+          } else if (scrollAccDeltaRef.current < -25) {
+            setIsHeaderVisible(true);
+          }
         }
+      } else {
+        scrollAccDeltaRef.current = 0;
+        setIsHeaderVisible(true);
       }
 
       if (scrollTimeoutRef.current) {
@@ -764,15 +779,11 @@ export default function ReaderView() {
   const isContentHeaderHidden = !isHeaderVisible && !isSidebarOpen;
 
   return (
-    <main
-      className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
-      ref={containerRef}
-      onScroll={handleScroll}
-    >
-      {/* Dynamic Auto-Hiding Breadcrumbs Bar */}
+    <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
+      {/* Dynamic Auto-Hiding Breadcrumbs Bar (Outside of main scroll area to prevent jitter/shaking) */}
       <div
         ref={contentHeaderRef}
-        className={`content-header sticky top-0 z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none ${
+        className={`content-header z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none shrink-0 ${
           isContentHeaderHidden ? 'hidden-scroll' : ''
         }`}
       >
@@ -848,29 +859,35 @@ export default function ReaderView() {
         </div>
       </div>
 
-      {/* Lazy-Loaded Chapter Content Stream */}
-      <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6" onClick={handleReaderClick}>
-        <div
-          className="reader-container w-full"
-          style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
-        >
-
-          {activeTab.chapters && activeTab.chapters.length > 0 ? (
-            activeTab.chapters.map((chap) => (
-              <ChapterBlock
-                key={chap.chapter_index}
-                chapter={chap}
-                html={activeTab.loadedChapters?.[chap.chapter_index]}
-                isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
-                onVisible={handleChapterVisible}
-                paliScript={settings.paliScript}
-              />
-            ))
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: activeTab.html }} />
-          )}
+      {/* Main Scrollable Reading Container */}
+      <main
+        className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
+        ref={containerRef}
+        onScroll={handleScroll}
+      >
+        {/* Lazy-Loaded Chapter Content Stream */}
+        <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6" onClick={handleReaderClick}>
+          <div
+            className="reader-container w-full"
+            style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
+          >
+            {activeTab.chapters && activeTab.chapters.length > 0 ? (
+              activeTab.chapters.map((chap) => (
+                <ChapterBlock
+                  key={chap.chapter_index}
+                  chapter={chap}
+                  html={activeTab.loadedChapters?.[chap.chapter_index]}
+                  isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
+                  onVisible={handleChapterVisible}
+                  paliScript={settings.paliScript}
+                />
+              ))
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: activeTab.html }} />
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
