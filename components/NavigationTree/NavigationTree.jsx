@@ -370,7 +370,7 @@ export default function NavigationTree() {
 
               {/* Dock Left */}
               <button
-                className={`tree-action-btn p-1 ${
+                className={`tree-action-btn p-1 hidden md:inline-flex ${
                   dockPosition === 'left' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
                 }`}
                 onClick={() => handleSetDock('left')}
@@ -381,7 +381,7 @@ export default function NavigationTree() {
 
               {/* Float Window */}
               <button
-                className={`tree-action-btn p-1 ${
+                className={`tree-action-btn p-1 hidden md:inline-flex ${
                   dockPosition === 'float' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
                 }`}
                 onClick={() => handleSetDock('float')}
@@ -392,7 +392,7 @@ export default function NavigationTree() {
 
               {/* Dock Right */}
               <button
-                className={`tree-action-btn p-1 ${
+                className={`tree-action-btn p-1 hidden md:inline-flex ${
                   dockPosition === 'right' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
                 }`}
                 onClick={() => handleSetDock('right')}
