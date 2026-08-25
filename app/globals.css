@@ -2366,6 +2366,37 @@ div.dict-dock-panel.dock-side {
   border-bottom-color: var(--accent);
 }
 
+/* Clicked/Tapped Word Highlight in Reader & Dictionary */
+.reader-clicked-word,
+.dict-clicked-word {
+  background-color: var(--accent-light, rgba(99, 102, 241, 0.15)) !important;
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: 0 -1px;
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px var(--accent-border, rgba(99, 102, 241, 0.25));
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  display: inline;
+}
+
+[data-theme="dark"] .reader-clicked-word,
+[data-theme="dark"] .dict-clicked-word,
+.dark .reader-clicked-word,
+.dark .dict-clicked-word {
+  background-color: rgba(99, 102, 241, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.35);
+  color: inherit;
+}
+
+[data-theme="sepia"] .reader-clicked-word,
+[data-theme="sepia"] .dict-clicked-word {
+  background-color: rgba(180, 83, 9, 0.2) !important;
+  box-shadow: 0 0 0 1px rgba(180, 83, 9, 0.25);
+  color: inherit;
+}
+
 .inflection-highlight {
   background-color: var(--accent-light) !important;
   color: var(--accent) !important;

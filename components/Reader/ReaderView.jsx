@@ -94,6 +94,135 @@ const ChapterBlock = memo(function ChapterBlock({
   );
 });
 
+const STORAGE_KEY_CLICKED_WORDS = 'tipitaka_last_clicked_words_v1';
+
+// Helper to clear any clicked word highlight in Reader
+function clearClickedWordHighlight(root = typeof document !== 'undefined' ? document : null) {
+  if (!root) return;
+  const elements = root.querySelectorAll('.reader-clicked-word');
+  elements.forEach((el) => {
+    const parent = el.parentNode;
+    if (parent) {
+      while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el);
+      }
+      parent.removeChild(el);
+      parent.normalize();
+    }
+  });
+}
+
+// Helper to highlight a DOM range with dashed accent underline and background
+function highlightRangeInReader(range) {
+  if (!range) return;
+  clearClickedWordHighlight();
+  try {
+    const span = document.createElement('span');
+    span.className = 'reader-clicked-word';
+    span.setAttribute('data-clicked-word', 'true');
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+  } catch (err) {
+    console.warn('Could not highlight clicked word range:', err);
+  }
+}
+
+// Helper to compute exact character offset inside a parent element
+function getCharOffsetInElement(parentEl, targetNode, targetOffset) {
+  if (!parentEl || !targetNode) return 0;
+  let offset = 0;
+  const walker = document.createTreeWalker(parentEl, NodeFilter.SHOW_TEXT, null, false);
+  let current;
+  while ((current = walker.nextNode())) {
+    if (current === targetNode) {
+      return offset + targetOffset;
+    }
+    offset += current.textContent.length;
+  }
+  return offset;
+}
+
+// Helper to construct a DOM Range from character offset and length in a parent element
+function createRangeFromCharOffset(parentEl, targetOffset, length) {
+  if (!parentEl) return null;
+  let offset = 0;
+  let startNode = null;
+  let startOffsetInNode = 0;
+  let endNode = null;
+  let endOffsetInNode = 0;
+
+  const targetEnd = targetOffset + length;
+  const walker = document.createTreeWalker(parentEl, NodeFilter.SHOW_TEXT, null, false);
+  let current;
+
+  while ((current = walker.nextNode())) {
+    const nodeLen = current.textContent.length;
+    if (!startNode && offset + nodeLen >= targetOffset) {
+      startNode = current;
+      startOffsetInNode = targetOffset - offset;
+    }
+    if (startNode && offset + nodeLen >= targetEnd) {
+      endNode = current;
+      endOffsetInNode = targetEnd - offset;
+      break;
+    }
+    offset += nodeLen;
+  }
+
+  if (startNode && endNode) {
+    try {
+      const range = document.createRange();
+      range.setStart(startNode, startOffsetInNode);
+      range.setEnd(endNode, endOffsetInNode);
+      return range;
+    } catch (e) {}
+  }
+  return null;
+}
+
+// Helper to find and highlight a stored word inside a book container
+function restoreClickedWordHighlight(bookCode, record, container = document) {
+  if (!bookCode || !record || !container) return false;
+  const { pIndex, paraNum, chapIdx, word, charOffset, length } = record;
+
+  // 1. Try finding by data-pindex
+  let pEl = null;
+  if (pIndex) {
+    pEl = container.querySelector(`p[data-pindex="${pIndex}"]`);
+  }
+  if (!pEl && paraNum) {
+    pEl = container.querySelector(`p[data-para="${paraNum}"]`);
+  }
+  if (!pEl && chapIdx !== undefined) {
+    pEl = container.querySelector(`#chap-${chapIdx} p`);
+  }
+
+  if (pEl) {
+    // Try exact character offset
+    if (charOffset !== undefined && length) {
+      const range = createRangeFromCharOffset(pEl, charOffset, length);
+      if (range && range.toString().trim()) {
+        highlightRangeInReader(range);
+        return true;
+      }
+    }
+
+    // Fallback: search word inside this paragraph
+    if (word) {
+      const pText = pEl.textContent || '';
+      const idx = pText.indexOf(word);
+      if (idx !== -1) {
+        const range = createRangeFromCharOffset(pEl, idx, word.length);
+        if (range) {
+          highlightRangeInReader(range);
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
 
 export default function ReaderView() {
   const {
@@ -130,6 +259,41 @@ export default function ReaderView() {
   const scrollAccDeltaRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
   const prevBookCodeRef = useRef(null);
+  const clickedWordsByBookRef = useRef({});
+
+  // Initialize clicked words from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CLICKED_WORDS);
+      if (saved) {
+        clickedWordsByBookRef.current = JSON.parse(saved);
+      }
+    } catch (e) {}
+  }, []);
+
+  const recordClickedWord = useCallback((bookCode, record) => {
+    if (!bookCode || !record) return;
+    clickedWordsByBookRef.current[bookCode] = record;
+    try {
+      localStorage.setItem(STORAGE_KEY_CLICKED_WORDS, JSON.stringify(clickedWordsByBookRef.current));
+    } catch (e) {}
+  }, []);
+
+  // Restore highlight when switching books / tabs or when chapters render
+  useEffect(() => {
+    if (!activeTab?.bookCode) return;
+    const bookCode = activeTab.bookCode;
+    const record = clickedWordsByBookRef.current[bookCode];
+
+    clearClickedWordHighlight();
+
+    if (record) {
+      const timer = setTimeout(() => {
+        restoreClickedWordHighlight(bookCode, record, containerRef.current || document);
+      }, 70);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab?.bookCode, activeTab?.currentChapterIdx, settings?.paliScript]);
 
   // Synchronously restore scroll position BEFORE browser paint (Zero jumping / bouncing!)
   useLayoutEffect(() => {
@@ -709,12 +873,36 @@ export default function ReaderView() {
           const rawWord = text.slice(start, end);
           const wordToLookup = cleanDictionaryQuery(rawWord);
           if (wordToLookup && wordToLookup.length >= 2) {
+            const pEl = node.parentElement?.closest('p[data-pindex], p[data-para]') || e.target.closest('p[data-pindex], p[data-para]');
+            const pIndex = pEl?.getAttribute('data-pindex') || null;
+            const pNum = pEl?.getAttribute('data-para') || null;
+            const chapEl = pEl?.closest('[data-chapter]');
+            const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+            const charOffset = pEl ? getCharOffsetInElement(pEl, node, start) : start;
+            const length = end - start;
+
+            const wordRange = document.createRange();
+            wordRange.setStart(node, start);
+            wordRange.setEnd(node, end);
+            highlightRangeInReader(wordRange);
+
+            if (activeTab?.bookCode) {
+              recordClickedWord(activeTab.bookCode, {
+                chapIdx,
+                pIndex,
+                paraNum: pNum,
+                word: rawWord,
+                charOffset,
+                length,
+              });
+            }
+
             openDictionary(wordToLookup);
           }
         }
       }
     }
-  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, settings?.dictLookupTrigger, openDictionary]);
+  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, settings?.dictLookupTrigger, openDictionary, recordClickedWord]);
 
   const handleReaderDoubleClick = useCallback((e) => {
     // 1. Check window selection first
@@ -723,6 +911,12 @@ export default function ReaderView() {
 
     if (selection && selection.length > 0 && selection.length < 50) {
       wordToLookup = cleanDictionaryQuery(selection);
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0).cloneRange();
+        highlightRangeInReader(range);
+        sel.removeAllRanges();
+      }
     } else {
       // 2. Extract word at click point
       let range = null;
@@ -751,13 +945,38 @@ export default function ReaderView() {
         }
         const rawWord = text.slice(start, end);
         wordToLookup = cleanDictionaryQuery(rawWord);
+        if (wordToLookup && wordToLookup.length >= 2) {
+          const pEl = node.parentElement?.closest('p[data-pindex], p[data-para]') || e.target.closest('p[data-pindex], p[data-para]');
+          const pIndex = pEl?.getAttribute('data-pindex') || null;
+          const pNum = pEl?.getAttribute('data-para') || null;
+          const chapEl = pEl?.closest('[data-chapter]');
+          const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+          const charOffset = pEl ? getCharOffsetInElement(pEl, node, start) : start;
+          const length = end - start;
+
+          const wordRange = document.createRange();
+          wordRange.setStart(node, start);
+          wordRange.setEnd(node, end);
+          highlightRangeInReader(wordRange);
+
+          if (activeTab?.bookCode) {
+            recordClickedWord(activeTab.bookCode, {
+              chapIdx,
+              pIndex,
+              paraNum: pNum,
+              word: rawWord,
+              charOffset,
+              length,
+            });
+          }
+        }
       }
     }
 
     if (wordToLookup && wordToLookup.length >= 2) {
       openDictionary(wordToLookup);
     }
-  }, [openDictionary]);
+  }, [openDictionary, activeTab, recordClickedWord]);
 
   const handleBreadcrumbClick = () => {
     document.body.classList.remove('zen-mode');
