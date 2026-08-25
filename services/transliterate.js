@@ -174,20 +174,34 @@ export function convertPaliScript(text, toScript) {
   }
 }
 
+const htmlTransliterationCache = new Map();
+const MAX_HTML_CACHE = 80;
+
 export function transliterateHtml(html, targetScript = "roman") {
   if (!html || !targetScript) return html;
   const targetKey = SCRIPT_MAP[targetScript.toString().toLowerCase()];
   if (!targetKey || targetKey === "RO") return html;
 
+  const cacheKey = `${targetKey}_${html.length}_${html.slice(0, 50)}`;
+  const cached = htmlTransliterationCache.get(cacheKey);
+  if (cached) return cached;
+
   // Transliterate only text nodes outside of HTML tags & entities,
   // while preserving <span class="pb" ...>[...]</span> page number indicators completely untouched
-  return html.replace(
+  const result = html.replace(
     /(<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>[\s\S]*?<\/span>|<[^>]*>|&[a-z0-9#]+;)|([^<>&]+)/gi,
     (match, nonTransliterated, textNode) => {
       if (nonTransliterated) return nonTransliterated;
       return convertPaliScript(textNode, targetScript);
     }
   );
+
+  if (htmlTransliterationCache.size >= MAX_HTML_CACHE) {
+    const firstKey = htmlTransliterationCache.keys().next().value;
+    htmlTransliterationCache.delete(firstKey);
+  }
+  htmlTransliterationCache.set(cacheKey, result);
+  return result;
 }
 
 export function highlightHtmlText(

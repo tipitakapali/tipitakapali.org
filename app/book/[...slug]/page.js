@@ -24,8 +24,9 @@ export async function generateMetadata({ params, searchParams }) {
   }
 
   try {
-    const res = await fetch(`http://127.0.0.1:5000/api/book/${encodeURIComponent(bookCode)}`, {
+    const res = await fetch(`http://127.0.0.1:5000/api/book/${encodeURIComponent(bookCode)}?chapter=0&buffer=0`, {
       next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(1200),
     });
     if (res.ok) {
       const data = await res.json();

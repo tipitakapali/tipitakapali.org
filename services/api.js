@@ -1,5 +1,5 @@
-// Development Mode Flag: Set to false to disable all caching during active development
-export const ENABLE_CLIENT_CACHE = false;
+// Client-Side Memory Cache Toggle: Enabled for instant sub-millisecond tab switching & navigation
+export const ENABLE_CLIENT_CACHE = true;
 
 // Client-side Memory Cache & Request Deduplication for Ultra-Fast Navigation
 const cache = new Map();
