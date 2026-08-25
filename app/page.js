@@ -8,6 +8,7 @@ import ReaderView from '../components/Reader/ReaderView';
 import Footer from '../components/Footer';
 import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
+import DictionaryModal from '../components/DictionaryModal';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
@@ -217,6 +218,7 @@ export function MainAppContent({ params: rawParams }) {
       <Footer />
       <SearchModal />
       <SettingsModal />
+      <DictionaryModal />
     </div>
 
   );

@@ -154,6 +154,30 @@ export function DictionaryProvider({ children }) {
     setIsOpen(false);
   }, []);
 
+  // Global keyboard shortcut ('d' or 'D' when reading, Esc to close)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+        return;
+      }
+      const tag = e.target.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
+        return;
+      }
+      if ((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const selection = window.getSelection()?.toString()?.trim();
+        if (selection && selection.length > 0 && selection.length < 50) {
+          openDictionary(selection);
+        } else {
+          openDictionary();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, openDictionary]);
+
   // History navigation
   const goBack = useCallback(() => {
     if (historyIndex > 0) {

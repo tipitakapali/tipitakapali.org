@@ -107,22 +107,56 @@ function getFChar(word, dbKey, useSplitter = false) {
   return prefix;
 }
 
+const DPD_FEEDBACK_TEMPLATE = `<p>ID <b>#tpo_id@ #tpo_word@</b></p><p>Digital Pāḷi Dictionary is a work in progress, made available for testing and feedback purposes.</p><p><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org" target="_blank">Add a missing word</a><span>. Please use this </span><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org" target="_blank">online form</a> to add missing words, especially from Vinaya, commentaries, and other later texts. If you prefer to work offline, here is a <a class="link" href="https://github.com/digitalpalidictionary/dpd-db/raw/main/docs/DPD%20Add%20Words.xlsx" download="true" target="_blank">spreadsheet to download</a><span>, fill in and submit.</span></p><p><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=#tpo_link@&entry.1433863141=Tipitakapali.org" target="_blank">Correct a mistake</a><span>. Did you spot a mistake in the dictionary? Please report it. It generally takes less than a minute and your corrections and suggestions help to improve the quality of this dictionary for everyone who uses it.</span></p><p><a class="link" href="https://digitalpalidictionary.github.io/" target="_blank">Visit the DPD website</a><span>. Get more detailed information about installation and upgrades, advanced settings and features.</span></p><p><a class="link" href="mailto:digitalpalidictionary@gmail.com?subject=Help%20with%20DPD">Help with coding or Pāḷi</a><span>. If you'd like to support the project, please get in touch.</span></p>`;
+
+const reDPDLinks = [
+  ['https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform', 'L#0@'],
+  ['https://docs.google.com/forms/d/e/1FAIpQLSdAL2PzavyrtXgGmtNrZAMyh3hV6g3fU0chxhWFxunQEZtH0g/viewform', 'L#1@'],
+  ['https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform', 'L#2@'],
+  ['https://docs.google.com/forms/d/e/1FAIpQLSfKUBx-icfRCWmhHqUwzX60BVQE21s_NERNfU2VvbjEfE371A/viewform', 'L#3@'],
+  ['https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform', 'L#4@'],
+];
+
+function restoreMinifiedLinksAndFeedback(html) {
+  if (!html || typeof html !== 'string') return '';
+  const regex = /#z3@(.*?)_fb@/g;
+  let m;
+  const feedbackMatchIds = [];
+  while ((m = regex.exec(html)) !== null) {
+    feedbackMatchIds.push([m[0], m[1]]);
+  }
+
+  feedbackMatchIds.forEach(([entireMatchStr, idAndLemma]) => {
+    const [id, lemma] = (idAndLemma || '').split('=');
+    let st = DPD_FEEDBACK_TEMPLATE.replaceAll('#tpo_id@', id || '');
+    st = st.replaceAll('#tpo_word@', lemma || '');
+    st = st.replaceAll('#tpo_link@', encodeURIComponent(lemma || ''));
+    html = html.replace(entireMatchStr, st);
+  });
+
+  reDPDLinks.forEach(([link, code]) => {
+    html = html.replaceAll(code, link);
+  });
+
+  return html;
+}
+
 // Restore DPD encoded json/family data
 function restoreDpdDefi(df) {
   if (!df || typeof df !== 'string') return '';
-  if (!df.startsWith('@')) return df;
+  if (!df.startsWith('@')) return restoreMinifiedLinksAndFeedback(df);
 
   const secondIndex = df.indexOf('@', 1);
-  if (secondIndex <= 0) return df;
+  if (secondIndex <= 0) return restoreMinifiedLinksAndFeedback(df);
 
   const jsonString = df.slice(1, secondIndex);
   let defi = df.slice(secondIndex + 1);
 
-  if (!goldendict) return defi;
+  if (!goldendict) return restoreMinifiedLinksAndFeedback(defi);
 
   try {
     const fData = JSON.parse(jsonString);
-    if (Object.keys(fData).length <= 2) return defi;
+    if (Object.keys(fData).length <= 2) return restoreMinifiedLinksAndFeedback(defi);
 
     const lemma = fData.lemma;
     if (fData.family_compounds && goldendict.makeFamilyCompoundHtml) {
@@ -144,7 +178,7 @@ function restoreDpdDefi(df) {
     console.error('[DictEngine] Error restoring DPD family data:', e.message);
   }
 
-  return defi;
+  return restoreMinifiedLinksAndFeedback(defi);
 }
 
 // Query synonyms for word

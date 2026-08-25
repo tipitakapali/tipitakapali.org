@@ -26,6 +26,54 @@ import {
 import { useDictionary } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertAnyToRoman, convertPaliScript, transliterateHtml } from '../services/transliterate';
+import { fetchDictionaryInflection } from '../services/api';
+
+// Helper to highlight exact matching inflections in table cells (CC BY-NC-SA 4.0 DPD)
+function highlightInflections(searchTerm, container) {
+  if (!searchTerm || !container) return;
+  const normalizedSearch = searchTerm.toLowerCase().trim();
+  const inflectionTables = container.querySelectorAll('table.inflection');
+
+  inflectionTables.forEach((table) => {
+    const cells = table.querySelectorAll('td');
+    cells.forEach((cell) => {
+      const cellHTML = cell.innerHTML;
+      const parts = cellHTML.split(/<br\s*\/?>/i);
+      let modified = false;
+
+      const newParts = parts.map((part) => {
+        const tempElement = document.createElement('div');
+        tempElement.innerHTML = part;
+        const partText = (tempElement.textContent || '').toLowerCase().trim();
+
+        if (partText === normalizedSearch) {
+          modified = true;
+          return `<span class="inflection-highlight font-bold text-[var(--accent)] bg-[var(--accent-light)] px-1 py-0.5 rounded shadow-xs">${part}</span>`;
+        }
+        return part;
+      });
+
+      if (modified) {
+        cell.innerHTML = newParts.join('<br>');
+      }
+    });
+  });
+}
+
+// Helper to transliterate table cells into reader's target script
+function convertPaliTableCells(container, selectTable = 'table.inflection', onlyCell = 'td', removeBoldTag = false, targetScript = 'roman') {
+  if (!container || !targetScript || targetScript === 'roman') return;
+  const tables = container.querySelectorAll(selectTable);
+  tables.forEach((table) => {
+    const cells = table.querySelectorAll(onlyCell);
+    cells.forEach((cell) => {
+      const converted = convertPaliScript(cell.textContent || '', targetScript);
+      if (converted) {
+        cell.innerHTML = `<b>${converted}</b>`;
+      }
+    });
+  });
+}
 
 export default function DictionaryModal() {
   const {
@@ -40,7 +88,6 @@ export default function DictionaryModal() {
     lookupData,
     isLoading,
     error,
-    inflectionCache,
     openDictionary,
     closeDictionary,
     performLookup,
@@ -50,7 +97,6 @@ export default function DictionaryModal() {
     setDockMode,
     setFontSizeMultiplier,
     setDisplayWord,
-    toggleInflection,
   } = useDictionary();
 
   const { settings } = useThemeSettings();
@@ -58,6 +104,8 @@ export default function DictionaryModal() {
   const [localInput, setLocalInput] = useState('');
   const inputRef = useRef(null);
   const contentContainerRef = useRef(null);
+
+  const currentScript = settings?.paliScript || 'roman';
 
   // Synchronize local input with context display word
   useEffect(() => {
@@ -74,6 +122,42 @@ export default function DictionaryModal() {
     }
   }, [isOpen]);
 
+  // Register global window.playAudio for inline DPD audio buttons (Fix 3)
+  useEffect(() => {
+    window.playAudio = function (headword, buttonElement) {
+      if (!headword) return;
+      const gender = 'male';
+      const baseUrl = 'https://www.dpdict.net/audio/';
+      const audioUrl = `${baseUrl}${encodeURIComponent(headword)}?gender=${gender}`;
+      const audio = new Audio(audioUrl);
+
+      audio.addEventListener('error', () => {
+        if (buttonElement) {
+          buttonElement.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14px" height="14px" fill="none" stroke="currentColor" stroke-width="2" class="text-rose-500 inline-block">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          `;
+          buttonElement.classList.add('disabled');
+          buttonElement.style.pointerEvents = 'none';
+          buttonElement.title = 'Audio not found';
+          buttonElement.removeAttribute('onclick');
+        }
+      });
+
+      audio.play().catch((err) => {
+        console.warn('Audio play failed:', err);
+      });
+    };
+
+    return () => {
+      try {
+        delete window.playAudio;
+      } catch (e) {}
+    };
+  }, []);
+
   // Handle word search submission
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -82,43 +166,111 @@ export default function DictionaryModal() {
     }
   };
 
-  // Intercept clicks inside definitions (DPD buttons, expandable sections, word click-to-lookup)
+  // Intercept clicks inside definitions (DPD buttons, inflection loader, auto-collapse, word jump)
   const handleContentClick = useCallback(
     async (e) => {
-      // 1. Handle DPD interactive button clicks (declension, conjugation, root family, compound family, etc.)
+      // 1. Handle Audio play button clicks
+      const playBtn = e.target.closest('a.dpd-button.play, button.play, a.play');
+      if (playBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const onclickAttr = playBtn.getAttribute('onclick') || '';
+        const match = onclickAttr.match(/playAudio\(['"]([^'"]+)['"]/);
+        const headword = match ? match[1] : queryWord;
+        if (typeof window.playAudio === 'function' && headword) {
+          window.playAudio(headword, playBtn);
+        }
+        return;
+      }
+
+      // 2. Handle DPD interactive button clicks (grammar, examples, declension, conjugation, families, fb)
       const buttonEl = e.target.closest('a.dpd-button, a.button, button[data-target]');
       if (buttonEl) {
         e.preventDefault();
         e.stopPropagation();
 
         const targetId = buttonEl.getAttribute('data-target');
-        if (targetId) {
-          const targetDiv = contentContainerRef.current?.querySelector(`#${CSS.escape(targetId)}`);
-          if (targetDiv) {
-            const isHidden = targetDiv.classList.contains('hidden');
-            if (isHidden) {
-              // If it's a declension or conjugation that hasn't been fetched yet
-              if (
-                (targetId.startsWith('declension_') || targetId.startsWith('conjugation_')) &&
-                targetDiv.innerHTML.trim().length === 0
-              ) {
-                targetDiv.innerHTML = '<div class="p-3 text-xs text-[var(--text-muted)] animate-pulse">Loading inflection table...</div>';
-                toggleInflection(targetId);
-              }
-              targetDiv.classList.remove('hidden');
-              buttonEl.classList.add('active');
-            } else {
-              targetDiv.classList.add('hidden');
-              buttonEl.classList.remove('active');
+        if (!targetId) return;
+
+        // Find enclosing entry container (div.dpd or section.dp9)
+        const entryEl =
+          buttonEl.closest('div.dpd') ||
+          buttonEl.closest('section.dp9') ||
+          buttonEl.closest('.dict-entry-box') ||
+          contentContainerRef.current;
+
+        const targetDiv = entryEl?.querySelector(`#${CSS.escape(targetId)}`) || document.getElementById(targetId);
+        if (!targetDiv) return;
+
+        const isCurrentlyHidden = targetDiv.classList.contains('hidden');
+
+        // Fix 4: Auto-collapse all other button data in this entry so user doesn't need to scroll up and down
+        if (entryEl) {
+          const allContentDivs = entryEl.querySelectorAll(
+            '[id^="grammar_"], [id^="examples_"], [id^="declension_"], [id^="conjugation_"], [id^="family_"], [id^="feedback_"], div.content'
+          );
+          allContentDivs.forEach((d) => {
+            if (d !== targetDiv) {
+              d.classList.add('hidden');
             }
-          } else if (targetId.startsWith('declension_') || targetId.startsWith('conjugation_')) {
-            toggleInflection(targetId);
+          });
+
+          const allButtons = entryEl.querySelectorAll('a.dpd-button, a.button');
+          allButtons.forEach((b) => {
+            if (b !== buttonEl) {
+              b.classList.remove('active');
+            }
+          });
+        }
+
+        // Toggle state of clicked button & content
+        if (isCurrentlyHidden) {
+          // Fix 2: Fetch and render inflection table if empty or loading
+          if (
+            (targetId.startsWith('declension_') || targetId.startsWith('conjugation_')) &&
+            (targetDiv.innerHTML.trim().length < 10 || targetDiv.innerHTML.includes('Loading'))
+          ) {
+            targetDiv.innerHTML = '<div class="p-3 text-xs text-[var(--text-muted)] animate-pulse">Loading inflection table...</div>';
+            targetDiv.classList.remove('hidden');
+            buttonEl.classList.add('active');
+
+            try {
+              const res = await fetchDictionaryInflection(targetId);
+              if (res && res.html) {
+                targetDiv.innerHTML = res.html;
+
+                // Highlight matching search word in table
+                if (queryWord) {
+                  highlightInflections(queryWord, targetDiv);
+                }
+
+                // Transliterate if not Roman
+                if (currentScript && currentScript !== 'roman') {
+                  convertPaliTableCells(targetDiv, 'table.inflection', 'td', true, currentScript);
+                }
+              } else {
+                targetDiv.innerHTML = '<div class="p-2.5 text-xs text-rose-500">Inflection table not available.</div>';
+              }
+            } catch (err) {
+              targetDiv.innerHTML = `<div class="p-2.5 text-xs text-rose-500">Failed to load: ${err.message}</div>`;
+            }
+          } else {
+            targetDiv.classList.remove('hidden');
+            buttonEl.classList.add('active');
           }
+
+          // Smoothly scroll target content into view
+          setTimeout(() => {
+            targetDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 30);
+        } else {
+          targetDiv.classList.add('hidden');
+          buttonEl.classList.remove('active');
         }
         return;
       }
 
-      // 2. Handle clicks on clickable terms / jumps inside definitions
+      // 3. Handle clicks on clickable terms / jumps inside definitions (Recursive lookup)
       const jumpLink = e.target.closest('a.jump, a.link, span.p1w, span.p2w, span.p3w, .dec-term');
       if (jumpLink) {
         const text = jumpLink.textContent?.trim();
@@ -132,7 +284,7 @@ export default function DictionaryModal() {
         }
       }
     },
-    [toggleInflection, performLookup]
+    [queryWord, currentScript, performLookup]
   );
 
   // Dictionary tab specifications
@@ -161,8 +313,6 @@ export default function DictionaryModal() {
   }, [lookupData, activeDictTab]);
 
   if (!isOpen) return null;
-
-  const currentScript = settings?.paliScript || 'roman';
 
   return (
     <div
@@ -203,7 +353,7 @@ export default function DictionaryModal() {
               <button
                 onClick={goBack}
                 disabled={historyIndex <= 0}
-                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
                 title="Previous lookup (Back)"
               >
                 <ArrowLeft size={13} />
@@ -211,7 +361,7 @@ export default function DictionaryModal() {
               <button
                 onClick={goForward}
                 disabled={historyIndex >= history.length - 1}
-                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
                 title="Next lookup (Forward)"
               >
                 <ArrowRight size={13} />
@@ -222,7 +372,7 @@ export default function DictionaryModal() {
             <div className="hidden sm:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
               <button
                 onClick={() => setFontSizeMultiplier((f) => f - 0.1)}
-                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition"
+                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
                 title="Smaller font"
               >
                 A-
@@ -232,7 +382,7 @@ export default function DictionaryModal() {
               </span>
               <button
                 onClick={() => setFontSizeMultiplier((f) => f + 0.1)}
-                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition"
+                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
                 title="Larger font"
               >
                 A+
@@ -243,21 +393,21 @@ export default function DictionaryModal() {
             <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
               <button
                 onClick={() => setDockMode('modal')}
-                className={`p-1 rounded transition ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
                 title="Center Modal mode"
               >
                 <Maximize2 size={13} />
               </button>
               <button
                 onClick={() => setDockMode('bottom')}
-                className={`p-1 rounded transition ${dockMode === 'bottom' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'bottom' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
                 title="Bottom Drawer mode"
               >
                 <PanelBottom size={13} />
               </button>
               <button
                 onClick={() => setDockMode('side')}
-                className={`p-1 rounded transition ${dockMode === 'side' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
                 title="Right Side Panel mode"
               >
                 <PanelRight size={13} />
@@ -267,7 +417,7 @@ export default function DictionaryModal() {
             {/* Close Button */}
             <button
               onClick={closeDictionary}
-              className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+              className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
               title="Close dictionary (Esc)"
             >
               <X size={17} />
@@ -304,7 +454,7 @@ export default function DictionaryModal() {
                     setDisplayWord('');
                     inputRef.current?.focus();
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
                 >
                   <X size={14} />
                 </button>
@@ -314,7 +464,7 @@ export default function DictionaryModal() {
             <button
               type="submit"
               disabled={isLoading || !localInput.trim()}
-              className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:pointer-events-none shadow-xs transition shrink-0"
+              className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:pointer-events-none shadow-xs transition shrink-0 cursor-pointer"
             >
               {isLoading ? 'Searching...' : 'Search'}
             </button>
@@ -445,7 +595,7 @@ export default function DictionaryModal() {
                 return (
                   <div
                     key={idx}
-                    className="p-3.5 sm:p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition"
+                    className="dict-entry-box p-3.5 sm:p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition"
                   >
                     {item.source && (
                       <div className="text-[10.5px] font-semibold text-[var(--accent)] mb-1.5 pb-1 border-b border-[var(--border-color)] flex items-center justify-between">

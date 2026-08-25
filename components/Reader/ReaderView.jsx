@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, BookA } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
@@ -920,6 +920,15 @@ export default function ReaderView() {
               </div>
             </div>
           )}
+
+          {/* Quick Dictionary Button */}
+          <button
+            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+            onClick={() => openDictionary()}
+            title="Open Pāḷi Dictionary (Double click word or press D)"
+          >
+            <BookA size={14} />
+          </button>
 
           {/* Quick Bookmark Button in Breadcrumb Header */}
           <button

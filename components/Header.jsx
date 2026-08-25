@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Menu, Search, Settings, Bookmark, HelpCircle, BookA } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import HelpModal from './HelpModal';
-import DictionaryModal from './DictionaryModal';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
 import { useDictionary } from '../context/DictionaryContext';
@@ -217,7 +216,6 @@ export default function Header() {
       </div>
 
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-      <DictionaryModal />
     </header>
   );
 }
