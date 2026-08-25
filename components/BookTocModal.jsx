@@ -90,6 +90,28 @@ export default function BookTocModal({ isOpen, onClose }) {
 
   const tocList = activeTab?.toc || [];
 
+  // Determine Piṭaka category (Vinaya, Sutta, Abhidhamma, Añña) for coloring
+  const currentPitaka = useMemo(() => {
+    if (!activeTab) return null;
+    const code = (activeTab.bookCode || '').toLowerCase();
+    const nikaya = (activeTab.nikaya || '').toLowerCase();
+    const cat = (activeTab.category || '').toLowerCase();
+
+    if (code.startsWith('vin') || nikaya.includes('vinaya') || cat.includes('vinaya')) return 'vinaya';
+    if (code.startsWith('s0') || nikaya.includes('sutta') || cat.includes('sutta')) return 'sutta';
+    if (
+      code.startsWith('abh') ||
+      code.startsWith('e0') ||
+      code.startsWith('y0') ||
+      code.startsWith('p0') ||
+      nikaya.includes('abhidhamma') ||
+      cat.includes('abhidhamma')
+    ) {
+      return 'abhidhamma';
+    }
+    return 'anna';
+  }, [activeTab]);
+
   const filteredToc = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
     if (!q) {
@@ -208,8 +230,8 @@ export default function BookTocModal({ isOpen, onClose }) {
               }
 
               if (isCurrentReading) {
-                itemClass += 'bg-[var(--accent-light)] text-[var(--accent)] rounded-lg ring-1 ring-[var(--accent-border)]/80 shadow-xs ';
-                titleClass += ' font-bold text-[var(--accent)] ';
+                itemClass += `toc-row-active ${currentPitaka ? `toc-row-active-${currentPitaka}` : 'toc-row-active-default'} rounded-lg shadow-xs `;
+                titleClass += ` font-bold ${currentPitaka ? `toc-title-${currentPitaka}` : 'text-[var(--accent)]'} `;
               }
 
               return (
@@ -221,33 +243,37 @@ export default function BookTocModal({ isOpen, onClose }) {
                 >
                   <div className="flex items-center gap-2.5 overflow-hidden mr-2">
                     {depth === 0 ? (
-                      <BookOpen size={15} className="text-[var(--accent)] shrink-0" />
+                      <BookOpen size={15} className={currentPitaka ? `tree-icon-${currentPitaka}` : 'text-[var(--accent)] shrink-0'} />
                     ) : depth === 1 ? (
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
                           isCurrentReading
-                            ? 'bg-[var(--accent)] ring-2 ring-[var(--accent)]/30'
-                            : 'bg-[var(--accent)]'
+                            ? `toc-bullet-dot ${currentPitaka ? `toc-dot-${currentPitaka}` : ''} ring-2 ring-current/30`
+                            : `toc-bullet-dot ${currentPitaka ? `toc-dot-${currentPitaka}` : ''}`
                         }`}
                       />
                     ) : depth === 2 ? (
                       <span
                         className={`w-2 h-2 rounded-full border-[1.5px] shrink-0 transition-colors ${
                           isCurrentReading
-                            ? 'border-[var(--accent)] bg-[var(--accent)]'
+                            ? `toc-bullet-ring ${currentPitaka ? `toc-dot-${currentPitaka}` : ''}`
                             : 'border-[var(--text-secondary)] bg-transparent'
                         }`}
                       />
                     ) : depth === 3 ? (
                       <span
                         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]'
+                          isCurrentReading
+                            ? `toc-bullet-dot ${currentPitaka ? `toc-dot-${currentPitaka}` : ''}`
+                            : 'bg-[var(--text-muted)]'
                         }`}
                       />
                     ) : (
                       <span
                         className={`w-1 h-1 rounded-full shrink-0 ${
-                          isCurrentReading ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/50'
+                          isCurrentReading
+                            ? `toc-bullet-dot ${currentPitaka ? `toc-dot-${currentPitaka}` : ''}`
+                            : 'bg-[var(--text-muted)]/50'
                         }`}
                       />
                     )}
@@ -255,10 +281,10 @@ export default function BookTocModal({ isOpen, onClose }) {
                   </div>
 
                   {isCurrentReading ? (
-                    <span className="text-[11px] font-semibold text-[var(--accent)] shrink-0 tracking-tight flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--bg-primary)] border border-[var(--accent-border)] shadow-2xs">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent)]" />
+                    <span className={`toc-reading-badge toc-reading-${currentPitaka || 'default'} text-[11px] font-semibold shrink-0 tracking-tight flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--bg-primary)] border shadow-2xs`}>
+                      <span className={`tree-ping-wrapper relative flex h-2 w-2 ${currentPitaka ? `tree-ping-${currentPitaka}` : 'tree-ping-default'}`}>
+                        <span className="tree-ping-dot-radar animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" />
+                        <span className="tree-ping-dot-core relative inline-flex rounded-full h-2 w-2" />
                       </span>
                       <span>Reading</span>
                     </span>

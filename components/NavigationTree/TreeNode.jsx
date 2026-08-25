@@ -167,10 +167,11 @@ const TreeNode = memo(function TreeNode({
 
   const renderIcon = () => {
     if (isActiveChapter) {
+      const pitakaPingCls = currentPitaka ? `tree-ping-${currentPitaka}` : 'tree-ping-default';
       return (
-        <span className="relative flex h-2.5 w-2.5 mx-0.5" title="Currently Reading Chapter">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75" />
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)]" />
+        <span className={`tree-ping-wrapper relative flex h-2.5 w-2.5 mx-0.5 ${pitakaPingCls}`} title="Currently Reading Chapter">
+          <span className="tree-ping-dot-radar animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" />
+          <span className="tree-ping-dot-core relative inline-flex rounded-full h-2.5 w-2.5" />
         </span>
       );
     }
@@ -244,18 +245,6 @@ const TreeNode = memo(function TreeNode({
             </span>
           )}
         </span>
-
-        {depth === 0 && currentPitaka && (
-          <span className={`tree-pitaka-badge tree-badge-${currentPitaka}`}>
-            {currentPitaka === 'vinaya'
-              ? 'Vinaya'
-              : currentPitaka === 'sutta'
-              ? 'Sutta'
-              : currentPitaka === 'abhidhamma'
-              ? 'Abhidhamma'
-              : 'Añña'}
-          </span>
-        )}
       </div>
 
       {hasChildren && isExpanded && (

@@ -411,14 +411,15 @@ export default function NavigationTree() {
 
               {/* Hide / Close Button */}
               <button
-                className="tree-action-btn p-1 hover:text-red-500 transition"
+                className="tree-action-btn tree-action-close p-1 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white transition"
                 onClick={() => {
                   setIsSidebarOpen(false);
                   setIsHeaderVisible(false);
                 }}
                 title="Close Navigation Tree"
+                aria-label="Close Navigation Tree"
               >
-                <X size={12} />
+                <X size={13} className="stroke-[2.5]" />
               </button>
             </div>
           </div>

@@ -481,6 +481,44 @@ aside.app-sidebar.dock-float.collapsed {
   color: var(--accent);
 }
 
+.tree-action-btn.tree-action-close {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.35);
+  background-color: rgba(220, 38, 38, 0.08);
+}
+
+.tree-action-btn.tree-action-close:hover {
+  color: #ffffff;
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+[data-theme="dark"] .tree-action-btn.tree-action-close,
+.dark .tree-action-btn.tree-action-close {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.4);
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+[data-theme="dark"] .tree-action-btn.tree-action-close:hover,
+.dark .tree-action-btn.tree-action-close:hover {
+  color: #ffffff;
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+[data-theme="sepia"] .tree-action-btn.tree-action-close {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.35);
+  background-color: rgba(185, 28, 28, 0.09);
+}
+
+[data-theme="sepia"] .tree-action-btn.tree-action-close:hover {
+  color: #ffffff;
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
 .sidebar-search {
   position: relative;
 }
@@ -695,6 +733,343 @@ aside.app-sidebar.dock-float.collapsed {
 [data-theme="sepia"] .tree-icon-sutta { color: #9f1239; }
 [data-theme="sepia"] .tree-icon-abhidhamma { color: #1d4ed8; }
 [data-theme="sepia"] .tree-icon-anna { color: #047857; }
+
+/* Reading Indicator (Ping Radar Dot) with Pitaka Colors */
+.tree-ping-default .tree-ping-dot-radar,
+.tree-ping-default .tree-ping-dot-core {
+  background-color: var(--accent);
+}
+.tree-ping-vinaya .tree-ping-dot-radar,
+.tree-ping-vinaya .tree-ping-dot-core {
+  background-color: #d97706;
+}
+.tree-ping-sutta .tree-ping-dot-radar,
+.tree-ping-sutta .tree-ping-dot-core {
+  background-color: #be123c;
+}
+.tree-ping-abhidhamma .tree-ping-dot-radar,
+.tree-ping-abhidhamma .tree-ping-dot-core {
+  background-color: #2563eb;
+}
+.tree-ping-anna .tree-ping-dot-radar,
+.tree-ping-anna .tree-ping-dot-core {
+  background-color: #059669;
+}
+
+/* Dark Theme Support for Reading Indicator */
+[data-theme="dark"] .tree-ping-vinaya .tree-ping-dot-radar,
+[data-theme="dark"] .tree-ping-vinaya .tree-ping-dot-core,
+.dark .tree-ping-vinaya .tree-ping-dot-radar,
+.dark .tree-ping-vinaya .tree-ping-dot-core {
+  background-color: #fbbf24;
+}
+[data-theme="dark"] .tree-ping-sutta .tree-ping-dot-radar,
+[data-theme="dark"] .tree-ping-sutta .tree-ping-dot-core,
+.dark .tree-ping-sutta .tree-ping-dot-radar,
+.dark .tree-ping-sutta .tree-ping-dot-core {
+  background-color: #fb7185;
+}
+[data-theme="dark"] .tree-ping-abhidhamma .tree-ping-dot-radar,
+[data-theme="dark"] .tree-ping-abhidhamma .tree-ping-dot-core,
+.dark .tree-ping-abhidhamma .tree-ping-dot-radar,
+.dark .tree-ping-abhidhamma .tree-ping-dot-core {
+  background-color: #60a5fa;
+}
+[data-theme="dark"] .tree-ping-anna .tree-ping-dot-radar,
+[data-theme="dark"] .tree-ping-anna .tree-ping-dot-core,
+.dark .tree-ping-anna .tree-ping-dot-radar,
+.dark .tree-ping-anna .tree-ping-dot-core {
+  background-color: #34d399;
+}
+
+/* Sepia Theme Support for Reading Indicator */
+[data-theme="sepia"] .tree-ping-vinaya .tree-ping-dot-radar,
+[data-theme="sepia"] .tree-ping-vinaya .tree-ping-dot-core {
+  background-color: #b45309;
+}
+[data-theme="sepia"] .tree-ping-sutta .tree-ping-dot-radar,
+[data-theme="sepia"] .tree-ping-sutta .tree-ping-dot-core {
+  background-color: #9f1239;
+}
+[data-theme="sepia"] .tree-ping-abhidhamma .tree-ping-dot-radar,
+[data-theme="sepia"] .tree-ping-abhidhamma .tree-ping-dot-core {
+  background-color: #1d4ed8;
+}
+[data-theme="sepia"] .tree-ping-anna .tree-ping-dot-radar,
+[data-theme="sepia"] .tree-ping-anna .tree-ping-dot-core {
+  background-color: #047857;
+}
+
+/* TOC Reading Badge styling matching Pitaka colors */
+.toc-reading-badge {
+  border-color: var(--border-color);
+  color: var(--accent);
+}
+
+.toc-reading-vinaya {
+  color: #d97706;
+  border-color: rgba(217, 119, 6, 0.35);
+  background-color: rgba(217, 119, 6, 0.06);
+}
+.toc-reading-sutta {
+  color: #be123c;
+  border-color: rgba(190, 18, 60, 0.35);
+  background-color: rgba(190, 18, 60, 0.06);
+}
+.toc-reading-abhidhamma {
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.35);
+  background-color: rgba(37, 99, 235, 0.06);
+}
+.toc-reading-anna {
+  color: #059669;
+  border-color: rgba(5, 150, 105, 0.35);
+  background-color: rgba(5, 150, 105, 0.06);
+}
+
+/* Dark Theme TOC Reading Badge */
+[data-theme="dark"] .toc-reading-vinaya,
+.dark .toc-reading-vinaya {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+  background-color: rgba(217, 119, 6, 0.15);
+}
+[data-theme="dark"] .toc-reading-sutta,
+.dark .toc-reading-sutta {
+  color: #fb7185;
+  border-color: rgba(251, 113, 133, 0.4);
+  background-color: rgba(190, 18, 60, 0.15);
+}
+[data-theme="dark"] .toc-reading-abhidhamma,
+.dark .toc-reading-abhidhamma {
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.4);
+  background-color: rgba(37, 99, 235, 0.15);
+}
+[data-theme="dark"] .toc-reading-anna,
+.dark .toc-reading-anna {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.4);
+  background-color: rgba(5, 150, 105, 0.15);
+}
+
+/* Sepia Theme TOC Reading Badge */
+[data-theme="sepia"] .toc-reading-vinaya {
+  color: #b45309;
+  border-color: rgba(180, 83, 9, 0.35);
+  background-color: rgba(180, 83, 9, 0.08);
+}
+[data-theme="sepia"] .toc-reading-sutta {
+  color: #9f1239;
+  border-color: rgba(159, 18, 57, 0.35);
+  background-color: rgba(159, 18, 57, 0.08);
+}
+[data-theme="sepia"] .toc-reading-abhidhamma {
+  color: #1d4ed8;
+  border-color: rgba(29, 78, 216, 0.35);
+  background-color: rgba(29, 78, 216, 0.08);
+}
+[data-theme="sepia"] .toc-reading-anna {
+  color: #047857;
+  border-color: rgba(4, 120, 87, 0.35);
+  background-color: rgba(4, 120, 87, 0.08);
+}
+
+/* TOC Title Colors */
+.toc-title-vinaya { color: #d97706; }
+.toc-title-sutta { color: #be123c; }
+.toc-title-abhidhamma { color: #2563eb; }
+.toc-title-anna { color: #059669; }
+
+[data-theme="dark"] .toc-title-vinaya, .dark .toc-title-vinaya { color: #fbbf24; }
+[data-theme="dark"] .toc-title-sutta, .dark .toc-title-sutta { color: #fb7185; }
+[data-theme="dark"] .toc-title-abhidhamma, .dark .toc-title-abhidhamma { color: #60a5fa; }
+[data-theme="dark"] .toc-title-anna, .dark .toc-title-anna { color: #34d399; }
+
+[data-theme="sepia"] .toc-title-vinaya { color: #b45309; }
+[data-theme="sepia"] .toc-title-sutta { color: #9f1239; }
+[data-theme="sepia"] .toc-title-abhidhamma { color: #1d4ed8; }
+[data-theme="sepia"] .toc-title-anna { color: #047857; }
+
+/* Active TOC Row Styles */
+.toc-row-active {
+  background-color: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+.toc-row-active.toc-row-active-vinaya {
+  background-color: rgba(217, 119, 6, 0.08);
+  color: #92400e;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+.toc-row-active.toc-row-active-sutta {
+  background-color: rgba(190, 18, 60, 0.08);
+  color: #9f1239;
+  border: 1px solid rgba(190, 18, 60, 0.25);
+}
+.toc-row-active.toc-row-active-abhidhamma {
+  background-color: rgba(37, 99, 235, 0.08);
+  color: #1e40af;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+.toc-row-active.toc-row-active-anna {
+  background-color: rgba(5, 150, 105, 0.08);
+  color: #065f46;
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="dark"] .toc-row-active.toc-row-active-vinaya,
+.dark .toc-row-active.toc-row-active-vinaya {
+  background-color: rgba(217, 119, 6, 0.16);
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+[data-theme="dark"] .toc-row-active.toc-row-active-sutta,
+.dark .toc-row-active.toc-row-active-sutta {
+  background-color: rgba(190, 18, 60, 0.16);
+  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.3);
+}
+[data-theme="dark"] .toc-row-active.toc-row-active-abhidhamma,
+.dark .toc-row-active.toc-row-active-abhidhamma {
+  background-color: rgba(37, 99, 235, 0.16);
+  color: #bfdbfe;
+  border-color: rgba(96, 165, 250, 0.3);
+}
+[data-theme="dark"] .toc-row-active.toc-row-active-anna,
+.dark .toc-row-active.toc-row-active-anna {
+  background-color: rgba(5, 150, 105, 0.16);
+  color: #a7f3d0;
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+[data-theme="sepia"] .toc-row-active.toc-row-active-vinaya {
+  background-color: rgba(180, 83, 9, 0.1);
+  color: #78350f;
+  border-color: rgba(180, 83, 9, 0.25);
+}
+[data-theme="sepia"] .toc-row-active.toc-row-active-sutta {
+  background-color: rgba(159, 18, 57, 0.1);
+  color: #881337;
+  border-color: rgba(159, 18, 57, 0.25);
+}
+[data-theme="sepia"] .toc-row-active.toc-row-active-abhidhamma {
+  background-color: rgba(29, 78, 216, 0.1);
+  color: #1e3a8a;
+  border-color: rgba(29, 78, 216, 0.25);
+}
+[data-theme="sepia"] .toc-row-active.toc-row-active-anna {
+  background-color: rgba(4, 120, 87, 0.1);
+  color: #064e3b;
+  border-color: rgba(4, 120, 87, 0.25);
+}
+
+/* TOC Bullet Dots with Pitaka Color Support */
+.toc-bullet-dot {
+  background-color: var(--accent);
+}
+.toc-bullet-dot.toc-dot-vinaya {
+  background-color: #d97706;
+}
+.toc-bullet-dot.toc-dot-sutta {
+  background-color: #be123c;
+}
+.toc-bullet-dot.toc-dot-abhidhamma {
+  background-color: #2563eb;
+}
+.toc-bullet-dot.toc-dot-anna {
+  background-color: #059669;
+}
+
+[data-theme="dark"] .toc-bullet-dot.toc-dot-vinaya,
+.dark .toc-bullet-dot.toc-dot-vinaya {
+  background-color: #fbbf24;
+}
+[data-theme="dark"] .toc-bullet-dot.toc-dot-sutta,
+.dark .toc-bullet-dot.toc-dot-sutta {
+  background-color: #fb7185;
+}
+[data-theme="dark"] .toc-bullet-dot.toc-dot-abhidhamma,
+.dark .toc-bullet-dot.toc-dot-abhidhamma {
+  background-color: #60a5fa;
+}
+[data-theme="dark"] .toc-bullet-dot.toc-dot-anna,
+.dark .toc-bullet-dot.toc-dot-anna {
+  background-color: #34d399;
+}
+
+[data-theme="sepia"] .toc-bullet-dot.toc-dot-vinaya {
+  background-color: #b45309;
+}
+[data-theme="sepia"] .toc-bullet-dot.toc-dot-sutta {
+  background-color: #9f1239;
+}
+[data-theme="sepia"] .toc-bullet-dot.toc-dot-abhidhamma {
+  background-color: #1d4ed8;
+}
+[data-theme="sepia"] .toc-bullet-dot.toc-dot-anna {
+  background-color: #047857;
+}
+
+/* Border variants for Depth 2 ring dots */
+.toc-bullet-ring {
+  border-color: var(--text-secondary);
+  background-color: transparent;
+}
+.toc-bullet-ring.toc-dot-vinaya {
+  border-color: #d97706;
+  background-color: #d97706;
+}
+.toc-bullet-ring.toc-dot-sutta {
+  border-color: #be123c;
+  background-color: #be123c;
+}
+.toc-bullet-ring.toc-dot-abhidhamma {
+  border-color: #2563eb;
+  background-color: #2563eb;
+}
+.toc-bullet-ring.toc-dot-anna {
+  border-color: #059669;
+  background-color: #059669;
+}
+
+[data-theme="dark"] .toc-bullet-ring.toc-dot-vinaya,
+.dark .toc-bullet-ring.toc-dot-vinaya {
+  border-color: #fbbf24;
+  background-color: #fbbf24;
+}
+[data-theme="dark"] .toc-bullet-ring.toc-dot-sutta,
+.dark .toc-bullet-ring.toc-dot-sutta {
+  border-color: #fb7185;
+  background-color: #fb7185;
+}
+[data-theme="dark"] .toc-bullet-ring.toc-dot-abhidhamma,
+.dark .toc-bullet-ring.toc-dot-abhidhamma {
+  border-color: #60a5fa;
+  background-color: #60a5fa;
+}
+[data-theme="dark"] .toc-bullet-ring.toc-dot-anna,
+.dark .toc-bullet-ring.toc-dot-anna {
+  border-color: #34d399;
+  background-color: #34d399;
+}
+
+[data-theme="sepia"] .toc-bullet-ring.toc-dot-vinaya {
+  border-color: #b45309;
+  background-color: #b45309;
+}
+[data-theme="sepia"] .toc-bullet-ring.toc-dot-sutta {
+  border-color: #9f1239;
+  background-color: #9f1239;
+}
+[data-theme="sepia"] .toc-bullet-ring.toc-dot-abhidhamma {
+  border-color: #1d4ed8;
+  background-color: #1d4ed8;
+}
+[data-theme="sepia"] .toc-bullet-ring.toc-dot-anna {
+  border-color: #047857;
+  background-color: #047857;
+}
 
 /* Root Pitaka Row Subtle Hover Accents */
 .tree-node.pitaka-vinaya.level-0 > .tree-row:hover {
