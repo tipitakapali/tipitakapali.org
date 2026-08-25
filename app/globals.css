@@ -2005,3 +2005,270 @@ footer.app-footer.hidden-footer,
   }
 }
 
+/* ==========================================================================
+   TIPITAKA DICTIONARY SYSTEM STYLES (DPD, PTS, ABD, PSD, SANS, INF, SPLITTER)
+   ========================================================================== */
+
+/* Dictionary Dialog & Drawer Layouts */
+.dict-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* Modal Mode */
+.dict-panel-modal {
+  width: 100%;
+  max-width: 780px;
+  height: 85vh;
+  max-height: 820px;
+  border-radius: 18px;
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  z-index: 121;
+}
+
+/* Bottom Sheet / Drawer Mode */
+.dict-panel-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 52vh;
+  min-height: 280px;
+  max-height: 85vh;
+  background-color: var(--bg-primary);
+  border-top: 2px solid var(--accent);
+  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.25);
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  overflow: hidden;
+}
+
+/* Side Panel Mode */
+.dict-panel-side {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 480px;
+  max-width: 95vw;
+  background-color: var(--bg-primary);
+  border-left: 2px solid var(--accent);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25);
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Dictionary DPD and General Typography Styles */
+.dp9 {
+  font-family: inherit;
+  font-size: var(--dict-font-size, 13.5px);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.dp9 div.dpd {
+  border: 1.5px solid var(--accent-border);
+  border-left: 3.5px solid var(--accent);
+  background: var(--bg-card);
+  border-radius: 10px;
+  line-height: 1.6;
+  margin: 6px 0;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+[data-theme="dark"] .dp9 div.dpd {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: var(--accent);
+}
+
+.dp9 .p1w, .dp9 .p2w, .dp9 .p3w {
+  font-weight: 700;
+  font-size: 1.15em;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+
+.dp9 .p1w {
+  color: var(--text-primary);
+}
+
+.dp9 .p2w {
+  color: var(--accent);
+}
+
+.dp9 .p3w {
+  color: #c97d10;
+}
+
+.dp9 .pp1w, .dp9 .pp2w {
+  font-weight: 700;
+  font-size: 1.15em;
+}
+.dp9 .pp2w {
+  color: var(--accent);
+}
+
+.dp9 .pm1w, .dp9 .pm2w {
+  font-weight: 700;
+  font-size: 1.1em;
+}
+.dp9 .pm2w {
+  color: var(--accent);
+}
+
+.dp9 .button-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 6px 0;
+}
+
+.dp9 a.button,
+.dp9 .dpd-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dp9 a.button:hover,
+.dp9 .dpd-button:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.dp9 a.button.active,
+.dp9 .dpd-button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff !important;
+}
+
+.dp9 .hidden {
+  display: none !important;
+}
+
+/* Inflection & Grammar Tables */
+.dp9 table.inflection {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 10px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  font-size: 12px;
+}
+
+.dp9 table.inflection th,
+.dp9 table.inflection td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.dp9 table.inflection th {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dp9 table.inflection tr:last-child th,
+.dp9 table.inflection tr:last-child td {
+  border-bottom: none;
+}
+
+.dp9 table.inflection th:last-child,
+.dp9 table.inflection td:last-child {
+  border-right: none;
+}
+
+.dp9 table.inflection td:hover {
+  background: var(--accent-light);
+}
+
+.dp9 table.family,
+.dp9 table.root_family,
+.dp9 table.grammar {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.dp9 table.family th,
+.dp9 table.family td,
+.dp9 table.grammar th,
+.dp9 table.grammar td {
+  padding: 4px 8px;
+  vertical-align: top;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dp9 table.family th,
+.dp9 table.grammar th {
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  width: 25%;
+}
+
+.dp9 .dec {
+  padding: 3px 0;
+  color: var(--text-primary);
+}
+
+.dp9 .dec-term {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dp9 .dec-term:hover {
+  text-decoration: underline;
+}
+
+.dict-clickable-word {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--accent-border);
+  transition: color 0.15s;
+}
+.dict-clickable-word:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+

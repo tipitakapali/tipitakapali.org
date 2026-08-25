@@ -177,3 +177,42 @@ export async function searchTipitaka(query, options = {}) {
   }, 10 * 60 * 1000);
 }
 
+export async function fetchDictionaryLookup(word, dictType = 'all', options = {}) {
+  const cleanWord = (word || '').trim();
+  if (!cleanWord) return { word: '', hasResults: false, error: 'Empty word' };
+
+  const params = new URLSearchParams();
+  params.set('w', cleanWord);
+  if (dictType && dictType !== 'all') params.set('dict', dictType);
+  if (options.useSplitter) params.set('d', 'yes');
+
+  const qs = params.toString();
+  const cacheKey = `dict_${qs}`;
+
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const res = await fetch(`/api/dict/lookup?${qs}`);
+      if (!res.ok) throw new Error(`Dictionary lookup failed for ${cleanWord}`);
+      return res.json();
+    },
+    24 * 60 * 60 * 1000
+  );
+}
+
+export async function fetchDictionaryInflection(query) {
+  const cleanQuery = (query || '').trim();
+  if (!cleanQuery) return null;
+
+  const cacheKey = `dict_inf_${cleanQuery}`;
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const res = await fetch(`/api/dict/inf?w=${encodeURIComponent(cleanQuery)}`);
+      if (!res.ok) throw new Error(`Inflection lookup failed for ${cleanQuery}`);
+      return res.json();
+    },
+    7 * 24 * 60 * 60 * 1000
+  );
+}
+

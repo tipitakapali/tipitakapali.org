@@ -5,8 +5,9 @@ import { Bookmark, BookmarkCheck } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
+import { useDictionary } from '../../context/DictionaryContext';
 
-import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali } from '../../services/transliterate';
+import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali, convertAnyToRoman } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
 
 // Memoized Chapter Block with Pre-Buffering Intersection Observer
@@ -121,7 +122,7 @@ export default function ReaderView() {
     searchHighlight,
   } = useTabs();
 
-
+  const { openDictionary } = useDictionary();
   const { settings, setIsZenMode } = useThemeSettings();
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
@@ -670,7 +671,48 @@ export default function ReaderView() {
     }
   }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory]);
 
+  const handleReaderDoubleClick = useCallback((e) => {
+    // 1. Check window selection first
+    const selection = window.getSelection()?.toString()?.trim();
+    let wordToLookup = '';
 
+    if (selection && selection.length > 0 && selection.length < 50) {
+      wordToLookup = selection.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+    } else {
+      // 2. Extract word at click point
+      let range = null;
+      if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+        if (pos && pos.offsetNode) {
+          range = document.createRange();
+          range.setStart(pos.offsetNode, pos.offset);
+          range.collapse(true);
+        }
+      }
+
+      if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+        const node = range.startContainer;
+        const offset = range.startOffset;
+        const text = node.textContent || '';
+        let start = offset;
+        let end = offset;
+        while (start > 0 && /\S/.test(text[start - 1])) {
+          start--;
+        }
+        while (end < text.length && /\S/.test(text[end])) {
+          end++;
+        }
+        const rawWord = text.slice(start, end);
+        wordToLookup = rawWord.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+      }
+    }
+
+    if (wordToLookup) {
+      openDictionary(wordToLookup);
+    }
+  }, [openDictionary]);
 
   const handleBreadcrumbClick = () => {
     document.body.classList.remove('zen-mode');
@@ -905,7 +947,11 @@ export default function ReaderView() {
         onScroll={handleScroll}
       >
         {/* Lazy-Loaded Chapter Content Stream */}
-        <div className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6" onClick={handleReaderClick}>
+        <div
+          className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6"
+          onClick={handleReaderClick}
+          onDoubleClick={handleReaderDoubleClick}
+        >
           <div
             className="reader-container w-full"
             style={{ maxWidth: 'var(--reader-max-width, 880px)' }}

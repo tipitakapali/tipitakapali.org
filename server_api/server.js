@@ -13,12 +13,6 @@ const HOST = process.env.HOST || '0.0.0.0';
 // Locate tipitaka.db database
 const DB_CANDIDATES = [
   path.join(__dirname, 'tipitaka.db'),
-  path.join(__dirname, '..', '..', 'web_app2', 'tipitaka.db'),
-  path.join(__dirname, '..', '..', 'tipitaka_latin2.db'),
-  path.join(__dirname, '..', '..', 'tipitaka.db'),
-  path.join(__dirname, '..', 'web_app2', 'tipitaka.db'),
-  path.join(__dirname, '..', 'tipitaka_latin2.db'),
-  path.join(__dirname, '..', 'tipitaka.db'),
 ];
 
 let DB_PATH = DB_CANDIDATES.find((p) => fs.existsSync(p));
@@ -560,6 +554,131 @@ async function main() {
         results: [],
       };
     }
+  });
+
+  // ==========================================
+  // Dictionary API Endpoints
+  // ==========================================
+  const dictEngine = require('./dictEngine');
+
+  fastify.get('/api/dict/lookup', async (req, reply) => {
+    const rawWord = req.query.w || req.query.word || req.query.q || '';
+    const dictType = (req.query.dict || req.query.dictionary || 'all').toLowerCase();
+    const useSplitter = req.query.d === 'yes';
+
+    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+
+    if (!rawWord.trim()) {
+      return { word: '', hasResults: false, error: 'Empty word query' };
+    }
+
+    if (dictType === 'all') {
+      return dictEngine.lookupAll(rawWord);
+    } else if (dictType === 'dpd') {
+      return { word: rawWord, results: dictEngine.lookupDPD(rawWord, useSplitter) };
+    } else if (dictType === 'pts') {
+      return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
+    } else if (dictType === 'abd') {
+      return { word: rawWord, results: dictEngine.lookupABD(rawWord) };
+    } else if (dictType === 'psd') {
+      return { word: rawWord, results: dictEngine.lookupPSD(rawWord) };
+    } else if (dictType === 'sans') {
+      return { word: rawWord, results: dictEngine.lookupSANS(rawWord) };
+    } else if (dictType === 'splitter') {
+      return { word: rawWord, results: dictEngine.lookupSplitter(rawWord) };
+    } else {
+      return dictEngine.lookupAll(rawWord);
+    }
+  });
+
+  fastify.post('/api/dict/lookup', async (req, reply) => {
+    const body = req.body || {};
+    const rawWord = body.w || body.word || body.q || '';
+    const dictType = (body.dict || body.dictionary || 'all').toLowerCase();
+    const useSplitter = body.d === 'yes';
+
+    if (!rawWord.trim()) {
+      return { word: '', hasResults: false, error: 'Empty word query' };
+    }
+
+    if (dictType === 'all') {
+      return dictEngine.lookupAll(rawWord);
+    } else if (dictType === 'dpd') {
+      return { word: rawWord, results: dictEngine.lookupDPD(rawWord, useSplitter) };
+    } else if (dictType === 'pts') {
+      return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
+    } else if (dictType === 'abd') {
+      return { word: rawWord, results: dictEngine.lookupABD(rawWord) };
+    } else if (dictType === 'psd') {
+      return { word: rawWord, results: dictEngine.lookupPSD(rawWord) };
+    } else if (dictType === 'sans') {
+      return { word: rawWord, results: dictEngine.lookupSANS(rawWord) };
+    } else if (dictType === 'splitter') {
+      return { word: rawWord, results: dictEngine.lookupSplitter(rawWord) };
+    } else {
+      return dictEngine.lookupAll(rawWord);
+    }
+  });
+
+  fastify.get('/api/dict/inf', async (req, reply) => {
+    const query = req.query.w || req.query.id || req.query.word || '';
+    reply.header('Cache-Control', 'public, max-age=604800');
+    if (!query) return { error: 'Empty inflection query' };
+    const res = dictEngine.lookupINF(query);
+    if (!res) return { word: query, html: '' };
+    return res;
+  });
+
+  fastify.post('/api/dict/inf', async (req, reply) => {
+    const body = req.body || {};
+    const query = body.w || body.id || body.word || '';
+    if (!query) return { error: 'Empty inflection query' };
+    const res = dictEngine.lookupINF(query);
+    if (!res) return { word: query, html: '' };
+    return res;
+  });
+
+  // Legacy fastify endpoints for compatibility with external references
+  fastify.post('/api/dpd', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupDPD(word, req.body?.d === 'yes');
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res.map((r) => r.html).join('\n\n');
+  });
+
+  fastify.post('/api/pts', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupPTS(word);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res.map((r) => r.html).join('\n\n');
+  });
+
+  fastify.post('/api/abd', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupABD(word);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res.map((r) => r.html).join('\n\n');
+  });
+
+  fastify.post('/api/psd', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupPSD(word);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res.map((r) => r.html).join('\n\n');
+  });
+
+  fastify.post('/api/sans', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupSANS(word);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res.map((r) => r.html).join('\n\n');
+  });
+
+  fastify.post('/api/inf', async (req, reply) => {
+    const word = req.body?.w || req.query?.w || '';
+    const res = dictEngine.lookupINF(word);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return res ? res.html : '';
   });
 
   // Health and metrics endpoint

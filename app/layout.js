@@ -1,6 +1,7 @@
 import './globals.css';
 import { ThemeSettingsProvider } from '../context/ThemeSettingsContext';
 import { TabProvider } from '../context/TabContext';
+import { DictionaryProvider } from '../context/DictionaryContext';
 
 export const metadata = {
   title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
@@ -35,7 +36,9 @@ export default function RootLayout({ children }) {
       <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
         <ThemeSettingsProvider>
           <TabProvider>
-            {children}
+            <DictionaryProvider>
+              {children}
+            </DictionaryProvider>
           </TabProvider>
         </ThemeSettingsProvider>
       </body>
