@@ -56,7 +56,14 @@ const ChapterBlock = memo(function ChapterBlock({
   }, [html, paliScript, searchHighlight, highlightSearchTerms]);
 
   if (displayHtml) {
-    return <div dangerouslySetInnerHTML={{ __html: displayHtml }} />;
+    return (
+      <div
+        id={`chap-${chapter.chapter_index}`}
+        data-chapter={chapter.chapter_index}
+        className="chapter-content-block"
+        dangerouslySetInnerHTML={{ __html: displayHtml }}
+      />
+    );
   }
 
   return (
@@ -575,6 +582,23 @@ export default function ReaderView() {
                 }
               }
               break;
+            }
+          }
+
+          // Also scan chapter blocks directly to handle chapter boundaries & headings
+          if (top < 30) {
+            foundChapterIdx = 0;
+          } else {
+            const chapBlocks = container.querySelectorAll('[data-chapter]');
+            for (const cb of chapBlocks) {
+              const r = cb.getBoundingClientRect();
+              if (r.top <= targetY && r.bottom > targetY) {
+                const cIdx = parseInt(cb.getAttribute('data-chapter'), 10);
+                if (!isNaN(cIdx)) {
+                  foundChapterIdx = cIdx;
+                  break;
+                }
+              }
             }
           }
 

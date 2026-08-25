@@ -266,20 +266,41 @@ export function TabProvider({ children }) {
       } catch (e) {}
     }
 
+    if (chapterIdx !== undefined && chapterIdx !== null) {
+      // If active tab, synchronize URL ?chapter=X and navigation tree
+      if (activeBookCodeRef.current === bookCode) {
+        updateUrlParams({ chapter: chapterIdx + 1 });
+        setTreeSelectedNode((prev) => {
+          if (prev?.bookCode === bookCode && prev?.chapterIdx === chapterIdx) return prev;
+          return { bookCode, chapterIdx };
+        });
+      }
+    }
+
     setOpenTabs((prev) => {
-      const updated = prev.map((t) =>
-        t.bookCode === bookCode
-          ? {
+      let hasChanged = false;
+      const updated = prev.map((t) => {
+        if (t.bookCode === bookCode) {
+          const newChapIdx = chapterIdx !== undefined ? chapterIdx : t.currentChapterIdx;
+          const newPara = paraNum || t.lastParaNum;
+          if (t.currentChapterIdx !== newChapIdx || t.lastParaNum !== newPara) {
+            hasChanged = true;
+            return {
               ...t,
-              currentChapterIdx: chapterIdx !== undefined ? chapterIdx : t.currentChapterIdx,
-              lastParaNum: paraNum || t.lastParaNum,
-            }
-          : t
-      );
-      persistTabs(updated, activeBookCodeRef.current);
-      return updated;
+              currentChapterIdx: newChapIdx,
+              lastParaNum: newPara,
+            };
+          }
+        }
+        return t;
+      });
+      if (hasChanged) {
+        persistTabs(updated, activeBookCodeRef.current);
+        return updated;
+      }
+      return prev;
     });
-  }, [persistTabs]);
+  }, [persistTabs, updateUrlParams]);
 
   // Load a single chapter into an open tab (on demand / lazy loading)
   const loadChapter = useCallback(async (bookCode, chapterIdx) => {
