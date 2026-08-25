@@ -23,7 +23,11 @@ export default function NavigationTree() {
   const [error, setError] = useState(null);
   const [filterText, setFilterText] = useState('');
   const [expandedMap, setExpandedMap] = useState({});
-  const [isTreeExpandedAll, setIsTreeExpandedAll] = useState(false);
+
+  // True if at least one folder/node in the tree is expanded
+  const hasAnyExpanded = React.useMemo(() => {
+    return Object.values(expandedMap).some(Boolean);
+  }, [expandedMap]);
 
   // Docking & Resizing State
   const [dockPosition, setDockPosition] = useState('left'); // 'left' | 'right' | 'float'
@@ -143,17 +147,21 @@ export default function NavigationTree() {
   }, [treeSelectedNode?.bookCode, treeData]);
 
   const handleToggleExpandAll = () => {
-    const nextState = !isTreeExpandedAll;
-    setIsTreeExpandedAll(nextState);
-    const newMap = {};
-    function traverse(nodes) {
-      for (const n of nodes) {
-        newMap[n.id] = nextState;
-        if (n.children) traverse(n.children);
+    if (hasAnyExpanded) {
+      // If any folder is currently open/expanded, collapse all
+      setExpandedMap({});
+    } else {
+      // If all folders are closed, expand all
+      const newMap = {};
+      function traverse(nodes) {
+        for (const n of nodes) {
+          newMap[n.id] = true;
+          if (n.children) traverse(n.children);
+        }
       }
+      traverse(treeData);
+      setExpandedMap(newMap);
     }
-    traverse(treeData);
-    setExpandedMap(newMap);
   };
 
   const handleSetDock = (newPos) => {
@@ -362,9 +370,10 @@ export default function NavigationTree() {
               <button
                 className="tree-action-btn p-1"
                 onClick={handleToggleExpandAll}
-                title={isTreeExpandedAll ? 'Collapse All Folders' : 'Expand All Folders'}
+                title={hasAnyExpanded ? 'Collapse All Folders' : 'Expand All Folders'}
+                aria-label={hasAnyExpanded ? 'Collapse All Folders' : 'Expand All Folders'}
               >
-                {isTreeExpandedAll ? <MinusSquare size={12} /> : <PlusSquare size={12} />}
+                {hasAnyExpanded ? <MinusSquare size={12} /> : <PlusSquare size={12} />}
               </button>
 
               {/* Dock Left */}

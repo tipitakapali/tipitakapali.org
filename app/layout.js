@@ -3,7 +3,7 @@ import { ThemeSettingsProvider } from '../context/ThemeSettingsContext';
 import { TabProvider } from '../context/TabContext';
 
 export const metadata = {
-  title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App',
+  title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
   description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
   icons: {
     icon: [

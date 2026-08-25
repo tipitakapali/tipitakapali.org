@@ -19,12 +19,36 @@ export function MainAppContent({ params: rawParams }) {
   const hasInitializedRef = useRef(false);
 
 
-  // Dynamic Browser, Search & SEO friendly Title Synchronizer
+  // Dynamic Browser, Search & SEO friendly Title & Meta Synchronizer
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
+    const setMetaDesc = (content) => {
+      let el = document.querySelector('meta[name="description"]');
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('name', 'description');
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+
+      // Also sync OpenGraph description if present
+      const ogEl = document.querySelector('meta[property="og:description"]');
+      if (ogEl) ogEl.setAttribute('content', content);
+    };
+
     if (!activeTab) {
-      document.title = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App', settings?.paliScript);
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const search = window.location.search;
+        const hasUrlBook = path.startsWith('/book/') || path.startsWith('/chapter/') || search.includes('book=');
+        if (hasUrlBook) {
+          // A book is currently loading from URL params; keep server-rendered title
+          return;
+        }
+      }
+      document.title = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
+      setMetaDesc('Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.');
       return;
     }
 
@@ -35,18 +59,28 @@ export function MainAppContent({ params: rawParams }) {
     const chapTitle = currentChap?.title ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
     const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), settings?.paliScript) : '';
 
-    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi App', settings?.paliScript);
-    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App', settings?.paliScript);
+    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi', settings?.paliScript);
+    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
+
+    let docTitle = '';
+    let subject = '';
 
     // Clean, search & bookmark-friendly title format matching breadcrumbs
     if (chapTitle && chapTitle !== bookTitle) {
-      document.title = `${bookTitle} › ${chapTitle} | ${tipitakaLabel}`;
+      subject = `${bookTitle} › ${chapTitle}`;
+      docTitle = `${subject} | ${tipitakaLabel}`;
     } else if (nikaya && nikaya !== bookTitle) {
-      document.title = `${bookTitle} (${nikaya}) | ${tipitakaLabel}`;
+      subject = `${bookTitle} (${nikaya})`;
+      docTitle = `${subject} | ${tipitakaLabel}`;
     } else {
-      document.title = `${bookTitle} | ${fullAppTitle}`;
+      subject = bookTitle;
+      docTitle = `${bookTitle} | ${fullAppTitle}`;
     }
+
+    document.title = docTitle;
+    setMetaDesc(`Complete ${subject} with rich typography, multi-script support, and full-text search.`);
   }, [
+    activeTab,
     activeTab?.bookCode,
     activeTab?.title,
     activeTab?.currentChapterIdx,

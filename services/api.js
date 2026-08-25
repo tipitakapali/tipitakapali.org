@@ -35,7 +35,7 @@ export async function fetchTree() {
   // 2. Persistent browser cache (0ms instant render on refresh/revisit)
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('tipitaka_tree_cache_v3');
+      const stored = localStorage.getItem('tipitaka_tree_cache_v4');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -55,7 +55,7 @@ export async function fetchTree() {
       const data = await res.json();
       if (typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
         try {
-          localStorage.setItem('tipitaka_tree_cache_v3', JSON.stringify(data));
+          localStorage.setItem('tipitaka_tree_cache_v4', JSON.stringify(data));
         } catch (e) {}
       }
       return data;
@@ -65,11 +65,33 @@ export async function fetchTree() {
 }
 
 export async function fetchBooks() {
+  const cached = cache.get('books_list');
+  if (cached) return cached.data;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('tipitaka_books_cache_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && Array.isArray(parsed.books) && parsed.books.length > 0) {
+          cache.set('books_list', { data: parsed, timestamp: Date.now() });
+          return parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
   return cachedFetch('books_list', async () => {
     const res = await fetch('/api/books');
     if (!res.ok) throw new Error('Failed to load books list');
-    return res.json();
-  }, 60 * 60 * 1000);
+    const data = await res.json();
+    if (typeof window !== 'undefined' && data && Array.isArray(data.books)) {
+      try {
+        localStorage.setItem('tipitaka_books_cache_v1', JSON.stringify(data));
+      } catch (e) {}
+    }
+    return data;
+  }, 24 * 60 * 60 * 1000);
 }
 
 export async function fetchBook(bookCode, options = {}) {
@@ -96,7 +118,7 @@ export async function fetchBook(bookCode, options = {}) {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}${qs}`);
     if (!res.ok) throw new Error(`Failed to load book: ${cleanCode}`);
     return res.json();
-  }, 30 * 60 * 1000);
+  }, 60 * 60 * 1000);
 }
 
 export async function fetchChapter(bookCode, chapterIndex) {
@@ -109,7 +131,7 @@ export async function fetchChapter(bookCode, chapterIndex) {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}`);
     if (!res.ok) throw new Error(`Failed to load chapter ${chapterIndex} for book: ${cleanCode}`);
     return res.json();
-  }, 30 * 60 * 1000);
+  }, 60 * 60 * 1000);
 }
 
 
@@ -121,7 +143,7 @@ export async function fetchToc(bookCode) {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/toc`);
     if (!res.ok) throw new Error(`Failed to load TOC for book: ${cleanCode}`);
     return res.json();
-  }, 60 * 60 * 1000);
+  }, 24 * 60 * 60 * 1000);
 }
 
 export async function fetchMat(bookCode) {
@@ -134,11 +156,10 @@ export async function fetchMat(bookCode) {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat`);
     if (!res.ok) return null;
     return res.json();
-  }, 60 * 60 * 1000);
+  }, 24 * 60 * 60 * 1000);
 }
 
 export async function searchTipitaka(query, options = {}) {
-
   const params = new URLSearchParams();
   params.set('q', query);
   if (options.book) params.set('book', options.book);
@@ -153,6 +174,6 @@ export async function searchTipitaka(query, options = {}) {
     const res = await fetch(`/api/search?${qs}`);
     if (!res.ok) throw new Error('Search query failed');
     return res.json();
-  }, 2 * 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
