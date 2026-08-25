@@ -165,6 +165,12 @@ export function DictionaryProvider({ children }) {
       .then((dpdData) => {
         if (currentSeq !== lookupSeqRef.current) return null;
         if (dpdData) {
+          const dpdCount = dpdData.counts?.dpd || dpdData.dpd?.length || 0;
+          if (dpdCount > 0) {
+            // DPD is the primary default dictionary whenever it has results
+            setActiveDictTab('dpd');
+          }
+
           setLookupData((prev) => {
             const prevMatchesWord = prev && prev.word === cleanWord;
             return {
@@ -172,7 +178,7 @@ export function DictionaryProvider({ children }) {
               hasResults: dpdData.hasResults || (dpdData.dpd?.length > 0) || (prevMatchesWord && prev.hasResults),
               synonyms: dpdData.synonyms || [],
               counts: {
-                dpd: dpdData.counts?.dpd || dpdData.dpd?.length || 0,
+                dpd: dpdCount,
                 pts: prevMatchesWord ? (prev.counts?.pts || 0) : 0,
                 abd: prevMatchesWord ? (prev.counts?.abd || 0) : 0,
                 psd: prevMatchesWord ? (prev.counts?.psd || 0) : 0,
@@ -234,19 +240,26 @@ export function DictionaryProvider({ children }) {
             };
           });
 
-          // If DPD had 0 results, auto-switch to first available tab with results
+          // Enforce: DPD is default unless it has no results. If DPD has 0 results, auto-switch to first available tab with results.
           setLookupData((latestData) => {
             if (latestData && latestData.word === cleanWord) {
-              setActiveDictTab((prevTab) => {
-                if (latestData.counts?.[prevTab] > 0) return prevTab;
-                if ((latestData.counts?.dpd || 0) === 0) {
-                  const priority = ['pts', 'abd', 'psd', 'sans', 'splitter'];
-                  for (const t of priority) {
-                    if (latestData.counts?.[t] > 0) return t;
+              const dpdCount = latestData.counts?.dpd || 0;
+              if (dpdCount > 0) {
+                setActiveDictTab('dpd');
+              } else {
+                const priority = ['pts', 'abd', 'psd', 'sans', 'splitter'];
+                let switched = false;
+                for (const t of priority) {
+                  if ((latestData.counts?.[t] || 0) > 0) {
+                    setActiveDictTab(t);
+                    switched = true;
+                    break;
                   }
                 }
-                return prevTab;
-              });
+                if (!switched) {
+                  setActiveDictTab('dpd');
+                }
+              }
             }
             return latestData;
           });
