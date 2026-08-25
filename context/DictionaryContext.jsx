@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { fetchDictionaryLookup, fetchDictionaryInflection } from '../services/api';
+import { fetchDictionaryLookup, fetchDPDLookup, fetchOthersLookup, fetchDictionaryInflection } from '../services/api';
 import { convertAnyToRoman } from '../services/transliterate';
 
 const DictionaryContext = createContext();
@@ -19,7 +19,7 @@ export function DictionaryProvider({ children }) {
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
   const [activeDictTab, setActiveDictTab] = useState('dpd');
-  const [dockMode, setDockModeState] = useState('modal'); // 'modal' | 'top' | 'bottom' | 'left' | 'side' | 'right'
+  const [dockMode, setDockModeState] = useState('modal'); // 'modal' | 'left' | 'side' | 'right'
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1.0);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
   const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
@@ -28,10 +28,13 @@ export function DictionaryProvider({ children }) {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Results & Loading state
+  // Results & Loading state (Stage 1 Priority DPD + Stage 2 Async Enrichment)
   const [lookupData, setLookupData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const lookupSeqRef = useRef(0);
 
   // Cache for loaded inflection tables: { [targetId]: htmlString }
   const [inflectionCache, setInflectionCache] = useState({});
@@ -126,16 +129,19 @@ export function DictionaryProvider({ children }) {
     } catch (e) {}
   }, []);
 
-  // Main lookup function
+  // Staged Lookup: Priority Stage 1 (DPD instant display) + Stage 2 (Async background enrichment)
   const performLookup = useCallback(async (wordToSearch, addToHistoryStack = true) => {
     if (!wordToSearch || !wordToSearch.trim()) return;
 
     const romanWord = convertAnyToRoman(wordToSearch).trim().toLowerCase();
     const cleanWord = romanWord || wordToSearch.trim().toLowerCase();
 
+    const currentSeq = ++lookupSeqRef.current;
+
     setQueryWord(cleanWord);
     setDisplayWord(wordToSearch);
     setIsLoading(true);
+    setIsBackgroundLoading(true);
     setError(null);
 
     // Update history stack
@@ -147,27 +153,116 @@ export function DictionaryProvider({ children }) {
       });
     }
 
-    try {
-      const data = await fetchDictionaryLookup(cleanWord, 'all');
-      setLookupData(data);
+    // Step 1: Fast priority DPD lookup (Digital Pāḷi Dictionary)
+    const dpdPromise = fetchDPDLookup(cleanWord)
+      .then((dpdData) => {
+        if (currentSeq !== lookupSeqRef.current) return null;
+        if (dpdData) {
+          setLookupData((prev) => {
+            const prevMatchesWord = prev && prev.word === cleanWord;
+            return {
+              word: cleanWord,
+              hasResults: dpdData.hasResults || (dpdData.dpd?.length > 0) || (prevMatchesWord && prev.hasResults),
+              synonyms: dpdData.synonyms || [],
+              counts: {
+                dpd: dpdData.counts?.dpd || dpdData.dpd?.length || 0,
+                pts: prevMatchesWord ? (prev.counts?.pts || 0) : 0,
+                abd: prevMatchesWord ? (prev.counts?.abd || 0) : 0,
+                psd: prevMatchesWord ? (prev.counts?.psd || 0) : 0,
+                sans: prevMatchesWord ? (prev.counts?.sans || 0) : 0,
+                splitter: prevMatchesWord ? (prev.counts?.splitter || 0) : 0,
+              },
+              dpd: dpdData.dpd || [],
+              pts: prevMatchesWord ? (prev.pts || []) : [],
+              abd: prevMatchesWord ? (prev.abd || []) : [],
+              psd: prevMatchesWord ? (prev.psd || []) : [],
+              sans: prevMatchesWord ? (prev.sans || []) : [],
+              splitter: prevMatchesWord ? (prev.splitter || []) : [],
+            };
+          });
+          // Immediately release loading so DPD renders with zero perceived delay!
+          setIsLoading(false);
+        }
+        return dpdData;
+      })
+      .catch((err) => {
+        if (currentSeq !== lookupSeqRef.current) return null;
+        console.warn('DPD lookup error:', err);
+        return null;
+      });
 
-      // Auto-select tab with results if current active tab has 0 matches
-      if (data && data.counts) {
-        setActiveDictTab((prevTab) => {
-          if (data.counts[prevTab] > 0) return prevTab;
-          // Pick first tab with matches
-          const priority = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
-          for (const t of priority) {
-            if (data.counts[t] > 0) return t;
-          }
-          return prevTab;
-        });
-      }
-    } catch (err) {
-      console.error('Dictionary lookup error:', err);
-      setError(err.message || 'Lookup failed');
+    // Step 2: Background async lookup for secondary dictionaries (PTS, ABD, PSD, Sanskrit, Splitter)
+    const othersPromise = fetchOthersLookup(cleanWord)
+      .then((othersData) => {
+        if (currentSeq !== lookupSeqRef.current) return null;
+        if (othersData) {
+          setLookupData((prev) => {
+            const prevDpdCount = prev?.counts?.dpd || prev?.dpd?.length || 0;
+            const ptsCount = othersData.counts?.pts || othersData.pts?.length || 0;
+            const abdCount = othersData.counts?.abd || othersData.abd?.length || 0;
+            const psdCount = othersData.counts?.psd || othersData.psd?.length || 0;
+            const sansCount = othersData.counts?.sans || othersData.sans?.length || 0;
+            const splitterCount = othersData.counts?.splitter || othersData.splitter?.length || 0;
+
+            const hasAny = prevDpdCount > 0 || ptsCount > 0 || abdCount > 0 || psdCount > 0 || sansCount > 0 || splitterCount > 0;
+
+            return {
+              word: cleanWord,
+              hasResults: hasAny,
+              synonyms: prev?.synonyms || [],
+              counts: {
+                dpd: prevDpdCount,
+                pts: ptsCount,
+                abd: abdCount,
+                psd: psdCount,
+                sans: sansCount,
+                splitter: splitterCount,
+              },
+              dpd: prev?.dpd || [],
+              pts: othersData.pts || [],
+              abd: othersData.abd || [],
+              psd: othersData.psd || [],
+              sans: othersData.sans || [],
+              splitter: othersData.splitter || [],
+            };
+          });
+
+          // If DPD had 0 results, auto-switch to first available tab with results
+          setLookupData((latestData) => {
+            if (latestData && latestData.word === cleanWord) {
+              setActiveDictTab((prevTab) => {
+                if (latestData.counts?.[prevTab] > 0) return prevTab;
+                if ((latestData.counts?.dpd || 0) === 0) {
+                  const priority = ['pts', 'abd', 'psd', 'sans', 'splitter'];
+                  for (const t of priority) {
+                    if (latestData.counts?.[t] > 0) return t;
+                  }
+                }
+                return prevTab;
+              });
+            }
+            return latestData;
+          });
+        }
+        setIsBackgroundLoading(false);
+        return othersData;
+      })
+      .catch((err) => {
+        if (currentSeq !== lookupSeqRef.current) return null;
+        console.warn('Others lookup error:', err);
+        setIsBackgroundLoading(false);
+        return null;
+      });
+
+    // Ensure main loading is cleared if both complete or in case DPD threw error
+    try {
+      await dpdPromise;
+    } catch (e) {
+      await othersPromise;
     } finally {
-      setIsLoading(false);
+      if (currentSeq === lookupSeqRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [historyIndex]);
 
@@ -262,6 +357,7 @@ export function DictionaryProvider({ children }) {
     historyIndex,
     lookupData,
     isLoading,
+    isBackgroundLoading,
     error,
     inflectionCache,
     expandedSections,

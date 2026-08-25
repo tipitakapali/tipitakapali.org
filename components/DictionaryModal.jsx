@@ -212,6 +212,7 @@ export default function DictionaryModal() {
     historyIndex,
     lookupData,
     isLoading,
+    isBackgroundLoading,
     error,
     openDictionary,
     closeDictionary,
@@ -760,6 +761,8 @@ export default function DictionaryModal() {
         {DICT_TABS.map((tab) => {
           const isActive = activeDictTab === tab.id;
           const hasMatches = tab.count > 0;
+          const isTabPending = isBackgroundLoading && tab.id !== 'dpd' && tab.count === 0;
+
           return (
             <button
               key={tab.id}
@@ -782,6 +785,8 @@ export default function DictionaryModal() {
                 >
                   {tab.count}
                 </span>
+              ) : isTabPending ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/60 animate-pulse inline-block" />
               ) : null}
             </button>
           );
@@ -796,11 +801,11 @@ export default function DictionaryModal() {
         onClick={handleContentClick}
         className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"
       >
-        {/* Loading Indicator */}
+        {/* Main Loading Indicator (Initial lookup) */}
         {isLoading && (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
             <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-medium">Looking up &ldquo;{queryWord}&rdquo; across dictionaries...</span>
+            <span className="text-xs font-medium">Looking up &ldquo;{queryWord}&rdquo; in Digital Pāḷi Dictionary...</span>
           </div>
         )}
 
@@ -808,6 +813,14 @@ export default function DictionaryModal() {
         {error && !isLoading && (
           <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
             {error}
+          </div>
+        )}
+
+        {/* Background Loading for active non-DPD tab */}
+        {!isLoading && currentTabResults.length === 0 && isBackgroundLoading && activeDictTab !== 'dpd' && queryWord && (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-medium">Loading {DICT_TABS.find((t) => t.id === activeDictTab)?.label} results for &ldquo;{queryWord}&rdquo;...</span>
           </div>
         )}
 
@@ -833,8 +846,8 @@ export default function DictionaryModal() {
           </div>
         )}
 
-        {/* No results for current tab */}
-        {!isLoading && currentTabResults.length === 0 && queryWord && (
+        {/* No results for current tab (after loading is complete) */}
+        {!isLoading && !isBackgroundLoading && currentTabResults.length === 0 && queryWord && (
           <div className="py-10 text-center space-y-3">
             <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
               <BookOpen size={20} />

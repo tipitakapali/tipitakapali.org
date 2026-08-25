@@ -211,6 +211,14 @@ export async function fetchDictionaryLookup(word, dictType = 'all', options = {}
   );
 }
 
+export async function fetchDPDLookup(word, options = {}) {
+  return fetchDictionaryLookup(word, 'dpd', options);
+}
+
+export async function fetchOthersLookup(word, options = {}) {
+  return fetchDictionaryLookup(word, 'others', options);
+}
+
 export async function fetchDictionaryInflection(query) {
   const cleanQuery = (query || '').trim();
   if (!cleanQuery) return null;

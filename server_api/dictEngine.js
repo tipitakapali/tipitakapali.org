@@ -542,9 +542,124 @@ function lookupINF(rawQuery) {
 // Server In-Memory Dictionary Cache: Re-enabled for sub-millisecond lookups
 const ENABLE_DICT_CACHE = true;
 
-// Bounded in-memory LRU cache for dictionary queries (< 0.01ms response time)
+// Bounded in-memory LRU caches for dictionary queries (< 0.01ms response time)
 const DICT_CACHE_MAX = 3000;
 const dictCache = new Map();
+const dpdCache = new Map();
+const othersCache = new Map();
+
+// Priority 1: Fast DPD lookup (Digital Pāḷi Dictionary + Synonyms)
+function lookupDPDFast(rawWord, useSplitter = false) {
+  const word = (rawWord || '').toLowerCase().trim();
+  if (!word) {
+    return {
+      word: '',
+      hasResults: false,
+      synonyms: [],
+      counts: { dpd: 0, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
+      dpd: [],
+      pts: [],
+      abd: [],
+      psd: [],
+      sans: [],
+      splitter: [],
+    };
+  }
+
+  const cacheKey = `${word}_${useSplitter ? '1' : '0'}`;
+  if (ENABLE_DICT_CACHE) {
+    const cached = dpdCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  const syns = getSynonyms(word);
+  const dpd = lookupDPD(word, useSplitter);
+
+  const result = {
+    word,
+    hasResults: dpd.length > 0,
+    synonyms: syns,
+    counts: {
+      dpd: dpd.length,
+      pts: 0,
+      abd: 0,
+      psd: 0,
+      sans: 0,
+      splitter: 0,
+    },
+    dpd,
+    pts: [],
+    abd: [],
+    psd: [],
+    sans: [],
+    splitter: [],
+  };
+
+  if (ENABLE_DICT_CACHE) {
+    if (dpdCache.size >= DICT_CACHE_MAX) {
+      const firstKey = dpdCache.keys().next().value;
+      dpdCache.delete(firstKey);
+    }
+    dpdCache.set(cacheKey, result);
+  }
+
+  return result;
+}
+
+// Priority 2: Async background lookup for secondary dictionaries (PTS, ABD, PSD, SANS, Splitter)
+function lookupOthers(rawWord) {
+  const word = (rawWord || '').toLowerCase().trim();
+  if (!word) {
+    return {
+      word: '',
+      hasResults: false,
+      counts: { pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
+      pts: [],
+      abd: [],
+      psd: [],
+      sans: [],
+      splitter: [],
+    };
+  }
+
+  if (ENABLE_DICT_CACHE) {
+    const cached = othersCache.get(word);
+    if (cached) return cached;
+  }
+
+  const pts = lookupPTS(word);
+  const abd = lookupABD(word);
+  const psd = lookupPSD(word);
+  const sans = lookupSANS(word);
+  const splitter = lookupSplitter(word);
+
+  const result = {
+    word,
+    hasResults: pts.length > 0 || abd.length > 0 || psd.length > 0 || sans.length > 0 || splitter.length > 0,
+    counts: {
+      pts: pts.length,
+      abd: abd.length,
+      psd: psd.length,
+      sans: sans.length,
+      splitter: splitter.length,
+    },
+    pts,
+    abd,
+    psd,
+    sans,
+    splitter,
+  };
+
+  if (ENABLE_DICT_CACHE) {
+    if (othersCache.size >= DICT_CACHE_MAX) {
+      const firstKey = othersCache.keys().next().value;
+      othersCache.delete(firstKey);
+    }
+    othersCache.set(word, result);
+  }
+
+  return result;
+}
 
 function lookupAll(rawWord) {
   const word = (rawWord || '').toLowerCase().trim();
@@ -553,6 +668,7 @@ function lookupAll(rawWord) {
       word: '',
       hasResults: false,
       synonyms: [],
+      counts: { dpd: 0, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
       dpd: [],
       pts: [],
       abd: [],
@@ -569,44 +685,30 @@ function lookupAll(rawWord) {
     }
   }
 
-  const syns = getSynonyms(word);
-  const dpd = lookupDPD(word);
-  const pts = lookupPTS(word);
-  const abd = lookupABD(word);
-  const psd = lookupPSD(word);
-  const sans = lookupSANS(word);
-  const splitter = lookupSplitter(word);
-
-  const hasResults =
-    dpd.length > 0 ||
-    pts.length > 0 ||
-    abd.length > 0 ||
-    psd.length > 0 ||
-    sans.length > 0 ||
-    splitter.length > 0;
+  const dpdRes = lookupDPDFast(word);
+  const othersRes = lookupOthers(word);
 
   const result = {
     word,
-    hasResults,
-    synonyms: syns,
+    hasResults: dpdRes.hasResults || othersRes.hasResults,
+    synonyms: dpdRes.synonyms,
     counts: {
-      dpd: dpd.length,
-      pts: pts.length,
-      abd: abd.length,
-      psd: psd.length,
-      sans: sans.length,
-      splitter: splitter.length,
+      dpd: dpdRes.counts.dpd,
+      pts: othersRes.counts.pts,
+      abd: othersRes.counts.abd,
+      psd: othersRes.counts.psd,
+      sans: othersRes.counts.sans,
+      splitter: othersRes.counts.splitter,
     },
-    dpd,
-    pts,
-    abd,
-    psd,
-    sans,
-    splitter,
+    dpd: dpdRes.dpd,
+    pts: othersRes.pts,
+    abd: othersRes.abd,
+    psd: othersRes.psd,
+    sans: othersRes.sans,
+    splitter: othersRes.splitter,
   };
 
   if (ENABLE_DICT_CACHE) {
-    // LRU cache insertion
     if (dictCache.size >= DICT_CACHE_MAX) {
       const firstKey = dictCache.keys().next().value;
       dictCache.delete(firstKey);
@@ -623,6 +725,8 @@ initDictDatabases();
 module.exports = {
   initDictDatabases,
   lookupAll,
+  lookupDPDFast,
+  lookupOthers,
   lookupDPD,
   lookupPTS,
   lookupABD,

@@ -586,7 +586,9 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (dictType === 'all') {
       return dictEngine.lookupAll(rawWord);
     } else if (dictType === 'dpd') {
-      return { word: rawWord, results: dictEngine.lookupDPD(rawWord, useSplitter) };
+      return dictEngine.lookupDPDFast(rawWord, useSplitter);
+    } else if (dictType === 'others' || dictType === 'rest') {
+      return dictEngine.lookupOthers(rawWord);
     } else if (dictType === 'pts') {
       return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
     } else if (dictType === 'abd') {
@@ -617,7 +619,9 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (dictType === 'all') {
       return dictEngine.lookupAll(rawWord);
     } else if (dictType === 'dpd') {
-      return { word: rawWord, results: dictEngine.lookupDPD(rawWord, useSplitter) };
+      return dictEngine.lookupDPDFast(rawWord, useSplitter);
+    } else if (dictType === 'others' || dictType === 'rest') {
+      return dictEngine.lookupOthers(rawWord);
     } else if (dictType === 'pts') {
       return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
     } else if (dictType === 'abd') {
