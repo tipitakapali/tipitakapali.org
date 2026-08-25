@@ -1,8 +1,15 @@
+// Development Mode Flag: Set to false to disable all caching during active development
+export const ENABLE_CLIENT_CACHE = false;
+
 // Client-side Memory Cache & Request Deduplication for Ultra-Fast Navigation
 const cache = new Map();
 const pendingRequests = new Map();
 
 async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000) {
+  if (!ENABLE_CLIENT_CACHE) {
+    return fetcher();
+  }
+
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < ttlMs) {
     return cached.data;
@@ -28,32 +35,34 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000) {
 }
 
 export async function fetchTree() {
-  // 1. In-memory cache
-  const cached = cache.get('tree_json');
-  if (cached) return cached.data;
+  if (ENABLE_CLIENT_CACHE) {
+    // 1. In-memory cache
+    const cached = cache.get('tree_json');
+    if (cached) return cached.data;
 
-  // 2. Persistent browser cache (0ms instant render on refresh/revisit)
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('tipitaka_tree_cache_v4');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          cache.set('tree_json', { data: parsed, timestamp: Date.now() });
-          return parsed;
+    // 2. Persistent browser cache (0ms instant render on refresh/revisit)
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('tipitaka_tree_cache_v4');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cache.set('tree_json', { data: parsed, timestamp: Date.now() });
+            return parsed;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
-  // 3. Fallback to API with 24h memory TTL and localStorage persistence
+  // Fallback to API
   return cachedFetch(
     'tree_json',
     async () => {
       const res = await fetch('/api/tree');
       if (!res.ok) throw new Error('Failed to load navigation tree');
       const data = await res.json();
-      if (typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
+      if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
         try {
           localStorage.setItem('tipitaka_tree_cache_v4', JSON.stringify(data));
         } catch (e) {}
@@ -65,27 +74,29 @@ export async function fetchTree() {
 }
 
 export async function fetchBooks() {
-  const cached = cache.get('books_list');
-  if (cached) return cached.data;
+  if (ENABLE_CLIENT_CACHE) {
+    const cached = cache.get('books_list');
+    if (cached) return cached.data;
 
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('tipitaka_books_cache_v1');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && Array.isArray(parsed.books) && parsed.books.length > 0) {
-          cache.set('books_list', { data: parsed, timestamp: Date.now() });
-          return parsed;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('tipitaka_books_cache_v1');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && Array.isArray(parsed.books) && parsed.books.length > 0) {
+            cache.set('books_list', { data: parsed, timestamp: Date.now() });
+            return parsed;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
   return cachedFetch('books_list', async () => {
     const res = await fetch('/api/books');
     if (!res.ok) throw new Error('Failed to load books list');
     const data = await res.json();
-    if (typeof window !== 'undefined' && data && Array.isArray(data.books)) {
+    if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && data && Array.isArray(data.books)) {
       try {
         localStorage.setItem('tipitaka_books_cache_v1', JSON.stringify(data));
       } catch (e) {}

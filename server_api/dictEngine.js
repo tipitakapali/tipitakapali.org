@@ -539,6 +539,9 @@ function lookupINF(rawQuery) {
   return null;
 }
 
+// Development Mode Flag: Set to false to disable all caching during active development
+const ENABLE_DICT_CACHE = false;
+
 // Bounded in-memory LRU cache for dictionary queries (< 0.01ms response time)
 const DICT_CACHE_MAX = 3000;
 const dictCache = new Map();
@@ -559,9 +562,11 @@ function lookupAll(rawWord) {
     };
   }
 
-  const cached = dictCache.get(word);
-  if (cached) {
-    return cached;
+  if (ENABLE_DICT_CACHE) {
+    const cached = dictCache.get(word);
+    if (cached) {
+      return cached;
+    }
   }
 
   const syns = getSynonyms(word);
@@ -600,12 +605,14 @@ function lookupAll(rawWord) {
     splitter,
   };
 
-  // LRU cache insertion
-  if (dictCache.size >= DICT_CACHE_MAX) {
-    const firstKey = dictCache.keys().next().value;
-    dictCache.delete(firstKey);
+  if (ENABLE_DICT_CACHE) {
+    // LRU cache insertion
+    if (dictCache.size >= DICT_CACHE_MAX) {
+      const firstKey = dictCache.keys().next().value;
+      dictCache.delete(firstKey);
+    }
+    dictCache.set(word, result);
   }
-  dictCache.set(word, result);
 
   return result;
 }

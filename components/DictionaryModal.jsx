@@ -407,7 +407,7 @@ export default function DictionaryModal() {
     >
       <div
         className={`dict-panel-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]`}
-        style={{ '--dict-font-size': `${13.5 * fontSizeMultiplier}px` }}
+        style={{ '--dict-font-size': `${15 * fontSizeMultiplier}px` }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}

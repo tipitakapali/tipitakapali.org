@@ -246,9 +246,20 @@ async function main() {
     };
   });
 
+// Active Development Cache Control Toggle: Set to false to disable HTTP caches during active development
+const ENABLE_HTTP_CACHE = false;
+
+function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-while-revalidate=604800') {
+  if (ENABLE_HTTP_CACHE) {
+    reply.header('Cache-Control', publicHeader);
+  } else {
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  }
+}
+
   // Navigation tree endpoint (1 Year Immutable Cache + RAM-Resident)
   fastify.get('/api/tree', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     if (precomputedTree) return precomputedTree;
 
     const treeJsonPath = path.join(__dirname, 'tree.json');
@@ -276,13 +287,13 @@ async function main() {
 
   // List all 217 books (1 Year Immutable Cache + RAM-Resident)
   fastify.get('/api/books', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     return precomputedBooksList;
   });
 
   // Get specific book with precomputed chapters and instant buffering support
   fastify.get('/api/book/:code', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const rawCode = req.params.code;
     let cleanCode = rawCode.replace('.xml', '');
     let resolvedChapFromCode = undefined;
@@ -384,7 +395,7 @@ async function main() {
 
   // Get specific chapter HTML instantly from precomputed table (< 0.1ms)
   fastify.get('/api/book/:code/chapter/:chapterIndex', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     let cleanCode = req.params.code.replace('.xml', '');
     const chapIdx = parseInt(req.params.chapterIndex, 10);
 
@@ -411,7 +422,7 @@ async function main() {
 
   // Get raw TEI XML source for a book
   fastify.get('/api/book/:code/xml', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const cleanCode = req.params.code.replace('.xml', '');
     const xmlRow = stmtGetBookXml.get(cleanCode);
     if (!xmlRow) {
@@ -424,7 +435,7 @@ async function main() {
 
   // Get hierarchical TOC for a book (In-Memory Cached)
   fastify.get('/api/book/:code/toc', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const cleanCode = req.params.code.replace('.xml', '');
     let toc = tocCache.get(cleanCode);
     if (!toc) {
@@ -440,7 +451,7 @@ async function main() {
 
   // Get MAT cross-reference relations for a book (In-Memory Lookup)
   fastify.get('/api/book/:code/mat', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     let cleanCode = req.params.code.replace('.xml', '');
 
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -471,13 +482,13 @@ async function main() {
 
   // Get full MAT matrix for all books (RAM-Resident)
   fastify.get('/api/mat', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     return precomputedMatList;
   });
 
   // Full-Text Search across 520,000+ paragraphs with In-Memory LRU Caching
   fastify.get('/api/search', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
     const rawQuery = req.query.q || req.query.query || '';
     const bookFilter = req.query.book || null;
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '50', 10)));
@@ -566,7 +577,7 @@ async function main() {
     const dictType = (req.query.dict || req.query.dictionary || 'all').toLowerCase();
     const useSplitter = req.query.d === 'yes';
 
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
 
     if (!rawWord.trim()) {
       return { word: '', hasResults: false, error: 'Empty word query' };
@@ -597,6 +608,8 @@ async function main() {
     const dictType = (body.dict || body.dictionary || 'all').toLowerCase();
     const useSplitter = body.d === 'yes';
 
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+
     if (!rawWord.trim()) {
       return { word: '', hasResults: false, error: 'Empty word query' };
     }
@@ -622,7 +635,7 @@ async function main() {
 
   fastify.get('/api/dict/inf', async (req, reply) => {
     const query = req.query.w || req.query.id || req.query.word || '';
-    reply.header('Cache-Control', 'public, max-age=604800');
+    applyCacheHeader(reply, 'public, max-age=604800');
     if (!query) return { error: 'Empty inflection query' };
     const res = dictEngine.lookupINF(query);
     if (!res) return { word: query, html: '' };
@@ -632,6 +645,7 @@ async function main() {
   fastify.post('/api/dict/inf', async (req, reply) => {
     const body = req.body || {};
     const query = body.w || body.id || body.word || '';
+    applyCacheHeader(reply, 'public, max-age=604800');
     if (!query) return { error: 'Empty inflection query' };
     const res = dictEngine.lookupINF(query);
     if (!res) return { word: query, html: '' };

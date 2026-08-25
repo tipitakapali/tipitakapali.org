@@ -2079,8 +2079,8 @@ footer.app-footer.hidden-footer,
 /* Dictionary DPD and General Typography Styles */
 .dp9 {
   font-family: inherit;
-  font-size: var(--dict-font-size, 13.5px);
-  line-height: 1.6;
+  font-size: var(--dict-font-size, 15px);
+  line-height: 1.65;
   color: var(--text-primary);
 }
 
@@ -2088,9 +2088,10 @@ footer.app-footer.hidden-footer,
   border: 1.5px solid var(--accent-border);
   background: var(--bg-card);
   border-radius: 10px;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 6px 0;
-  padding: 10px 14px;
+  padding: 12px 16px;
+  font-size: var(--dict-font-size, 15px);
   box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
@@ -2099,11 +2100,22 @@ footer.app-footer.hidden-footer,
   border-color: var(--accent-border);
 }
 
+.dp9 .content {
+  font-size: 1em;
+  line-height: 1.65;
+}
+
+.dp9 .content p {
+  margin-top: 0.2em;
+  margin-bottom: 0.4em;
+  line-height: 1.65;
+}
+
 .dp9 .p1w, .dp9 .p2w, .dp9 .p3w {
   font-weight: 700;
-  font-size: 1.15em;
+  font-size: 1.25em;
   display: inline-block;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .dp9 .p1w {
@@ -2120,7 +2132,7 @@ footer.app-footer.hidden-footer,
 
 .dp9 .pp1w, .dp9 .pp2w {
   font-weight: 700;
-  font-size: 1.15em;
+  font-size: 1.25em;
 }
 .dp9 .pp2w {
   color: var(--accent);
@@ -2128,7 +2140,7 @@ footer.app-footer.hidden-footer,
 
 .dp9 .pm1w, .dp9 .pm2w {
   font-weight: 700;
-  font-size: 1.1em;
+  font-size: 1.25em;
 }
 .dp9 .pm2w {
   color: var(--accent);
@@ -2187,12 +2199,12 @@ footer.app-footer.hidden-footer,
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
-  font-size: 12px;
+  font-size: 13.5px;
 }
 
 .dp9 table.inflection th,
 .dp9 table.inflection td {
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
   text-align: center;
@@ -2225,14 +2237,14 @@ footer.app-footer.hidden-footer,
   width: 100%;
   border-collapse: collapse;
   margin: 8px 0;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 
 .dp9 table.family th,
 .dp9 table.family td,
 .dp9 table.grammar th,
 .dp9 table.grammar td {
-  padding: 4px 8px;
+  padding: 5px 10px;
   vertical-align: top;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
@@ -2283,14 +2295,14 @@ footer.app-footer.hidden-footer,
 /* PTS (Pali Text Society PED) Styling */
 .pts15 {
   font-family: inherit;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
   border: 1.5px solid #22c55e;
   background: var(--bg-card);
-  line-height: 1.65;
+  line-height: 1.7;
   margin: 4px 0;
   color: var(--text-primary);
-  font-size: var(--dict-font-size, 13.5px);
+  font-size: var(--dict-font-size, 15px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -2310,13 +2322,13 @@ footer.app-footer.hidden-footer,
 
 .pts15 .f2 g {
   color: #16a34a;
-  font-size: 0.85em;
+  font-size: 0.9em;
   font-weight: 600;
 }
 
 .pts15 .f2 {
   color: var(--text-muted);
-  font-size: 0.85em;
+  font-size: 0.9em;
 }
 
 .pts15 .in1 {
@@ -2345,9 +2357,9 @@ footer.app-footer.hidden-footer,
   border-radius: 10px;
   border: 1.5px solid #d97706;
   background: var(--bg-card);
-  line-height: 1.8;
+  line-height: 1.85;
   color: var(--text-primary);
-  font-size: var(--dict-font-size, 14px);
+  font-size: var(--dict-font-size, 15.5px);
   margin: 4px 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
@@ -2360,7 +2372,7 @@ footer.app-footer.hidden-footer,
 .tmmAbhidhan p {
   margin-top: 0;
   margin-bottom: 0.4em;
-  line-height: 1.8;
+  line-height: 1.85;
 }
 
 .tmmAbhidhan div {
@@ -2370,7 +2382,7 @@ footer.app-footer.hidden-footer,
 /* Headword in Myanmar */
 .tmmAbhidhan .word {
   font-weight: 700;
-  font-size: 1.25em;
+  font-size: 1.3em;
   color: #ea580c;
   display: inline-block;
   margin-bottom: 4px;
@@ -2396,7 +2408,7 @@ footer.app-footer.hidden-footer,
 /* Viggaha (Pali Grammatical Derivation & Etymology) */
 .tmmAbhidhan .viggaha {
   color: #0284c7;
-  font-size: 0.95em;
+  font-size: 0.98em;
   margin: 4px 0 6px 0;
 }
 
@@ -2423,7 +2435,7 @@ footer.app-footer.hidden-footer,
 .tmmAbhidhan .definition li {
   margin-bottom: 4px;
   padding-left: 4px;
-  line-height: 1.8;
+  line-height: 1.85;
 }
 
 /* Reference Citation & Sources */
@@ -2431,7 +2443,7 @@ footer.app-footer.hidden-footer,
 .tmmAbhidhan .source {
   text-align: right;
   color: var(--text-muted);
-  font-size: 0.82em;
+  font-size: 0.85em;
   margin-top: 8px;
   padding-top: 4px;
   border-top: 1px dashed var(--border-color);
@@ -2439,20 +2451,20 @@ footer.app-footer.hidden-footer,
 
 .tmmAbhidhan .seeBookInfo {
   color: var(--text-muted);
-  font-size: 0.8em;
+  font-size: 0.82em;
   font-style: italic;
 }
 
 
 /* Pāli-Sinhala Dictionary (PSD) Styling */
 .psinh26 {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
   border: 1.5px solid #8b5cf6;
   background: var(--bg-card);
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text-primary);
-  font-size: var(--dict-font-size, 13.5px);
+  font-size: var(--dict-font-size, 15px);
   margin: 4px 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
@@ -2486,11 +2498,11 @@ section.PSD {
 .PSD .psdW {
   color: #0d9488;
   font-weight: 700;
-  font-size: 1.15em;
+  font-size: 1.2em;
 }
 
 .PSD h1 {
-  font-size: 1.2em;
+  font-size: 1.25em;
   font-weight: 700;
   margin: 0.25em 0;
   color: var(--text-primary);
@@ -2507,13 +2519,13 @@ section.PSD {
 
 /* Sanskrit Lexicon (Apte & Monier-Williams) Styling */
 .sanskritSection {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
   border: 1.5px solid #0891b2;
   background: var(--bg-card);
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text-primary);
-  font-size: var(--dict-font-size, 13.5px);
+  font-size: var(--dict-font-size, 15px);
   margin: 4px 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
@@ -2550,7 +2562,7 @@ section.MWS {
 }
 
 .MWS .sdatadeva {
-  font-size: 1.1em;
+  font-size: 1.15em;
 }
 
 .MWS .asdata {
@@ -2559,7 +2571,7 @@ section.MWS {
 }
 
 .MWS .footnote, .MWS .g, .MWS .lang, .MWS .lnum, .MWS .pb {
-  font-size: 0.85em;
+  font-size: 0.88em;
   color: var(--text-muted);
 }
 
@@ -2571,7 +2583,7 @@ section.MWS {
 
 .MWS td {
   padding: 3px 6px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 /* Splitter / Deconstructor Styling (Distinct Indigo Color Identity) */
@@ -2581,6 +2593,7 @@ section.MWS {
   border: 1.5px solid #6366f1;
   background: var(--bg-card);
   margin: 4px 0;
+  font-size: var(--dict-font-size, 15px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -2591,6 +2604,7 @@ section.MWS {
 
 .dpd-splitter-section .p2w {
   color: #4f46e5;
+  font-size: 1.2em;
 }
 
 [data-theme="dark"] .dpd-splitter-section .p2w {
@@ -2599,9 +2613,9 @@ section.MWS {
 
 .dpd-splitter-section .dec {
   padding: 3px 0;
-  font-size: 1.1em;
+  font-size: 1.12em;
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .dpd-splitter-section .dec-plus {
