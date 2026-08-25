@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ListTree, X, Search, BookOpen, ChevronRight, Bookmark } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
 
 // Compute accurate hierarchy depth: Book/Nikāya (0) > Chapter (1) > Title (2) > Subhead (3) > Subsubhead (4)
 function getTocItemHierarchy(item) {
@@ -126,7 +126,7 @@ export default function BookTocModal({ isOpen, onClose }) {
             <ListTree size={18} className="text-[var(--accent)] shrink-0" />
             <div className="overflow-hidden">
               <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">
-                {convertPaliScript(activeTab.title, settings?.paliScript)}
+                {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
               </h3>
               <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
                 <span>Table of Contents</span>
@@ -251,7 +251,7 @@ export default function BookTocModal({ isOpen, onClose }) {
                         }`}
                       />
                     )}
-                    <span className={titleClass}>{convertPaliScript(item.title, settings?.paliScript)}</span>
+                    <span className={titleClass}>{convertPaliScript(capitalizePali(item.title), settings?.paliScript)}</span>
                   </div>
 
                   {isCurrentReading ? (

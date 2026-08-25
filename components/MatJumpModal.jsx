@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { X, BookOpen, Layers, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { convertPaliScript } from '../services/transliterate';
+import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 
 export default function MatJumpModal({ isOpen, onClose }) {
@@ -117,7 +117,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
           <div className="truncate flex items-center gap-1.5">
             <span className="text-[var(--text-muted)]">Current Position:</span>
             <span className="font-semibold text-[var(--text-primary)] truncate max-w-[220px]">
-              {convertPaliScript(activeTab.title, settings?.paliScript)}
+              {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
             </span>
           </div>
           {activeParaNum && (
@@ -157,7 +157,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
-                        {convertPaliScript(item.title, settings?.paliScript)}
+                        {convertPaliScript(capitalizePali(item.title), settings?.paliScript)}
                       </span>
                       <span
                         className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold border ${item.badgeColor}`}

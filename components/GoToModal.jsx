@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Navigation, Hash, BookOpen, CornerDownLeft, AlertCircle } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { convertPaliScript } from '../services/transliterate';
+import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export default function GoToModal({ isOpen, onClose, initialTab = 'para', initialEdition = null }) {
   const { activeTab, openBook, activeParaNum } = useTabs();
@@ -315,7 +315,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
                 Go to Location
               </h3>
               <p className="text-[11px] text-[var(--text-muted)] truncate max-w-[240px]">
-                {convertPaliScript(activeTab.title, settings?.paliScript)}
+                {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
               </p>
             </div>
           </div>

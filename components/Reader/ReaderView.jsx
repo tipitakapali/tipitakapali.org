@@ -6,7 +6,7 @@ import WelcomeView from './WelcomeView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 
-import { transliterateHtml, convertPaliScript, highlightHtmlText } from '../../services/transliterate';
+import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
 
 // Memoized Chapter Block with Pre-Buffering Intersection Observer
@@ -67,7 +67,7 @@ const ChapterBlock = memo(function ChapterBlock({
       className="chapter-placeholder py-8 px-4 my-6 border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--bg-secondary)]/40 select-none"
     >
       <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] text-center">
-        {convertPaliScript(chapter.title, paliScript)}
+        {convertPaliScript(capitalizePali(chapter.title), paliScript)}
       </h3>
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1">
@@ -805,15 +805,17 @@ export default function ReaderView() {
           onClick={handleBreadcrumbClick}
           title="Click to reveal full navigation and sidebar"
         >
-          <span>{convertPaliScript('Tipiṭaka', settings?.paliScript)}</span>
-          <span className="opacity-40">›</span>
-          <span className="truncate opacity-75">{convertPaliScript(activeTab.nikaya || activeTab.category || '', settings?.paliScript)}</span>
-          <span className="opacity-40">›</span>
-          <span className="current truncate font-semibold text-[var(--accent)]">{convertPaliScript(activeTab.title, settings?.paliScript)}</span>
-          {currentChap && currentChap.title !== activeTab.title && (
+          {(activeTab.nikaya || activeTab.category) && (
+            <>
+              <span className="truncate opacity-75">{convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}</span>
+              <span className="opacity-40">›</span>
+            </>
+          )}
+          <span className="current truncate font-semibold text-[var(--accent)]">{convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}</span>
+          {currentChap && capitalizePali(currentChap.title) !== capitalizePali(activeTab.title) && (
             <>
               <span className="opacity-40">›</span>
-              <span className="truncate text-[var(--text-muted)]">{convertPaliScript(currentChap.title, settings?.paliScript)}</span>
+              <span className="truncate text-[var(--text-muted)]">{convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript)}</span>
             </>
           )}
         </div>

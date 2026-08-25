@@ -10,7 +10,7 @@ import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { convertPaliScript } from '../services/transliterate';
+import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
@@ -24,19 +24,19 @@ export function MainAppContent({ params: rawParams }) {
     if (typeof document === 'undefined') return;
 
     if (!activeTab) {
-      document.title = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka', settings?.paliScript);
+      document.title = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App', settings?.paliScript);
       return;
     }
 
     const currentChapIdx = activeTab.currentChapterIdx || 0;
     const currentChap = activeTab.chapters?.[currentChapIdx];
 
-    const bookTitle = convertPaliScript(activeTab.title, settings?.paliScript);
-    const chapTitle = currentChap?.title ? convertPaliScript(currentChap.title, settings?.paliScript) : '';
-    const nikaya = activeTab.nikaya ? convertPaliScript(activeTab.nikaya, settings?.paliScript) : '';
+    const bookTitle = convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript);
+    const chapTitle = currentChap?.title ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
+    const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), settings?.paliScript) : '';
 
-    const tipitakaLabel = convertPaliScript('Tipiṭaka', settings?.paliScript);
-    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka', settings?.paliScript);
+    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi App', settings?.paliScript);
+    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App', settings?.paliScript);
 
     // Clean, search & bookmark-friendly title format matching breadcrumbs
     if (chapTitle && chapTitle !== bookTitle) {

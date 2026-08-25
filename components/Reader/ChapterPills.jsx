@@ -3,7 +3,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { convertPaliScript } from '../../services/transliterate';
+import { convertPaliScript, capitalizePali } from '../../services/transliterate';
 
 export default function ChapterPills({ chapters: propsChapters, currentChapterIdx: propsIdx, onChapterSelect: propsOnSelect }) {
   const { activeTab, setChapterForActiveTab } = useTabs();
@@ -29,7 +29,7 @@ export default function ChapterPills({ chapters: propsChapters, currentChapterId
     <div className="chapter-pills-bar" ref={pillsScrollRef}>
       {chapters.map((chap, i) => {
         const isActive = i === currentChapterIdx;
-        const displayTitle = convertPaliScript(chap.title, settings?.paliScript) || `Chapter ${i + 1}`;
+        const displayTitle = convertPaliScript(capitalizePali(chap.title), settings?.paliScript) || `Chapter ${i + 1}`;
         return (
           <button
             key={chap.chapter_index !== undefined ? chap.chapter_index : i}

@@ -50,6 +50,17 @@ export function typeVelthuis(uType) {
 }
 
 /**
+ * Capitalizes the first Unicode letter of a Pali text/title, skipping leading digits and punctuation.
+ * e.g. "añña" -> "Añña", "1. paṇāmagāthā" -> "1. Paṇāmagāthā", "ṭīkā" -> "Ṭīkā"
+ */
+export function capitalizePali(text) {
+  if (!text || typeof text !== 'string') return text || '';
+  return text.replace(/^([\s\d\.\-\(\)\[\]\/#:]*)([\p{L}])/u, (_, prefix, firstChar) => {
+    return prefix + firstChar.toUpperCase();
+  });
+}
+
+/**
  * Convert any of the 17 supported scripts or Velthuis input to standard Roman Pāḷi
  */
 export function convertAnyToRoman(text) {

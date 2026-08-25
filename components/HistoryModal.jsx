@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { X, History, Trash2, Search, ExternalLink, Clock } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export default function HistoryModal({ isOpen, onClose }) {
   const { recentHistory, clearHistory, openBook } = useTabs();
@@ -95,10 +95,10 @@ export default function HistoryModal({ isOpen, onClose }) {
             </div>
           ) : (
             filtered.map((item) => {
-              const displayBookTitle = convertPaliScript(item.bookTitle, settings?.paliScript);
-              const displayChapterTitle = convertPaliScript(item.chapterTitle, settings?.paliScript);
+              const displayBookTitle = convertPaliScript(capitalizePali(item.bookTitle), settings?.paliScript);
+              const displayChapterTitle = convertPaliScript(capitalizePali(item.chapterTitle), settings?.paliScript);
               const displaySnippet = convertPaliScript(item.snippet, settings?.paliScript);
-              const displayNikaya = convertPaliScript(item.nikaya, settings?.paliScript);
+              const displayNikaya = convertPaliScript(capitalizePali(item.nikaya), settings?.paliScript);
               return (
                 <div
                   key={item.id}

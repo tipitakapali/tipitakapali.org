@@ -3,12 +3,12 @@
 import React from 'react';
 import { Book } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
+import { convertPaliScript, transliterateHtml, capitalizePali } from '../../services/transliterate';
 
 export default function SearchResultItem({ result, onClick }) {
   const { settings } = useThemeSettings();
-  const displayTitle = convertPaliScript(result.book_title, settings?.paliScript);
-  const displayNikaya = convertPaliScript(result.nikaya || '', settings?.paliScript);
+  const displayTitle = convertPaliScript(capitalizePali(result.book_title), settings?.paliScript);
+  const displayNikaya = convertPaliScript(capitalizePali(result.nikaya || ''), settings?.paliScript);
   const displaySnippet = transliterateHtml(result.snippet, settings?.paliScript);
 
   return (

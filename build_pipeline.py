@@ -68,7 +68,7 @@ INDEX_HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chaṭṭha Saṅgāyana Tipiṭaka (Roman Latin)</title>
+    <title>Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi App</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         :root {
@@ -2432,14 +2432,22 @@ INDEX_HTML_TEMPLATE = r"""<!DOCTYPE html>
             highlightNode(element);
         }
 
+        function capitalizePali(text) {
+            if (!text || typeof text !== 'string') return text || '';
+            return text.replace(/^([\s\d\.\-\(\)\[\]\/#:]*)([\p{L}])/u, (_, prefix, firstChar) => {
+                return prefix + firstChar.toUpperCase();
+            });
+        }
+
         function updateBreadcrumb(tab, chapterTitle) {
+            const nikaya = tab.nikaya || tab.category;
+            const nikayaSpan = nikaya ? `<span>${capitalizePali(nikaya)}</span> <span>›</span> ` : '';
+            const bTitle = capitalizePali(tab.title);
+            const cTitle = chapterTitle ? capitalizePali(chapterTitle) : '';
             breadcrumbs.innerHTML = `
-                <span>Tipiṭaka</span>
-                <span>›</span>
-                <span>${tab.nikaya || tab.category || ''}</span>
-                <span>›</span>
-                <span class="current">${tab.title}</span>
-                ${chapterTitle && chapterTitle !== tab.title ? `<span>›</span> <span>${chapterTitle}</span>` : ''}
+                ${nikayaSpan}
+                <span class="current">${bTitle}</span>
+                ${cTitle && cTitle !== bTitle ? `<span>›</span> <span>${cTitle}</span>` : ''}
             `;
         }
 

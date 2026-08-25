@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { X, Bookmark, BookmarkCheck, Trash2, Search, ExternalLink, Calendar, Plus } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export default function BookmarkModal({ isOpen, onClose }) {
   const { bookmarks, addBookmark, removeBookmark, openBook, activeTab, activeParaNum } = useTabs();
@@ -150,11 +150,11 @@ export default function BookmarkModal({ isOpen, onClose }) {
                 Current Reading Page:
               </div>
               <div className="text-xs font-semibold text-[var(--text-primary)] truncate flex items-center gap-1.5 flex-wrap">
-                <span>{convertPaliScript(activeTab.title, settings?.paliScript)}</span>
+                <span>{convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}</span>
                 {currentChap?.title && currentChap.title !== activeTab.title && (
                   <span className="text-[var(--text-muted)] font-normal">
                     {' › '}
-                    {convertPaliScript(currentChap.title, settings?.paliScript)}
+                    {convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript)}
                   </span>
                 )}
                 {activeParaNum && (
@@ -212,10 +212,10 @@ export default function BookmarkModal({ isOpen, onClose }) {
             </div>
           ) : (
             filtered.map((item) => {
-              const displayBookTitle = convertPaliScript(item.bookTitle, settings?.paliScript);
-              const displayChapterTitle = convertPaliScript(item.chapterTitle, settings?.paliScript);
+              const displayBookTitle = convertPaliScript(capitalizePali(item.bookTitle), settings?.paliScript);
+              const displayChapterTitle = convertPaliScript(capitalizePali(item.chapterTitle), settings?.paliScript);
               const displaySnippet = convertPaliScript(item.snippet, settings?.paliScript);
-              const displayNikaya = convertPaliScript(item.nikaya, settings?.paliScript);
+              const displayNikaya = convertPaliScript(capitalizePali(item.nikaya), settings?.paliScript);
               return (
                 <div
                   key={item.id}
