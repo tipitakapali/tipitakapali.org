@@ -75,8 +75,11 @@ export default function MatJumpModal({ isOpen, onClose }) {
   // Simplify Jump list by showing only other connected layers
   const jumpTargets = connectedBooks.filter((item) => !item.isCurrent);
 
-  const handleJump = (layer) => {
-    jumpToMat(layer);
+  const handleJump = (item) => {
+    jumpToMat(item.layer, {
+      title: item.title,
+      code: item.code,
+    });
     onClose();
   };
 
@@ -137,7 +140,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
             jumpTargets.map((item) => (
               <div
                 key={item.layer}
-                onClick={() => item.available && handleJump(item.layer)}
+                onClick={() => item.available && handleJump(item)}
                 className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 select-none ${
                   item.available
                     ? 'border-[var(--border-color)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--bg-card)] cursor-pointer group'
@@ -182,7 +185,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleJump(item.layer);
+                        handleJump(item);
                       }}
                       className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
                     >

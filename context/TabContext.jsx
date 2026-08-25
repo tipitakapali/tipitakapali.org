@@ -519,6 +519,26 @@ export function TabProvider({ children }) {
         return;
       }
 
+      // Optimistic tab creation - instant 0ms tab open in TabBar and switch to new tab
+      const optimisticTab = {
+        bookCode: cleanCode,
+        title: options.title || cleanCode,
+        nikaya: options.nikaya || '',
+        category: options.category || '',
+        chapter_count: 1,
+        chapters: [],
+        toc: [],
+        loadedChapters: {},
+        loadingChapters: { [targetChapIdx]: true },
+        isLoading: true,
+        currentChapterIdx: targetChapIdx,
+      };
+      const nextTabsOptimistic = [...openTabsRef.current, optimisticTab];
+      setOpenTabs(nextTabsOptimistic);
+      setActiveBookCode(cleanCode);
+      persistTabs(nextTabsOptimistic, cleanCode);
+      updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1 });
+
       setLoadingBook(true);
       try {
         // First resolve chapter if targetParaNum is provided and we can pre-check or load metadata
@@ -566,6 +586,7 @@ export function TabProvider({ children }) {
           loadedChapters: { ...bookData.chapters_data },
 
           loadingChapters: {},
+          isLoading: false,
           currentChapterIdx: targetChapIdx,
         };
 
@@ -993,7 +1014,7 @@ export function TabProvider({ children }) {
 
   // Jump MAT (Mūla · Aṭṭhakathā · Ṭīkā) handler
   const jumpToMat = useCallback(
-    async (targetLayer) => {
+    async (targetLayer, options = {}) => {
       if (!activeTab) return;
       let mat = activeTab.mat;
       if (!mat) {
@@ -1002,11 +1023,20 @@ export function TabProvider({ children }) {
         } catch (e) {}
       }
 
-      let targetCode = null;
-      if (mat) {
-        if (targetLayer === 'mula') targetCode = mat.mula_code;
-        else if (targetLayer === 'attha') targetCode = mat.attha_code;
-        else if (targetLayer === 'tika') targetCode = mat.tika_code;
+      let targetCode = options.code || null;
+      let targetTitle = options.title || null;
+
+      if (!targetCode && mat) {
+        if (targetLayer === 'mula') {
+          targetCode = mat.mula_code;
+          targetTitle = mat.mula_title;
+        } else if (targetLayer === 'attha') {
+          targetCode = mat.attha_code;
+          targetTitle = mat.attha_title;
+        } else if (targetLayer === 'tika') {
+          targetCode = mat.tika_code;
+          targetTitle = mat.tika_title;
+        }
       }
 
       if (!targetCode) {
@@ -1036,6 +1066,7 @@ export function TabProvider({ children }) {
       }
 
       openBook(targetCode, {
+        title: targetTitle || undefined,
         targetParaNum: currentPara || undefined,
       });
     },

@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { Bookmark, BookmarkCheck, BookA } from 'lucide-react';
 import WelcomeView from './WelcomeView';
+import MeditationLoader from './MeditationLoader';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
@@ -1107,6 +1108,19 @@ export default function ReaderView() {
     return (
       <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
         <WelcomeView />
+      </main>
+    );
+  }
+
+  if (activeTab.isLoading || (!activeTab.chapters?.length && !activeTab.html)) {
+    return (
+      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
+        <MeditationLoader
+          bookTitle={activeTab.title}
+          chapterIdx={activeTab.currentChapterIdx}
+          paraNum={activeParaNum}
+          paliScript={settings?.paliScript}
+        />
       </main>
     );
   }
