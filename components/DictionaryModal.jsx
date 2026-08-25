@@ -8,8 +8,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Layers,
-  PanelTop,
-  PanelBottom,
   PanelLeft,
   PanelRight,
   Maximize2,
@@ -232,9 +230,8 @@ export default function DictionaryModal() {
   const contentContainerRef = useRef(null);
   const modalPanelRef = useRef(null);
 
-  // Resizable Dimensions State (persisted in localStorage)
+  // Resizable Width State (persisted in localStorage)
   const [dictWidth, setDictWidth] = useState(420);
-  const [dictHeight, setDictHeight] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
 
   const currentScript = settings?.paliScript || 'roman';
@@ -248,13 +245,6 @@ export default function DictionaryModal() {
         const parsedW = parseInt(savedW, 10);
         if (!isNaN(parsedW) && parsedW >= 260 && parsedW <= 1000) {
           setDictWidth(parsedW);
-        }
-      }
-      const savedH = localStorage.getItem('tipitaka_dict_dock_height');
-      if (savedH) {
-        const parsedH = parseInt(savedH, 10);
-        if (!isNaN(parsedH) && parsedH >= 200 && parsedH <= 900) {
-          setDictHeight(parsedH);
         }
       }
     } catch (e) {}
@@ -297,45 +287,6 @@ export default function DictionaryModal() {
       document.addEventListener('mouseup', onMouseUp);
     },
     [dictWidth, dockMode]
-  );
-
-  // Resize handler for drawer height (Top or Bottom drawer)
-  const startResizingHeight = useCallback(
-    (mouseDownEvent) => {
-      mouseDownEvent.preventDefault();
-      setIsResizing(true);
-      const startY = mouseDownEvent.clientY;
-      const startHeight = dictHeight;
-
-      const onMouseMove = (mouseMoveEvent) => {
-        let newHeight;
-        if (dockMode === 'bottom') {
-          newHeight = startHeight - (mouseMoveEvent.clientY - startY);
-        } else {
-          newHeight = startHeight + (mouseMoveEvent.clientY - startY);
-        }
-        const maxH = Math.min(850, typeof window !== 'undefined' ? window.innerHeight * 0.85 : 700);
-        const clamped = Math.max(220, Math.min(newHeight, maxH));
-        setDictHeight(clamped);
-        try {
-          localStorage.setItem('tipitaka_dict_dock_height', String(clamped));
-        } catch (e) {}
-      };
-
-      const onMouseUp = () => {
-        setIsResizing(false);
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-      };
-
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'row-resize';
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    },
-    [dictHeight, dockMode]
   );
 
   // Synchronize local input with context display word
@@ -646,20 +597,12 @@ export default function DictionaryModal() {
       )}
 
       {/* Resizer handle on bottom edge (when top drawer) */}
-      {dockMode === 'top' && (
+      {/* Resizer handle on right edge (when docked left) */}
+      {dockMode === 'left' && (
         <div
-          className={`dict-resizer-handle dict-resizer-handle-bottom ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={startResizingHeight}
-          title="Drag to resize drawer height"
-        />
-      )}
-
-      {/* Resizer handle on top edge (when bottom drawer) */}
-      {dockMode === 'bottom' && (
-        <div
-          className={`dict-resizer-handle dict-resizer-handle-top ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={startResizingHeight}
-          title="Drag to resize drawer height"
+          className={`dict-resizer-handle dict-resizer-handle-right ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startResizingWidth}
+          title="Drag to resize dictionary panel width"
         />
       )}
 
@@ -728,7 +671,7 @@ export default function DictionaryModal() {
             </button>
           </div>
 
-          {/* Dock Position Switcher */}
+          {/* Dock Position Switcher: Left Dock, Center Modal, Right Dock */}
           <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
             <button
               onClick={() => setDockMode('left')}
@@ -738,25 +681,11 @@ export default function DictionaryModal() {
               <PanelLeft size={13} />
             </button>
             <button
-              onClick={() => setDockMode('top')}
-              className={`p-1 rounded transition cursor-pointer ${dockMode === 'top' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-              title="Top Drawer mode"
-            >
-              <PanelTop size={13} />
-            </button>
-            <button
               onClick={() => setDockMode('modal')}
               className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
               title="Center Modal mode"
             >
               <Maximize2 size={13} />
-            </button>
-            <button
-              onClick={() => setDockMode('bottom')}
-              className={`p-1 rounded transition cursor-pointer ${dockMode === 'bottom' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-              title="Bottom Drawer mode"
-            >
-              <PanelBottom size={13} />
             </button>
             <button
               onClick={() => setDockMode('side')}
@@ -860,12 +789,12 @@ export default function DictionaryModal() {
       </div>
 
       {/* ========================================================= */}
-      {/* Definition Content Body */}
+      {/* Definition Content Body (Lean & Seamless without chunky borders) */}
       {/* ========================================================= */}
       <div
         ref={contentContainerRef}
         onClick={handleContentClick}
-        className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"
+        className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"
       >
         {/* Loading Indicator */}
         {isLoading && (
@@ -884,7 +813,7 @@ export default function DictionaryModal() {
 
         {/* Results List */}
         {!isLoading && currentTabResults.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {currentTabResults.map((item, idx) => {
               const rawHtml = item.html || '';
               const processedHtml = convertDictionaryEntryHtml(rawHtml, activeDictTab, currentScript);
@@ -892,14 +821,8 @@ export default function DictionaryModal() {
               return (
                 <div
                   key={idx}
-                  className="dict-entry-box p-3.5 sm:p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition"
+                  className="dict-entry-item pb-2.5 mb-2.5 border-b border-[var(--border-color)]/30 last:border-b-0 last:pb-0 last:mb-0"
                 >
-                  {item.source && (
-                    <div className="text-[10.5px] font-semibold text-[var(--accent)] mb-1.5 pb-1 border-b border-[var(--border-color)] flex items-center justify-between">
-                      <span>{item.source}</span>
-                      {item.isExact && <span className="text-[9.5px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded">Exact match</span>}
-                    </div>
-                  )}
                   <div
                     className="dp9 leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: processedHtml }}
@@ -981,38 +904,19 @@ export default function DictionaryModal() {
   }
 
   // 2. Docked Left or Right Panels (Docked into layout alongside Reader & Sidebar)
-  if (dockMode === 'left' || dockMode === 'side' || dockMode === 'right') {
-    return (
-      <aside
-        ref={modalPanelRef}
-        className={`dict-dock-panel dock-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
-          isResizing ? 'select-none' : ''
-        }`}
-        style={{
-          width: `${dictWidth}px`,
-          '--dict-font-size': `${15 * fontSizeMultiplier}px`,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {renderInnerContent()}
-      </aside>
-    );
-  }
-
-  // 3. Top or Bottom Drawers
   return (
-    <div
+    <aside
       ref={modalPanelRef}
-      className={`dict-panel-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
+      className={`dict-dock-panel dock-${dockMode === 'left' ? 'left' : 'side'} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
         isResizing ? 'select-none' : ''
       }`}
       style={{
-        height: `${dictHeight}px`,
+        width: `${dictWidth}px`,
         '--dict-font-size': `${15 * fontSizeMultiplier}px`,
       }}
       onClick={(e) => e.stopPropagation()}
     >
       {renderInnerContent()}
-    </div>
+    </aside>
   );
 }

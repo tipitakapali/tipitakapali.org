@@ -43,8 +43,10 @@ export function DictionaryProvider({ children }) {
   useEffect(() => {
     try {
       const savedDock = localStorage.getItem(STORAGE_KEYS.DOCK_MODE);
-      if (savedDock && ['modal', 'top', 'bottom', 'left', 'side', 'right'].includes(savedDock)) {
+      if (savedDock && ['modal', 'left', 'side', 'right'].includes(savedDock)) {
         setDockModeState(savedDock);
+      } else if (savedDock === 'top' || savedDock === 'bottom') {
+        setDockModeState('side');
       }
       const savedFont = localStorage.getItem(STORAGE_KEYS.FONT_SIZE);
       if (savedFont) {
@@ -69,19 +71,20 @@ export function DictionaryProvider({ children }) {
   }, []);
 
   const setDockMode = useCallback((mode) => {
-    setDockModeState(mode);
+    const validMode = ['left', 'modal', 'side', 'right'].includes(mode) ? mode : 'side';
+    setDockModeState(validMode);
     try {
-      localStorage.setItem(STORAGE_KEYS.DOCK_MODE, mode);
+      localStorage.setItem(STORAGE_KEYS.DOCK_MODE, validMode);
     } catch (e) {}
 
     // Synchronize Navigation Sidebar to dock to the opposite side
     if (typeof window !== 'undefined') {
-      if (mode === 'left') {
+      if (validMode === 'left') {
         try {
           localStorage.setItem('tipitaka_tree_dock', 'right');
           window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'right' }));
         } catch (e) {}
-      } else if (mode === 'side' || mode === 'right') {
+      } else if (validMode === 'side' || validMode === 'right') {
         try {
           localStorage.setItem('tipitaka_tree_dock', 'left');
           window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'left' }));
