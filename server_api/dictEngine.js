@@ -138,6 +138,10 @@ function restoreMinifiedLinksAndFeedback(html) {
     html = html.replaceAll(code, link);
   });
 
+  // Normalize footer class names to dpd-footer and ensure closing tag
+  html = html.replaceAll('class=footer', 'class="dpd-footer"');
+  html = html.replaceAll('class="footer"', 'class="dpd-footer"');
+
   return html;
 }
 
@@ -193,12 +197,8 @@ function getSynonyms(word) {
   }
 }
 
-// Query DPD Dictionary
-function lookupDPD(rawWord, useSplitter = false) {
-  if (!dbs.DPD) return [];
-  const word = rawWord.toLowerCase().trim();
-  if (!word) return [];
-
+// Single-word DPD Query
+function lookupSingleDPD(word) {
   const syns = getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
@@ -224,20 +224,32 @@ function lookupDPD(rawWord, useSplitter = false) {
     }
   }
 
-  // If no main DPD entries found, check splitter
-  if (exactMatches.length === 0 && relatedMatches.length === 0 && dbs.SPLI) {
-    return lookupSplitter(word);
-  }
-
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query PTS PED Dictionary
-function lookupPTS(rawWord) {
-  if (!dbs.PTS) return [];
+// Query DPD Dictionary (supports multi-word phrases)
+function lookupDPD(rawWord) {
+  if (!dbs.DPD) return [];
   const word = rawWord.toLowerCase().trim();
   if (!word) return [];
 
+  if (word.includes(' ')) {
+    const fullMatches = lookupSingleDPD(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSingleDPD(tok));
+    }
+    return results;
+  }
+
+  return lookupSingleDPD(word);
+}
+
+// Single-word PTS Query
+function lookupSinglePTS(word) {
   const syns = getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
@@ -265,12 +277,29 @@ function lookupPTS(rawWord) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query Abhidhānappadīpikā (Pāli-Myanmar)
-function lookupABD(rawWord) {
-  if (!dbs.ABD) return [];
+// Query PTS PED Dictionary (supports multi-word phrases)
+function lookupPTS(rawWord) {
+  if (!dbs.PTS) return [];
   const word = rawWord.toLowerCase().trim();
   if (!word) return [];
 
+  if (word.includes(' ')) {
+    const fullMatches = lookupSinglePTS(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSinglePTS(tok));
+    }
+    return results;
+  }
+
+  return lookupSinglePTS(word);
+}
+
+// Single-word Abhidhān Query
+function lookupSingleABD(word) {
   const syns = getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
@@ -298,12 +327,29 @@ function lookupABD(rawWord) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query Pāli-Sinhala Dictionary
-function lookupPSD(rawWord) {
-  if (!dbs.PSD) return [];
+// Query Abhidhānappadīpikā (supports multi-word phrases)
+function lookupABD(rawWord) {
+  if (!dbs.ABD) return [];
   const word = rawWord.toLowerCase().trim();
   if (!word) return [];
 
+  if (word.includes(' ')) {
+    const fullMatches = lookupSingleABD(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSingleABD(tok));
+    }
+    return results;
+  }
+
+  return lookupSingleABD(word);
+}
+
+// Single-word PSD Query
+function lookupSinglePSD(word) {
   const syns = getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
@@ -335,12 +381,29 @@ function lookupPSD(rawWord) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query Sanskrit (Apte / Monier-Williams)
-function lookupSANS(rawWord) {
-  if (!dbs.SANS) return [];
+// Query Pāli-Sinhala Dictionary (supports multi-word phrases)
+function lookupPSD(rawWord) {
+  if (!dbs.PSD) return [];
   const word = rawWord.toLowerCase().trim();
   if (!word) return [];
 
+  if (word.includes(' ')) {
+    const fullMatches = lookupSinglePSD(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSinglePSD(tok));
+    }
+    return results;
+  }
+
+  return lookupSinglePSD(word);
+}
+
+// Single-word Sanskrit Query
+function lookupSingleSANS(word) {
   const fchar = getFChar(word, 'SANS', false);
   const matches = [];
 
@@ -362,12 +425,29 @@ function lookupSANS(rawWord) {
   return matches;
 }
 
-// Query Splitter / Deconstructor
-function lookupSplitter(rawWord) {
-  if (!dbs.SPLI) return [];
+// Query Sanskrit (supports multi-word phrases)
+function lookupSANS(rawWord) {
+  if (!dbs.SANS) return [];
   const word = rawWord.toLowerCase().trim();
   if (!word) return [];
 
+  if (word.includes(' ')) {
+    const fullMatches = lookupSingleSANS(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSingleSANS(tok));
+    }
+    return results;
+  }
+
+  return lookupSingleSANS(word);
+}
+
+// Single-word Splitter Query
+function lookupSingleSplitter(word) {
   const fchar = getFChar(word, 'SPLI', true);
   const results = [];
 
@@ -376,19 +456,22 @@ function lookupSplitter(rawWord) {
     for (const r of rows) {
       const elements = (r.defi || '').split('@').filter((x) => x && x.trim().length > 0);
       const decHtml = elements
-        .map((el) => `<p class="dec">${el.replaceAll('+', ' + ')}</p>`)
+        .map((el) => `<p class="dec">${el.replaceAll('+', ' <span class="dec-plus">+</span> ')}</p>`)
         .join('');
 
+      const encodedWord = encodeURIComponent(r.word);
+      const improveLink = `https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=${encodedWord}&entry.326955045=Deconstructor&entry.1433863141=Tipitakapali.org%209999-12-12`;
+
       const html = `
-        <section class="dp9 dpd-splitter-section">
-          <span class="p2w font-bold text-[var(--accent)] text-sm">${r.word}</span>
-          <div class="dpd mt-1 p-2 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 text-xs">
-            ${decHtml}
-            <p class="footer text-[10px] text-[var(--text-muted)] mt-1.5 pt-1 border-t border-[var(--border-color)]">
-              DPD Deconstructor computed compound split.
-            </p>
+        <div class="dpd-splitter-section">
+          <div class="splitter-headword">
+            <span class="p2w font-bold text-indigo-600 dark:text-indigo-400 text-sm sm:text-base">${r.word}</span>
           </div>
-        </section>
+          <div class="splitter-body mt-2 space-y-1.5">
+            ${decHtml}
+          </div>
+          <p class="dpd-footer">These DPD word breakups are code-generated. <a href="${improveLink}" class="link" target="_blank">Improve it</a>.</p>
+        </div>
       `;
       results.push({
         word: r.word,
@@ -403,6 +486,27 @@ function lookupSplitter(rawWord) {
   }
 
   return results;
+}
+
+// Query Splitter / Deconstructor (supports multi-word phrases)
+function lookupSplitter(rawWord) {
+  if (!dbs.SPLI) return [];
+  const word = rawWord.toLowerCase().trim();
+  if (!word) return [];
+
+  if (word.includes(' ')) {
+    const fullMatches = lookupSingleSplitter(word);
+    if (fullMatches.length > 0) return fullMatches;
+
+    const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
+    const results = [];
+    for (const tok of tokens) {
+      results.push(...lookupSingleSplitter(tok));
+    }
+    return results;
+  }
+
+  return lookupSingleSplitter(word);
 }
 
 // Query Inflection table (declension & conjugation)
@@ -466,7 +570,7 @@ function lookupAll(rawWord) {
   const abd = lookupABD(word);
   const psd = lookupPSD(word);
   const sans = lookupSANS(word);
-  const splitter = dpd.some((d) => d.isSplitter) ? [] : lookupSplitter(word);
+  const splitter = lookupSplitter(word);
 
   const hasResults =
     dpd.length > 0 ||

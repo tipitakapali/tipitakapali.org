@@ -2574,25 +2574,96 @@ section.MWS {
   line-height: 1.4;
 }
 
-/* Splitter / Deconstructor Styling */
+/* Splitter / Deconstructor Styling (Distinct Indigo Color Identity) */
 .dpd-splitter-section {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 10px;
-  border: 1.5px solid var(--accent-border);
+  border: 1.5px solid #6366f1;
   background: var(--bg-card);
   margin: 4px 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 [data-theme="dark"] .dpd-splitter-section {
-  border-color: var(--accent-border);
+  border-color: #818cf8;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dpd-splitter-section .p2w {
+  color: #4f46e5;
+}
+
+[data-theme="dark"] .dpd-splitter-section .p2w {
+  color: #818cf8;
 }
 
 .dpd-splitter-section .dec {
   padding: 3px 0;
-  font-size: 1.05em;
+  font-size: 1.1em;
   color: var(--text-primary);
+  line-height: 1.6;
 }
+
+.dpd-splitter-section .dec-plus {
+  color: var(--text-muted);
+  font-weight: 500;
+  opacity: 0.75;
+  padding: 0 4px;
+  user-select: none;
+}
+
+[data-theme="dark"] .dpd-splitter-section .dec-plus {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+/* ========================================================= */
+/* DPD & Splitter Contribution / Feedback Footer Notes      */
+/* ========================================================= */
+.dpd-footer,
+.dp9 p.dpd-footer,
+.dp9 .footer,
+.dpd-splitter-section .dpd-footer {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  opacity: 0.65;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-color);
+  user-select: none;
+}
+
+[data-theme="dark"] .dpd-footer,
+[data-theme="dark"] .dp9 p.dpd-footer,
+[data-theme="dark"] .dp9 .footer,
+[data-theme="dark"] .dpd-splitter-section .dpd-footer {
+  opacity: 0.6;
+}
+
+.dpd-footer a,
+.dpd-footer a.link,
+.dp9 p.dpd-footer a,
+.dp9 .footer a,
+.dpd-splitter-section .dpd-footer a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border-color);
+  text-underline-offset: 2px;
+  transition: all 0.15s ease;
+}
+
+.dpd-footer a:hover,
+.dpd-footer a.link:hover,
+.dp9 p.dpd-footer a:hover,
+.dp9 .footer a:hover,
+.dpd-splitter-section .dpd-footer a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+  opacity: 1;
+}
+
+
 
 
 
