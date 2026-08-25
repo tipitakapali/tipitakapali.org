@@ -25,13 +25,18 @@ import {
 } from 'lucide-react';
 import { useDictionary } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertAnyToRoman, convertPaliScript, transliterateHtml } from '../services/transliterate';
+import { typeVelthuis, convertAnyToRoman, convertPaliScript } from '../services/transliterate';
 import { fetchDictionaryInflection } from '../services/api';
 
 // Helper to highlight exact matching inflections in table cells (CC BY-NC-SA 4.0 DPD)
-function highlightInflections(searchTerm, container) {
+function highlightInflections(searchTerm, container, targetScript = 'roman') {
   if (!searchTerm || !container) return;
-  const normalizedSearch = searchTerm.toLowerCase().trim();
+  const romanSearch = searchTerm.toLowerCase().trim();
+  const convertedSearch =
+    targetScript && targetScript !== 'roman'
+      ? convertPaliScript(searchTerm, targetScript)?.toLowerCase().trim()
+      : null;
+
   const inflectionTables = container.querySelectorAll('table.inflection');
 
   inflectionTables.forEach((table) => {
@@ -46,7 +51,7 @@ function highlightInflections(searchTerm, container) {
         tempElement.innerHTML = part;
         const partText = (tempElement.textContent || '').toLowerCase().trim();
 
-        if (partText === normalizedSearch) {
+        if (partText === romanSearch || (convertedSearch && partText === convertedSearch)) {
           modified = true;
           return `<span class="inflection-highlight font-bold text-[var(--accent)] bg-[var(--accent-light)] px-1 py-0.5 rounded shadow-xs">${part}</span>`;
         }
@@ -60,19 +65,69 @@ function highlightInflections(searchTerm, container) {
   });
 }
 
-// Helper to transliterate table cells into reader's target script
-function convertPaliTableCells(container, selectTable = 'table.inflection', onlyCell = 'td', removeBoldTag = false, targetScript = 'roman') {
-  if (!container || !targetScript || targetScript === 'roman') return;
-  const tables = container.querySelectorAll(selectTable);
-  tables.forEach((table) => {
-    const cells = table.querySelectorAll(onlyCell);
-    cells.forEach((cell) => {
-      const converted = convertPaliScript(cell.textContent || '', targetScript);
-      if (converted) {
-        cell.innerHTML = `<b>${converted}</b>`;
-      }
-    });
-  });
+// Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons & definitions untouched)
+function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
+  if (!rawHtml || !targetScript || targetScript === 'roman') return rawHtml;
+  if (typeof window === 'undefined') return rawHtml;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+
+    if (dictType === 'dpd') {
+      // 1. Convert heading words only (span.p1w, span.p2w, b.epd)
+      doc.querySelectorAll('span.p1w, span.p2w, b.epd').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+
+      // 2. Convert root and compound family headwords in table headers
+      doc.querySelectorAll('table.family th, table.root_family th').forEach((el) => {
+        const text = el.textContent || '';
+        if (!/^(Total|Count|ID|No\.)/i.test(text)) {
+          const converted = convertPaliScript(text, targetScript);
+          if (converted) el.textContent = converted;
+        }
+      });
+
+      // 3. Convert deconstructor lines and terms
+      doc.querySelectorAll('.dp9 p.dec, .dp9 .dec-term, .dec').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+    } else if (dictType === 'pts') {
+      doc.querySelectorAll('span.pp1w, span.pp2w').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+    } else if (dictType === 'abd') {
+      doc.querySelectorAll('span.pm1w, span.pm2w').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+    } else if (dictType === 'psd') {
+      doc.querySelectorAll('span.psdW, span.p2w').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+    } else if (dictType === 'splitter') {
+      doc.querySelectorAll('span.p2w, p.dec, .dec-term').forEach((el) => {
+        const text = el.textContent || '';
+        const converted = convertPaliScript(text, targetScript);
+        if (converted) el.textContent = converted;
+      });
+    }
+
+    return doc.body.innerHTML;
+  } catch (err) {
+    console.warn('Error converting dictionary entry script:', err);
+    return rawHtml;
+  }
 }
 
 export default function DictionaryModal() {
@@ -225,7 +280,7 @@ export default function DictionaryModal() {
 
         // Toggle state of clicked button & content
         if (isCurrentlyHidden) {
-          // Fix 2: Fetch and render inflection table if empty or loading
+          // Fix 2: Fetch and render inflection table (Dual display: Converted Script + Roman Pāḷi)
           if (
             (targetId.startsWith('declension_') || targetId.startsWith('conjugation_')) &&
             (targetDiv.innerHTML.trim().length < 10 || targetDiv.innerHTML.includes('Loading'))
@@ -237,16 +292,47 @@ export default function DictionaryModal() {
             try {
               const res = await fetchDictionaryInflection(targetId);
               if (res && res.html) {
-                targetDiv.innerHTML = res.html;
+                let finalInfHtml = res.html;
 
-                // Highlight matching search word in table
-                if (queryWord) {
-                  highlightInflections(queryWord, targetDiv);
+                // Fix 2: Dual Inflection Table Display (Converted Script on top, Roman Pāḷi below)
+                if (currentScript && currentScript !== 'roman') {
+                  const tempContainer = document.createElement('div');
+                  tempContainer.innerHTML = res.html;
+
+                  const origTable = tempContainer.querySelector('table.inflection');
+                  if (origTable) {
+                    const roTableHtml = `
+                      <div class="mt-4 pt-3 border-t border-[var(--border-color)]">
+                        <div class="text-xs font-bold text-center text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">
+                          Inflection in Roman Pāḷi
+                        </div>
+                        ${origTable.outerHTML}
+                      </div>
+                    `;
+
+                    // Transliterate cells of the top table
+                    const cells = origTable.querySelectorAll('td');
+                    cells.forEach((cell) => {
+                      const rawCellHtml = cell.innerHTML.replace(/<\/b>ṃ/g, 'ṃ</b>').replace(/<\/?b>/g, '');
+                      const parts = rawCellHtml.split(/<br\s*\/?>/i);
+                      const convertedParts = parts.map((part) => {
+                        const cleanPart = part.replace(/<[^>]+>/g, '').trim();
+                        if (!cleanPart) return part;
+                        const converted = convertPaliScript(cleanPart, currentScript);
+                        return `<b>${converted}</b>`;
+                      });
+                      cell.innerHTML = convertedParts.join('<br>');
+                    });
+
+                    finalInfHtml = tempContainer.innerHTML + roTableHtml;
+                  }
                 }
 
-                // Transliterate if not Roman
-                if (currentScript && currentScript !== 'roman') {
-                  convertPaliTableCells(targetDiv, 'table.inflection', 'td', true, currentScript);
+                targetDiv.innerHTML = finalInfHtml;
+
+                // Highlight matching search word across both tables
+                if (queryWord) {
+                  highlightInflections(queryWord, targetDiv, currentScript);
                 }
               } else {
                 targetDiv.innerHTML = '<div class="p-2.5 text-xs text-rose-500">Inflection table not available.</div>';
@@ -587,22 +673,14 @@ export default function DictionaryModal() {
 
           {/* Results List */}
           {!isLoading && currentTabResults.length > 0 && (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {currentTabResults.map((item, idx) => {
                 const rawHtml = item.html || '';
-                const renderedHtml = currentScript !== 'roman' ? transliterateHtml(rawHtml, currentScript) : rawHtml;
+                // Fix 1: Selectively convert only Pali elements, preserving English buttons & text
+                const renderedHtml = convertDictionaryEntryHtml(rawHtml, activeDictTab, currentScript);
 
                 return (
-                  <div
-                    key={idx}
-                    className="dict-entry-box p-3.5 sm:p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition"
-                  >
-                    {item.source && (
-                      <div className="text-[10.5px] font-semibold text-[var(--accent)] mb-1.5 pb-1 border-b border-[var(--border-color)] flex items-center justify-between">
-                        <span>{item.source}</span>
-                        {item.isExact && <span className="text-[9.5px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded">Exact match</span>}
-                      </div>
-                    )}
+                  <div key={idx} className="dict-entry-item">
                     <div
                       className="dp9 leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: renderedHtml }}

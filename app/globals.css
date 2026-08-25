@@ -2282,4 +2282,240 @@ footer.app-footer.hidden-footer,
   display: inline-block;
 }
 
+/* PTS (Pali Text Society PED) Styling */
+.pts15 {
+  font-family: inherit;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid #22c55e;
+  background: var(--bg-card);
+  line-height: 1.65;
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: var(--dict-font-size, 13.5px);
+}
+
+[data-theme="dark"] .pts15 {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: #22c55e;
+}
+
+.pts15 i {
+  color: #2563eb;
+  font-style: italic;
+}
+
+[data-theme="dark"] .pts15 i {
+  color: #60a5fa;
+}
+
+.pts15 .f2 g {
+  color: #16a34a;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.pts15 .f2 {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.pts15 .in1 {
+  margin-left: 14px;
+  border-left: 2.5px solid var(--accent-border);
+  padding-left: 10px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.pts15 .in2 {
+  margin-left: 22px;
+  border-left: 2.5px solid var(--accent-border);
+  padding-left: 10px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+/* Abhidhānappadīpikā (Pāli-Myanmar) Styling */
+.tmmAbhidhan {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid #d97706;
+  background: var(--bg-card);
+  line-height: 1.75;
+  color: var(--text-primary);
+  font-size: var(--dict-font-size, 13.5px);
+}
+
+[data-theme="dark"] .tmmAbhidhan {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: #d97706;
+}
+
+.tmmAbhidhan p {
+  margin-bottom: 0.5em;
+}
+
+.tmmAbhidhan .word {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Pāli-Sinhala Dictionary (PSD) Styling */
+.psinh26 {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid #8b5cf6;
+  background: var(--bg-card);
+  line-height: 1.65;
+  color: var(--text-primary);
+  font-size: var(--dict-font-size, 13.5px);
+  margin: 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .psinh26 {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: #8b5cf6;
+}
+
+.psinh26 section.PSD,
+section.PSD {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+.PSD .psdT {
+  font-weight: 700;
+  display: inline-block;
+  padding: 3px 10px;
+  background-color: #3d4b8f;
+  color: #f8fafc;
+  border-radius: 6px;
+  font-size: 11.5px;
+  margin: 6px 0 6px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.PSD .psdW {
+  color: #0d9488;
+  font-weight: 700;
+  font-size: 1.15em;
+}
+
+.PSD h1 {
+  font-size: 1.2em;
+  font-weight: 700;
+  margin: 0.25em 0;
+  color: var(--text-primary);
+}
+
+.PSD ul {
+  margin: 0.3em 0 0.3em 1.2em;
+  list-style-type: disc;
+}
+
+.PSD li {
+  margin: 0.25em 0;
+}
+
+/* Sanskrit Lexicon (Apte & Monier-Williams) Styling */
+.sanskritSection {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid #0891b2;
+  background: var(--bg-card);
+  line-height: 1.65;
+  color: var(--text-primary);
+  font-size: var(--dict-font-size, 13.5px);
+  margin: 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .sanskritSection {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+  border-left-color: #0891b2;
+}
+
+.sanskritSection section.MWS,
+section.MWS {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+.MWS .Dn {
+  font-weight: 700;
+  display: inline-block;
+  padding: 3px 10px;
+  background-color: #0e7490;
+  color: #f8fafc;
+  border-radius: 6px;
+  font-size: 11.5px;
+  margin: 4px 0 6px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.MWS .sdata, .MWS .sdatadeva {
+  color: #0891b2;
+  font-weight: 600;
+}
+
+.MWS .sdatadeva {
+  font-size: 1.1em;
+}
+
+.MWS .asdata {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.MWS .footnote, .MWS .g, .MWS .lang, .MWS .lnum, .MWS .pb {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.MWS table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+}
+
+.MWS td {
+  padding: 3px 6px;
+  line-height: 1.4;
+}
+
+/* Splitter / Deconstructor Styling */
+.dpd-splitter-section {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent);
+  background: var(--bg-card);
+  margin: 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.dpd-splitter-section .dec {
+  padding: 3px 0;
+  font-size: 1.05em;
+  color: var(--text-primary);
+}
+
+
+
 

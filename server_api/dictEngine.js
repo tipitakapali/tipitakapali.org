@@ -250,7 +250,7 @@ function lookupPTS(rawWord) {
       const rows = dbs.PTS.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(w);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
-        const html = `<span class="${isExact ? 'pp2w' : 'pp1w'}">${r.word}</span><br>${r.defi}`;
+        const html = `<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">${r.word}</span><br>${r.defi}</div>`;
         if (isExact) {
           exactMatches.push({ word: r.word, isExact: true, html });
         } else {
@@ -283,7 +283,7 @@ function lookupABD(rawWord) {
       const rows = dbs.ABD.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(w);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
-        const html = `<span class="${isExact ? 'pm2w' : 'pm1w'}">${r.word}</span> ${r.defi}`;
+        const html = `<div class="tmmAbhidhan"><span class="${isExact ? 'pm2w' : 'pm1w'}">${r.word}</span><br>${r.defi}</div>`;
         if (isExact) {
           exactMatches.push({ word: r.word, isExact: true, html });
         } else {
@@ -319,9 +319,12 @@ function lookupPSD(rawWord) {
         let df = r.defi;
         if (isExact) {
           df = df.replaceAll('class=psdW', 'class=p2w');
-          exactMatches.push({ word: r.word, isExact: true, source: r.source, html: df });
+        }
+        const html = `<div class="psinh26">${df}</div>`;
+        if (isExact) {
+          exactMatches.push({ word: r.word, isExact: true, source: r.source, html });
         } else {
-          relatedMatches.push({ word: r.word, isExact: false, source: r.source, html: df });
+          relatedMatches.push({ word: r.word, isExact: false, source: r.source, html });
         }
       }
     } catch (e) {
@@ -349,7 +352,8 @@ function lookupSANS(rawWord) {
       if (isExact) {
         df = df.replaceAll('class=p1w', 'class=p3w');
       }
-      matches.push({ word: r.word, isExact, html: df });
+      const html = `<div class="sanskritSection">${df}</div>`;
+      matches.push({ word: r.word, isExact, html });
     }
   } catch (e) {
     console.error('[DictEngine] SANS lookup error:', e.message);
