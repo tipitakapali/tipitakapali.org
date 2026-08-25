@@ -903,7 +903,7 @@ export default function ReaderView() {
   const isContentHeaderHidden = !isHeaderVisible && !isSidebarOpen;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
+    <div className="reader-view-panel flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
       {/* Dynamic Auto-Hiding Breadcrumbs Bar (Outside of main scroll area to prevent jitter/shaking) */}
       <div
         ref={contentHeaderRef}

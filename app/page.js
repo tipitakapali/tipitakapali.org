@@ -214,11 +214,11 @@ export function MainAppContent({ params: rawParams }) {
       <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
         <NavigationTree />
         <ReaderView />
+        <DictionaryModal />
       </div>
       <Footer />
       <SearchModal />
       <SettingsModal />
-      <DictionaryModal />
     </div>
 
   );

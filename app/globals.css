@@ -347,6 +347,7 @@ aside.app-sidebar {
 }
 
 aside.app-sidebar.dock-left {
+  order: 5;
   border-right: 1px solid var(--border-color);
   transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -2039,83 +2040,139 @@ footer.app-footer.hidden-footer,
   z-index: 121;
 }
 
+/* True Docked Left / Right Panels (Layout columns alongside Reader & Sidebar) */
+aside.dict-dock-panel,
+div.dict-dock-panel {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 35;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Docked Left Mode */
+aside.dict-dock-panel.dock-left,
+div.dict-dock-panel.dock-left {
+  order: 1 !important;
+  border-right: 1px solid var(--border-color);
+  animation: slideRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reader View Center Container */
+.reader-view-panel,
+main.content-area {
+  order: 10 !important;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Docked Right / Side Mode */
+aside.dict-dock-panel.dock-right,
+aside.dict-dock-panel.dock-side,
+div.dict-dock-panel.dock-right,
+div.dict-dock-panel.dock-side {
+  order: 90 !important;
+  border-left: 1px solid var(--border-color);
+  animation: slideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Top Sheet / Drawer Mode */
 .dict-panel-top {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 52vh;
-  min-height: 280px;
-  max-height: 85vh;
   background-color: var(--bg-primary);
   border-bottom: 2px solid var(--accent);
-  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
-  z-index: 125;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  z-index: 45;
   display: flex;
   flex-direction: column;
-  border-bottom-left-radius: 16px;
-  border-bottom-right-radius: 16px;
   overflow: hidden;
   animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Bottom Sheet / Drawer Mode */
 .dict-panel-bottom {
-  position: fixed;
+  position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 52vh;
-  min-height: 280px;
-  max-height: 85vh;
   background-color: var(--bg-primary);
   border-top: 2px solid var(--accent);
-  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.25);
-  z-index: 125;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
+  z-index: 45;
   display: flex;
   flex-direction: column;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
   overflow: hidden;
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Left Side Panel Mode */
-.dict-panel-left {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 480px;
-  max-width: 95vw;
-  background-color: var(--bg-primary);
-  border-right: 2px solid var(--accent);
-  box-shadow: 10px 0 35px rgba(0, 0, 0, 0.25);
-  z-index: 125;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: slideRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+/* Dictionary Resizer Handles */
+.dict-resizer-handle {
+  position: absolute;
+  z-index: 50;
+  transition: background-color 0.15s ease;
 }
 
-/* Right Side Panel Mode */
-.dict-panel-side,
-.dict-panel-right {
-  position: fixed;
+.dict-resizer-handle:hover,
+.dict-resizer-handle.resizing {
+  background-color: var(--accent);
+}
+
+/* Resizer Handle on Left Edge (for Right-Docked Panel) */
+.dict-resizer-handle-left {
   top: 0;
   bottom: 0;
+  left: -3px;
+  width: 6px;
+  cursor: col-resize;
+}
+
+/* Resizer Handle on Right Edge (for Left-Docked Panel) */
+.dict-resizer-handle-right {
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: col-resize;
+}
+
+/* Resizer Handle on Top Edge (for Bottom Drawer) */
+.dict-resizer-handle-top {
+  top: -3px;
+  left: 0;
   right: 0;
-  width: 480px;
-  max-width: 95vw;
-  background-color: var(--bg-primary);
-  border-left: 2px solid var(--accent);
-  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25);
-  z-index: 125;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: slideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 6px;
+  cursor: row-resize;
+}
+
+/* Resizer Handle on Bottom Edge (for Top Drawer) */
+.dict-resizer-handle-bottom {
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+}
+
+/* Mobile Fallback for Docked Panels */
+@media (max-width: 767px) {
+  aside.dict-dock-panel.dock-left,
+  aside.dict-dock-panel.dock-right,
+  aside.dict-dock-panel.dock-side {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    z-index: 125 !important;
+  }
 }
 
 /* Dictionary DPD and General Typography Styles */

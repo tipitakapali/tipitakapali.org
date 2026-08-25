@@ -7,8 +7,6 @@ import {
   Search,
   ArrowLeft,
   ArrowRight,
-  HelpCircle,
-  Keyboard,
   Layers,
   PanelTop,
   PanelBottom,
@@ -229,13 +227,116 @@ export default function DictionaryModal() {
   } = useDictionary();
 
   const { settings } = useThemeSettings();
-  const [showVelthuisHelp, setShowVelthuisHelp] = useState(false);
   const [localInput, setLocalInput] = useState('');
   const inputRef = useRef(null);
   const contentContainerRef = useRef(null);
   const modalPanelRef = useRef(null);
 
+  // Resizable Dimensions State (persisted in localStorage)
+  const [dictWidth, setDictWidth] = useState(420);
+  const [dictHeight, setDictHeight] = useState(380);
+  const [isResizing, setIsResizing] = useState(false);
+
   const currentScript = settings?.paliScript || 'roman';
+
+  // Load saved dimensions from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedW = localStorage.getItem('tipitaka_dict_dock_width');
+      if (savedW) {
+        const parsedW = parseInt(savedW, 10);
+        if (!isNaN(parsedW) && parsedW >= 260 && parsedW <= 1000) {
+          setDictWidth(parsedW);
+        }
+      }
+      const savedH = localStorage.getItem('tipitaka_dict_dock_height');
+      if (savedH) {
+        const parsedH = parseInt(savedH, 10);
+        if (!isNaN(parsedH) && parsedH >= 200 && parsedH <= 900) {
+          setDictHeight(parsedH);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Resize handler for docked width (Left or Right panel)
+  const startResizingWidth = useCallback(
+    (mouseDownEvent) => {
+      mouseDownEvent.preventDefault();
+      setIsResizing(true);
+      const startX = mouseDownEvent.clientX;
+      const startWidth = dictWidth;
+
+      const onMouseMove = (mouseMoveEvent) => {
+        let newWidth;
+        if (dockMode === 'side' || dockMode === 'right') {
+          newWidth = startWidth - (mouseMoveEvent.clientX - startX);
+        } else {
+          newWidth = startWidth + (mouseMoveEvent.clientX - startX);
+        }
+        const maxW = Math.min(950, typeof window !== 'undefined' ? window.innerWidth * 0.75 : 850);
+        const clamped = Math.max(280, Math.min(newWidth, maxW));
+        setDictWidth(clamped);
+        try {
+          localStorage.setItem('tipitaka_dict_dock_width', String(clamped));
+        } catch (e) {}
+      };
+
+      const onMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [dictWidth, dockMode]
+  );
+
+  // Resize handler for drawer height (Top or Bottom drawer)
+  const startResizingHeight = useCallback(
+    (mouseDownEvent) => {
+      mouseDownEvent.preventDefault();
+      setIsResizing(true);
+      const startY = mouseDownEvent.clientY;
+      const startHeight = dictHeight;
+
+      const onMouseMove = (mouseMoveEvent) => {
+        let newHeight;
+        if (dockMode === 'bottom') {
+          newHeight = startHeight - (mouseMoveEvent.clientY - startY);
+        } else {
+          newHeight = startHeight + (mouseMoveEvent.clientY - startY);
+        }
+        const maxH = Math.min(850, typeof window !== 'undefined' ? window.innerHeight * 0.85 : 700);
+        const clamped = Math.max(220, Math.min(newHeight, maxH));
+        setDictHeight(clamped);
+        try {
+          localStorage.setItem('tipitaka_dict_dock_height', String(clamped));
+        } catch (e) {}
+      };
+
+      const onMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'row-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [dictHeight, dockMode]
+  );
 
   // Synchronize local input with context display word
   useEffect(() => {
@@ -252,11 +353,15 @@ export default function DictionaryModal() {
     }
   }, [isOpen]);
 
-  // Task 2: Close dictionary panel when clicking anywhere outside of it (for all dock modes)
+  // Outside click listener: closes modal or top/bottom drawer when clicking outside (docked left/right stays docked like sidebar)
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDownOutside = (e) => {
+      // In docked side panel modes (left/right), keep it docked like the navigation tree
+      if (dockMode === 'left' || dockMode === 'side' || dockMode === 'right') {
+        return;
+      }
       // Don't close if click is inside the dictionary panel
       if (modalPanelRef.current && modalPanelRef.current.contains(e.target)) {
         return;
@@ -276,7 +381,7 @@ export default function DictionaryModal() {
       clearTimeout(timer);
       document.removeEventListener('pointerdown', handlePointerDownOutside, true);
     };
-  }, [isOpen, closeDictionary]);
+  }, [isOpen, dockMode, closeDictionary]);
 
   // Register global window.playAudio for inline DPD audio buttons (Fix 3)
   useEffect(() => {
@@ -520,361 +625,394 @@ export default function DictionaryModal() {
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      className={dockMode === 'modal' ? 'dict-overlay animate-fade-in' : ''}
-      onClick={dockMode === 'modal' ? closeDictionary : undefined}
-    >
-      <div
-        ref={modalPanelRef}
-        className={`dict-panel-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]`}
-        style={{ '--dict-font-size': `${15 * fontSizeMultiplier}px` }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ========================================================= */}
-        {/* Top Header Bar */}
-        {/* ========================================================= */}
-        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between gap-2 select-none shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] shrink-0">
-              <BookA size={16} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
-                  Pāḷi Dictionary
-                </h3>
-                {queryWord && (
-                  <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--accent)] font-semibold truncate max-w-[140px]">
-                    {queryWord}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* History Back / Forward */}
-            <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
-              <button
-                onClick={goBack}
-                disabled={historyIndex <= 0}
-                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-                title="Previous lookup (Back)"
-              >
-                <ArrowLeft size={13} />
-              </button>
-              <button
-                onClick={goForward}
-                disabled={historyIndex >= history.length - 1}
-                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-                title="Next lookup (Forward)"
-              >
-                <ArrowRight size={13} />
-              </button>
-            </div>
-
-            {/* Font Size Adjust */}
-            <div className="hidden sm:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
-              <button
-                onClick={() => setFontSizeMultiplier((f) => f - 0.1)}
-                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
-                title="Smaller font"
-              >
-                A-
-              </button>
-              <span className="px-1 font-mono text-[10px] text-[var(--text-secondary)]">
-                {Math.round(fontSizeMultiplier * 100)}%
-              </span>
-              <button
-                onClick={() => setFontSizeMultiplier((f) => f + 0.1)}
-                className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
-                title="Larger font"
-              >
-                A+
-              </button>
-            </div>
-
-            {/* Dock Position Switcher */}
-            <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
-              <button
-                onClick={() => setDockMode('left')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'left' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Left Side Panel mode (Tree docks Right)"
-              >
-                <PanelLeft size={13} />
-              </button>
-              <button
-                onClick={() => setDockMode('top')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'top' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Top Drawer mode"
-              >
-                <PanelTop size={13} />
-              </button>
-              <button
-                onClick={() => setDockMode('modal')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Center Modal mode"
-              >
-                <Maximize2 size={13} />
-              </button>
-              <button
-                onClick={() => setDockMode('bottom')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'bottom' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Bottom Drawer mode"
-              >
-                <PanelBottom size={13} />
-              </button>
-              <button
-                onClick={() => setDockMode('side')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' || dockMode === 'right' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Right Side Panel mode (Tree docks Left)"
-              >
-                <PanelRight size={13} />
-              </button>
-            </div>
-
-            {/* Close Button */}
-            <button
-              onClick={closeDictionary}
-              className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-              title="Close dictionary (Esc)"
-            >
-              <X size={17} />
-            </button>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* Search Input Bar & Velthuis Shortcuts */}
-        {/* ========================================================= */}
-        <div className="p-3 bg-[var(--bg-primary)] border-b border-[var(--border-color)] space-y-2 shrink-0">
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={localInput}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-                  const converted = hasNonLatin ? raw : typeVelthuis(raw);
-                  setLocalInput(converted);
-                  setDisplayWord(converted);
-                }}
-                placeholder="Type Pali term or Velthuis (e.g. buddha, bhikkhu, anatta, dhamma, nibbaana)..."
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-xs transition"
-              />
-              {localInput && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalInput('');
-                    setDisplayWord('');
-                    inputRef.current?.focus();
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading || !localInput.trim()}
-              className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:pointer-events-none shadow-xs transition shrink-0 cursor-pointer"
-            >
-              {isLoading ? 'Searching...' : 'Search'}
-            </button>
-          </form>
-
-          {/* Guide toggle button */}
-          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] px-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Keyboard size={12} className="text-[var(--accent)] shrink-0" />
-              <span className="truncate">Velthuis & 17 scripts input accepted</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowVelthuisHelp((prev) => !prev)}
-              className="text-[var(--accent)] hover:underline font-semibold cursor-pointer shrink-0 ml-auto flex items-center gap-1"
-            >
-              <HelpCircle size={12} />
-              <span>{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
-            </button>
-          </div>
-
-          {/* Velthuis Shortcuts Table */}
-          {showVelthuisHelp && (
-            <div className="p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[11px] space-y-1.5 animate-fade-in">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[10.5px]">
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">aa, ii, uu</span>
-                  <span className="font-bold text-[var(--accent)]">ā, ī, ū</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">.m, m..</span>
-                  <span className="font-bold text-[var(--accent)]">ṃ, ṁ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">.t, .d</span>
-                  <span className="font-bold text-[var(--accent)]">ṭ, ḍ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">.n, .l</span>
-                  <span className="font-bold text-[var(--accent)]">ṇ, ḷ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">~n, ,,n</span>
-                  <span className="font-bold text-[var(--accent)]">ñ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">"n, n..</span>
-                  <span className="font-bold text-[var(--accent)]">ṅ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">.s, "s</span>
-                  <span className="font-bold text-[var(--accent)]">ṣ, ś</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)] py-0.5">
-                  <span className="text-[var(--text-muted)]">.h, .r</span>
-                  <span className="font-bold text-[var(--accent)]">ḥ, ṛ</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ========================================================= */}
-        {/* Dictionary Switcher Tabs Bar */}
-        {/* ========================================================= */}
-        <div className="px-3 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-          {DICT_TABS.map((tab) => {
-            const isActive = activeDictTab === tab.id;
-            const hasMatches = tab.count > 0;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setDictTab(tab.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer select-none ${
-                  isActive
-                    ? 'bg-[var(--accent)] text-white shadow-xs'
-                    : hasMatches
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--accent)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
-                }`}
-                title={tab.desc}
-              >
-                <span>{tab.label}</span>
-                {hasMatches ? (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ========================================================= */}
-        {/* Definition Content Body */}
-        {/* ========================================================= */}
+  const renderInnerContent = () => (
+    <>
+      {/* Resizer handle on left edge (when docked right/side) */}
+      {(dockMode === 'side' || dockMode === 'right') && (
         <div
-          ref={contentContainerRef}
-          onClick={handleContentClick}
-          className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"
-        >
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
-              <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs font-medium">Looking up &ldquo;{queryWord}&rdquo; across dictionaries...</span>
-            </div>
-          )}
+          className={`dict-resizer-handle dict-resizer-handle-left ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startResizingWidth}
+          title="Drag to resize dictionary panel width"
+        />
+      )}
 
-          {/* Error Message */}
-          {error && !isLoading && (
-            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
-              {error}
-            </div>
-          )}
+      {/* Resizer handle on right edge (when docked left) */}
+      {dockMode === 'left' && (
+        <div
+          className={`dict-resizer-handle dict-resizer-handle-right ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startResizingWidth}
+          title="Drag to resize dictionary panel width"
+        />
+      )}
 
-          {/* Results List */}
-          {!isLoading && currentTabResults.length > 0 && (
-            <div className="space-y-2">
-              {currentTabResults.map((item, idx) => {
-                const rawHtml = item.html || '';
-                // Fix 1: Selectively convert only Pali elements, preserving English buttons & text
-                const renderedHtml = convertDictionaryEntryHtml(rawHtml, activeDictTab, currentScript);
+      {/* Resizer handle on bottom edge (when top drawer) */}
+      {dockMode === 'top' && (
+        <div
+          className={`dict-resizer-handle dict-resizer-handle-bottom ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startResizingHeight}
+          title="Drag to resize drawer height"
+        />
+      )}
 
-                return (
-                  <div key={idx} className="dict-entry-item">
-                    <div
-                      className="dp9 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: renderedHtml }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Resizer handle on top edge (when bottom drawer) */}
+      {dockMode === 'bottom' && (
+        <div
+          className={`dict-resizer-handle dict-resizer-handle-top ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startResizingHeight}
+          title="Drag to resize drawer height"
+        />
+      )}
 
-          {/* No results for current tab */}
-          {!isLoading && currentTabResults.length === 0 && queryWord && (
-            <div className="py-10 text-center space-y-3">
-              <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
-                <BookOpen size={20} />
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                No entries found in <b>{DICT_TABS.find((t) => t.id === activeDictTab)?.label}</b> for &ldquo;{queryWord}&rdquo;.
-              </p>
-              {lookupData?.hasResults && (
-                <p className="text-xs text-[var(--accent)]">
-                  Check other tabs above for matching entries in different dictionaries.
-                </p>
+      {/* ========================================================= */}
+      {/* Top Header Bar */}
+      {/* ========================================================= */}
+      <div className="px-3.5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between gap-2 select-none shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] shrink-0">
+            <BookA size={16} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
+                Pāḷi Dictionary
+              </h3>
+              {queryWord && (
+                <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--accent)] font-semibold truncate max-w-[130px]">
+                  {queryWord}
+                </span>
               )}
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Initial / Empty State with Suggestions */}
-          {!isLoading && !queryWord && (
-            <div className="py-8 text-center space-y-4 text-xs text-[var(--text-muted)]">
-              <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--accent)]">
-                <Sparkles size={22} />
-              </div>
-              <div className="max-w-sm mx-auto space-y-1">
-                <h4 className="font-bold text-[var(--text-primary)] text-sm">Comprehensive Pāḷi Dictionaries</h4>
-                <p className="text-[11.5px] text-[var(--text-secondary)] leading-relaxed">
-                  Type any Pāḷi word, root, or inflected form in the search box above, or double-click any word in the reader to look up definitions instantly.
-                </p>
-              </div>
+        {/* Action Toolbar */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* History Back / Forward */}
+          <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
+            <button
+              onClick={goBack}
+              disabled={historyIndex <= 0}
+              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+              title="Previous lookup (Back)"
+            >
+              <ArrowLeft size={13} />
+            </button>
+            <button
+              onClick={goForward}
+              disabled={historyIndex >= history.length - 1}
+              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+              title="Next lookup (Forward)"
+            >
+              <ArrowRight size={13} />
+            </button>
+          </div>
 
-              {/* Sample Quick Terms */}
-              <div className="pt-2">
-                <span className="text-[11px] text-[var(--text-muted)] block mb-2">Try quick lookup:</span>
-                <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  {['buddha', 'dhamma', 'saṅgha', 'bhikkhu', 'nibbāna', 'anatta', 'dukkha', 'paññā', 'samādhi', 'mettā'].map((w) => (
-                    <button
-                      key={w}
-                      onClick={() => performLookup(w, true)}
-                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] border border-[var(--border-color)] text-xs font-mono transition cursor-pointer"
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Font Size Adjust */}
+          <div className="hidden sm:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
+            <button
+              onClick={() => setFontSizeMultiplier((f) => f - 0.1)}
+              className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
+              title="Smaller font"
+            >
+              A-
+            </button>
+            <span className="px-1 font-mono text-[10px] text-[var(--text-secondary)]">
+              {Math.round(fontSizeMultiplier * 100)}%
+            </span>
+            <button
+              onClick={() => setFontSizeMultiplier((f) => f + 0.1)}
+              className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
+              title="Larger font"
+            >
+              A+
+            </button>
+          </div>
+
+          {/* Dock Position Switcher */}
+          <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
+            <button
+              onClick={() => setDockMode('left')}
+              className={`p-1 rounded transition cursor-pointer ${dockMode === 'left' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              title="Left Dock Panel mode (Tree docks Right)"
+            >
+              <PanelLeft size={13} />
+            </button>
+            <button
+              onClick={() => setDockMode('top')}
+              className={`p-1 rounded transition cursor-pointer ${dockMode === 'top' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              title="Top Drawer mode"
+            >
+              <PanelTop size={13} />
+            </button>
+            <button
+              onClick={() => setDockMode('modal')}
+              className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              title="Center Modal mode"
+            >
+              <Maximize2 size={13} />
+            </button>
+            <button
+              onClick={() => setDockMode('bottom')}
+              className={`p-1 rounded transition cursor-pointer ${dockMode === 'bottom' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              title="Bottom Drawer mode"
+            >
+              <PanelBottom size={13} />
+            </button>
+            <button
+              onClick={() => setDockMode('side')}
+              className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' || dockMode === 'right' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              title="Right Dock Panel mode (Tree docks Left)"
+            >
+              <PanelRight size={13} />
+            </button>
+          </div>
+
+          {/* Close Button */}
+          <button
+            onClick={closeDictionary}
+            className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            title="Close dictionary (Esc)"
+          >
+            <X size={17} />
+          </button>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* Search Input Bar */}
+      {/* ========================================================= */}
+      <div className="p-2.5 sm:p-3 bg-[var(--bg-primary)] border-b border-[var(--border-color)] shrink-0">
+        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={localInput}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+                const converted = hasNonLatin ? raw : typeVelthuis(raw);
+                setLocalInput(converted);
+                setDisplayWord(converted);
+              }}
+              placeholder="Multi words, 17 Pāḷi scripts & Velthuis input accepted"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-xs transition"
+            />
+            {localInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalInput('');
+                  setDisplayWord('');
+                  inputRef.current?.focus();
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !localInput.trim()}
+            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:pointer-events-none shadow-xs transition shrink-0 cursor-pointer"
+          >
+            {isLoading ? 'Searching...' : 'Search'}
+          </button>
+        </form>
+      </div>
+
+      {/* ========================================================= */}
+      {/* Dictionary Switcher Tabs Bar */}
+      {/* ========================================================= */}
+      <div className="px-3 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        {DICT_TABS.map((tab) => {
+          const isActive = activeDictTab === tab.id;
+          const hasMatches = tab.count > 0;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setDictTab(tab.id)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer select-none ${
+                isActive
+                  ? 'bg-[var(--accent)] text-white shadow-xs'
+                  : hasMatches
+                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--accent)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+              }`}
+              title={tab.desc}
+            >
+              <span>{tab.label}</span>
+              {hasMatches ? (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ========================================================= */}
+      {/* Definition Content Body */}
+      {/* ========================================================= */}
+      <div
+        ref={contentContainerRef}
+        onClick={handleContentClick}
+        className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"
+      >
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-medium">Looking up &ldquo;{queryWord}&rdquo; across dictionaries...</span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && !isLoading && (
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+            {error}
+          </div>
+        )}
+
+        {/* Results List */}
+        {!isLoading && currentTabResults.length > 0 && (
+          <div className="space-y-4">
+            {currentTabResults.map((item, idx) => {
+              const rawHtml = item.html || '';
+              const processedHtml = convertDictionaryEntryHtml(rawHtml, activeDictTab, currentScript);
+
+              return (
+                <div
+                  key={idx}
+                  className="dict-entry-box p-3.5 sm:p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition"
+                >
+                  {item.source && (
+                    <div className="text-[10.5px] font-semibold text-[var(--accent)] mb-1.5 pb-1 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <span>{item.source}</span>
+                      {item.isExact && <span className="text-[9.5px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded">Exact match</span>}
+                    </div>
+                  )}
+                  <div
+                    className="dp9 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: processedHtml }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* No results for current tab */}
+        {!isLoading && currentTabResults.length === 0 && queryWord && (
+          <div className="py-10 text-center space-y-3">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)]">
+              <BookOpen size={20} />
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">
+              No entries found in <b>{DICT_TABS.find((t) => t.id === activeDictTab)?.label}</b> for &ldquo;{queryWord}&rdquo;.
+            </p>
+            {lookupData?.hasResults && (
+              <p className="text-xs text-[var(--accent)]">
+                Check other tabs above for matching entries in different dictionaries.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Initial / Empty State with Suggestions */}
+        {!isLoading && !queryWord && (
+          <div className="py-8 text-center space-y-4 text-xs text-[var(--text-muted)]">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--accent)]">
+              <Sparkles size={22} />
+            </div>
+            <div className="max-w-sm mx-auto space-y-1">
+              <h4 className="font-bold text-[var(--text-primary)] text-sm">Comprehensive Pāḷi Dictionaries</h4>
+              <p className="text-[11.5px] text-[var(--text-secondary)] leading-relaxed">
+                Type any Pāḷi word, root, or inflected form in the search box above, or double-click any word in the reader to look up definitions instantly.
+              </p>
+            </div>
+
+            {/* Sample Quick Terms */}
+            <div className="pt-2">
+              <span className="text-[11px] text-[var(--text-muted)] block mb-2">Try quick lookup:</span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                {['buddha', 'dhamma', 'saṅgha', 'bhikkhu', 'nibbāna', 'anatta', 'dukkha', 'paññā', 'samādhi', 'mettā'].map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => performLookup(w, true)}
+                    className="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] border border-[var(--border-color)] text-xs font-mono transition cursor-pointer"
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  // 1. Center Modal Mode
+  if (dockMode === 'modal') {
+    return (
+      <div
+        className="dict-overlay animate-fade-in"
+        onClick={closeDictionary}
+      >
+        <div
+          ref={modalPanelRef}
+          className="dict-panel-modal flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]"
+          style={{ '--dict-font-size': `${15 * fontSizeMultiplier}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {renderInnerContent()}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Docked Left or Right Panels (Docked into layout alongside Reader & Sidebar)
+  if (dockMode === 'left' || dockMode === 'side' || dockMode === 'right') {
+    return (
+      <aside
+        ref={modalPanelRef}
+        className={`dict-dock-panel dock-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
+          isResizing ? 'select-none' : ''
+        }`}
+        style={{
+          width: `${dictWidth}px`,
+          '--dict-font-size': `${15 * fontSizeMultiplier}px`,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {renderInnerContent()}
+      </aside>
+    );
+  }
+
+  // 3. Top or Bottom Drawers
+  return (
+    <div
+      ref={modalPanelRef}
+      className={`dict-panel-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
+        isResizing ? 'select-none' : ''
+      }`}
+      style={{
+        height: `${dictHeight}px`,
+        '--dict-font-size': `${15 * fontSizeMultiplier}px`,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {renderInnerContent()}
     </div>
   );
 }

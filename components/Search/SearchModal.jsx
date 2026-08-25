@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Loader2, HelpCircle, Keyboard } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
 import { searchTipitaka } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
@@ -12,7 +12,6 @@ export default function SearchModal() {
     useTabs();
 
   const [query, setQuery] = useState('');
-  const [showVelthuisHelp, setShowVelthuisHelp] = useState(false);
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -115,13 +114,13 @@ export default function SearchModal() {
   return (
     <div className="modal-overlay active" onClick={closeSearchModal}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header flex-col items-stretch gap-2.5 p-3 sm:p-4">
+        <div className="modal-header p-3 sm:p-4">
           <div className="flex items-center gap-2.5 w-full">
             <Search size={18} className="modal-search-icon shrink-0" />
             <input
               ref={inputRef}
               type="text"
-              placeholder='Full text Search (e.g. kusalā, nibbāna, dhamma)...'
+              placeholder="Full text search - Velthuis & 17 pāḷi scripts input accepted"
               value={query}
               onChange={handleInputChange}
               autoComplete="off"
@@ -149,71 +148,6 @@ export default function SearchModal() {
               <X size={18} />
             </button>
           </div>
-
-          {/* Velthuis & 17 Multi-Script Typing Support Info & Guide */}
-          <div className="flex items-center justify-between gap-3 sm:gap-4 text-[11px] text-[var(--text-muted)] pt-1.5 border-t border-[var(--border-color)]/60 px-0.5">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Keyboard size={13} className="text-[var(--accent)] shrink-0" />
-              <span className="truncate sm:whitespace-normal">
-                Velthuis & 17 scripts input accepted (Auto-converted to Roman)
-              </span>
-            </div>
-            <button
-              onClick={() => setShowVelthuisHelp((prev) => !prev)}
-              className="flex items-center gap-1 text-[var(--accent)] hover:underline font-semibold cursor-pointer shrink-0 ml-auto"
-              title="How to type Velthuis diacritics"
-            >
-              <HelpCircle size={13} className="shrink-0" />
-              <span className="whitespace-nowrap">{showVelthuisHelp ? 'Hide guide' : 'Typing guide'}</span>
-            </button>
-          </div>
-
-          {/* Velthuis Scheme Guide Table */}
-          {showVelthuisHelp && (
-            <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[11px] space-y-2 animate-fade-in mt-1.5">
-              <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
-                <span>Velthuis Pāḷi Typing Shortcuts</span>
-                <span className="text-[10px] font-normal text-[var(--text-muted)]">Type as you speak</span>
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10.5px]">
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">aa, ii, uu</span>
-                  <span className="font-bold text-[var(--accent)]">ā, ī, ū</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">.m, m..</span>
-                  <span className="font-bold text-[var(--accent)]">ṃ, ṁ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">.t, .d</span>
-                  <span className="font-bold text-[var(--accent)]">ṭ, ḍ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">.n, .l</span>
-                  <span className="font-bold text-[var(--accent)]">ṇ, ḷ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">~n, ,,n</span>
-                  <span className="font-bold text-[var(--accent)]">ñ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">"n, n..</span>
-                  <span className="font-bold text-[var(--accent)]">ṅ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">.h, .r</span>
-                  <span className="font-bold text-[var(--accent)]">ḥ, ṛ</span>
-                </div>
-                <div className="flex justify-between border-b border-[var(--border-color)]/50 py-0.5">
-                  <span className="text-[var(--text-muted)]">.s, "s</span>
-                  <span className="font-bold text-[var(--accent)]">ṣ, ś</span>
-                </div>
-              </div>
-              <div className="text-[10px] text-[var(--text-muted)] italic">
-                * Uppercase is also supported (e.g. AA → Ā, .N → Ṇ).
-              </div>
-            </div>
-          )}
         </div>
 
 
