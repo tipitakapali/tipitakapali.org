@@ -405,3 +405,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+server_api/tipitaka.db_before_byPitaka
+*.db
+server_api/tipitaka.db_before_byPitaka

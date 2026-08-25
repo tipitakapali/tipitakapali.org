@@ -28,11 +28,40 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000) {
 }
 
 export async function fetchTree() {
-  return cachedFetch('tree_json', async () => {
-    const res = await fetch('/api/tree');
-    if (!res.ok) throw new Error('Failed to load navigation tree');
-    return res.json();
-  }, 60 * 60 * 1000); // 1 hour
+  // 1. In-memory cache
+  const cached = cache.get('tree_json');
+  if (cached) return cached.data;
+
+  // 2. Persistent browser cache (0ms instant render on refresh/revisit)
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('tipitaka_tree_cache_v3');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cache.set('tree_json', { data: parsed, timestamp: Date.now() });
+          return parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback to API with 24h memory TTL and localStorage persistence
+  return cachedFetch(
+    'tree_json',
+    async () => {
+      const res = await fetch('/api/tree');
+      if (!res.ok) throw new Error('Failed to load navigation tree');
+      const data = await res.json();
+      if (typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
+        try {
+          localStorage.setItem('tipitaka_tree_cache_v3', JSON.stringify(data));
+        } catch (e) {}
+      }
+      return data;
+    },
+    24 * 60 * 60 * 1000 // 24 hours in-memory TTL
+  );
 }
 
 export async function fetchBooks() {

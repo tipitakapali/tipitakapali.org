@@ -129,9 +129,9 @@ async function main() {
     };
   });
 
-  // Navigation tree endpoint
+  // Navigation tree endpoint (Static Canonical Structure - 1 Year Long Cache)
   fastify.get('/api/tree', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const treeJsonPath = path.join(__dirname, 'tree.json');
     if (fs.existsSync(treeJsonPath)) {
       try {
@@ -165,7 +165,7 @@ async function main() {
 
   // List all 217 books
   fastify.get('/api/books', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const rows = stmtGetBooks.all();
     return {
       total: rows.length,
@@ -175,7 +175,7 @@ async function main() {
 
   // Get specific book with precomputed chapters and instant buffering support
   fastify.get('/api/book/:code', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const rawCode = req.params.code;
     let cleanCode = rawCode.replace('.xml', '');
     let resolvedChapFromCode = undefined;
@@ -256,7 +256,7 @@ async function main() {
 
   // Get specific chapter HTML instantly from precomputed table (< 0.1ms)
   fastify.get('/api/book/:code/chapter/:chapterIndex', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     let cleanCode = req.params.code.replace('.xml', '');
     const chapIdx = parseInt(req.params.chapterIndex, 10);
 
@@ -283,7 +283,7 @@ async function main() {
 
   // Get raw TEI XML source for a book (isolated from reader path)
   fastify.get('/api/book/:code/xml', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const cleanCode = req.params.code.replace('.xml', '');
     const xmlRow = stmtGetBookXml.get(cleanCode);
     if (!xmlRow) {
@@ -296,7 +296,7 @@ async function main() {
 
   // Get hierarchical TOC for a book
   fastify.get('/api/book/:code/toc', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const cleanCode = req.params.code.replace('.xml', '');
     const toc = stmtGetToc.all(cleanCode);
     return {
@@ -308,7 +308,7 @@ async function main() {
 
   // Get MAT (Mūla / Aṭṭhakathā / Ṭīkā) cross-reference relations for a book
   fastify.get('/api/book/:code/mat', async (req, reply) => {
-    reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.header('Cache-Control', 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const rawCode = req.params.code;
     let cleanCode = rawCode.replace('.xml', '');
 
