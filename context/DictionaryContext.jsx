@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   DOCK_MODE: 'tipitaka_dict_dock_mode_v1',
   FONT_SIZE: 'tipitaka_dict_font_size_v1',
   CLICK_LOOKUP: 'tipitaka_dict_click_lookup_v1',
+  CLICK_MODE: 'tipitaka_dict_click_mode_v1',
   LAST_TAB: 'tipitaka_dict_last_tab_v1',
 };
 
@@ -18,9 +19,10 @@ export function DictionaryProvider({ children }) {
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
   const [activeDictTab, setActiveDictTab] = useState('dpd');
-  const [dockMode, setDockModeState] = useState('modal'); // 'modal' | 'bottom' | 'side'
+  const [dockMode, setDockModeState] = useState('modal'); // 'modal' | 'top' | 'bottom' | 'left' | 'side' | 'right'
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1.0);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
+  const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
 
   // History stack for back/forward navigation inside dictionary
   const [history, setHistory] = useState([]);
@@ -41,7 +43,7 @@ export function DictionaryProvider({ children }) {
   useEffect(() => {
     try {
       const savedDock = localStorage.getItem(STORAGE_KEYS.DOCK_MODE);
-      if (savedDock && ['modal', 'bottom', 'side'].includes(savedDock)) {
+      if (savedDock && ['modal', 'top', 'bottom', 'left', 'side', 'right'].includes(savedDock)) {
         setDockModeState(savedDock);
       }
       const savedFont = localStorage.getItem(STORAGE_KEYS.FONT_SIZE);
@@ -55,6 +57,10 @@ export function DictionaryProvider({ children }) {
       if (savedClick !== null) {
         setClickToLookupState(savedClick === 'true');
       }
+      const savedClickMode = localStorage.getItem(STORAGE_KEYS.CLICK_MODE);
+      if (savedClickMode && ['single', 'double'].includes(savedClickMode)) {
+        setClickLookupModeState(savedClickMode);
+      }
       const savedTab = localStorage.getItem(STORAGE_KEYS.LAST_TAB);
       if (savedTab && ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'].includes(savedTab)) {
         setActiveDictTab(savedTab);
@@ -66,6 +72,29 @@ export function DictionaryProvider({ children }) {
     setDockModeState(mode);
     try {
       localStorage.setItem(STORAGE_KEYS.DOCK_MODE, mode);
+    } catch (e) {}
+
+    // Synchronize Navigation Sidebar to dock to the opposite side
+    if (typeof window !== 'undefined') {
+      if (mode === 'left') {
+        try {
+          localStorage.setItem('tipitaka_tree_dock', 'right');
+          window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'right' }));
+        } catch (e) {}
+      } else if (mode === 'side' || mode === 'right') {
+        try {
+          localStorage.setItem('tipitaka_tree_dock', 'left');
+          window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'left' }));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const setClickLookupMode = useCallback((mode) => {
+    if (!['single', 'double'].includes(mode)) return;
+    setClickLookupModeState(mode);
+    try {
+      localStorage.setItem(STORAGE_KEYS.CLICK_MODE, mode);
     } catch (e) {}
   }, []);
 
@@ -225,6 +254,7 @@ export function DictionaryProvider({ children }) {
     dockMode,
     fontSizeMultiplier,
     clickToLookupEnabled,
+    clickLookupMode,
     history,
     historyIndex,
     lookupData,
@@ -241,6 +271,7 @@ export function DictionaryProvider({ children }) {
     setDockMode,
     setFontSizeMultiplier,
     setClickToLookupEnabled,
+    setClickLookupMode,
     toggleInflection,
     setDisplayWord,
   };

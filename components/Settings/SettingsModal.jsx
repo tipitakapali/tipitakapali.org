@@ -394,6 +394,54 @@ export default function SettingsModal() {
                     />
                   </label>
                 </div>
+
+                {/* Dictionary Word Lookup Trigger Setting */}
+                <div className="pt-3 border-t border-[var(--border-color)] space-y-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                    Dictionary Word Lookup Trigger
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => updateSetting('dictLookupTrigger', 'single')}
+                      className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                        (settings.dictLookupTrigger || 'single') === 'single'
+                          ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                          : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-[var(--text-primary)]">Single Click</span>
+                        {(settings.dictLookupTrigger || 'single') === 'single' && (
+                          <Check size={14} className="text-[var(--accent)]" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
+                        Click any Pāḷi word once to look up definitions instantly.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateSetting('dictLookupTrigger', 'double')}
+                      className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                        settings.dictLookupTrigger === 'double'
+                          ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                          : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-[var(--text-primary)]">Double Click</span>
+                        {settings.dictLookupTrigger === 'double' && (
+                          <Check size={14} className="text-[var(--accent)]" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
+                        Double-click words to look up (preserves standard single click).
+                      </p>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

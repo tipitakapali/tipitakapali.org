@@ -539,8 +539,8 @@ function lookupINF(rawQuery) {
   return null;
 }
 
-// Development Mode Flag: Set to false to disable all caching during active development
-const ENABLE_DICT_CACHE = false;
+// Server In-Memory Dictionary Cache: Re-enabled for sub-millisecond lookups
+const ENABLE_DICT_CACHE = true;
 
 // Bounded in-memory LRU cache for dictionary queries (< 0.01ms response time)
 const DICT_CACHE_MAX = 3000;

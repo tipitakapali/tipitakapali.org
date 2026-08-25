@@ -634,6 +634,12 @@ export default function ReaderView() {
   );
 
   const handleReaderClick = useCallback((e) => {
+    // 1. Ignore clicks on interactive controls (buttons, links, go-to markers)
+    if (e.target.closest('button, a, input, select, textarea, [data-goto-type]')) {
+      return;
+    }
+
+    // 2. Track reading position and active paragraph
     const pEl = e.target.closest('p[data-pindex]');
     if (pEl && activeTab) {
       let pNum = pEl.getAttribute('data-para');
@@ -669,7 +675,46 @@ export default function ReaderView() {
         snippet: snip || `${activeTab.title} — ${activeTab.chapters?.[chapIdx]?.title || `Chapter ${chapIdx + 1}`}`,
       });
     }
-  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory]);
+
+    // 3. Single-Click Dictionary Word Lookup (Task 4)
+    const triggerMode = settings?.dictLookupTrigger || 'single';
+    if (triggerMode === 'single') {
+      const selection = window.getSelection()?.toString()?.trim();
+      // Only trigger if not dragging/selecting multiple words
+      if (!selection || selection.length <= 1) {
+        let range = null;
+        if (document.caretRangeFromPoint) {
+          range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        } else if (document.caretPositionFromPoint) {
+          const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+          if (pos && pos.offsetNode) {
+            range = document.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+          }
+        }
+
+        if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+          const node = range.startContainer;
+          const offset = range.startOffset;
+          const text = node.textContent || '';
+          let start = offset;
+          let end = offset;
+          while (start > 0 && /\S/.test(text[start - 1])) {
+            start--;
+          }
+          while (end < text.length && /\S/.test(text[end])) {
+            end++;
+          }
+          const rawWord = text.slice(start, end);
+          const wordToLookup = rawWord.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+          if (wordToLookup && wordToLookup.length >= 2) {
+            openDictionary(wordToLookup);
+          }
+        }
+      }
+    }
+  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, settings?.dictLookupTrigger, openDictionary]);
 
   const handleReaderDoubleClick = useCallback((e) => {
     // 1. Check window selection first
@@ -709,7 +754,7 @@ export default function ReaderView() {
       }
     }
 
-    if (wordToLookup) {
+    if (wordToLookup && wordToLookup.length >= 2) {
       openDictionary(wordToLookup);
     }
   }, [openDictionary]);

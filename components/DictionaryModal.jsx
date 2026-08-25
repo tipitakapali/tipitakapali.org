@@ -10,7 +10,9 @@ import {
   HelpCircle,
   Keyboard,
   Layers,
+  PanelTop,
   PanelBottom,
+  PanelLeft,
   PanelRight,
   Maximize2,
   Minimize2,
@@ -65,7 +67,43 @@ function highlightInflections(searchTerm, container, targetScript = 'roman') {
   });
 }
 
-// Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons & definitions untouched)
+// Helper to extract word under cursor on click event (supports Pāḷi Roman diacritics, Devanagari, Myanmar, Sinhala, Thai)
+function extractWordFromPointerEvent(e) {
+  if (typeof document === 'undefined') return '';
+  let range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(e.clientX, e.clientY);
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos && pos.offsetNode) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+    }
+  }
+
+  if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+    const text = range.startContainer.textContent || '';
+    const offset = range.startOffset;
+    let start = offset;
+    let end = offset;
+
+    const isWordChar = (ch) => /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u1000-\u109F\u0D80-\u0DFF\u0E00-\u0E7F]/.test(ch);
+
+    while (start > 0 && isWordChar(text[start - 1])) {
+      start--;
+    }
+    while (end < text.length && isWordChar(text[end])) {
+      end++;
+    }
+
+    const raw = text.slice(start, end).trim();
+    return raw;
+  }
+  return '';
+}
+
+// Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons, definitions, & EPD English headwords untouched)
 function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
   if (!rawHtml || !targetScript || targetScript === 'roman') return rawHtml;
   if (typeof window === 'undefined') return rawHtml;
@@ -75,14 +113,50 @@ function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
     const doc = parser.parseFromString(rawHtml, 'text/html');
 
     if (dictType === 'dpd') {
-      // 1. Convert heading words only (span.p1w, span.p2w, b.epd)
-      doc.querySelectorAll('span.p1w, span.p2w, b.epd').forEach((el) => {
-        const text = el.textContent || '';
-        const converted = convertPaliScript(text, targetScript);
-        if (converted) el.textContent = converted;
-      });
+      // 1. Process sections / entries in DPD
+      const sections = doc.querySelectorAll('section.dp9, .dp9');
+      if (sections.length > 0) {
+        sections.forEach((sec) => {
+          // Check if this section is an EPD (English-Pāḷi Dictionary) entry
+          const isEpd = sec.querySelector('b.epd, .epd') !== null;
+          if (isEpd) {
+            // EPD entry:
+            // The headword (span.p1w, span.p2w) is the English lookup word (e.g. "cheerful", "happy").
+            // DO NOT convert the English headword!
+            // Convert only the Pāḷi target words in b.epd / .epd:
+            sec.querySelectorAll('b.epd, .epd').forEach((el) => {
+              const text = el.textContent || '';
+              const converted = convertPaliScript(text, targetScript);
+              if (converted) el.textContent = converted;
+            });
+          } else {
+            // Regular DPD entry: headwords (span.p1w, span.p2w, span.p3w, span.pp1w, span.pp2w, span.pm1w, span.pm2w) are Pāḷi
+            sec.querySelectorAll('span.p1w, span.p2w, span.p3w, span.pp1w, span.pp2w, span.pm1w, span.pm2w').forEach((el) => {
+              const text = el.textContent || '';
+              const converted = convertPaliScript(text, targetScript);
+              if (converted) el.textContent = converted;
+            });
+          }
+        });
+      } else {
+        // Fallback for flat HTML
+        const isEpd = doc.querySelector('b.epd, .epd') !== null;
+        if (isEpd) {
+          doc.querySelectorAll('b.epd, .epd').forEach((el) => {
+            const text = el.textContent || '';
+            const converted = convertPaliScript(text, targetScript);
+            if (converted) el.textContent = converted;
+          });
+        } else {
+          doc.querySelectorAll('span.p1w, span.p2w, span.p3w, span.pp1w, span.pp2w, span.pm1w, span.pm2w').forEach((el) => {
+            const text = el.textContent || '';
+            const converted = convertPaliScript(text, targetScript);
+            if (converted) el.textContent = converted;
+          });
+        }
+      }
 
-      // 2. Convert root and compound family headwords in table headers
+      // 2. Convert root and compound family headwords in table headers (these are Pāḷi)
       doc.querySelectorAll('table.family th, table.root_family th').forEach((el) => {
         const text = el.textContent || '';
         if (!/^(Total|Count|ID|No\.)/i.test(text)) {
@@ -91,7 +165,7 @@ function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
         }
       });
 
-      // 3. Convert deconstructor lines and terms
+      // 3. Convert deconstructor lines and terms (these are Pāḷi)
       doc.querySelectorAll('.dp9 p.dec, .dp9 .dec-term, .dec').forEach((el) => {
         const text = el.textContent || '';
         const converted = convertPaliScript(text, targetScript);
@@ -159,6 +233,7 @@ export default function DictionaryModal() {
   const [localInput, setLocalInput] = useState('');
   const inputRef = useRef(null);
   const contentContainerRef = useRef(null);
+  const modalPanelRef = useRef(null);
 
   const currentScript = settings?.paliScript || 'roman';
 
@@ -176,6 +251,32 @@ export default function DictionaryModal() {
       }, 80);
     }
   }, [isOpen]);
+
+  // Task 2: Close dictionary panel when clicking anywhere outside of it (for all dock modes)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDownOutside = (e) => {
+      // Don't close if click is inside the dictionary panel
+      if (modalPanelRef.current && modalPanelRef.current.contains(e.target)) {
+        return;
+      }
+      // Don't close if clicking on an interactive trigger meant to open/toggle dictionary
+      if (e.target.closest('[data-dict-trigger]') || e.target.closest('.dict-quick-btn')) {
+        return;
+      }
+      closeDictionary();
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handlePointerDownOutside, true);
+    }, 60);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handlePointerDownOutside, true);
+    };
+  }, [isOpen, closeDictionary]);
 
   // Register global window.playAudio for inline DPD audio buttons (Fix 3)
   useEffect(() => {
@@ -356,17 +457,36 @@ export default function DictionaryModal() {
         return;
       }
 
-      // 3. Handle clicks on clickable terms / jumps inside definitions (Recursive lookup)
-      const jumpLink = e.target.closest('a.jump, a.link, span.p1w, span.p2w, span.p3w, .dec-term');
+      // 3. Handle external links (e.g. feedback links, sutta external links)
+      const externalLink = e.target.closest('a[href^="http"], a.link');
+      if (externalLink && externalLink.getAttribute('href')?.startsWith('http')) {
+        return;
+      }
+
+      // 4. Handle clicks on clickable terms / jumps inside definitions (Explicit jump links)
+      const jumpLink = e.target.closest('a.jump, span.p1w, span.p2w, span.p3w, .dec-term, b.epd, .epd');
       if (jumpLink) {
         const text = jumpLink.textContent?.trim();
         if (text && text.length > 1) {
           e.preventDefault();
           e.stopPropagation();
-          const cleanWord = text.replace(/^[√\d\s\.\-]+/, '').trim();
-          if (cleanWord) {
+          const cleanWord = text.replace(/^[√\d\s\.\-]+/, '').replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+          if (cleanWord && cleanWord.length >= 2) {
             performLookup(cleanWord, true);
+            return;
           }
+        }
+      }
+
+      // 5. Handle clicking ANY word inside the dictionary text results (Task 3)
+      const clickedWord = extractWordFromPointerEvent(e);
+      const cleanClicked = clickedWord ? clickedWord.replace(/^[√\d\s\.\-]+/, '').replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim() : '';
+      if (cleanClicked && cleanClicked.length >= 2) {
+        const sel = window.getSelection()?.toString()?.trim();
+        if (!sel || sel.length <= 1) {
+          e.preventDefault();
+          e.stopPropagation();
+          performLookup(cleanClicked, true);
         }
       }
     },
@@ -406,6 +526,7 @@ export default function DictionaryModal() {
       onClick={dockMode === 'modal' ? closeDictionary : undefined}
     >
       <div
+        ref={modalPanelRef}
         className={`dict-panel-${dockMode} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]`}
         style={{ '--dict-font-size': `${15 * fontSizeMultiplier}px` }}
         onClick={(e) => e.stopPropagation()}
@@ -478,6 +599,20 @@ export default function DictionaryModal() {
             {/* Dock Position Switcher */}
             <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
               <button
+                onClick={() => setDockMode('left')}
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'left' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                title="Left Side Panel mode (Tree docks Right)"
+              >
+                <PanelLeft size={13} />
+              </button>
+              <button
+                onClick={() => setDockMode('top')}
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'top' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                title="Top Drawer mode"
+              >
+                <PanelTop size={13} />
+              </button>
+              <button
                 onClick={() => setDockMode('modal')}
                 className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
                 title="Center Modal mode"
@@ -493,8 +628,8 @@ export default function DictionaryModal() {
               </button>
               <button
                 onClick={() => setDockMode('side')}
-                className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-                title="Right Side Panel mode"
+                className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' || dockMode === 'right' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                title="Right Side Panel mode (Tree docks Left)"
               >
                 <PanelRight size={13} />
               </button>

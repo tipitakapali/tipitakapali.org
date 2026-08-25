@@ -2039,6 +2039,27 @@ footer.app-footer.hidden-footer,
   z-index: 121;
 }
 
+/* Top Sheet / Drawer Mode */
+.dict-panel-top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52vh;
+  min-height: 280px;
+  max-height: 85vh;
+  background-color: var(--bg-primary);
+  border-bottom: 2px solid var(--accent);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  overflow: hidden;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Bottom Sheet / Drawer Mode */
 .dict-panel-bottom {
   position: fixed;
@@ -2057,10 +2078,30 @@ footer.app-footer.hidden-footer,
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   overflow: hidden;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Side Panel Mode */
-.dict-panel-side {
+/* Left Side Panel Mode */
+.dict-panel-left {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 480px;
+  max-width: 95vw;
+  background-color: var(--bg-primary);
+  border-right: 2px solid var(--accent);
+  box-shadow: 10px 0 35px rgba(0, 0, 0, 0.25);
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Right Side Panel Mode */
+.dict-panel-side,
+.dict-panel-right {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -2074,6 +2115,7 @@ footer.app-footer.hidden-footer,
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: slideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Dictionary DPD and General Typography Styles */

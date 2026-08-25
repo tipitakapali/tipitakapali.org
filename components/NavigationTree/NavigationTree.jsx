@@ -39,7 +39,7 @@ export default function NavigationTree() {
   const { setIsZenMode } = useThemeSettings();
   const treeContainerRef = useRef(null);
 
-  // Load saved preferences
+  // Load saved preferences and listen for dynamic dock position updates
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -62,6 +62,14 @@ export default function NavigationTree() {
         }
       }
     } catch (e) {}
+
+    const handleDockChange = (e) => {
+      if (e.detail && ['left', 'right', 'float'].includes(e.detail)) {
+        setDockPosition(e.detail);
+      }
+    };
+    window.addEventListener('tipitaka_tree_dock_change', handleDockChange);
+    return () => window.removeEventListener('tipitaka_tree_dock_change', handleDockChange);
   }, []);
 
   // Update CSS variable --sidebar-width on root

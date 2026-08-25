@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   pulseAnimation: true,
   scrollMotion: 'fast', // 'fast' | 'instant' | 'smooth'
   paliScript: 'roman',
+  dictLookupTrigger: 'single', // 'single' | 'double'
   translations: {
     english: false,
     vietnamese: false,

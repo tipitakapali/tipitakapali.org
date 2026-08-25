@@ -246,8 +246,8 @@ async function main() {
     };
   });
 
-// Active Development Cache Control Toggle: Set to false to disable HTTP caches during active development
-const ENABLE_HTTP_CACHE = false;
+// Server Cache Control Toggle: Re-enabled for ultra-low latency sub-millisecond serving
+const ENABLE_HTTP_CACHE = true;
 
 function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-while-revalidate=604800') {
   if (ENABLE_HTTP_CACHE) {
