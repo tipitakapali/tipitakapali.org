@@ -7,7 +7,7 @@ import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
 
-import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali, convertAnyToRoman } from '../../services/transliterate';
+import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
 
 // Memoized Chapter Block with Pre-Buffering Intersection Observer
@@ -707,7 +707,7 @@ export default function ReaderView() {
             end++;
           }
           const rawWord = text.slice(start, end);
-          const wordToLookup = rawWord.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+          const wordToLookup = cleanDictionaryQuery(rawWord);
           if (wordToLookup && wordToLookup.length >= 2) {
             openDictionary(wordToLookup);
           }
@@ -722,7 +722,7 @@ export default function ReaderView() {
     let wordToLookup = '';
 
     if (selection && selection.length > 0 && selection.length < 50) {
-      wordToLookup = selection.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+      wordToLookup = cleanDictionaryQuery(selection);
     } else {
       // 2. Extract word at click point
       let range = null;
@@ -750,7 +750,7 @@ export default function ReaderView() {
           end++;
         }
         const rawWord = text.slice(start, end);
-        wordToLookup = rawWord.replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+        wordToLookup = cleanDictionaryQuery(rawWord);
       }
     }
 

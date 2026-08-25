@@ -188,8 +188,10 @@ export async function searchTipitaka(query, options = {}) {
   }, 10 * 60 * 1000);
 }
 
+import { cleanDictionaryQuery } from './transliterate';
+
 export async function fetchDictionaryLookup(word, dictType = 'all', options = {}) {
-  const cleanWord = (word || '').trim();
+  const cleanWord = cleanDictionaryQuery(word || '').trim();
   if (!cleanWord) return { word: '', hasResults: false, error: 'Empty word' };
 
   const params = new URLSearchParams();

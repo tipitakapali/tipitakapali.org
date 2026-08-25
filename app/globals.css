@@ -2282,7 +2282,8 @@ div.dict-dock-panel.dock-side {
 
 .dp9 table.family,
 .dp9 table.root_family,
-.dp9 table.grammar {
+.dp9 table.grammar,
+.dp9 table.sutta-info {
   width: 100%;
   border-collapse: collapse;
   margin: 8px 0;
@@ -2292,7 +2293,9 @@ div.dict-dock-panel.dock-side {
 .dp9 table.family th,
 .dp9 table.family td,
 .dp9 table.grammar th,
-.dp9 table.grammar td {
+.dp9 table.grammar td,
+.dp9 table.sutta-info th,
+.dp9 table.sutta-info td {
   padding: 5px 10px;
   vertical-align: top;
   text-align: left;
@@ -2300,11 +2303,43 @@ div.dict-dock-panel.dock-side {
 }
 
 .dp9 table.family th,
-.dp9 table.grammar th {
+.dp9 table.grammar th,
+.dp9 table.sutta-info th {
   color: var(--accent);
   font-weight: 700;
   white-space: nowrap;
   width: 25%;
+}
+
+.dp9 table.sutta-info th.heading {
+  color: var(--text-primary);
+  font-weight: 700;
+  white-space: nowrap;
+  background-color: var(--bg-secondary);
+}
+
+/* Sutta & Sutta Link in DPD entries (adapted from tp_dev.css) */
+.dp9 p.sutta,
+.dp9 .sutta {
+  color: var(--text-primary);
+  font-style: italic;
+  padding: 2px 0 4px 0;
+  line-height: 1.65;
+}
+
+.dp9 a.sutta_link,
+.dp9 .sutta_link {
+  color: var(--accent);
+  font-style: italic;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.dp9 a.sutta_link:hover,
+.dp9 .sutta_link:hover {
+  color: var(--accent-hover, var(--accent));
+  text-decoration: underline;
 }
 
 .dp9 .dec {
@@ -2505,13 +2540,14 @@ div.dict-dock-panel.dock-side {
 
 /* Pāli-Sinhala Dictionary (PSD) Styling */
 .psinh26 {
+  font-family: "UN-Abhaya", "Iskoola Pota", "Noto Serif Sinhala", "Noto Sans Sinhala", system-ui, sans-serif;
   padding: 4px 0;
   border-radius: 0;
   border: none;
   background: transparent;
-  line-height: 1.65;
+  line-height: 1.85;
   color: var(--text-primary);
-  font-size: var(--dict-font-size, 15px);
+  font-size: calc(var(--dict-font-size, 15px) * 1.22);
   margin: 0;
   box-shadow: none;
 }
@@ -2528,6 +2564,8 @@ section.PSD {
   padding: 0 !important;
   margin: 0 !important;
   box-shadow: none !important;
+  font-size: 1.05em;
+  line-height: 1.85;
 }
 
 /* PSD Dictionary Name Title Badge */
@@ -2536,11 +2574,11 @@ section.PSD {
 .psdT {
   font-weight: 700;
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2.5px 9px;
   background-color: var(--accent-light, #ede9fe);
   color: var(--accent, #7c3aed);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   margin: 2px 0 6px 0;
 }
 
@@ -2554,11 +2592,11 @@ section.PSD {
 .PSD .psdW {
   color: #0d9488;
   font-weight: 700;
-  font-size: 1.2em;
+  font-size: 1.3em;
 }
 
 .PSD h1 {
-  font-size: 1.25em;
+  font-size: 1.35em;
   font-weight: 700;
   margin: 0.25em 0;
   color: var(--text-primary);
@@ -2570,7 +2608,18 @@ section.PSD {
 }
 
 .PSD li {
-  margin: 0.25em 0;
+  margin: 0.3em 0;
+  line-height: 1.85;
+}
+
+.PSD r {
+  color: #16a34a;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+[data-theme="dark"] .PSD r {
+  color: #4ade80;
 }
 
 /* Sanskrit Lexicon (Apte & Monier-Williams) Styling */

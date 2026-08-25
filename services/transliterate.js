@@ -75,7 +75,7 @@ export function convertAnyToRoman(text) {
       }
     }
   } catch (e) {}
-  return converted;
+  return converted.replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
 }
 
 
@@ -336,6 +336,42 @@ export function highlightHtmlText(
 
   // Fallback: If no specific paragraph targeted, highlight text throughout
   return highlightTextInside(html);
+}
+
+/**
+ * Normalizes and cleans raw copied/pasted Pāḷi text queries for dictionary lookup.
+ * Automatically strips quotes (‘‘, ’’, “”, etc.), attached quote particles (e.g. ’’ti, ’ti, ”ti, ’’pi, ’va, etc.),
+ * punctuation marks, and non-letter symbols while preserving multi-word tokens and Pāḷi diacritics.
+ * 
+ * Example: "‘‘Evaṃ, bhante’’ti" -> "Evaṃ bhante ti"
+ */
+export function cleanDictionaryQuery(rawInput) {
+  if (!rawInput || typeof rawInput !== 'string') return '';
+
+  let text = rawInput;
+
+  // 1. Normalize niggahita / anusvara: replace all ṁ / Ṁ with ṃ behind the scenes
+  text = text.replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
+
+  // 2. Normalize zero-width and unusual unicode spaces
+  text = text.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ');
+
+  // 3. Separate attached quotes from trailing enclitics / quote markers (e.g. ’’ti, ’ti, ”ti, ’’pi, ’va, etc.)
+  // Handles Roman, Myanmar, Sinhala, and Devanagari attached particles
+  text = text.replace(/([’'”"»›]+)(ti|pi|va|eva|iti|api|nti|တိ|ති|ति)\b/gi, ' $2');
+
+  // 3. Replace all quotation marks (curly, straight, double-single, guillemets, etc.) with spaces
+  text = text.replace(/[‘’“”"''`«»‹›„]/g, ' ');
+
+  // 4. Replace punctuation & symbols (commas, periods, semicolons, colons, dashes, brackets, ellipsis, etc.)
+  // Note: Handles standard ASCII and Indic punctuation (၊, ။, etc.)
+  text = text.replace(/[.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။]/g, ' ');
+
+  // 5. Clean leading root symbols e.g. √
+  text = text.replace(/^[√\s\d.-]+/, ' ');
+
+  // 6. Collapse multiple consecutive whitespaces into a single space and trim
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 export { CVT };

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { fetchDictionaryLookup, fetchDPDLookup, fetchOthersLookup, fetchDictionaryInflection } from '../services/api';
-import { convertAnyToRoman } from '../services/transliterate';
+import { convertAnyToRoman, cleanDictionaryQuery } from '../services/transliterate';
 
 const DictionaryContext = createContext();
 
@@ -133,13 +133,20 @@ export function DictionaryProvider({ children }) {
   const performLookup = useCallback(async (wordToSearch, addToHistoryStack = true) => {
     if (!wordToSearch || !wordToSearch.trim()) return;
 
-    const romanWord = convertAnyToRoman(wordToSearch).trim().toLowerCase();
-    const cleanWord = romanWord || wordToSearch.trim().toLowerCase();
+    // Preserve the exact raw user input for display (e.g. "‘‘Evaṃ, bhante’’ti" or "evaṁ")
+    const rawDisplay = wordToSearch.trim();
+
+    // Behind the scenes: clean quotes, attached enclitics, punctuation, and normalize ṁ -> ṃ
+    const sanitizedInput = cleanDictionaryQuery(rawDisplay);
+    if (!sanitizedInput) return;
+
+    const romanWord = convertAnyToRoman(sanitizedInput).trim().toLowerCase();
+    const cleanWord = (romanWord || sanitizedInput.trim().toLowerCase()).replace(/ṁ/g, 'ṃ');
 
     const currentSeq = ++lookupSeqRef.current;
 
     setQueryWord(cleanWord);
-    setDisplayWord(wordToSearch);
+    setDisplayWord(rawDisplay);
     setIsLoading(true);
     setIsBackgroundLoading(true);
     setError(null);
@@ -147,7 +154,7 @@ export function DictionaryProvider({ children }) {
     // Update history stack
     if (addToHistoryStack) {
       setHistory((prev) => {
-        const nextStack = [...prev.slice(0, historyIndex + 1), cleanWord];
+        const nextStack = [...prev.slice(0, historyIndex + 1), rawDisplay];
         setHistoryIndex(nextStack.length - 1);
         return nextStack;
       });

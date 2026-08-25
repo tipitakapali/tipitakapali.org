@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useDictionary } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertAnyToRoman, convertPaliScript } from '../services/transliterate';
+import { typeVelthuis, convertAnyToRoman, convertPaliScript, cleanDictionaryQuery } from '../services/transliterate';
 import { fetchDictionaryInflection } from '../services/api';
 
 // Helper to highlight exact matching inflections in table cells (CC BY-NC-SA 4.0 DPD)
@@ -250,6 +250,20 @@ export default function DictionaryModal() {
       }
     } catch (e) {}
   }, []);
+
+  // Reset scroll position to top whenever active dictionary tab or query word changes (Task 2)
+  useEffect(() => {
+    if (contentContainerRef.current) {
+      contentContainerRef.current.scrollTop = 0;
+    }
+  }, [activeDictTab, queryWord]);
+
+  const handleTabSelect = useCallback((tabId) => {
+    setDictTab(tabId);
+    if (contentContainerRef.current) {
+      contentContainerRef.current.scrollTop = 0;
+    }
+  }, [setDictTab]);
 
   // Resize handler for docked width (Left or Right panel)
   const startResizingWidth = useCallback(
@@ -527,7 +541,7 @@ export default function DictionaryModal() {
         if (text && text.length > 1) {
           e.preventDefault();
           e.stopPropagation();
-          const cleanWord = text.replace(/^[√\d\s\.\-]+/, '').replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim();
+          const cleanWord = cleanDictionaryQuery(text);
           if (cleanWord && cleanWord.length >= 2) {
             performLookup(cleanWord, true);
             return;
@@ -537,7 +551,7 @@ export default function DictionaryModal() {
 
       // 5. Handle clicking ANY word inside the dictionary text results (Task 3)
       const clickedWord = extractWordFromPointerEvent(e);
-      const cleanClicked = clickedWord ? clickedWord.replace(/^[√\d\s\.\-]+/, '').replace(/[…‘'’!"#$%&()*+,\-./:;<=>?@\[\\\]^_`{|}~0-9]/g, ' ').trim() : '';
+      const cleanClicked = clickedWord ? cleanDictionaryQuery(clickedWord) : '';
       if (cleanClicked && cleanClicked.length >= 2) {
         const sel = window.getSelection()?.toString()?.trim();
         if (!sel || sel.length <= 1) {
@@ -766,7 +780,7 @@ export default function DictionaryModal() {
           return (
             <button
               key={tab.id}
-              onClick={() => setDictTab(tab.id)}
+              onClick={() => handleTabSelect(tab.id)}
               className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer select-none ${
                 isActive
                   ? 'bg-[var(--accent)] text-white shadow-xs'

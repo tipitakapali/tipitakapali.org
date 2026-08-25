@@ -227,10 +227,27 @@ function lookupSingleDPD(word) {
   return [...exactMatches, ...relatedMatches];
 }
 
+function normalizeDictWord(rawWord) {
+  if (!rawWord || typeof rawWord !== 'string') return '';
+  let text = rawWord;
+  // 1. Replace all ṁ / Ṁ with ṃ
+  text = text.replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
+  // 2. Separate attached quote particles e.g. ’’ti, ’ti, ”ti, ’’pi, ’va
+  text = text.replace(/([’'”"»›]+)(ti|pi|va|eva|iti|api|nti|တိ|ති|ति)\b/gi, ' $2');
+  // 3. Strip quotes
+  text = text.replace(/[‘’“”"''`«»‹›„]/g, ' ');
+  // 4. Strip punctuation
+  text = text.replace(/[.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။]/g, ' ');
+  // 5. Clean leading root symbols
+  text = text.replace(/^[√\s\d.-]+/, ' ');
+  // 6. Lowercase & trim
+  return text.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 // Query DPD Dictionary (supports multi-word phrases)
 function lookupDPD(rawWord) {
   if (!dbs.DPD) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -280,7 +297,7 @@ function lookupSinglePTS(word) {
 // Query PTS PED Dictionary (supports multi-word phrases)
 function lookupPTS(rawWord) {
   if (!dbs.PTS) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -330,7 +347,7 @@ function lookupSingleABD(word) {
 // Query Abhidhānappadīpikā (supports multi-word phrases)
 function lookupABD(rawWord) {
   if (!dbs.ABD) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -384,7 +401,7 @@ function lookupSinglePSD(word) {
 // Query Pāli-Sinhala Dictionary (supports multi-word phrases)
 function lookupPSD(rawWord) {
   if (!dbs.PSD) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -428,7 +445,7 @@ function lookupSingleSANS(word) {
 // Query Sanskrit (supports multi-word phrases)
 function lookupSANS(rawWord) {
   if (!dbs.SANS) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -491,7 +508,7 @@ function lookupSingleSplitter(word) {
 // Query Splitter / Deconstructor (supports multi-word phrases)
 function lookupSplitter(rawWord) {
   if (!dbs.SPLI) return [];
-  const word = rawWord.toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
@@ -550,7 +567,7 @@ const othersCache = new Map();
 
 // Priority 1: Fast DPD lookup (Digital Pāḷi Dictionary + Synonyms)
 function lookupDPDFast(rawWord, useSplitter = false) {
-  const word = (rawWord || '').toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) {
     return {
       word: '',
@@ -608,7 +625,7 @@ function lookupDPDFast(rawWord, useSplitter = false) {
 
 // Priority 2: Async background lookup for secondary dictionaries (PTS, ABD, PSD, SANS, Splitter)
 function lookupOthers(rawWord) {
-  const word = (rawWord || '').toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) {
     return {
       word: '',
@@ -662,7 +679,7 @@ function lookupOthers(rawWord) {
 }
 
 function lookupAll(rawWord) {
-  const word = (rawWord || '').toLowerCase().trim();
+  const word = normalizeDictWord(rawWord);
   if (!word) {
     return {
       word: '',
