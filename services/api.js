@@ -173,8 +173,11 @@ export async function fetchMat(bookCode) {
 export async function searchTipitaka(query, options = {}) {
   const params = new URLSearchParams();
   params.set('q', query);
-  if (options.book) params.set('book', options.book);
-  if (options.nikaya) params.set('nikaya', options.nikaya);
+  if (options.book && options.book !== 'all') params.set('book', options.book);
+  if (options.mat && options.mat !== 'all') params.set('mat', options.mat);
+  if (options.pitaka && options.pitaka !== 'all') params.set('pitaka', options.pitaka);
+  if (options.distance && options.distance !== 'any') params.set('distance', options.distance);
+  if (options.sort && options.sort !== 'pitaka') params.set('sort', options.sort);
   if (options.limit) params.set('limit', options.limit);
   if (options.offset) params.set('offset', options.offset);
 

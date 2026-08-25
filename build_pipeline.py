@@ -3459,7 +3459,8 @@ def build_sqlite_database():
         para_num,
         para_index UNINDEXED,
         para_rend,
-        content
+        content,
+        prefix = 3
     );
     """)
 
@@ -3624,10 +3625,16 @@ def build_sqlite_database():
 
             cur.execute("UPDATE books SET chapter_count = ? WHERE id = ?;", (len(actions), book_id))
 
-        # 3. Index paragraphs into FTS5 with exact para_index
-        paras = re.findall(r'<(?:p|head)\s+rend="([^"]+)"(?:\s+n="([^"]+)")?\s*>(.*?)</(?:p|head)>', xml_content_utf8, flags=re.DOTALL)
+        # 3. Index paragraphs into FTS5 with exact para_index (retaining footnote/variant text)
+        paras = re.findall(r'<(?:p|head|trailer)\s+rend="([^"]+)"(?:\s+n="([^"]+)")?\s*>(.*?)</(?:p|head|trailer)>', xml_content_utf8, flags=re.DOTALL)
         for p_idx, (rend, pnum, pcontent) in enumerate(paras):
-            clean_text = re.sub(r'<[^>]+>', '', pcontent).strip()
+            t_clean = re.sub(r'<pb[^>]*/>', ' ', pcontent)
+            t_clean = re.sub(r'<span class="pagebreak"[^>]*>.*?</span>', ' ', t_clean, flags=re.DOTALL)
+            t_clean = re.sub(r'<strong class="paranum"[^>]*>.*?</strong>', ' ', t_clean, flags=re.DOTALL)
+            t_clean = re.sub(r'<[^>]+>', ' ', t_clean)
+            t_clean = t_clean.replace('ṁ', 'ṃ').replace('Ṁ', 'ṃ')
+            t_clean = re.sub(r'[\u200B-\u200D\uFEFF\u00A0]', ' ', t_clean)
+            clean_text = re.sub(r'\s+', ' ', t_clean).strip()
             if clean_text:
                 cur.execute("""
                 INSERT INTO paragraphs_fts (book_code, book_title, nikaya, para_num, para_index, para_rend, content)

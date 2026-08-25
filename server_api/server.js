@@ -41,7 +41,6 @@ const stmtGetChapterHtml = db.prepare('SELECT html FROM chapters WHERE book_code
 const stmtGetChaptersRangeHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index');
 const stmtGetAllChaptersHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index');
 const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
-const stmtGetBookXml = db.prepare('SELECT xml_filename, xml_content FROM books_xml WHERE book_code = ?');
 
 let stmtGetMat = null;
 let stmtGetAllMat = null;
@@ -420,19 +419,6 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     };
   });
 
-  // Get raw TEI XML source for a book
-  fastify.get('/api/book/:code/xml', async (req, reply) => {
-    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
-    const cleanCode = req.params.code.replace('.xml', '');
-    const xmlRow = stmtGetBookXml.get(cleanCode);
-    if (!xmlRow) {
-      reply.code(404);
-      return { error: `Raw XML for '${cleanCode}' not found` };
-    }
-    reply.header('Content-Type', 'application/xml; charset=utf-8');
-    return xmlRow.xml_content;
-  });
-
   // Get hierarchical TOC for a book (In-Memory Cached)
   fastify.get('/api/book/:code/toc', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
@@ -486,24 +472,191 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return precomputedMatList;
   });
 
+// Helper to build FTS5 match query supporting single words, exact phrases, proximity (NEAR), and multi-word AND
+function buildFts5Query(cleanText, distance = 'any') {
+  if (!cleanText) return '';
+  const tokens = cleanText
+    .replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF*]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (tokens.length === 0) return '';
+
+  // Single word: e.g. "dhamma"* or "dhamma"
+  if (tokens.length === 1) {
+    const tok = tokens[0];
+    return tok.endsWith('*') ? `"${tok.slice(0, -1)}"*` : `"${tok}"*`;
+  }
+
+  // Exact phrase: distance = 1
+  if (distance === 1 || distance === '1' || distance === 'exact') {
+    const phrase = tokens.map((t) => t.replace(/\*/g, '')).join(' ');
+    return `"${phrase}"`;
+  }
+
+  // Word proximity: distance = 2, 3, 5, 8, 10
+  const distNum = parseInt(distance, 10);
+  if (!isNaN(distNum) && distNum >= 2 && distNum <= 50) {
+    const terms = tokens.map((t) => `"${t.replace(/\*/g, '')}"`).join(' ');
+    return `NEAR(${terms}, ${distNum})`;
+  }
+
+  // Default: ANY distance (AND across paragraph)
+  return tokens.map((t) => (t.endsWith('*') ? `"${t.slice(0, -1)}"*` : `"${t}"*`)).join(' AND ');
+}
+
+// Helper to construct dynamic SQL WHERE & ORDER BY for full-text search
+function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
+  const whereClauses = ['paragraphs_fts MATCH ?'];
+  const params = [ftsQuery];
+
+  // 1. Specific Book Filter
+  if (book && book !== 'all') {
+    const cleanBook = book.replace('.xml', '');
+    whereClauses.push('book_code = ?');
+    params.push(cleanBook);
+  }
+
+  // 2. MAT Filter: Mūla, Aṭṭhakathā, Ṭīkā, Añña
+  if (mat && mat !== 'all') {
+    const matList = mat
+      .toLowerCase()
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const matConditions = [];
+    for (const m of matList) {
+      if (m === 'mula' || m === 'm' || m === 'mul') {
+        matConditions.push("book_code LIKE '%.mul%'");
+      } else if (m === 'attha' || m === 'a' || m === 'att') {
+        matConditions.push("book_code LIKE '%.att%'");
+      } else if (m === 'tika' || m === 't' || m === 'tik') {
+        matConditions.push("book_code LIKE '%.tik%'");
+      } else if (m === 'anna' || m === 'anya' || m === 'e') {
+        matConditions.push("(book_code NOT LIKE '%.mul%' AND book_code NOT LIKE '%.att%' AND book_code NOT LIKE '%.tik%')");
+      }
+    }
+    if (matConditions.length > 0) {
+      whereClauses.push(`(${matConditions.join(' OR ')})`);
+    }
+  }
+
+  // 3. Piṭaka / Nikāya Filter
+  if (pitaka && pitaka !== 'all') {
+    const pitList = pitaka
+      .toLowerCase()
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const pitConditions = [];
+    for (const p of pitList) {
+      if (p === 'vinaya' || p === 'vi' || p === 'vin') {
+        pitConditions.push("(book_code LIKE 'vin%' OR book_code LIKE 'vi%' OR book_code LIKE 'v0%')");
+      } else if (p === 'sutta' || p === 'su' || p === 's') {
+        pitConditions.push("(book_code LIKE 's0%' OR book_code LIKE 's1%' OR book_code LIKE 's2%')");
+      } else if (p === 'digha' || p === 's01') {
+        pitConditions.push("book_code LIKE 's01%'");
+      } else if (p === 'majjhima' || p === 's02') {
+        pitConditions.push("book_code LIKE 's02%'");
+      } else if (p === 'samyutta' || p === 's03') {
+        pitConditions.push("book_code LIKE 's03%'");
+      } else if (p === 'anguttara' || p === 's04') {
+        pitConditions.push("book_code LIKE 's04%'");
+      } else if (p === 'khuddaka' || p === 's05') {
+        pitConditions.push("book_code LIKE 's05%'");
+      } else if (p === 'abhidhamma' || p === 'abh' || p === 'ab') {
+        pitConditions.push("book_code LIKE 'abh%'");
+      } else if (p === 'anna' || p === 'anya' || p === 'e') {
+        pitConditions.push("book_code LIKE 'e%'");
+      }
+    }
+    if (pitConditions.length > 0) {
+      whereClauses.push(`(${pitConditions.join(' OR ')})`);
+    }
+  }
+
+  const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+  // 4. Sorting logic (Default: Piṭaka canonical order)
+  let orderSql = `
+    ORDER BY 
+      CASE 
+        WHEN book_code LIKE '%.mul%' THEN 1
+        WHEN book_code LIKE '%.att%' THEN 2
+        WHEN book_code LIKE '%.tik%' THEN 3
+        ELSE 4
+      END ASC,
+      CASE 
+        WHEN book_code LIKE 'vin%' OR book_code LIKE 'vi%' OR book_code LIKE 'v0%' THEN 1
+        WHEN book_code LIKE 's01%' THEN 2
+        WHEN book_code LIKE 's02%' THEN 3
+        WHEN book_code LIKE 's03%' THEN 4
+        WHEN book_code LIKE 's04%' THEN 5
+        WHEN book_code LIKE 's05%' THEN 6
+        WHEN book_code LIKE 'abh%' THEN 7
+        WHEN book_code LIKE 'e%'   THEN 8
+        ELSE 9
+      END ASC,
+      book_code ASC,
+      para_index ASC,
+      rowid ASC
+  `;
+
+  if (sort === 'relevance' || sort === 'rank') {
+    orderSql = 'ORDER BY rank ASC';
+  } else if (sort === 'bm25') {
+    orderSql = 'ORDER BY bm25(paragraphs_fts) ASC';
+  }
+
+  const countSql = `SELECT count(*) as total FROM paragraphs_fts ${whereSql}`;
+  const querySql = `
+    SELECT 
+      rowid,
+      book_code,
+      book_title,
+      nikaya,
+      para_num,
+      para_index,
+      para_rend,
+      snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) as snippet
+    FROM paragraphs_fts 
+    ${whereSql}
+    ${orderSql}
+    LIMIT ? OFFSET ?
+  `;
+
+  return { countSql, querySql, params };
+}
+
   // Full-Text Search across 520,000+ paragraphs with In-Memory LRU Caching
   fastify.get('/api/search', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
     const rawQuery = req.query.q || req.query.query || '';
     const bookFilter = req.query.book || null;
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '50', 10)));
+    const matFilter = req.query.mat || 'all';
+    const pitakaFilter = req.query.pitaka || req.query.nikaya || 'all';
+    const distanceVal = req.query.distance || req.query.dist || 'any';
+    const sortVal = req.query.sort || 'pitaka';
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = Math.max(0, parseInt(req.query.offset || '0', 10));
 
     if (!rawQuery || rawQuery.trim().length < 2) {
       return { total: 0, count: 0, results: [] };
     }
 
-    // Auto-normalize Velthuis typing
-    const convertedQuery = typeVelthuis(rawQuery.trim());
+    // Auto-normalize Velthuis typing and nigghahita
+    const convertedQuery = typeVelthuis(rawQuery.trim()).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
     const cleanQuery = convertedQuery.trim();
 
+    // Construct FTS5 match query
+    const ftsMatch = buildFts5Query(cleanQuery, distanceVal);
+    if (!ftsMatch) {
+      return { total: 0, count: 0, results: [] };
+    }
+
     // In-Memory Search Cache Lookup (< 0.05ms)
-    const cacheKey = `${cleanQuery}::${bookFilter || 'all'}::${limit}::${offset}`;
+    const cacheKey = `${ftsMatch}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${distanceVal}::${limit}::${offset}`;
     const cachedEntry = searchCache.get(cacheKey);
     if (cachedEntry && Date.now() - cachedEntry.timestamp < SEARCH_CACHE_TTL) {
       searchHits++;
@@ -511,39 +664,31 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     }
     searchMisses++;
 
-    let sanitized = cleanQuery
-      .replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF]/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((w) => `"${w}"*`)
-      .join(' AND ');
-
-    if (!sanitized) {
-      return { total: 0, count: 0, results: [] };
-    }
-
     try {
-      let total = 0;
-      let rows = [];
+      const { countSql, querySql, params } = buildSearchSql({
+        ftsQuery: ftsMatch,
+        mat: matFilter,
+        pitaka: pitakaFilter,
+        book: bookFilter,
+        sort: sortVal,
+      });
 
-      if (bookFilter) {
-        const cleanBook = bookFilter.replace('.xml', '');
-        const countRow = stmtSearchBookCount.get(cleanBook, sanitized);
-        total = countRow ? countRow.total : 0;
-        rows = stmtSearchBook.all(cleanBook, sanitized, limit, offset);
-      } else {
-        const countRow = stmtSearchCount.get(sanitized);
-        total = countRow ? countRow.total : 0;
-        rows = stmtSearch.all(sanitized, limit, offset);
-      }
+      const countRow = db.prepare(countSql).get(...params);
+      const total = countRow ? countRow.total : 0;
+
+      const rows = db.prepare(querySql).all(...params, limit, offset);
 
       const responseData = {
         query: cleanQuery,
+        ftsQuery: ftsMatch,
         total: total,
         count: rows.length,
         offset: offset,
         limit: limit,
+        mat: matFilter,
+        pitaka: pitakaFilter,
+        distance: distanceVal,
+        sort: sortVal,
         results: rows,
       };
 

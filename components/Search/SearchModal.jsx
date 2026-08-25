@@ -1,11 +1,50 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, X, Loader2, Filter, SlidersHorizontal, ArrowUpDown, ChevronDown } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
 import { searchTipitaka } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { typeVelthuis, convertAnyToRoman } from '../../services/transliterate';
+
+const MAT_OPTIONS = [
+  { id: 'all', label: 'All' },
+  { id: 'mula', label: 'Mūla' },
+  { id: 'attha', label: 'Aṭṭhakathā' },
+  { id: 'tika', label: 'Ṭīkā' },
+  { id: 'anna', label: 'Añña' },
+];
+
+const PITAKA_OPTIONS = [
+  { id: 'all', label: 'All Piṭakas' },
+  { id: 'vinaya', label: 'Vinayapiṭaka' },
+  { id: 'sutta', label: 'Suttapiṭaka (All)' },
+  { id: 'digha', label: '— Dīghanikāya' },
+  { id: 'majjhima', label: '— Majjhimanikāya' },
+  { id: 'samyutta', label: '— Saṃyuttanikāya' },
+  { id: 'anguttara', label: '— Aṅguttaranikāya' },
+  { id: 'khuddaka', label: '— Khuddakanikāya' },
+  { id: 'abhidhamma', label: 'Abhidhammapiṭaka' },
+  { id: 'anna', label: 'Añña (Other texts)' },
+];
+
+const DISTANCE_OPTIONS = [
+  { id: 'any', label: 'Any' },
+  { id: '1', label: '1 word (Exact phrase)' },
+  { id: '2', label: '2 words' },
+  { id: '3', label: '3 words' },
+  { id: '5', label: '5 words' },
+  { id: '8', label: '8 words' },
+  { id: '10', label: '10 words' },
+];
+
+const SORT_OPTIONS = [
+  { id: 'pitaka', label: 'Piṭaka order' },
+  { id: 'relevance', label: 'Relevant' },
+  { id: 'bm25', label: 'BM25' },
+];
+
+const SEARCH_PREFS_KEY = 'tipitaka_search_prefs_v1';
 
 export default function SearchModal() {
   const { isSearchOpen, searchInitialQuery, closeSearchModal, openBook, updateUrlParams } =
@@ -15,10 +54,93 @@ export default function SearchModal() {
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [offset, setOffset] = useState(0);
+
+  // Search Filter and Sort Controls (Default: Piṭaka Sort, Any Distance, All MAT, All Piṭakas)
+  const [matFilter, setMatFilter] = useState('all');
+  const [pitakaFilter, setPitakaFilter] = useState('all');
+  const [distanceFilter, setDistanceFilter] = useState('any');
+  const [sortOption, setSortOption] = useState('pitaka');
 
   const inputRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  // Load saved preferences on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SEARCH_PREFS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.mat) setMatFilter(parsed.mat);
+        if (parsed.pitaka) setPitakaFilter(parsed.pitaka);
+        if (parsed.distance) setDistanceFilter(parsed.distance);
+        if (parsed.sort) setSortOption(parsed.sort);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, []);
+
+  // Save preferences whenever they change
+  const savePrefs = (mat, pitaka, distance, sort) => {
+    try {
+      localStorage.setItem(
+        SEARCH_PREFS_KEY,
+        JSON.stringify({ mat, pitaka, distance, sort })
+      );
+    } catch {
+      // Ignore quota errors
+    }
+  };
+
+  const performSearch = useCallback(
+    async (searchQuery, currentOffset = 0, currentMat = matFilter, currentPitaka = pitakaFilter, currentDist = distanceFilter, currentSort = sortOption) => {
+      if (!searchQuery || searchQuery.trim().length < 2) {
+        setResults([]);
+        setTotal(0);
+        setOffset(0);
+        return;
+      }
+
+      if (currentOffset === 0) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      setError(null);
+
+      try {
+        const data = await searchTipitaka(searchQuery, {
+          mat: currentMat,
+          pitaka: currentPitaka,
+          distance: currentDist,
+          sort: currentSort,
+          limit: 50,
+          offset: currentOffset,
+        });
+
+        const newResults = data.results || [];
+        if (currentOffset === 0) {
+          setResults(newResults);
+          setOffset(0);
+        } else {
+          setResults((prev) => [...prev, ...newResults]);
+          setOffset(currentOffset);
+        }
+        setTotal(data.total || 0);
+        updateUrlParams({ q: searchQuery });
+      } catch (err) {
+        setError(err.message);
+        if (currentOffset === 0) setResults([]);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [matFilter, pitakaFilter, distanceFilter, sortOption, updateUrlParams]
+  );
 
   useEffect(() => {
     if (isSearchOpen) {
@@ -30,7 +152,7 @@ export default function SearchModal() {
 
         const romanQuery = convertAnyToRoman(displayedVal).trim();
         if (romanQuery.length >= 2) {
-          performSearch(romanQuery);
+          performSearch(romanQuery, 0);
         }
       }
 
@@ -42,7 +164,7 @@ export default function SearchModal() {
         }
       }, 50);
     }
-  }, [isSearchOpen, searchInitialQuery]);
+  }, [isSearchOpen, searchInitialQuery, performSearch]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -53,28 +175,6 @@ export default function SearchModal() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSearchOpen, closeSearchModal]);
-
-  const performSearch = async (searchQuery) => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
-      setResults([]);
-      setTotal(0);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await searchTipitaka(searchQuery, { limit: 50 });
-      setResults(data.results || []);
-      setTotal(data.total || 0);
-      updateUrlParams({ q: searchQuery });
-    } catch (err) {
-      setError(err.message);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleInputChange = (e) => {
     const raw = e.target.value;
@@ -94,8 +194,45 @@ export default function SearchModal() {
 
     setLoading(true);
     debounceTimerRef.current = setTimeout(() => {
-      performSearch(romanQuery);
+      performSearch(romanQuery, 0);
     }, 250);
+  };
+
+  const handleFilterChange = (type, value) => {
+    let newMat = matFilter;
+    let newPitaka = pitakaFilter;
+    let newDist = distanceFilter;
+    let newSort = sortOption;
+
+    if (type === 'mat') {
+      newMat = value;
+      setMatFilter(value);
+    } else if (type === 'pitaka') {
+      newPitaka = value;
+      setPitakaFilter(value);
+    } else if (type === 'distance') {
+      newDist = value;
+      setDistanceFilter(value);
+    } else if (type === 'sort') {
+      newSort = value;
+      setSortOption(value);
+    }
+
+    savePrefs(newMat, newPitaka, newDist, newSort);
+
+    const romanQuery = convertAnyToRoman(query).trim();
+    if (romanQuery.length >= 2) {
+      performSearch(romanQuery, 0, newMat, newPitaka, newDist, newSort);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (loading || loadingMore) return;
+    const nextOffset = offset + 50;
+    const romanQuery = convertAnyToRoman(query).trim();
+    if (romanQuery.length >= 2) {
+      performSearch(romanQuery, nextOffset);
+    }
   };
 
   const handleResultClick = async (result) => {
@@ -113,10 +250,11 @@ export default function SearchModal() {
 
   return (
     <div className="modal-overlay active" onClick={closeSearchModal}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header p-3 sm:p-4">
+      <div className="modal-card modal-card-search" onClick={(e) => e.stopPropagation()}>
+        {/* Search Header Row */}
+        <div className="modal-header p-3 sm:p-4 pb-2">
           <div className="flex items-center gap-2.5 w-full">
-            <Search size={18} className="modal-search-icon shrink-0" />
+            <Search size={18} className="modal-search-icon shrink-0 text-[var(--accent)]" />
             <input
               ref={inputRef}
               type="text"
@@ -128,7 +266,7 @@ export default function SearchModal() {
             />
             {query && (
               <button
-                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 onClick={() => {
                   setQuery('');
                   setResults([]);
@@ -150,10 +288,78 @@ export default function SearchModal() {
           </div>
         </div>
 
+        {/* Search Filters & Controls Toolbar */}
+        <div className="search-filter-toolbar">
+          {/* MAT Filter Segmented Buttons */}
+          <div className="search-filter-item">
+            <span className="search-filter-label">Group:</span>
+            <div className="search-mat-pills">
+              {MAT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`search-mat-pill ${matFilter === opt.id ? 'active' : ''}`}
+                  onClick={() => handleFilterChange('mat', opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          {/* Piṭaka Filter Dropdown */}
+          <div className="search-filter-item">
+            <span className="search-filter-label">Piṭaka:</span>
+            <select
+              value={pitakaFilter}
+              onChange={(e) => handleFilterChange('pitaka', e.target.value)}
+              className="search-select-dropdown"
+            >
+              {PITAKA_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Word Distance Dropdown */}
+          <div className="search-filter-item">
+            <span className="search-filter-label">Distance:</span>
+            <select
+              value={distanceFilter}
+              onChange={(e) => handleFilterChange('distance', e.target.value)}
+              className="search-select-dropdown"
+            >
+              {DISTANCE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div className="search-filter-item">
+            <span className="search-filter-label">Sort:</span>
+            <select
+              value={sortOption}
+              onChange={(e) => handleFilterChange('sort', e.target.value)}
+              className="search-select-dropdown font-medium"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Modal Body / Results */}
         <div className="modal-body">
           {loading && (
-            <div className="loading-view">
+            <div className="loading-view py-8">
               <Loader2 size={24} className="spinner" />
               <div>
                 Searching Tipiṭaka for &ldquo;<strong>{query}</strong>&rdquo;...
@@ -176,7 +382,14 @@ export default function SearchModal() {
                 <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
                   ({convertAnyToRoman(query).trim()})
                 </span>
-              )}.
+              )}
+              {matFilter !== 'all' || pitakaFilter !== 'all' || distanceFilter !== 'any' ? (
+                <div className="mt-2 text-xs text-[var(--text-muted)]">
+                  (Filters active: {matFilter !== 'all' ? `Group=${matFilter} ` : ''}
+                  {pitakaFilter !== 'all' ? `Piṭaka=${pitakaFilter} ` : ''}
+                  {distanceFilter !== 'any' ? `Distance=${distanceFilter} ` : ''})
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -184,7 +397,7 @@ export default function SearchModal() {
             <>
               <div className="search-summary-bar">
                 <span>
-                  Found <strong>{total}</strong> matches for &ldquo;<strong>{query}</strong>&rdquo;
+                  Found <strong>{total.toLocaleString()}</strong> matches for &ldquo;<strong>{query}</strong>&rdquo;
                   {convertAnyToRoman(query).trim() !== query.trim() && (
                     <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
                       ({convertAnyToRoman(query).trim()})
@@ -192,17 +405,38 @@ export default function SearchModal() {
                   )}
                   :
                 </span>
-                <span>Click any result to jump</span>
+                <span className="text-xs">
+                  Showing {results.length} of {total.toLocaleString()}
+                </span>
               </div>
               <div className="search-results-list">
                 {results.map((r, i) => (
                   <SearchResultItem
-                    key={`${r.book_code}-${r.para_index || i}`}
+                    key={`${r.book_code}-${r.para_index || i}-${i}`}
                     result={r}
                     onClick={() => handleResultClick(r)}
                   />
                 ))}
               </div>
+
+              {results.length < total && (
+                <div className="flex justify-center mt-4 mb-2">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="px-4 py-2 text-xs font-semibold rounded-md bg-[var(--bg-secondary)] hover:bg-[var(--bg-active)] border border-[var(--border-color)] text-[var(--text-primary)] transition-all flex items-center gap-2"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 size={14} className="spinner" />
+                        Loading more matches...
+                      </>
+                    ) : (
+                      `Load More (+50 of ${(total - results.length).toLocaleString()} remaining)`
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -210,3 +444,4 @@ export default function SearchModal() {
     </div>
   );
 }
+
