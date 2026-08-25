@@ -1,30 +1,43 @@
 #!/bin/bash
 set -e
 
-# Change directory to server_api folder
+# Change directory to db folder
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$DIR"
+if [ -d "$DIR/db" ]; then
+  cd "$DIR/db"
+else
+  cd "$DIR"
+fi
 
 echo "=========================================="
 echo " Tipitaka Database Zip & Split Tool"
+echo " (Processing all databases in: $(pwd))"
 echo "=========================================="
 
-DB_FILES=("tipitaka.db" "books_xml.db")
+# If arguments are passed, use them; otherwise automatically find all *.db files
+if [ $# -gt 0 ]; then
+  DB_FILES=("$@")
+else
+  DB_FILES=(*.db)
+fi
+
+echo "Found ${#DB_FILES[@]} database file(s) to process: ${DB_FILES[*]}"
+echo ""
 
 for DB_FILE in "${DB_FILES[@]}"; do
   if [ -f "$DB_FILE" ]; then
     ZIP_FILE="${DB_FILE}.zip"
     
-    echo ""
-    echo "[+] Processing $DB_FILE ($(du -h "$DB_FILE" | cut -f1))..."
+    echo "------------------------------------------"
+    echo "[+] Processing: $DB_FILE ($(du -h "$DB_FILE" | cut -f1))"
     
-    # Remove old zip and part files
+    # Remove old zip and part files for this db
     rm -f "$ZIP_FILE" "${ZIP_FILE}.part"*
     
     # Compress into zip
     echo "    -> Zipping $DB_FILE into $ZIP_FILE..."
     zip -9 -q "$ZIP_FILE" "$DB_FILE"
-    echo "    -> Created $ZIP_FILE ($(du -h "$ZIP_FILE" | cut -f1))."
+    echo "    -> Created $ZIP_FILE ($(du -h "$ZIP_FILE" | cut -f1))"
     
     # Split zip file into parts of 45MB each
     echo "    -> Splitting $ZIP_FILE into 45M parts..."
@@ -36,12 +49,12 @@ for DB_FILE in "${DB_FILES[@]}"; do
     echo "    ✓ Parts created:"
     ls -lh "${ZIP_FILE}.part"* | awk '{print "       " $9 " (" $5 ")"}'
   else
-    echo "[-] $DB_FILE not found, skipping."
+    echo "[-] $DB_FILE is not a regular file, skipping."
   fi
 done
 
 echo ""
 echo "=========================================="
-echo "✓ All databases zipped and split into parts!"
+echo "✓ All (${#DB_FILES[@]}) databases zipped and split into parts!"
 echo "  Ready to commit parts to GitHub."
 echo "=========================================="

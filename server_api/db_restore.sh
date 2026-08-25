@@ -1,22 +1,39 @@
 #!/bin/bash
 set -e
 
-# Change directory to server_api folder
+# Change directory to db folder
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$DIR"
+if [ -d "$DIR/db" ]; then
+  cd "$DIR/db"
+else
+  cd "$DIR"
+fi
 
 echo "=========================================="
 echo " Tipitaka Database Restore Tool"
+echo " (Restoring in: $(pwd))"
 echo "=========================================="
 
-DB_FILES=("tipitaka.db" "books_xml.db")
+# Auto-discover all db part archives in the folder
+if [ $# -gt 0 ]; then
+  DB_FILES=("$@")
+else
+  DB_FILES=($(ls *.db.zip.part* 2>/dev/null | sed -E 's/\.zip\.part.*//' | sort -u || true))
+fi
+
+if [ ${#DB_FILES[@]} -eq 0 ]; then
+  echo "[-] No *.db.zip.part* files found to restore in $(pwd)."
+  exit 0
+fi
+
+echo "Found ${#DB_FILES[@]} database(s) to restore: ${DB_FILES[*]}"
+echo ""
 
 for DB_FILE in "${DB_FILES[@]}"; do
   ZIP_FILE="${DB_FILE}.zip"
   
-  # Check if part files exist
   if ls "${ZIP_FILE}.part"* 1> /dev/null 2>&1; then
-    echo ""
+    echo "------------------------------------------"
     echo "[+] Restoring $DB_FILE from parts..."
     
     # Reassemble parts into single zip file
@@ -49,5 +66,5 @@ done
 
 echo ""
 echo "=========================================="
-echo "✓ Database restore complete!"
+echo "✓ All databases restored successfully!"
 echo "=========================================="

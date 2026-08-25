@@ -12,6 +12,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 // Locate tipitaka.db database
 const DB_CANDIDATES = [
+  path.join(__dirname, 'db', 'tipitaka.db'),
   path.join(__dirname, 'tipitaka.db'),
 ];
 
@@ -32,6 +33,30 @@ db.exec(`
   PRAGMA query_only = 1;
 `);
 
+// Locate and initialize separate fts_tipitaka.db database for full-text search
+const FTS_DB_CANDIDATES = [
+  path.join(__dirname, 'db', 'fts_tipitaka.db'),
+  path.join(__dirname, 'fts_tipitaka.db'),
+  path.join(__dirname, 'db', 'tipitaka.db'),
+  path.join(__dirname, 'tipitaka.db'),
+];
+
+let FTS_DB_PATH = FTS_DB_CANDIDATES.find((p) => fs.existsSync(p));
+let dbFts = null;
+if (FTS_DB_PATH) {
+  try {
+    dbFts = new DatabaseSync(FTS_DB_PATH, { readOnly: true });
+    dbFts.exec(`
+      PRAGMA synchronous = NORMAL;
+      PRAGMA temp_store = MEMORY;
+      PRAGMA query_only = 1;
+    `);
+    console.log(`[Database] Using FTS5 SQLite database at: ${FTS_DB_PATH}`);
+  } catch (err) {
+    console.warn('[Database] FTS database initialization error:', err.message);
+  }
+}
+
 // Prepared Statements for ultra-low latency direct execution (Zero runtime parsing)
 const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 'tree_json'");
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
@@ -50,40 +75,6 @@ try {
 } catch (e) {
   console.warn('[MAT] book_mat table prepared statement error:', e.message);
 }
-
-const stmtSearchCount = db.prepare('SELECT count(*) as total FROM paragraphs_fts WHERE paragraphs_fts MATCH ?');
-const stmtSearch = db.prepare(`
-  SELECT 
-    rowid,
-    book_code,
-    book_title,
-    nikaya,
-    para_num,
-    para_index,
-    para_rend,
-    snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) as snippet
-  FROM paragraphs_fts 
-  WHERE paragraphs_fts MATCH ? 
-  ORDER BY rank
-  LIMIT ? OFFSET ?
-`);
-
-const stmtSearchBookCount = db.prepare('SELECT count(*) as total FROM paragraphs_fts WHERE book_code = ? AND paragraphs_fts MATCH ?');
-const stmtSearchBook = db.prepare(`
-  SELECT 
-    rowid,
-    book_code,
-    book_title,
-    nikaya,
-    para_num,
-    para_index,
-    para_rend,
-    snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) as snippet
-  FROM paragraphs_fts 
-  WHERE book_code = ? AND paragraphs_fts MATCH ? 
-  ORDER BY rank
-  LIMIT ? OFFSET ?
-`);
 
 // Velthuis input normalization for Pāḷi searches
 function typeVelthuis(uType) {
@@ -673,10 +664,11 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
         sort: sortVal,
       });
 
-      const countRow = db.prepare(countSql).get(...params);
+      const searchDb = dbFts || db;
+      const countRow = searchDb.prepare(countSql).get(...params);
       const total = countRow ? countRow.total : 0;
 
-      const rows = db.prepare(querySql).all(...params, limit, offset);
+      const rows = searchDb.prepare(querySql).all(...params, limit, offset);
 
       const responseData = {
         query: cleanQuery,

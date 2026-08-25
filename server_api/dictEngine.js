@@ -4,18 +4,10 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 
-// Locate dictionary database directory
-const CANDIDATE_DIRS = [
-  process.env.DICT_DB_DIR,
-  path.resolve(__dirname, '..', '..', 'ref', 'apitipitakapali', 'db'),
-  path.resolve(__dirname, '..', 'ref', 'apitipitakapali', 'db'),
-  path.resolve(__dirname, 'dict_db'),
-  '/home/administrator/tipitaka-xml-vri/ref/apitipitakapali/db',
-].filter(Boolean);
-
-let DB_DIR = CANDIDATE_DIRS.find((d) => fs.existsSync(d));
-if (!DB_DIR) {
-  console.warn('[DictEngine] Warning: Dictionary database directory not found in candidate locations:', CANDIDATE_DIRS);
+// Locate dictionary database directory (strictly server_api/db)
+const DB_DIR = path.resolve(__dirname, 'db');
+if (!fs.existsSync(DB_DIR)) {
+  console.warn('[DictEngine] Warning: Dictionary database directory not found at:', DB_DIR);
 } else {
   console.log(`[DictEngine] Dictionary databases directory: ${DB_DIR}`);
 }
