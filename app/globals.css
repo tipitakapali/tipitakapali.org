@@ -2127,12 +2127,12 @@ footer.app-footer.hidden-footer,
 
 @media (max-width: 640px) {
   .dict-overlay {
-    padding: 8px 8px 38px 8px;
+    padding: 6px 6px 22vh 6px;
     align-items: flex-start;
   }
   .dict-panel-modal {
-    height: 78vh;
-    max-height: 78vh;
+    height: 64vh;
+    max-height: 64vh;
     margin-top: 4px;
   }
 }

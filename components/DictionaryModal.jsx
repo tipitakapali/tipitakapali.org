@@ -309,15 +309,29 @@ export default function DictionaryModal() {
     setLocalInput(displayWord || queryWord || '');
   }, [displayWord, queryWord]);
 
-  // Focus search input on open
+  // Focus search input on desktop open only (avoid auto-keyboard and auto-highlight on mobile)
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 80);
+      const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      if (!isTouch) {
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 80);
+      }
     }
   }, [isOpen]);
+
+  // Safe dismiss handler that stops mobile ghost click-through
+  const handleSafeDismiss = useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof window !== 'undefined') {
+      window.__tipitaka_dict_just_closed = Date.now();
+    }
+    closeDictionary();
+  }, [closeDictionary]);
 
   // Outside click listener: closes modal or top/bottom drawer when clicking outside (docked left/right stays docked like sidebar)
   useEffect(() => {
@@ -336,7 +350,7 @@ export default function DictionaryModal() {
       if (e.target.closest('[data-dict-trigger]') || e.target.closest('.dict-quick-btn')) {
         return;
       }
-      closeDictionary();
+      handleSafeDismiss(e);
     };
 
     const timer = setTimeout(() => {
@@ -347,7 +361,7 @@ export default function DictionaryModal() {
       clearTimeout(timer);
       document.removeEventListener('pointerdown', handlePointerDownOutside, true);
     };
-  }, [isOpen, dockMode, closeDictionary]);
+  }, [isOpen, dockMode, handleSafeDismiss]);
 
   // Register global window.playAudio for inline DPD audio buttons (Fix 3)
   useEffect(() => {
@@ -781,7 +795,7 @@ export default function DictionaryModal() {
 
           {/* Close Button with "Close" text label for easy touch */}
           <button
-            onClick={closeDictionary}
+            onClick={handleSafeDismiss}
             className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 text-xs font-semibold transition cursor-pointer min-h-[30px] touch-manipulation"
             title="Close dictionary (Esc)"
             aria-label="Close dictionary"
@@ -821,7 +835,13 @@ export default function DictionaryModal() {
             {localInput && (
               <button
                 type="button"
-                onPointerDown={(e) => {
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setLocalInput('');
+                  setDisplayWord('');
+                }}
+                onTouchStart={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   setLocalInput('');
@@ -832,9 +852,8 @@ export default function DictionaryModal() {
                   e.stopPropagation();
                   setLocalInput('');
                   setDisplayWord('');
-                  inputRef.current?.focus();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer touch-manipulation z-10"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
                 title="Clear input"
                 aria-label="Clear input"
               >
@@ -993,7 +1012,12 @@ export default function DictionaryModal() {
     return (
       <div
         className="dict-overlay animate-fade-in"
-        onClick={closeDictionary}
+        onClick={handleSafeDismiss}
+        onTouchEnd={(e) => {
+          if (e.target === e.currentTarget) {
+            handleSafeDismiss(e);
+          }
+        }}
       >
         <div
           ref={modalPanelRef}

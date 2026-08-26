@@ -799,6 +799,13 @@ export default function ReaderView() {
   );
 
   const handleReaderClick = useCallback((e) => {
+    // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
+    if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
+
     // 1. Ignore clicks on interactive controls (buttons, links, go-to markers)
     if (e.target.closest('button, a, input, select, textarea, [data-goto-type]')) {
       return;
@@ -887,12 +894,16 @@ export default function ReaderView() {
             wordRange.setEnd(node, end);
             highlightRangeInReader(wordRange);
 
-            // Clear native selection to prevent mobile selection pin handles from appearing
+            // Multi-frame clear to suppress mobile OS asynchronous selection handles / pins
             if (typeof window !== 'undefined') {
-              const sel = window.getSelection();
-              if (sel) {
-                sel.removeAllRanges();
-              }
+              const clearSel = () => {
+                const sel = window.getSelection();
+                if (sel) sel.removeAllRanges();
+              };
+              clearSel();
+              setTimeout(clearSel, 0);
+              setTimeout(clearSel, 60);
+              setTimeout(clearSel, 160);
             }
 
             if (activeTab?.bookCode) {

@@ -12,6 +12,7 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import TreeNode from './TreeNode';
+import HelpModal from '../HelpModal';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
@@ -23,6 +24,7 @@ export default function NavigationTree() {
   const [error, setError] = useState(null);
   const [filterText, setFilterText] = useState('');
   const [expandedMap, setExpandedMap] = useState({});
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // True if at least one folder/node in the tree is expanded
   const hasAnyExpanded = React.useMemo(() => {
@@ -365,10 +367,18 @@ export default function NavigationTree() {
           onMouseDown={dockPosition === 'float' ? startDragging : undefined}
         >
           <div className="sidebar-title-row">
-            <div className="sidebar-title flex items-center gap-1.5">
+            <div className="sidebar-title flex items-center gap-1.5 min-w-0">
               {dockPosition === 'float' && (
-                <GripHorizontal size={14} className="text-[var(--text-muted)] cursor-move" />
+                <GripHorizontal size={14} className="text-[var(--text-muted)] cursor-move shrink-0" />
               )}
+              <button
+                onClick={() => setIsHelpOpen(true)}
+                className="font-bold text-[13.5px] sm:text-[14.5px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
+                title="Tipiṭaka Reader — Help & Guide (Press ?)"
+                aria-label="Tipiṭaka Reader Help and User Guide"
+              >
+                <span>TipitakaPali.org</span>
+              </button>
             </div>
 
             {/* Tree & Dock Actions */}
@@ -513,6 +523,8 @@ export default function NavigationTree() {
           />
         )}
       </aside>
+
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </>
   );
 }
