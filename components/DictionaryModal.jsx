@@ -405,16 +405,41 @@ export default function DictionaryModal() {
     };
   }, [isOpen, dockMode, handleSafeDismiss]);
 
-  // Register global window.playAudio for inline DPD audio buttons (Fix 3)
+  // Register global window.playAudio for inline DPD audio buttons (Fix 3) - singleton + dedupe to prevent double 206
   useEffect(() => {
     window.playAudio = function (headword, buttonElement) {
       if (!headword) return;
+      const now = Date.now();
+      // Dedupe: inline onclick + delegated handler both fire (~0-50ms apart) → keep only first
+      if (
+        window._lastAudioPlay &&
+        window._lastAudioPlay.headword === headword &&
+        now - window._lastAudioPlay.time < 800
+      ) {
+        return;
+      }
+      window._lastAudioPlay = { headword, time: now };
+
+      // Stop any currently playing audio (prevents overlap/echo)
+      if (window._currentAudio) {
+        try {
+          window._currentAudio.pause();
+          window._currentAudio.currentTime = 0;
+        } catch (e) {}
+        window._currentAudio = null;
+      }
+
       const gender = 'male';
       const baseUrl = 'https://www.dpdict.net/audio/';
       const audioUrl = `${baseUrl}${encodeURIComponent(headword)}?gender=${gender}`;
       const audio = new Audio(audioUrl);
+      window._currentAudio = audio;
 
+      audio.addEventListener('ended', () => {
+        if (window._currentAudio === audio) window._currentAudio = null;
+      });
       audio.addEventListener('error', () => {
+        if (window._currentAudio === audio) window._currentAudio = null;
         if (buttonElement) {
           buttonElement.innerHTML = `
             <svg viewBox="0 0 24 24" width="14px" height="14px" fill="none" stroke="currentColor" stroke-width="2" class="text-rose-500 inline-block">
@@ -430,13 +455,20 @@ export default function DictionaryModal() {
       });
 
       audio.play().catch((err) => {
+        if (window._currentAudio === audio) window._currentAudio = null;
         console.warn('Audio play failed:', err);
       });
     };
 
     return () => {
       try {
+        if (window._currentAudio) {
+          window._currentAudio.pause();
+          window._currentAudio = null;
+        }
         delete window.playAudio;
+        delete window._lastAudioPlay;
+        delete window._currentAudio;
       } catch (e) {}
     };
   }, []);
@@ -516,14 +548,19 @@ export default function DictionaryModal() {
   // Intercept clicks inside definitions (DPD buttons, inflection loader, auto-collapse, word jump)
   const handleContentClick = useCallback(
     async (e) => {
-      // 1. Handle Audio play button clicks
+      // 1. Handle Audio play button clicks — neutralize inline onclick + delegated double-fire
       const playBtn = e.target.closest('a.dpd-button.play, button.play, a.play');
       if (playBtn) {
         e.preventDefault();
         e.stopPropagation();
+        // Capture headword before removing inline handler
         const onclickAttr = playBtn.getAttribute('onclick') || '';
         const match = onclickAttr.match(/playAudio\(['"]([^'"]+)['"]/);
         const headword = match ? match[1] : queryWord;
+        // Remove inline onclick so future clicks go only through delegated path (prevents recurring double)
+        if (playBtn.hasAttribute('onclick')) {
+          playBtn.removeAttribute('onclick');
+        }
         if (typeof window.playAudio === 'function' && headword) {
           window.playAudio(headword, playBtn);
         }
