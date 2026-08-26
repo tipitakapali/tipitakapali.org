@@ -773,9 +773,6 @@ export function TabProvider({ children }) {
           setActiveBookCode(null);
           setTreeSelectedNode(null);
           updateUrlParams({ book: null, chapter: null, q: null, search: null });
-          persistTabs([], null);
-          setIsZenMode(false);
-          setIsSidebarOpen(true);
           if (typeof document !== 'undefined') {
             document.body.classList.remove('zen-mode');
           }
@@ -785,6 +782,126 @@ export function TabProvider({ children }) {
       }
     },
     [updateUrlParams, persistTabs, setActiveParaNum, setIsZenMode, setIsSidebarOpen]
+  );
+
+  // Close other tabs except bookCode
+  const closeOtherTabs = useCallback(
+    (bookCode) => {
+      const currentTabs = openTabsRef.current;
+      const targetTab = currentTabs.find((t) => t.bookCode === bookCode);
+      if (!targetTab) return;
+
+      const newTabs = [targetTab];
+      setOpenTabs(newTabs);
+      setActiveBookCode(bookCode);
+
+      const firstP = getFirstParaOfChapter(targetTab.para_to_chapter, targetTab.currentChapterIdx || 0);
+      if (firstP) {
+        setActiveParaNum(firstP);
+      }
+      setTreeSelectedNode({
+        bookCode: targetTab.bookCode,
+        chapterIdx: targetTab.currentChapterIdx || 0,
+      });
+      updateUrlParams({
+        book: targetTab.bookCode,
+        chapter: (targetTab.currentChapterIdx || 0) + 1,
+        q: null,
+        search: null,
+      });
+      persistTabs(newTabs, bookCode);
+    },
+    [updateUrlParams, persistTabs, setActiveParaNum]
+  );
+
+  // Close all tabs
+  const closeAllTabs = useCallback(() => {
+    setOpenTabs([]);
+    setActiveBookCode(null);
+    setTreeSelectedNode(null);
+    updateUrlParams({ book: null, chapter: null, q: null, search: null });
+    persistTabs([], null);
+    setIsZenMode(false);
+    setIsSidebarOpen(true);
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('zen-mode');
+    }
+  }, [updateUrlParams, persistTabs, setIsZenMode, setIsSidebarOpen]);
+
+  // Close tabs to the left of bookCode
+  const closeLeftTabs = useCallback(
+    (bookCode) => {
+      const currentTabs = openTabsRef.current;
+      const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
+      if (idx <= 0) return;
+
+      const newTabs = currentTabs.slice(idx);
+      setOpenTabs(newTabs);
+
+      const activeCode = activeBookCodeRef.current;
+      const activeStillPresent = newTabs.some((t) => t.bookCode === activeCode);
+
+      if (!activeStillPresent) {
+        const nextTab = newTabs[0];
+        setActiveBookCode(nextTab.bookCode);
+        const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
+        if (firstP) {
+          setActiveParaNum(firstP);
+        }
+        setTreeSelectedNode({
+          bookCode: nextTab.bookCode,
+          chapterIdx: nextTab.currentChapterIdx || 0,
+        });
+        updateUrlParams({
+          book: nextTab.bookCode,
+          chapter: (nextTab.currentChapterIdx || 0) + 1,
+          q: null,
+          search: null,
+        });
+        persistTabs(newTabs, nextTab.bookCode);
+      } else {
+        persistTabs(newTabs, activeCode);
+      }
+    },
+    [updateUrlParams, persistTabs, setActiveParaNum]
+  );
+
+  // Close tabs to the right of bookCode
+  const closeRightTabs = useCallback(
+    (bookCode) => {
+      const currentTabs = openTabsRef.current;
+      const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
+      if (idx === -1 || idx >= currentTabs.length - 1) return;
+
+      const newTabs = currentTabs.slice(0, idx + 1);
+      setOpenTabs(newTabs);
+
+      const activeCode = activeBookCodeRef.current;
+      const activeStillPresent = newTabs.some((t) => t.bookCode === activeCode);
+
+      if (!activeStillPresent) {
+        const nextTab = newTabs[newTabs.length - 1];
+        setActiveBookCode(nextTab.bookCode);
+        const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
+        if (firstP) {
+          setActiveParaNum(firstP);
+        }
+        setTreeSelectedNode({
+          bookCode: nextTab.bookCode,
+          chapterIdx: nextTab.currentChapterIdx || 0,
+        });
+        updateUrlParams({
+          book: nextTab.bookCode,
+          chapter: (nextTab.currentChapterIdx || 0) + 1,
+          q: null,
+          search: null,
+        });
+        persistTabs(newTabs, nextTab.bookCode);
+      } else {
+        persistTabs(newTabs, activeCode);
+      }
+    },
+    [updateUrlParams, persistTabs, setActiveParaNum]
   );
 
   const reorderTabs = useCallback(
@@ -1132,6 +1249,10 @@ export function TabProvider({ children }) {
         bufferAdjacentChapters,
         switchTab,
         closeTab,
+        closeOtherTabs,
+        closeAllTabs,
+        closeLeftTabs,
+        closeRightTabs,
         reorderTabs,
         setChapterForActiveTab,
         saveTabPosition,
