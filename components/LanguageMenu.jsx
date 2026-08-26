@@ -84,6 +84,7 @@ export default function LanguageMenu() {
                 value={settings.paliScript || 'roman'}
                 onChange={(e) => {
                   updateSetting('paliScript', e.target.value);
+                  setIsOpen(false);
                 }}
                 className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-lg p-2 text-xs font-semibold outline-none cursor-pointer focus:border-[var(--accent)] transition"
               >

@@ -253,10 +253,20 @@ export default function SearchModal() {
   return (
     <div className="modal-overlay active" onClick={closeSearchModal}>
       <div className="modal-card modal-card-search" onClick={(e) => e.stopPropagation()}>
-        {/* Search Header Row */}
-        <div className="modal-header p-3 sm:p-4 pb-2">
-          <div className="flex items-center gap-2.5 w-full">
-            <Search size={18} className="modal-search-icon shrink-0 text-[var(--accent)]" />
+        {/* Search Header Row — redesigned to match Dictionary (Task 4) */}
+        <div className="p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const romanQuery = convertAnyToRoman(query).trim();
+              if (romanQuery.length >= 2) {
+                performSearch(romanQuery, 0);
+              }
+              inputRef.current?.blur();
+            }}
+            className="relative flex-1 min-w-0"
+          >
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
             <input
               ref={inputRef}
               type="text"
@@ -265,6 +275,7 @@ export default function SearchModal() {
               onChange={handleInputChange}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                  e.preventDefault();
                   e.target?.blur();
                   const romanQuery = convertAnyToRoman(query).trim();
                   if (romanQuery.length >= 2) {
@@ -273,12 +284,15 @@ export default function SearchModal() {
                 }
               }}
               autoComplete="off"
-              className="flex-1 text-sm sm:text-base outline-none bg-transparent"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
             />
             {query && (
               <button
                 type="button"
-                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer touch-manipulation"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   setQuery('');
@@ -291,20 +305,23 @@ export default function SearchModal() {
                   setTotal(0);
                   inputRef.current?.focus();
                 }}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
                 title="Clear input"
                 aria-label="Clear input"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             )}
-            <button
-              className="btn-icon p-1.5"
-              onClick={closeSearchModal}
-              title="Close search (Esc)"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          </form>
+          <button
+            type="button"
+            onClick={closeSearchModal}
+            className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)] border border-[var(--border-color)] text-xs font-medium shadow-2xs transition cursor-pointer shrink-0"
+            title="Close search (Esc)"
+            aria-label="Close search"
+          >
+            <span>Close</span>
+          </button>
         </div>
 
         {/* Search Filters & Controls Toolbar */}

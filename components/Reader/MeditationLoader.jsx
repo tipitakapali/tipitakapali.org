@@ -32,7 +32,7 @@ export default function MeditationLoader({ bookTitle, bookCode, chapterIdx, para
       </div>
 
       {/* Book Title & Target Section */}
-      <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] max-w-md truncate px-2 mb-1">
+      <h2 className="meditation-title text-base sm:text-lg font-bold text-[var(--text-primary)] max-w-md truncate px-2 mb-1">
         {displayTitle}
       </h2>
 
@@ -54,7 +54,7 @@ export default function MeditationLoader({ bookTitle, bookCode, chapterIdx, para
       <div className="max-w-md px-4 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]/60 text-xs text-[var(--text-secondary)] shadow-2xs space-y-1">
         <div className="font-serif italic text-[12.5px] text-[var(--accent)] flex items-center justify-center gap-1.5 leading-relaxed">
           <Sparkles size={13} className="shrink-0" />
-          <span>{convertPaliScript('Ekāyano ayaṃ, bhikkhave, maggo ... yadidaṃ cattāro satipaṭṭhānā.', paliScript)}</span>
+          <span className="meditation-pali-quote">{convertPaliScript('Ekāyano ayaṃ, bhikkhave, maggo ... yadidaṃ cattāro satipaṭṭhānā.', paliScript)}</span>
         </div>
         <p className="text-[11px] text-[var(--text-muted)]">
           "This is the one-way path, monks... namely, the four foundations of mindfulness."

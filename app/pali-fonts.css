@@ -262,6 +262,33 @@ html[data-script="sinhala"] { --font-reader: "UN-Abhaya", serif; }
 html[data-script="myanmar"] { --font-reader: "Pyidaungsu", sans-serif; }
 html[data-script="devanagari"] { --font-reader: "Noto Sans Devanagari", sans-serif; }
 html[data-script="thai"] { --font-reader: "THSarabunPali", serif; }
+
+/* Thai script appears visually smaller at same px — scale up for readability (Task 2) — BIGGER */
+html[data-script="thai"] .reader-container {
+  font-size: calc(var(--font-size-base) * 1.35);
+  line-height: 2.1;
+}
+html[data-script="thai"] .dp9,
+html[data-script="thai"] .pts15,
+html[data-script="thai"] .psinh26,
+html[data-script="thai"] .tmmAbhidhan,
+html[data-script]:not([data-script="roman"]) .dpd-splitter-section {
+  font-size: calc(var(--dict-font-size, 15px) * 1.32);
+}
+html[data-script="thai"] .sidebar-title,
+html[data-script="thai"] .sidebar-title span,
+html[data-script="thai"] .tree-row,
+html[data-script="thai"] .tree-text,
+html[data-script="thai"] .result-snippet,
+html[data-script="thai"] .chapter-pill {
+  font-size: calc(1em * 1.32);
+}
+html[data-script]:not([data-script="roman"]) .book-tab {
+  font-size: calc(1em * 1.18);
+}
+html[data-script="thai"] .welcome-title {
+  font-size: calc(1em * 1.22);
+}
 html[data-script="laos"] { --font-reader: "Noto Sans Lao", sans-serif; }
 html[data-script="khmer"] { --font-reader: "Noto Sans Khmer", sans-serif; }
 html[data-script="bengali"] { --font-reader: "Noto Sans Bengali", sans-serif; }
@@ -295,4 +322,100 @@ html[data-script="tibetan"] .reader-container,
 html[data-script="cyrillic"] .reader-container {
   font-family: var(--font-reader);
   line-height: 1.9;
+}
+
+/* Dictionary Pali words — must use same font as main text when script changes.
+   convertDictionaryEntryHtml only transliterates these selectors, so keep them in sync with --font-reader
+   (sanskrit .asdata NOT converted — excluded per user) */
+html[data-script]:not([data-script="roman"]) .dp9 .p1w,
+html[data-script]:not([data-script="roman"]) .dp9 .p2w,
+html[data-script]:not([data-script="roman"]) .dp9 .p3w,
+html[data-script]:not([data-script="roman"]) .dp9 .pp1w,
+html[data-script]:not([data-script="roman"]) .dp9 .pp2w,
+html[data-script]:not([data-script="roman"]) .dp9 .pm1w,
+html[data-script]:not([data-script="roman"]) .dp9 .pm2w,
+html[data-script]:not([data-script="roman"]) .dp9 p.dec,
+html[data-script]:not([data-script="roman"]) .dp9 .dec,
+html[data-script]:not([data-script="roman"]) .dp9 .dec-term,
+html[data-script]:not([data-script="roman"]) .dp9 b.epd,
+html[data-script]:not([data-script="roman"]) .dp9 .epd,
+html[data-script]:not([data-script="roman"]) .dp9 table.family th,
+html[data-script]:not([data-script="roman"]) .dp9 table.root_family th,
+html[data-script]:not([data-script="roman"]) .dp9 table.inflection th,
+html[data-script]:not([data-script="roman"]) .dp9 table.inflection td,
+html[data-script]:not([data-script="roman"]) .pts15 .pp1w,
+html[data-script]:not([data-script="roman"]) .pts15 .pp2w,
+html[data-script]:not([data-script="roman"]) .psinh26 .psdW,
+html[data-script]:not([data-script="roman"]) .psinh26 .p2w,
+html[data-script]:not([data-script="roman"]) .tmmAbhidhan .word,
+html[data-script]:not([data-script="roman"]) .dpd-splitter-section .p2w,
+html[data-script]:not([data-script="roman"]) .dpd-splitter-section p.dec,
+html[data-script]:not([data-script="roman"]) .dpd-splitter-section .dec,
+html[data-script]:not([data-script="roman"]) .dpd-splitter-section .dec-term,
+html[data-script]:not([data-script="roman"]) .sanskritSection .sdata,
+html[data-script]:not([data-script="roman"]) .sanskritSection .sdatadeva {
+  font-family: var(--font-reader) !important;
+}
+
+/* Thai Pali — converted Pali appears too small vs Roman; enlarge these Pali selectors for thai only — BIGGER x2 */
+html[data-script="thai"] .dp9 .p1w,
+html[data-script="thai"] .dp9 .p2w,
+html[data-script="thai"] .dp9 .p3w,
+html[data-script="thai"] .dp9 .pp1w,
+html[data-script="thai"] .dp9 .pp2w,
+html[data-script="thai"] .dp9 .pm1w,
+html[data-script="thai"] .dp9 .pm2w,
+html[data-script="thai"] .dp9 p.dec,
+html[data-script="thai"] .dp9 .dec,
+html[data-script="thai"] .dp9 .dec-term,
+html[data-script="thai"] .dp9 b.epd,
+html[data-script="thai"] .dp9 .epd,
+html[data-script="thai"] .dp9 table.family th,
+html[data-script="thai"] .dp9 table.root_family th,
+html[data-script="thai"] .dp9 table.inflection th,
+html[data-script="thai"] .dp9 table.inflection td,
+html[data-script="thai"] .pts15 .pp1w,
+html[data-script="thai"] .pts15 .pp2w,
+html[data-script="thai"] .psinh26 .psdW,
+html[data-script="thai"] .psinh26 .p2w,
+html[data-script="thai"] .tmmAbhidhan .word,
+html[data-script="thai"] .dpd-splitter-section .p2w,
+html[data-script="thai"] .dpd-splitter-section p.dec,
+html[data-script="thai"] .dpd-splitter-section .dec,
+html[data-script="thai"] .dpd-splitter-section .dec-term,
+html[data-script="thai"] .sanskritSection .sdata,
+html[data-script="thai"] .sanskritSection .sdatadeva {
+  font-size: 1.50em;
+  line-height: 1.75;
+}
+
+/* All other transliterated Pali UI should also match main text font (Task 1: navigation bar) */
+html[data-script]:not([data-script="roman"]) .sidebar-title,
+html[data-script]:not([data-script="roman"]) .sidebar-title span,
+html[data-script]:not([data-script="roman"]) .sidebar-title button span,
+html[data-script]:not([data-script="roman"]) .tree-text,
+html[data-script]:not([data-script="roman"]) .tree-row,
+html[data-script]:not([data-script="roman"]) .result-snippet,
+html[data-script]:not([data-script="roman"]) .result-meta,
+html[data-script]:not([data-script="roman"]) .book-tab .tab-title,
+html[data-script]:not([data-script="roman"]) .breadcrumbs span,
+html[data-script]:not([data-script="roman"]) .chapter-pill,
+html[data-script]:not([data-script="roman"]) .toc-title,
+html[data-script]:not([data-script="roman"]) .welcome-title,
+html[data-script]:not([data-script="roman"]) .welcome-view p {
+  font-family: var(--font-reader);
+}
+
+/* Meditation loader — Pali title & quote must match reader font + Thai bigger */
+html[data-script]:not([data-script="roman"]) .meditation-title,
+html[data-script]:not([data-script="roman"]) .meditation-pali-quote {
+  font-family: var(--font-reader) !important;
+}
+html[data-script="thai"] .meditation-title {
+  font-size: calc(1em * 1.22);
+  line-height: 1.9;
+}
+html[data-script="thai"] .meditation-pali-quote {
+  font-size: 1.28em;
+  line-height: 1.8;
 }

@@ -835,16 +835,15 @@ export default function DictionaryModal() {
           )}
         </form>
 
-        {/* Close Button (Replacing Search Button) */}
+        {/* Close Button */}
         <button
           type="button"
           onClick={handleSafeDismiss}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)] border border-[var(--border-color)] text-xs font-medium shadow-2xs transition cursor-pointer shrink-0"
+          className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)] border border-[var(--border-color)] text-xs font-medium shadow-2xs transition cursor-pointer shrink-0"
           title="Close dictionary (Esc)"
           aria-label="Close dictionary"
         >
           <span>Close</span>
-          <X size={14} className="stroke-[2]" />
         </button>
       </div>
 
