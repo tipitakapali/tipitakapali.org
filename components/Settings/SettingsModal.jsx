@@ -679,7 +679,7 @@ export default function SettingsModal() {
                         type="button"
                         onClick={() => updateSetting('scrollMotion', m.id)}
                         className={`p-2.5 text-left rounded-lg border transition flex flex-col justify-between ${
-                          (settings.scrollMotion || 'fast') === m.id
+                          (settings.scrollMotion || 'instant') === m.id
                             ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold shadow-xs'
                             : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-gray-400'
                         }`}
@@ -687,7 +687,7 @@ export default function SettingsModal() {
                         <div className="text-xs font-bold">{m.label}</div>
                         <div
                           className={`text-[10px] mt-1 leading-tight ${
-                            (settings.scrollMotion || 'fast') === m.id ? 'text-white/80' : 'text-[var(--text-muted)]'
+                            (settings.scrollMotion || 'instant') === m.id ? 'text-white/80' : 'text-[var(--text-muted)]'
                           }`}
                         >
                           {m.desc}

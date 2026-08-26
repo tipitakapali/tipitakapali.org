@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
   treeDensity: 'normal',
   highlightSearchTerms: true,
   pulseAnimation: true,
-  scrollMotion: 'fast', // 'fast' | 'instant' | 'smooth'
+  scrollMotion: 'instant', // 'fast' | 'instant' | 'smooth'
   paliScript: 'roman',
   dictLookupTrigger: 'single', // 'single' | 'double'
   defaultEditionPage: 'M', // 'M' (Myanmar) | 'V' (VRI) | 'P' (PTS) | 'T' (Thai) | 'all' (All editions)
