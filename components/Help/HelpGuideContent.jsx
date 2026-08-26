@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export const HELP_SECTIONS = [
-  { id: 'topic-overview', label: 'Tipiṭaka Reader Overview', icon: BookOpen },
+  { id: 'topic-overview', label: 'TipitakaPali.org Overview', icon: BookOpen },
   { id: 'topic-search', label: 'Full-Text Search (FTS5)', icon: Search },
   { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookA },
   { id: 'topic-velthuis', label: 'Velthuis Pāḷi Typing', icon: Keyboard },
@@ -131,7 +131,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-[var(--accent)]" />
           <h3 className="font-bold text-sm text-[var(--text-primary)]">
-            Tipiṭaka Pāḷi Reader (CST Edition)
+            TipitakaPali.org (CST Edition)
           </h3>
         </div>
         <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">
