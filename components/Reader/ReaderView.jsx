@@ -1202,7 +1202,7 @@ export default function ReaderView() {
               title="Current Reading Page across Editions • Click to Go to Page"
             >
               <span className="text-[9px] sm:text-[9.5px] font-sans font-semibold uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
-                Page:
+                P:
               </span>
               <div className="flex items-center gap-1">
                 {editionStatsList.map(({ ed, page, label }, idx) => (

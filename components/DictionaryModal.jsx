@@ -305,24 +305,20 @@ export default function DictionaryModal() {
     [dictWidth, dockMode]
   );
 
-  // Synchronize local input with context display word ONLY on new lookup
-  const lastSyncedWordRef = useRef('');
+  // Synchronize local input with context display word ONLY when an external lookup occurs
   useEffect(() => {
-    const currentWord = displayWord || queryWord || '';
-    if (currentWord && currentWord !== lastSyncedWordRef.current) {
-      setLocalInput(currentWord);
-      lastSyncedWordRef.current = currentWord;
+    if (displayWord || queryWord) {
+      setLocalInput(displayWord || queryWord || '');
     }
-  }, [displayWord, queryWord]);
+  }, [queryWord]);
 
-  // Dedicated instant clear handler that prevents re-sync loop
+  // Dedicated instant clear handler
   const handleClearInput = useCallback((e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     setLocalInput('');
-    lastSyncedWordRef.current = '';
     if (clearDictionaryInput) {
       clearDictionaryInput();
     } else {
@@ -729,16 +725,9 @@ export default function DictionaryModal() {
             <BookA size={16} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
-                Pāḷi Dictionary
-              </h3>
-              {queryWord && (
-                <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--accent)] font-semibold truncate max-w-[120px]">
-                  {queryWord}
-                </span>
-              )}
-            </div>
+            <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
+              Dictionary
+            </h3>
           </div>
         </div>
 
@@ -840,14 +829,18 @@ export default function DictionaryModal() {
               value={localInput}
               onChange={(e) => {
                 const raw = e.target.value;
-                const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-                const converted = hasNonLatin ? raw : typeVelthuis(raw);
-                setLocalInput(converted);
-                setDisplayWord(converted);
+                const isDeleting = raw.length < localInput.length;
+                let finalVal = raw;
+                if (!isDeleting) {
+                  const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+                  finalVal = hasNonLatin ? raw : typeVelthuis(raw);
+                }
+                setLocalInput(finalVal);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  e.target?.blur();
+                  e.preventDefault();
+                  handleSearchSubmit(e);
                 }
               }}
               placeholder="Multi words, 17 Pāḷi scripts & Velthuis input accepted"
