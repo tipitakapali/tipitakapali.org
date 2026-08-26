@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { X, History, Trash2, Search, ExternalLink, Clock } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali, normalizePaliForSearch } from '../services/transliterate';
 
 export default function HistoryModal({ isOpen, onClose }) {
   const { recentHistory, clearHistory, openBook } = useTabs();
@@ -14,12 +14,17 @@ export default function HistoryModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const filtered = recentHistory.filter((h) => {
-    if (!filterText.trim()) return true;
-    const q = filterText.toLowerCase();
+    const rawQ = filterText.trim();
+    if (!rawQ) return true;
+    const q = rawQ.toLowerCase();
+    const normQ = normalizePaliForSearch(rawQ);
     return (
       h.bookTitle?.toLowerCase().includes(q) ||
+      normalizePaliForSearch(h.bookTitle).includes(normQ) ||
       h.chapterTitle?.toLowerCase().includes(q) ||
-      h.nikaya?.toLowerCase().includes(q)
+      normalizePaliForSearch(h.chapterTitle).includes(normQ) ||
+      h.nikaya?.toLowerCase().includes(q) ||
+      normalizePaliForSearch(h.nikaya).includes(normQ)
     );
   });
 

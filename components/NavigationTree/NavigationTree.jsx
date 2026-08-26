@@ -16,7 +16,7 @@ import HelpModal from '../HelpModal';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript } from '../../services/transliterate';
+import { typeVelthuis, convertPaliScript, normalizePaliForSearch } from '../../services/transliterate';
 
 export default function NavigationTree() {
   const [treeData, setTreeData] = useState([]);
@@ -295,13 +295,18 @@ export default function NavigationTree() {
   );
 
   const matchingNodeIds = React.useMemo(() => {
-    const q = filterText.trim().toLowerCase();
+    const q = filterText.trim();
     if (!q || !treeData.length) return null;
 
+    const normQ = normalizePaliForSearch(q);
+    const lowerQ = q.toLowerCase();
     const matched = new Set();
 
     function matchNode(node) {
-      const isDirectMatch = node.text?.toLowerCase().includes(q);
+      const nodeText = node.text || '';
+      const isDirectMatch =
+        nodeText.toLowerCase().includes(lowerQ) ||
+        normalizePaliForSearch(nodeText).includes(normQ);
       let childMatch = false;
 
       if (node.children && node.children.length > 0) {

@@ -78,6 +78,36 @@ export function convertAnyToRoman(text) {
   return converted.replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
 }
 
+/**
+ * Normalizes Pali text by stripping diacritics and converting non-Latin scripts to standard ASCII lowercase.
+ * Enables fuzzy / diacritic-insensitive matching.
+ * e.g. "Paṭhamakoṭigāmasuttaṃ" -> "pathamakotigamasuttam"
+ */
+export function normalizePaliForSearch(text) {
+  if (!text || typeof text !== 'string') return '';
+  
+  let s = convertAnyToRoman(text).toLowerCase();
+
+  s = s
+    .replace(/[āàáâãä]/g, 'a')
+    .replace(/[īìíîï]/g, 'i')
+    .replace(/[ūùúûü]/g, 'u')
+    .replace(/[ēèéêë]/g, 'e')
+    .replace(/[ōòóôö]/g, 'o')
+    .replace(/[ṃṁ]/g, 'm')
+    .replace(/[ṅñṇ]/g, 'n')
+    .replace(/[ṭ]/g, 't')
+    .replace(/[ḍ]/g, 'd')
+    .replace(/[ḷḹ]/g, 'l')
+    .replace(/[ṣś]/g, 's')
+    .replace(/[ṛṝ]/g, 'r')
+    .replace(/[ḥ]/g, 'h');
+
+  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  return s.trim();
+}
+
 
 
 // Map script aliases to CVT Script enum keys

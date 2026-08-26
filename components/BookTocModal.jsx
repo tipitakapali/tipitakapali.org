@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ListTree, X, Search, BookOpen, ChevronRight, Bookmark } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali, normalizePaliForSearch } from '../services/transliterate';
 
 // Compute accurate hierarchy depth: Book/Nikāya (0) > Chapter (1) > Title (2) > Subhead (3) > Subsubhead (4)
 function getTocItemHierarchy(item) {
@@ -113,13 +113,21 @@ export default function BookTocModal({ isOpen, onClose }) {
   }, [activeTab]);
 
   const filteredToc = useMemo(() => {
-    const q = filterQuery.trim().toLowerCase();
+    const q = filterQuery.trim();
     if (!q) {
       return tocList.map((item, originalIdx) => ({ ...item, originalIdx }));
     }
+    const normQ = normalizePaliForSearch(q);
+    const lowerQ = q.toLowerCase();
     return tocList
       .map((item, originalIdx) => ({ ...item, originalIdx }))
-      .filter((item) => item.title.toLowerCase().includes(q));
+      .filter((item) => {
+        const titleStr = item.title || '';
+        return (
+          titleStr.toLowerCase().includes(lowerQ) ||
+          normalizePaliForSearch(titleStr).includes(normQ)
+        );
+      });
   }, [tocList, filterQuery]);
 
   if (!isOpen || !activeTab) return null;

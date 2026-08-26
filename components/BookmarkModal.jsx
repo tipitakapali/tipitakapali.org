@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { X, Bookmark, BookmarkCheck, Trash2, Search, ExternalLink, Calendar, Plus } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { typeVelthuis, convertPaliScript, capitalizePali } from '../services/transliterate';
+import { typeVelthuis, convertPaliScript, capitalizePali, normalizePaliForSearch } from '../services/transliterate';
 
 export default function BookmarkModal({ isOpen, onClose }) {
   const { bookmarks, addBookmark, removeBookmark, openBook, activeTab, activeParaNum } = useTabs();
@@ -97,13 +97,19 @@ export default function BookmarkModal({ isOpen, onClose }) {
   };
 
   const filtered = bookmarks.filter((b) => {
-    if (!filterText.trim()) return true;
-    const q = filterText.toLowerCase();
+    const rawQ = filterText.trim();
+    if (!rawQ) return true;
+    const q = rawQ.toLowerCase();
+    const normQ = normalizePaliForSearch(rawQ);
     return (
       b.bookTitle?.toLowerCase().includes(q) ||
+      normalizePaliForSearch(b.bookTitle).includes(normQ) ||
       b.chapterTitle?.toLowerCase().includes(q) ||
+      normalizePaliForSearch(b.chapterTitle).includes(normQ) ||
       b.snippet?.toLowerCase().includes(q) ||
-      b.nikaya?.toLowerCase().includes(q)
+      normalizePaliForSearch(b.snippet).includes(normQ) ||
+      b.nikaya?.toLowerCase().includes(q) ||
+      normalizePaliForSearch(b.nikaya).includes(normQ)
     );
   });
 
