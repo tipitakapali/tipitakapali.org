@@ -67,10 +67,10 @@ export default function HelpGuideContent({ showTabBar = true }) {
   const CurrentIcon = currentSection.icon;
 
   return (
-    <div className="space-y-6 text-xs text-[var(--text-secondary)] leading-relaxed relative">
+    <div className="text-xs text-[var(--text-secondary)] leading-relaxed relative flex flex-col flex-1">
       {/* Fixed Sticky Header Selector Bar */}
       {showTabBar && (
-        <div className="sticky top-0 bg-[var(--bg-primary)] py-2.5 px-3 -mx-3 -mt-2 mb-4 border-b border-[var(--border-color)] z-30 flex items-center justify-between gap-3 shadow-xs">
+        <div className="sticky top-0 bg-[var(--bg-secondary)] py-2.5 px-4 sm:px-6 border-b border-[var(--border-color)] z-30 flex items-center justify-between gap-3 shadow-xs shrink-0">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)] shrink-0">
             <Filter size={14} className="text-[var(--accent)]" />
             <span>Jump to Topic:</span>
@@ -124,8 +124,10 @@ export default function HelpGuideContent({ showTabBar = true }) {
         </div>
       )}
 
-      {/* 1. Introduction & Overview */}
-      <section id="topic-overview" className="scroll-mt-14 space-y-3 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
+      {/* Content Sections Container */}
+      <div className="p-4 sm:p-6 space-y-6 flex-1">
+        {/* 1. Introduction & Overview */}
+        <section id="topic-overview" className="scroll-mt-14 space-y-3 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
         <div className="flex items-center gap-2">
           <BookOpen size={16} className="text-[var(--accent)]" />
           <h3 className="font-bold text-sm text-[var(--text-primary)]">
@@ -563,6 +565,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export default function HelpModal({ isOpen, onClose }) {
         </div>
 
         {/* Modal Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1 flex flex-col">
           <HelpGuideContent defaultTab="all" showTabBar={true} />
         </div>
 

@@ -144,10 +144,10 @@ export default function SettingsModal() {
           </div>
 
           {/* Tab Content Panel */}
-          <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-5 sm:space-y-6">
+          <div className="flex-1 overflow-y-auto flex flex-col">
             {/* 1. Typography Tab */}
             {activeTab === 'typography' && (
-              <div className="space-y-5">
+              <div className="p-3.5 sm:p-5 space-y-5">
                 {/* Font Family */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
@@ -282,7 +282,7 @@ export default function SettingsModal() {
 
             {/* 2. Themes & Colors Tab */}
             {activeTab === 'themes' && (
-              <div className="space-y-5">
+              <div className="p-3.5 sm:p-5 space-y-5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2.5">
                     Color Theme
@@ -336,7 +336,7 @@ export default function SettingsModal() {
 
             {/* 3. Display Options Tab */}
             {activeTab === 'display' && (
-              <div className="space-y-4">
+              <div className="p-3.5 sm:p-5 space-y-4">
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
                   Reader Text Elements & Markers
                 </div>
@@ -468,7 +468,7 @@ export default function SettingsModal() {
 
             {/* 4. Layout & Tree Tab */}
             {activeTab === 'layout' && (
-              <div className="space-y-5">
+              <div className="p-3.5 sm:p-5 space-y-5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
                     Reader Column Width
@@ -577,7 +577,7 @@ export default function SettingsModal() {
 
             {/* 5. Backup & Reset Tab */}
             {activeTab === 'backup' && (
-              <div className="space-y-4">
+              <div className="p-3.5 sm:p-5 space-y-4">
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
                   Settings Backup & Migration
                 </div>
@@ -622,7 +622,7 @@ export default function SettingsModal() {
 
             {/* 6. Help & Guide Tab */}
             {activeTab === 'help' && (
-              <div className="animate-fade-in">
+              <div className="animate-fade-in flex-1 flex flex-col">
                 <HelpGuideContent defaultTab="all" showTabBar={true} />
               </div>
             )}
