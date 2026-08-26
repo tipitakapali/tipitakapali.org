@@ -238,9 +238,11 @@ export default function SearchModal() {
   const handleResultClick = async (result) => {
     closeSearchModal();
     const romanQuery = convertAnyToRoman(query).trim();
+    // para_num can be empty string for headings (e.g. Paṭhamakoṭigāmasuttaṃ); treat empty as undefined so para_index fallback is used
+    const cleanParaNum = result.para_num && String(result.para_num).trim() ? String(result.para_num).trim() : undefined;
     await openBook(result.book_code, {
       targetParaIndex: result.para_index,
-      targetParaNum: result.para_num,
+      targetParaNum: cleanParaNum,
       highlightQuery: romanQuery,
       searchQuery: query.trim() || romanQuery,
     });

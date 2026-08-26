@@ -58,6 +58,34 @@ function getFirstParaOfChapter(paraToChapMap, targetChapIdx) {
   return firstNum;
 }
 
+function getChapterIdxForParaIndex(chapters, targetParaIndex) {
+  if (!Array.isArray(chapters) || chapters.length === 0) return null;
+  if (targetParaIndex === undefined || targetParaIndex === null || targetParaIndex === '') return null;
+  const t = parseInt(String(targetParaIndex).trim(), 10);
+  if (isNaN(t)) return null;
+  // Chapters are sorted by chapter_index, but use para_index to find container
+  // Find greatest chapter where para_index <= t
+  let best = null;
+  // Create sorted copy by para_index ascending to be robust
+  const sorted = [...chapters].sort((a, b) => {
+    const aIdx = a.para_index !== undefined && a.para_index !== null ? parseInt(a.para_index, 10) : 0;
+    const bIdx = b.para_index !== undefined && b.para_index !== null ? parseInt(b.para_index, 10) : 0;
+    return aIdx - bIdx;
+  });
+  for (const ch of sorted) {
+    const start = ch.para_index !== undefined && ch.para_index !== null ? parseInt(ch.para_index, 10) : 0;
+    if (isNaN(start)) continue;
+    if (t >= start) {
+      best = ch.chapter_index;
+    } else {
+      break;
+    }
+  }
+  if (best !== null) return best;
+  // Fallback: if not found (e.g. para_index smaller than first chapter start), return first chapter
+  return sorted[0]?.chapter_index ?? 0;
+}
+
 export function TabProvider({ children }) {
 
 
@@ -457,7 +485,20 @@ export function TabProvider({ children }) {
             hasTargetChapter = true;
             setActiveParaNum(resolved.paraNum || rawParaNum);
           }
-        } else if (hasTargetChapter) {
+        }
+
+        // Fallback: resolve chapter via para_index for headings/subheads where para_num is empty
+        if (!hasTargetChapter && options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
+          const chapFromIdx = getChapterIdxForParaIndex(tab.chapters, options.targetParaIndex);
+          if (chapFromIdx !== null && chapFromIdx !== undefined) {
+            targetChapIdx = chapFromIdx;
+            hasTargetChapter = true;
+            // For para_index targets (e.g. sutta titles), clear activeParaNum if it was stale from previous chapter
+            // ReaderView will scroll via paraIndex, not paraNum
+          }
+        }
+
+        if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
           const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx);
           if (firstP) {
             setActiveParaNum(firstP);
@@ -559,7 +600,22 @@ export function TabProvider({ children }) {
               Object.assign(bookData.chapters_data, chapData.chapters_data);
             }
           }
-        } else if (hasTargetChapter) {
+        }
+
+        // Fallback: resolve chapter via para_index for headings where para_num is empty (e.g. Paṭhamakoṭigāmasuttaṃ)
+        if (!hasTargetChapter && options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
+          const chapFromIdx = getChapterIdxForParaIndex(bookData.chapters, options.targetParaIndex);
+          if (chapFromIdx !== null && chapFromIdx !== undefined) {
+            targetChapIdx = chapFromIdx;
+            hasTargetChapter = true;
+            if (!bookData.chapters_data?.[targetChapIdx]) {
+              const chapData = await fetchBook(cleanCode, { chapter: targetChapIdx, buffer: 1 });
+              Object.assign(bookData.chapters_data, chapData.chapters_data);
+            }
+          }
+        }
+
+        if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
           const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx);
           if (firstP) {
             setActiveParaNum(firstP);
