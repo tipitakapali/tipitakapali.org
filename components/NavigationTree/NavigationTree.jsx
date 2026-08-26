@@ -8,7 +8,6 @@ import {
   MinusSquare,
   PanelLeft,
   PanelRight,
-  Move,
   GripHorizontal,
 } from 'lucide-react';
 import TreeNode from './TreeNode';
@@ -407,17 +406,6 @@ export default function NavigationTree() {
                 title="Dock to Left"
               >
                 <PanelLeft size={12} />
-              </button>
-
-              {/* Float Window */}
-              <button
-                className={`tree-action-btn tree-action-dock p-1 hidden md:inline-flex ${
-                  dockPosition === 'float' ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
-                }`}
-                onClick={() => handleSetDock('float')}
-                title="Float / Moveable Window"
-              >
-                <Move size={12} />
               </button>
 
               {/* Dock Right */}
