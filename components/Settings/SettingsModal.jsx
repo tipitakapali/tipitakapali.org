@@ -355,6 +355,26 @@ export default function SettingsModal() {
                     />
                   </label>
 
+                  <div className="p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold">Breadcrumb Page Edition</div>
+                      <div className="text-[11px] text-[var(--text-muted)]">
+                        Default edition indicator shown in breadcrumbs
+                      </div>
+                    </div>
+                    <select
+                      value={settings.defaultEditionPage || 'M'}
+                      onChange={(e) => updateSetting('defaultEditionPage', e.target.value)}
+                      className="px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] text-xs text-[var(--text-primary)] font-semibold outline-none focus:border-[var(--accent)] cursor-pointer shrink-0"
+                    >
+                      <option value="M">Myanmar (M) [Default]</option>
+                      <option value="V">VRI (V)</option>
+                      <option value="P">PTS (P)</option>
+                      <option value="T">Thai (T)</option>
+                      <option value="all">All Editions</option>
+                    </select>
+                  </div>
+
 
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer hover:border-[var(--accent-border)] transition">
                     <div>

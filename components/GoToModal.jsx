@@ -182,6 +182,9 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
 
   const handleParaSubmit = (e) => {
     if (e) e.preventDefault();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     const clean = String(paraInput || '').trim().replace(/^(?:para-?|p)/i, '');
     if (!clean) {
       setErrorMessage('Please enter a paragraph number');
@@ -212,6 +215,9 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
 
   const handlePageSubmit = (e) => {
     if (e) e.preventDefault();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     const clean = String(pageInput || '').trim();
     if (!clean) {
       setErrorMessage('Please enter a page number');

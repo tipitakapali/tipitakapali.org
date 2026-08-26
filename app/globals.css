@@ -2105,15 +2105,15 @@ footer.app-footer.hidden-footer,
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 10px 10px 32px 10px;
 }
 
 /* Modal Mode */
 .dict-panel-modal {
   width: 100%;
   max-width: 780px;
-  height: 85vh;
-  max-height: 820px;
+  height: 82vh;
+  max-height: 800px;
   border-radius: 18px;
   box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.35);
   display: flex;
@@ -2123,6 +2123,18 @@ footer.app-footer.hidden-footer,
   overflow: hidden;
   position: relative;
   z-index: 121;
+}
+
+@media (max-width: 640px) {
+  .dict-overlay {
+    padding: 8px 8px 38px 8px;
+    align-items: flex-start;
+  }
+  .dict-panel-modal {
+    height: 78vh;
+    max-height: 78vh;
+    margin-top: 4px;
+  }
 }
 
 /* True Docked Left / Right Panels (Layout columns alongside Reader & Sidebar) */

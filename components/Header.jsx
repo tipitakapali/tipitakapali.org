@@ -99,7 +99,7 @@ export default function Header() {
           className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1.5 focus:outline-none"
           title="Tipiṭaka Reader — Help & Guide (Press ?)"
         >
-          <span>TipitakaPali.org</span>
+          <span className="hidden sm:inline">TipitakaPali.org</span>
         </button>
       </div>
 

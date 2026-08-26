@@ -175,12 +175,12 @@ export default function BookTabsBar() {
       </div>
 
       <button
-        className="new-tab-btn flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer shrink-0"
+        className="new-tab-btn flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer shrink-0"
         onClick={() => setIsHistoryOpen(true)}
         title="Recent Reading History"
+        aria-label="Recent Reading History"
       >
-        <History size={13} className="text-[var(--accent)]" />
-        <span>History</span>
+        <History size={14} className="text-[var(--accent)]" />
         {recentHistory.length > 0 && (
           <span className="text-[9.5px] px-1 py-0.2 rounded bg-[var(--bg-secondary)] text-[var(--text-muted)] font-mono border border-[var(--border-color)]">
             {recentHistory.length}

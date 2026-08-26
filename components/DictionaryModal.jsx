@@ -385,9 +385,73 @@ export default function DictionaryModal() {
     };
   }, []);
 
+  // Touch Gesture Handling: Horizontal Swipe between Tabs (looping) + Pull Down to Dismiss
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0, isHeader: false });
+
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const target = e.target;
+    // Don't intercept touches inside inputs or resizer
+    if (target.closest('input, textarea, select, .dict-resizer-handle')) return;
+
+    const isHeader = Boolean(target.closest('.dict-header-bar, .dict-tabs-bar'));
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+      isHeader,
+    };
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (e.changedTouches.length !== 1) return;
+    const touch = e.changedTouches[0];
+    const start = touchStartRef.current;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const duration = Date.now() - start.time;
+
+    // Only handle quick gestures (< 600ms)
+    if (duration > 600) return;
+
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    // 1. Pull down gesture to dismiss (minimum 70px vertical swipe downwards)
+    if (deltaY > 70 && absY > absX * 1.3) {
+      const isAtTop = !contentContainerRef.current || contentContainerRef.current.scrollTop <= 5;
+      if (start.isHeader || isAtTop) {
+        closeDictionary();
+        return;
+      }
+    }
+
+    // 2. Horizontal swipe gesture to switch dictionary tabs (looping among dictionary tabs)
+    if (absX > 45 && absX > absY * 1.3) {
+      const tabIds = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
+      const currentIndex = tabIds.indexOf(activeDictTab);
+      if (currentIndex !== -1) {
+        if (deltaX < 0) {
+          // Swipe Left -> Next tab (looping)
+          const nextIndex = (currentIndex + 1) % tabIds.length;
+          handleTabSelect(tabIds[nextIndex]);
+        } else {
+          // Swipe Right -> Prev tab (looping)
+          const prevIndex = (currentIndex - 1 + tabIds.length) % tabIds.length;
+          handleTabSelect(tabIds[prevIndex]);
+        }
+      }
+    }
+  }, [activeDictTab, closeDictionary, handleTabSelect]);
+
   // Handle word search submission
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    inputRef.current?.blur();
     if (localInput.trim()) {
       performLookup(localInput.trim(), true);
     }
@@ -624,18 +688,18 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Top Header Bar */}
       {/* ========================================================= */}
-      <div className="px-3.5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between gap-2 select-none shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="dict-header-bar px-3 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between gap-1.5 sm:gap-2 select-none shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] shrink-0">
             <BookA size={16} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
                 Pāḷi Dictionary
               </h3>
               {queryWord && (
-                <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--accent)] font-semibold truncate max-w-[130px]">
+                <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--accent)] font-semibold truncate max-w-[120px]">
                   {queryWord}
                 </span>
               )}
@@ -643,7 +707,7 @@ export default function DictionaryModal() {
           </div>
         </div>
 
-        {/* Action Toolbar */}
+        {/* Action Toolbar: History & Font Controls (Visible and center-aligned on mobile + desktop) */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* History Back / Forward */}
           <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
@@ -652,6 +716,7 @@ export default function DictionaryModal() {
               disabled={historyIndex <= 0}
               className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
               title="Previous lookup (Back)"
+              aria-label="Previous lookup"
             >
               <ArrowLeft size={13} />
             </button>
@@ -660,17 +725,19 @@ export default function DictionaryModal() {
               disabled={historyIndex >= history.length - 1}
               className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
               title="Next lookup (Forward)"
+              aria-label="Next lookup"
             >
               <ArrowRight size={13} />
             </button>
           </div>
 
-          {/* Font Size Adjust */}
-          <div className="hidden sm:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
+          {/* Font Size Adjust (Visible on mobile & desktop) */}
+          <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
             <button
               onClick={() => setFontSizeMultiplier((f) => f - 0.1)}
               className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
               title="Smaller font"
+              aria-label="Smaller font"
             >
               A-
             </button>
@@ -681,12 +748,13 @@ export default function DictionaryModal() {
               onClick={() => setFontSizeMultiplier((f) => f + 0.1)}
               className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
               title="Larger font"
+              aria-label="Larger font"
             >
               A+
             </button>
           </div>
 
-          {/* Dock Position Switcher: Left Dock, Center Modal, Right Dock */}
+          {/* Dock Position Switcher: Left Dock, Center Modal, Right Dock (Desktop only) */}
           <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
             <button
               onClick={() => setDockMode('left')}
@@ -711,13 +779,15 @@ export default function DictionaryModal() {
             </button>
           </div>
 
-          {/* Close Button */}
+          {/* Close Button with "Close" text label for easy touch */}
           <button
             onClick={closeDictionary}
-            className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 text-xs font-semibold transition cursor-pointer min-h-[30px] touch-manipulation"
             title="Close dictionary (Esc)"
+            aria-label="Close dictionary"
           >
-            <X size={17} />
+            <X size={14} className="stroke-[2.5]" />
+            <span>Close</span>
           </button>
         </div>
       </div>
@@ -740,20 +810,35 @@ export default function DictionaryModal() {
                 setLocalInput(converted);
                 setDisplayWord(converted);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.target?.blur();
+                }
+              }}
               placeholder="Multi words, 17 Pāḷi scripts & Velthuis input accepted"
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-xs transition"
             />
             {localInput && (
               <button
                 type="button"
-                onClick={() => {
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setLocalInput('');
+                  setDisplayWord('');
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setLocalInput('');
                   setDisplayWord('');
                   inputRef.current?.focus();
                 }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer touch-manipulation z-10"
+                title="Clear input"
+                aria-label="Clear input"
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             )}
           </div>
@@ -771,7 +856,7 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Dictionary Switcher Tabs Bar */}
       {/* ========================================================= */}
-      <div className="px-3 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         {DICT_TABS.map((tab) => {
           const isActive = activeDictTab === tab.id;
           const hasMatches = tab.count > 0;
@@ -815,14 +900,6 @@ export default function DictionaryModal() {
         onClick={handleContentClick}
         className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"
       >
-        {/* Main Loading Indicator (Initial lookup) */}
-        {isLoading && (
-          <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
-            <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-medium">Looking up &ldquo;{queryWord}&rdquo; in Digital Pāḷi Dictionary...</span>
-          </div>
-        )}
-
         {/* Error Message */}
         {error && !isLoading && (
           <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
@@ -920,6 +997,8 @@ export default function DictionaryModal() {
       >
         <div
           ref={modalPanelRef}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           className="dict-panel-modal flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]"
           style={{ '--dict-font-size': `${15 * fontSizeMultiplier}px` }}
           onClick={(e) => e.stopPropagation()}
@@ -934,6 +1013,8 @@ export default function DictionaryModal() {
   return (
     <aside
       ref={modalPanelRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       className={`dict-dock-panel dock-${dockMode === 'left' ? 'left' : 'side'} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
         isResizing ? 'select-none' : ''
       }`}

@@ -261,12 +261,28 @@ export default function SearchModal() {
               placeholder="Full text search - Velthuis & 17 pāḷi scripts input accepted"
               value={query}
               onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.target?.blur();
+                  const romanQuery = convertAnyToRoman(query).trim();
+                  if (romanQuery.length >= 2) {
+                    performSearch(romanQuery, 0);
+                  }
+                }
+              }}
               autoComplete="off"
               className="flex-1 text-sm sm:text-base outline-none bg-transparent"
             />
             {query && (
               <button
-                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                type="button"
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer touch-manipulation"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setQuery('');
+                  setResults([]);
+                  setTotal(0);
+                }}
                 onClick={() => {
                   setQuery('');
                   setResults([]);
@@ -274,6 +290,7 @@ export default function SearchModal() {
                   inputRef.current?.focus();
                 }}
                 title="Clear input"
+                aria-label="Clear input"
               >
                 <X size={15} />
               </button>

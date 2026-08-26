@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS = {
   scrollMotion: 'fast', // 'fast' | 'instant' | 'smooth'
   paliScript: 'roman',
   dictLookupTrigger: 'single', // 'single' | 'double'
+  defaultEditionPage: 'M', // 'M' (Myanmar) | 'V' (VRI) | 'P' (PTS) | 'T' (Thai) | 'all' (All editions)
   translations: {
     english: false,
     vietnamese: false,

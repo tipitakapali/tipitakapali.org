@@ -369,7 +369,6 @@ export default function NavigationTree() {
               {dockPosition === 'float' && (
                 <GripHorizontal size={14} className="text-[var(--text-muted)] cursor-move" />
               )}
-              <span>Navigation</span>
             </div>
 
             {/* Tree & Dock Actions */}
@@ -440,12 +439,23 @@ export default function NavigationTree() {
               placeholder="Filter books & chapters..."
               value={filterText}
               onChange={(e) => setFilterText(typeVelthuis(e.target.value))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.target?.blur();
+                }
+              }}
             />
             {filterText && (
               <button
-                className="clear-btn"
+                type="button"
+                className="clear-btn cursor-pointer touch-manipulation"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setFilterText('');
+                }}
                 onClick={() => setFilterText('')}
                 title="Clear filter"
+                aria-label="Clear filter"
               >
                 <X size={12} />
               </button>

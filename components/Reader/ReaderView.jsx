@@ -887,6 +887,14 @@ export default function ReaderView() {
             wordRange.setEnd(node, end);
             highlightRangeInReader(wordRange);
 
+            // Clear native selection to prevent mobile selection pin handles from appearing
+            if (typeof window !== 'undefined') {
+              const sel = window.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+              }
+            }
+
             if (activeTab?.bookCode) {
               recordClickedWord(activeTab.bookCode, {
                 chapIdx,
@@ -1003,7 +1011,7 @@ export default function ReaderView() {
       T: 'Thai',
       O: 'Other',
     };
-    return ['M', 'V', 'P', 'T', 'O']
+    const allEditions = ['M', 'V', 'P', 'T', 'O']
       .filter((ed) => activeEditionPages[ed])
       .map((ed) => {
         const rawPage = String(activeEditionPages[ed]);
@@ -1022,7 +1030,16 @@ export default function ReaderView() {
           label: EDITION_LABELS[ed] || ed,
         };
       });
-  }, [activeEditionPages]);
+
+    if (allEditions.length === 0) return [];
+
+    const defaultEd = settings?.defaultEditionPage || 'M';
+    if (defaultEd === 'all') return allEditions;
+
+    const preferred = allEditions.find((item) => item.ed === defaultEd);
+    if (preferred) return [preferred];
+    return [allEditions[0]];
+  }, [activeEditionPages, settings?.defaultEditionPage]);
 
   const handleQuickBookmark = () => {
     if (!activeTab) return;
@@ -1199,14 +1216,6 @@ export default function ReaderView() {
             </div>
           )}
 
-          {/* Quick Dictionary Button */}
-          <button
-            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
-            onClick={() => openDictionary()}
-            title="Open Pāḷi Dictionary (Double click word or press D)"
-          >
-            <BookA size={14} />
-          </button>
 
           {/* Quick Bookmark Button in Breadcrumb Header */}
           <button
