@@ -819,12 +819,13 @@ export default function DictionaryModal() {
           const isActive = activeDictTab === tab.id;
           const hasMatches = tab.count > 0;
           const isTabPending = isBackgroundLoading && tab.id !== 'dpd' && tab.count === 0;
+          const displayCount = tab.count > 99 ? '99+' : tab.count;
 
           return (
             <button
               key={tab.id}
               onClick={() => handleTabSelect(tab.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition cursor-pointer select-none ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none shrink-0 transition-colors ${
                 isActive
                   ? 'bg-[var(--accent)] text-white shadow-xs'
                   : hasMatches
@@ -834,17 +835,23 @@ export default function DictionaryModal() {
               title={tab.desc}
             >
               <span>{tab.label}</span>
-              {hasMatches ? (
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              ) : isTabPending ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/60 animate-pulse inline-block" />
-              ) : null}
+              <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
+                {hasMatches ? (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
+                    }`}
+                  >
+                    {displayCount}
+                  </span>
+                ) : isTabPending ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/60 animate-pulse inline-block" />
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] invisible" aria-hidden="true">
+                    0
+                  </span>
+                )}
+              </span>
             </button>
           );
         })}

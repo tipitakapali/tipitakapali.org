@@ -332,23 +332,25 @@ export function DictionaryProvider({ children }) {
           splitter: data.splitter || [],
         };
 
-        setLookupData(lookupResult);
-
-        // Auto-select tab: First enabled dictionary with results in user's prioritized order
+        // Batch data + tab selection together to avoid two-frame motion
+        // Keep current tab if it has results (prevents jarring jump back to DPD on every lookup)
         const activeOrder = (dictOrder || DEFAULT_DICT_ORDER).filter(
           (id) => dictEnabled?.[id] !== false
         );
+        const currentTabKey = activeDictTab;
+        const currentHasResults = (lookupResult.counts?.[currentTabKey] || 0) > 0 && activeOrder.includes(currentTabKey);
 
-        let switched = false;
-        for (const t of activeOrder) {
-          if ((lookupResult.counts?.[t] || 0) > 0) {
-            setActiveDictTab(t);
-            switched = true;
-            break;
+        // Update data first (tabs will derive counts from this)
+        setLookupData(lookupResult);
+
+        if (!currentHasResults) {
+          for (const t of activeOrder) {
+            if ((lookupResult.counts?.[t] || 0) > 0) {
+              if (t !== currentTabKey) setActiveDictTab(t);
+              break;
+            }
           }
-        }
-        if (!switched && activeOrder.length > 0) {
-          setActiveDictTab(activeOrder[0]);
+          // If no dictionary has results, stay on current tab (avoid forced jump to DPD)
         }
       }
     } catch (err) {
@@ -361,7 +363,7 @@ export function DictionaryProvider({ children }) {
         setIsBackgroundLoading(false);
       }
     }
-  }, [historyIndex, dictOrder, dictEnabled]);
+  }, [historyIndex, dictOrder, dictEnabled, activeDictTab]);
 
   // Open dictionary with word (or just open)
   const openDictionary = useCallback((word = '', initialTab = null) => {
