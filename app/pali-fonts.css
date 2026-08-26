@@ -1,0 +1,298 @@
+/* Pali Script Fonts — mapped per user request, files served from /public/fonts/pali */
+
+/* UN-Abhaya (Sinhala) — si */
+@font-face {
+  font-family: "UN-Abhaya";
+  src: url("/fonts/pali/UN-Abhaya/static/UN-Abhaya-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "UN-Abhaya";
+  src: url("/fonts/pali/UN-Abhaya/static/UN-Abhaya-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Pyidaungsu (Myanmar) — my */
+@font-face {
+  font-family: "Pyidaungsu";
+  src: url("/fonts/pali/Pyidaungsu/static/Pyidaungsu-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Pyidaungsu";
+  src: url("/fonts/pali/Pyidaungsu/static/Pyidaungsu-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Devanagari — hi */
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  src: url("/fonts/pali/Noto_Sans_Devanagari/static/NotoSansDevanagari-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  src: url("/fonts/pali/Noto_Sans_Devanagari/static/NotoSansDevanagari-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans (Roman + Cyrillic) — ro, cyrl */
+@font-face {
+  font-family: "Noto Sans";
+  src: url("/fonts/pali/Noto_Sans/static/NotoSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans";
+  src: url("/fonts/pali/Noto_Sans/static/NotoSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* THSarabunPali (Thai) — thai */
+@font-face {
+  font-family: "THSarabunPali";
+  src: url("/fonts/pali/THSarabunPali/static/THSarabunPali-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "THSarabunPali";
+  src: url("/fonts/pali/THSarabunPali/static/THSarabunPali-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Lao — laos */
+@font-face {
+  font-family: "Noto Sans Lao";
+  src: url("/fonts/pali/Noto_Sans_Lao/static/NotoSansLao-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Lao";
+  src: url("/fonts/pali/Noto_Sans_Lao/static/NotoSansLao-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Khmer — km */
+@font-face {
+  font-family: "Noto Sans Khmer";
+  src: url("/fonts/pali/Noto_Sans_Khmer/static/NotoSansKhmer-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Khmer";
+  src: url("/fonts/pali/Noto_Sans_Khmer/static/NotoSansKhmer-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Bengali — beng */
+@font-face {
+  font-family: "Noto Sans Bengali";
+  src: url("/fonts/pali/Noto_Sans_Bengali/static/NotoSansBengali-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Bengali";
+  src: url("/fonts/pali/Noto_Sans_Bengali/static/NotoSansBengali-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Gurmukhi — gurm */
+@font-face {
+  font-family: "Noto Sans Gurmukhi";
+  src: url("/fonts/pali/Noto_Sans_Gurmukhi/static/NotoSansGurmukhi-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Gurmukhi";
+  src: url("/fonts/pali/Noto_Sans_Gurmukhi/static/NotoSansGurmukhi-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Gujarati — guja */
+@font-face {
+  font-family: "Noto Sans Gujarati";
+  src: url("/fonts/pali/Noto_Sans_Gujarati/static/NotoSansGujarati-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Gujarati";
+  src: url("/fonts/pali/Noto_Sans_Gujarati/static/NotoSansGujarati-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Telugu — telu */
+@font-face {
+  font-family: "Noto Sans Telugu";
+  src: url("/fonts/pali/Noto_Sans_Telugu/static/NotoSansTelugu-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Telugu";
+  src: url("/fonts/pali/Noto_Sans_Telugu/static/NotoSansTelugu-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Kannada — kann */
+@font-face {
+  font-family: "Noto Sans Kannada";
+  src: url("/fonts/pali/Noto_Sans_Kannada/static/NotoSansKannada-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Kannada";
+  src: url("/fonts/pali/Noto_Sans_Kannada/static/NotoSansKannada-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Malayalam — mala */
+@font-face {
+  font-family: "Noto Sans Malayalam";
+  src: url("/fonts/pali/Noto_Sans_Malayalam/static/NotoSansMalayalam-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Malayalam";
+  src: url("/fonts/pali/Noto_Sans_Malayalam/static/NotoSansMalayalam-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Tai Tham — tham */
+@font-face {
+  font-family: "Noto Sans Tai Tham";
+  src: url("/fonts/pali/Noto_Sans_Tai_Tham/static/NotoSansTaiTham-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Tai Tham";
+  src: url("/fonts/pali/Noto_Sans_Tai_Tham/static/NotoSansTaiTham-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Sans Brahmi — brah (only Regular available, reuse for Bold) */
+@font-face {
+  font-family: "Noto Sans Brahmi";
+  src: url("/fonts/pali/Noto_Sans_Brahmi/static/NotoSansBrahmi-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans Brahmi";
+  src: url("/fonts/pali/Noto_Sans_Brahmi/static/NotoSansBrahmi-Regular.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Serif Tibetan — tibt */
+@font-face {
+  font-family: "Noto Serif Tibetan";
+  src: url("/fonts/pali/Noto_Serif_Tibetan/static/NotoSerifTibetan-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Serif Tibetan";
+  src: url("/fonts/pali/Noto_Serif_Tibetan/static/NotoSerifTibetan-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Script-specific font overrides — applied via html[data-script] -> --font-reader */
+/* These override the user font choice (data-font) when a non-Roman script is active */
+html[data-script="sinhala"] { --font-reader: "UN-Abhaya", serif; }
+html[data-script="myanmar"] { --font-reader: "Pyidaungsu", sans-serif; }
+html[data-script="devanagari"] { --font-reader: "Noto Sans Devanagari", sans-serif; }
+html[data-script="thai"] { --font-reader: "THSarabunPali", serif; }
+html[data-script="laos"] { --font-reader: "Noto Sans Lao", sans-serif; }
+html[data-script="khmer"] { --font-reader: "Noto Sans Khmer", sans-serif; }
+html[data-script="bengali"] { --font-reader: "Noto Sans Bengali", sans-serif; }
+html[data-script="gurmukhi"] { --font-reader: "Noto Sans Gurmukhi", sans-serif; }
+html[data-script="gujarati"] { --font-reader: "Noto Sans Gujarati", sans-serif; }
+html[data-script="telugu"] { --font-reader: "Noto Sans Telugu", sans-serif; }
+html[data-script="kannada"] { --font-reader: "Noto Sans Kannada", sans-serif; }
+html[data-script="malayalam"] { --font-reader: "Noto Sans Malayalam", sans-serif; }
+html[data-script="taitham"] { --font-reader: "Noto Sans Tai Tham", sans-serif; }
+html[data-script="brahmi"] { --font-reader: "Noto Sans Brahmi", sans-serif; }
+html[data-script="tibetan"] { --font-reader: "Noto Serif Tibetan", serif; }
+html[data-script="cyrillic"] { --font-reader: "Noto Sans", sans-serif; }
+html[data-script="roman"] { /* keep user --font-reader (gentium/garamond/etc) */ }
+
+/* Ensure reader content and transliterated UI use the script font */
+html[data-script="sinhala"] .reader-container,
+html[data-script="myanmar"] .reader-container,
+html[data-script="devanagari"] .reader-container,
+html[data-script="thai"] .reader-container,
+html[data-script="laos"] .reader-container,
+html[data-script="khmer"] .reader-container,
+html[data-script="bengali"] .reader-container,
+html[data-script="gurmukhi"] .reader-container,
+html[data-script="gujarati"] .reader-container,
+html[data-script="telugu"] .reader-container,
+html[data-script="kannada"] .reader-container,
+html[data-script="malayalam"] .reader-container,
+html[data-script="taitham"] .reader-container,
+html[data-script="brahmi"] .reader-container,
+html[data-script="tibetan"] .reader-container,
+html[data-script="cyrillic"] .reader-container {
+  font-family: var(--font-reader);
+  line-height: 1.9;
+}

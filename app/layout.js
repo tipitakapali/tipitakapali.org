@@ -1,4 +1,5 @@
 import './globals.css';
+import './pali-fonts.css';
 import { ThemeSettingsProvider } from '../context/ThemeSettingsContext';
 import { TabProvider } from '../context/TabContext';
 import { DictionaryProvider } from '../context/DictionaryContext';
@@ -32,7 +33,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
+    <html lang="en" data-theme="light" data-script="roman" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
       <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
         <ThemeSettingsProvider>
           <TabProvider>

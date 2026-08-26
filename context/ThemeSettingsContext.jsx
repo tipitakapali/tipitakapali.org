@@ -98,6 +98,7 @@ export function ThemeSettingsProvider({ children }) {
     root.setAttribute('data-accent', settings.accentColor);
     root.setAttribute('data-font', settings.fontFamily);
     root.setAttribute('data-density', settings.treeDensity);
+    root.setAttribute('data-script', settings.paliScript || 'roman');
 
     root.style.setProperty('--font-size-base', `${settings.fontSize}px`);
     root.style.setProperty('--line-height-base', `${settings.lineHeight}`);
