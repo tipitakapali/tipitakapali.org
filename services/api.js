@@ -195,9 +195,13 @@ export async function fetchBook(bookCode, options = {}) {
   }
 
   const params = new URLSearchParams();
-  if (resolvedChapter !== undefined) params.set('chapter', resolvedChapter);
-  if (options.buffer !== undefined) params.set('buffer', options.buffer);
-  if (options.full) params.set('full', 'true');
+  if (options.tocOnly) {
+    params.set('tocOnly', 'true');
+  } else {
+    if (resolvedChapter !== undefined) params.set('chapter', resolvedChapter);
+    if (options.buffer !== undefined) params.set('buffer', options.buffer);
+    if (options.full) params.set('full', 'true');
+  }
 
   const qs = params.toString() ? `?${params.toString()}` : '';
   const cacheKey = `book_${cleanCode}_${qs}`;
@@ -207,6 +211,10 @@ export async function fetchBook(bookCode, options = {}) {
     if (!res.ok) throw new Error(`Failed to load book: ${cleanCode}`);
     return res.json();
   }, 60 * 60 * 1000);
+}
+
+export async function fetchBookTocOnly(bookCode) {
+  return fetchBook(bookCode, { tocOnly: true });
 }
 
 export async function fetchChapter(bookCode, chapterIndex) {

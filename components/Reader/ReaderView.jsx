@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 're
 import { Bookmark, BookmarkCheck, BookA } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
+import BookTocView from './BookTocView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
@@ -1150,6 +1151,15 @@ export default function ReaderView() {
     return (
       <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
         <WelcomeView />
+      </main>
+    );
+  }
+
+  // TOC view — when book opened without specific section
+  if (activeTab.viewMode === 'toc' || activeTab.isTocView) {
+    return (
+      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
+        <BookTocView />
       </main>
     );
   }

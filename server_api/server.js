@@ -333,6 +333,33 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       tocCache.set(cleanCode, toc);
     }
 
+    const isTocOnly = req.query.tocOnly === 'true' || req.query.tocOnly === '1';
+    if (isTocOnly) {
+      // Lightweight TOC-only response for initial book click — no chapter HTML
+      return {
+        code: book.code,
+        title: book.title,
+        nikaya: book.nikaya,
+        category: book.category,
+        chapter_count: book.chapter_count,
+        chapters: chapters,
+        toc: toc,
+        para_to_chapter: meta.para_to_chapter || {},
+        para_to_index: meta.para_to_index || {},
+        page_to_chapter: meta.page_to_chapter || {},
+        page_to_para: meta.page_to_para || {},
+        page_anchors: meta.page_anchors || {},
+        para_range: meta.para_range || { min: 1, max: 1, total: 0 },
+        edition_ranges: meta.edition_ranges || {},
+        book_type: meta.book_type || 'Whole',
+        mat: meta.mat || precomputedMatMap.get(cleanCode) || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
+        initial_chapter: null,
+        chapters_data: {},
+        html: '',
+        viewMode: 'toc',
+      };
+    }
+
     const isFullRequested = req.query.full === 'true';
     const reqChap = req.query.chapter !== undefined
       ? parseInt(req.query.chapter, 10)

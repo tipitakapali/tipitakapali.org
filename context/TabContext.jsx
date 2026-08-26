@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { fetchBook, fetchChapter, fetchMat, lookupBookInfo } from '../services/api';
+import { fetchBook, fetchChapter, fetchMat, lookupBookInfo, fetchBookTocOnly } from '../services/api';
 import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
@@ -406,7 +406,7 @@ export function TabProvider({ children }) {
       if (!bookCode) return;
       let cleanCode = bookCode.replace('.xml', '');
       let hasTargetChapter = options.targetChapterIdx !== undefined && options.targetChapterIdx !== null;
-      let targetChapIdx = hasTargetChapter ? options.targetChapterIdx : 0;
+      let targetChapIdx = hasTargetChapter ? options.targetChapterIdx : null;
 
       // Handle chapter suffix in code (e.g. s0201m.mul1 -> s0201m.mul, chapter_index 1)
       const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -419,6 +419,10 @@ export function TabProvider({ children }) {
       }
 
       const rawParaNum = options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '') : null;
+      const hasParaTarget = rawParaNum || (options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '');
+      const hasPageTarget = !!options.targetPage;
+      // TOC request: no specific chapter/para/page — show book's TOC
+      const isTocRequest = !hasTargetChapter && !hasParaTarget && !hasPageTarget;
 
 
       const currentTabs = openTabsRef.current;
@@ -441,6 +445,57 @@ export function TabProvider({ children }) {
       if (existingTabIndex !== -1) {
         setActiveBookCode((prev) => (prev !== cleanCode ? cleanCode : prev));
         const tab = currentTabs[existingTabIndex];
+
+        // TOC request — show book TOC (no auto chapter 1)
+        if (isTocRequest) {
+          const nextTabsToc = currentTabs.map((t) =>
+            t.bookCode === cleanCode ? { ...t, viewMode: 'toc', isTocView: true, currentChapterIdx: null } : t
+          );
+          setOpenTabs(nextTabsToc);
+          persistTabs(nextTabsToc, cleanCode);
+          setActiveBookCode(cleanCode);
+          setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: null });
+          updateUrlParams({ book: cleanCode, chapter: null, q: null, search: null });
+          setTargetScrollIntent(null);
+          setSearchHighlight(null);
+          if (!tab.toc || tab.toc.length === 0 || !tab.chapters || tab.chapters.length === 0) {
+            fetchBookTocOnly(cleanCode)
+              .then((bData) => {
+                if (bData) {
+                  setOpenTabs((prev) =>
+                    prev.map((t) =>
+                      t.bookCode === cleanCode
+                        ? {
+                            ...t,
+                            title: bData.title || t.title,
+                            nikaya: bData.nikaya || t.nikaya,
+                            category: bData.category || t.category,
+                            chapter_count: bData.chapter_count || t.chapter_count,
+                            chapters: bData.chapters || t.chapters,
+                            toc: bData.toc || t.toc,
+                            para_to_chapter: bData.para_to_chapter || t.para_to_chapter,
+                            para_to_index: bData.para_to_index || t.para_to_index,
+                            page_to_chapter: bData.page_to_chapter || t.page_to_chapter,
+                            viewMode: 'toc',
+                            isTocView: true,
+                            isLoading: false,
+                          }
+                        : t
+                    )
+                  );
+                }
+              })
+              .catch(() => {});
+          }
+          addToHistory({
+            bookCode: cleanCode,
+            bookTitle: tab.title,
+            nikaya: tab.nikaya,
+            chapterIdx: 0,
+            chapterTitle: '',
+          });
+          return;
+        }
 
         // Ensure tab has full metadata (para_to_chapter, page_to_chapter, etc.)
         if (
@@ -507,7 +562,7 @@ export function TabProvider({ children }) {
 
         if (hasTargetChapter) {
           const nextTabs = currentTabs.map((t) =>
-            t.bookCode === cleanCode ? { ...t, currentChapterIdx: targetChapIdx } : t
+            t.bookCode === cleanCode ? { ...t, currentChapterIdx: targetChapIdx, viewMode: 'reader', isTocView: false } : t
           );
           setOpenTabs(nextTabs);
           persistTabs(nextTabs, cleanCode);
@@ -560,8 +615,87 @@ export function TabProvider({ children }) {
         return;
       }
 
-      // Optimistic tab creation - instant 0ms tab open in TabBar and switch to new tab
+      // Optimistic tab creation - instant 0ms tab open
       const bookInfo = lookupBookInfo(cleanCode);
+      if (isTocRequest) {
+        const optimisticTocTab = {
+          bookCode: cleanCode,
+          title: options.title || bookInfo?.title || cleanCode,
+          nikaya: options.nikaya || bookInfo?.nikaya || '',
+          category: options.category || bookInfo?.category || '',
+          chapter_count: 1,
+          chapters: [],
+          toc: [],
+          loadedChapters: {},
+          loadingChapters: {},
+          isLoading: true,
+          currentChapterIdx: null,
+          viewMode: 'toc',
+          isTocView: true,
+        };
+        const nextTabsOptimistic = [...openTabsRef.current, optimisticTocTab];
+        setOpenTabs(nextTabsOptimistic);
+        setActiveBookCode(cleanCode);
+        persistTabs(nextTabsOptimistic, cleanCode);
+        updateUrlParams({ book: cleanCode, chapter: null, q: null, search: null });
+        setLoadingBook(true);
+        try {
+          const bookData = await fetchBookTocOnly(cleanCode);
+          const newTocTab = {
+            bookCode: bookData.code,
+            title: bookData.title,
+            nikaya: bookData.nikaya || bookData.category || '',
+            category: bookData.category || '',
+            chapter_count: bookData.chapter_count,
+            chapters: bookData.chapters || [],
+            toc: bookData.toc || [],
+            mat: bookData.mat || null,
+            para_to_chapter: bookData.para_to_chapter || {},
+            para_to_index: bookData.para_to_index || {},
+            page_to_chapter: bookData.page_to_chapter || {},
+            page_to_para: bookData.page_to_para || {},
+            page_anchors: bookData.page_anchors || {},
+            para_range: bookData.para_range || null,
+            edition_ranges: bookData.edition_ranges || null,
+            book_type: bookData.book_type || 'Whole',
+            loadedChapters: {},
+            loadingChapters: {},
+            isLoading: false,
+            currentChapterIdx: null,
+            viewMode: 'toc',
+            isTocView: true,
+          };
+          const currentTabsNow2 = openTabsRef.current;
+          const idx2 = currentTabsNow2.findIndex((t) => t.bookCode === cleanCode);
+          let nextTabs2;
+          if (idx2 !== -1) {
+            nextTabs2 = [...currentTabsNow2];
+            nextTabs2[idx2] = { ...nextTabs2[idx2], ...newTocTab };
+          } else {
+            nextTabs2 = [...currentTabsNow2, newTocTab];
+          }
+          setOpenTabs(nextTabs2);
+          persistTabs(nextTabs2, cleanCode);
+          setActiveBookCode(cleanCode);
+          setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: null });
+          setTargetScrollIntent(null);
+          setSearchHighlight(null);
+          updateUrlParams({ book: cleanCode, chapter: null, q: null, search: null });
+          addToHistory({
+            bookCode: cleanCode,
+            bookTitle: newTocTab.title,
+            nikaya: newTocTab.nikaya,
+            chapterIdx: 0,
+            chapterTitle: '',
+          });
+          return;
+        } catch (err) {
+          alert(`Error opening book: ${err.message}`);
+          return;
+        } finally {
+          setLoadingBook(false);
+        }
+      }
       const optimisticTab = {
         bookCode: cleanCode,
         title: options.title || bookInfo?.title || cleanCode,
@@ -574,6 +708,8 @@ export function TabProvider({ children }) {
         loadingChapters: { [targetChapIdx]: true },
         isLoading: true,
         currentChapterIdx: targetChapIdx,
+        viewMode: 'reader',
+        isTocView: false,
       };
       const nextTabsOptimistic = [...openTabsRef.current, optimisticTab];
       setOpenTabs(nextTabsOptimistic);
@@ -645,6 +781,8 @@ export function TabProvider({ children }) {
           loadingChapters: {},
           isLoading: false,
           currentChapterIdx: targetChapIdx,
+          viewMode: 'reader',
+          isTocView: false,
         };
 
         const currentTabsNow = openTabsRef.current;

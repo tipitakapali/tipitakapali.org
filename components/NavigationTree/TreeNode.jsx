@@ -131,7 +131,11 @@ const TreeNode = memo(function TreeNode({
     isChapterNode &&
     nodeBookCode === activeBookCode &&
     activeTab &&
-    nodeChapterIdx === (activeTab.currentChapterIdx || 0);
+    activeTab.viewMode !== 'toc' &&
+    !activeTab.isTocView &&
+    activeTab.currentChapterIdx !== null &&
+    activeTab.currentChapterIdx !== undefined &&
+    nodeChapterIdx === activeTab.currentChapterIdx;
 
   const handleRowClick = async (e) => {
     e.stopPropagation();
@@ -149,13 +153,13 @@ const TreeNode = memo(function TreeNode({
       return;
     }
 
-    // 2. Book clicked
+    // 2. Book clicked — show TOC (no auto chapter 1)
     if (isBookNode && nodeBookCode) {
       if (hasChildren) {
         setExpandedMap((prev) => ({ ...prev, [node.id]: !prev[node.id] }));
       }
       closeIfMobile();
-      await openBook(nodeBookCode, { targetChapterIdx: 0 });
+      await openBook(nodeBookCode, {});
       return;
     }
 
