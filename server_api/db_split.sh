@@ -9,14 +9,60 @@ else
   cd "$DIR"
 fi
 
+usage() {
+  echo "Usage: $0 [-f <db-file>] [db-file ...]"
+  echo ""
+  echo "Options:"
+  echo "  -f, --file <db-file>   Split only the given database file"
+  echo "  -h, --help             Show this help message"
+  echo ""
+  echo "Examples:"
+  echo "  $0                          Split all *.db files"
+  echo "  $0 -f tipitaka.db           Split only tipitaka.db"
+  echo "  $0 tipitaka.db palisinh.db  Split specific files"
+}
+
 echo "=========================================="
 echo " Tipitaka Database Zip & Split Tool"
-echo " (Processing all databases in: $(pwd))"
+echo " (Databases directory: $(pwd))"
 echo "=========================================="
 
-# If arguments are passed, use them; otherwise automatically find all *.db files
-if [ $# -gt 0 ]; then
-  DB_FILES=("$@")
+# Parse CLI options
+TARGET=""
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -f|--file)
+      if [ -z "$2" ]; then
+        echo "[-] $1 requires a database filename"
+        usage
+        exit 1
+      fi
+      TARGET="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "[-] Unknown option: $1"
+      usage
+      exit 1
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# If -f/--file given, use only that file; otherwise positional args;
+# otherwise automatically find all *.db files
+if [ -n "$TARGET" ]; then
+  DB_FILES=("$TARGET")
+elif [ ${#POSITIONAL[@]} -gt 0 ]; then
+  DB_FILES=("${POSITIONAL[@]}")
 else
   DB_FILES=(*.db)
 fi
