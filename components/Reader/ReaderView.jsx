@@ -669,12 +669,17 @@ export default function ReaderView() {
   const handleScroll = useCallback(
     (e) => {
       const top = e.target.scrollTop;
+      const scrollHeight = e.target.scrollHeight || 0;
+      const clientHeight = e.target.clientHeight || 0;
+      const distanceFromBottom = scrollHeight - (top + clientHeight);
+
       const delta = top - lastScrollTopRef.current;
       lastScrollTopRef.current = top;
 
       // When navigation tree is closed: smooth hysteresis directional auto-hide
       if (!isSidebarOpen) {
-        if (top <= 40) {
+        // At top or bottom boundaries: keep header/footer visible & prevent oscillation
+        if (top <= 40 || distanceFromBottom <= 100) {
           scrollAccDeltaRef.current = 0;
           setIsHeaderVisible(true);
         } else {
@@ -685,9 +690,9 @@ export default function ReaderView() {
             scrollAccDeltaRef.current += delta;
           }
 
-          if (scrollAccDeltaRef.current > 30 && top > 70) {
+          if (scrollAccDeltaRef.current > 40 && top > 80 && distanceFromBottom > 100) {
             setIsHeaderVisible(false);
-          } else if (scrollAccDeltaRef.current < -25) {
+          } else if (scrollAccDeltaRef.current < -30) {
             setIsHeaderVisible(true);
           }
         }
