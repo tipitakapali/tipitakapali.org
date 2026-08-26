@@ -217,7 +217,7 @@ export default function SettingsModal() {
                     Reset Application & Clear Storage
                   </div>
                   <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-3">
-                    Wipes all browser storage (<code className="px-1 py-0.5 rounded bg-[var(--bg-secondary)] text-[10px]">localStorage</code> and <code className="px-1 py-0.5 rounded bg-[var(--bg-secondary)] text-[10px]">sessionStorage</code>), bookmarks, reading history, custom dictionary ordering, and restores default factory settings.
+                    It will restore TipitakaPali.org to the default settings. And the reset will also delete TipitakaPali.org&apos;s saved tabs, book positions, bookmarks, search history, dictionary order.
                   </p>
                   <button
                     type="button"
@@ -897,7 +897,7 @@ export default function SettingsModal() {
             </div>
 
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              This will permanently delete all <strong>localStorage</strong> and <strong>sessionStorage</strong> data, including saved tabs, book positions, bookmarks, search history, dictionary order, and restore factory defaults.
+              It will restore TipitakaPali.org to the default settings. And the reset will also delete TipitakaPali.org&apos;s saved tabs, book positions, bookmarks, search history, dictionary order.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
