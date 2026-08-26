@@ -85,26 +85,28 @@ export default function Header() {
       }`}
     >
       {/* Brand & Menu */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 min-w-0 sm:min-w-[190px]">
         <button
           className="p-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
           onClick={toggleSidebar}
           title="Toggle Navigation Tree (Ctrl+B)"
+          aria-label="Toggle Navigation Tree"
         >
           <Menu size={19} />
         </button>
 
         <button
-          onClick={() => setIsHelpOpen(true)}
-          className="font-bold text-[15px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1.5 focus:outline-none"
-          title="Tipiṭaka Reader — Help & Guide (Press ?)"
+          onClick={toggleSidebar}
+          className="flex font-bold text-[14px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer items-center gap-1.5 focus:outline-none truncate"
+          title="Toggle Navigation Tree (Ctrl+B)"
+          aria-label="Toggle Navigation Tree"
         >
-          <span className="hidden sm:inline">TipitakaPali.org</span>
+          <span>TipitakaPali.org</span>
         </button>
       </div>
 
-      {/* Desktop Search Bar */}
-      <div className="hidden sm:flex flex-1 max-w-[380px] mx-3">
+      {/* Desktop Search Bar (Centered) */}
+      <div className="hidden sm:flex flex-1 max-w-[420px] mx-auto justify-center">
         <div
           className="relative w-full cursor-pointer"
           onClick={() => openSearchModal('')}
@@ -122,28 +124,27 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Right / Centered Controls on Mobile */}
-      <div className="flex-1 sm:flex-initial flex items-center justify-center sm:justify-end gap-1 sm:gap-2 shrink-0">
+      {/* Right Controls */}
+      <div className="flex-1 sm:flex-initial flex items-center justify-center sm:justify-end gap-1.5 sm:gap-2 shrink-0 sm:min-w-[190px]">
         {/* Mobile Search Button */}
         <button
           onClick={() => openSearchModal('')}
-          className="sm:hidden flex items-center gap-1 px-2 py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="sm:hidden p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           title="Search books (/)"
           aria-label="Search books"
         >
           <Search size={14} className="text-[var(--accent)]" />
-          <span className="inline">Search</span>
         </button>
 
         {/* Dictionary Button */}
         <button
-          className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={() => openDictionary()}
           title="Pāḷi Dictionary Look-up"
           aria-label="Pāḷi Dictionary Look-up"
         >
           <BookA size={14} className="text-[var(--accent)]" />
-          <span className="inline">Dict</span>
+          <span className="hidden sm:inline">Dict</span>
         </button>
 
         {/* Language & Multi-Translation Menu */}
@@ -151,13 +152,13 @@ export default function Header() {
 
         {/* Saved (Bookmarks) Button */}
         <button
-          className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={() => setIsBookmarkOpen(true)}
           title="Saved Bookmarks"
           aria-label="Saved Bookmarks"
         >
           <Bookmark size={14} className="text-[var(--accent)]" />
-          <span className="hidden min-[400px]:inline">Saved</span>
+          <span className="hidden sm:inline">Saved</span>
           {bookmarks.length > 0 && (
             <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
               {bookmarks.length}
@@ -211,13 +212,13 @@ export default function Header() {
 
         {/* Settings Button */}
         <button
-          className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={openSettingsModal}
           title="Advanced Reader Settings"
           aria-label="Advanced Reader Settings"
         >
           <Settings size={14} />
-          <span className="hidden min-[480px]:inline">Settings</span>
+          <span className="hidden sm:inline">Settings</span>
         </button>
       </div>
 

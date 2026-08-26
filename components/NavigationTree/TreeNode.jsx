@@ -28,38 +28,8 @@ const TreeNode = memo(function TreeNode({
   const { openBook, activeBookCode, activeTab, setIsSidebarOpen } = useTabs();
   const { settings } = useThemeSettings();
 
-  const labelParts = useMemo(() => {
-    if (!node.text) return { main: '', suffix: null, type: null };
-
-    // Match parenthetical suffix, e.g. "Vinayapiṭaka (Mūla)" -> "Vinayapiṭaka" + "(Mūla)"
-    const match = node.text.match(/^(.*?)\s*(\([^\)]+\))$/);
-    if (match) {
-      const main = convertPaliScript(match[1].trim(), settings?.paliScript);
-      const suffix = convertPaliScript(match[2].trim(), settings?.paliScript);
-      const lowerRaw = match[2].toLowerCase();
-
-      let type = 'generic';
-      if (lowerRaw.includes('mūla') || lowerRaw.includes('mula')) type = 'mula';
-      else if (lowerRaw.includes('aṭṭhakathā') || lowerRaw.includes('atthakatha')) type = 'attha';
-      else if (lowerRaw.includes('ṭīkā') || lowerRaw.includes('tika')) type = 'tika';
-
-      return { main, suffix, type };
-    }
-
-    return {
-      main: convertPaliScript(node.text, settings?.paliScript),
-      suffix: null,
-      type: null,
-    };
-  }, [node.text, settings?.paliScript]);
-
-  // If filtering is active and this node is not in matching IDs, skip rendering
-  if (matchingNodeIds && !matchingNodeIds.has(node.id)) {
-    return null;
-  }
-
-  const hasChildren = node.children && node.children.length > 0;
-  const href = node.a_attr?.href || node.href || '';
+  const hasChildren = node?.children && node.children.length > 0;
+  const href = node?.a_attr?.href || node?.href || '';
 
   let nodeBookCode = null;
   let nodeChapterIdx = null;
@@ -91,10 +61,35 @@ const TreeNode = memo(function TreeNode({
     }
   }
 
+  const labelParts = useMemo(() => {
+    if (!node?.text) return { main: '', suffix: null, type: null };
+
+    // Match parenthetical suffix, e.g. "Vinayapiṭaka (Mūla)" -> "Vinayapiṭaka" + "(Mūla)"
+    const match = node.text.match(/^(.*?)\s*(\([^\)]+\))$/);
+    if (match) {
+      const main = convertPaliScript(match[1].trim(), settings?.paliScript);
+      const suffix = convertPaliScript(match[2].trim(), settings?.paliScript);
+      const lowerRaw = match[2].toLowerCase();
+
+      let type = 'generic';
+      if (lowerRaw.includes('mūla') || lowerRaw.includes('mula')) type = 'mula';
+      else if (lowerRaw.includes('aṭṭhakathā') || lowerRaw.includes('atthakatha')) type = 'attha';
+      else if (lowerRaw.includes('ṭīkā') || lowerRaw.includes('tika')) type = 'tika';
+
+      return { main, suffix, type };
+    }
+
+    return {
+      main: convertPaliScript(node.text, settings?.paliScript),
+      suffix: null,
+      type: null,
+    };
+  }, [node?.text, settings?.paliScript]);
+
   // Determine Piṭaka category (Vinaya, Sutta, Abhidhamma, Añña)
   const currentPitaka = useMemo(() => {
     if (pitakaType) return pitakaType;
-    const txt = (node.text || '').toLowerCase();
+    const txt = (node?.text || '').toLowerCase();
     if (txt.includes('vinaya')) return 'vinaya';
     if (txt.includes('sutta')) return 'sutta';
     if (txt.includes('abhidhamma')) return 'abhidhamma';
@@ -113,7 +108,12 @@ const TreeNode = memo(function TreeNode({
       return 'anna';
     }
     return null;
-  }, [pitakaType, node.text, nodeBookCode]);
+  }, [pitakaType, node?.text, nodeBookCode]);
+
+  // If filtering is active and this node is not in matching IDs, skip rendering (ALL hooks executed above)
+  if (matchingNodeIds && !matchingNodeIds.has(node.id)) {
+    return null;
+  }
 
   const isFiltered = Boolean(filterText && filterText.trim().length > 0);
   const isExpanded = Boolean(expandedMap[node.id] || isFiltered);

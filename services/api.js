@@ -34,11 +34,86 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000) {
   return promise;
 }
 
+// Book Code to Info Index Map (Title, Nikaya, Category)
+const bookCodeToInfoMap = new Map();
+
+export function indexTreeData(treeNodes) {
+  if (!Array.isArray(treeNodes)) return;
+
+  function traverse(nodes, parentNikaya = '', parentCategory = '') {
+    for (const node of nodes) {
+      if (!node) continue;
+      const text = node.text || '';
+      const href = node.a_attr?.href || node.href || '';
+      const nikaya = node.nikaya || parentNikaya;
+      const category = node.category || parentCategory;
+
+      if (href && href.startsWith('cscd/')) {
+        const m = href.match(/^cscd\/([a-z0-9_]+\.[a-z0-9_]+?)(\d+)?\.xml$/i);
+        if (m) {
+          const code = m[1].toLowerCase();
+          const cleanTitle = text.replace(/\s*\([^\)]+\)$/, '').trim();
+          if (!bookCodeToInfoMap.has(code) || !m[2]) {
+            bookCodeToInfoMap.set(code, {
+              title: cleanTitle || text,
+              rawTitle: text,
+              nikaya,
+              category,
+            });
+          }
+        }
+      }
+
+      if (node.children && Array.isArray(node.children) && node.children.length > 0) {
+        traverse(node.children, parentNikaya || text, parentCategory || text);
+      }
+    }
+  }
+
+  traverse(treeNodes);
+}
+
+export function lookupBookInfo(bookCode) {
+  if (!bookCode || typeof bookCode !== 'string') return null;
+  const clean = bookCode.replace('.xml', '').toLowerCase();
+
+  // 1. Check in-memory map
+  if (bookCodeToInfoMap.has(clean)) {
+    return bookCodeToInfoMap.get(clean);
+  }
+
+  // 2. Try loading from tree cache if not yet indexed
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('tipitaka_tree_cache_v4');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          indexTreeData(parsed);
+          if (bookCodeToInfoMap.has(clean)) {
+            return bookCodeToInfoMap.get(clean);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
+export function lookupBookTitle(bookCode) {
+  const info = lookupBookInfo(bookCode);
+  return info?.title || null;
+}
+
 export async function fetchTree() {
   if (ENABLE_CLIENT_CACHE) {
     // 1. In-memory cache
     const cached = cache.get('tree_json');
-    if (cached) return cached.data;
+    if (cached) {
+      indexTreeData(cached.data);
+      return cached.data;
+    }
 
     // 2. Persistent browser cache (0ms instant render on refresh/revisit)
     if (typeof window !== 'undefined') {
@@ -48,6 +123,7 @@ export async function fetchTree() {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
             cache.set('tree_json', { data: parsed, timestamp: Date.now() });
+            indexTreeData(parsed);
             return parsed;
           }
         }
@@ -67,6 +143,7 @@ export async function fetchTree() {
           localStorage.setItem('tipitaka_tree_cache_v4', JSON.stringify(data));
         } catch (e) {}
       }
+      indexTreeData(data);
       return data;
     },
     24 * 60 * 60 * 1000 // 24 hours in-memory TTL

@@ -3,9 +3,22 @@
 import React from 'react';
 import { BookOpen, Sparkles } from 'lucide-react';
 import { convertPaliScript, capitalizePali } from '../../services/transliterate';
+import { lookupBookInfo } from '../../services/api';
 
-export default function MeditationLoader({ bookTitle, chapterIdx, paraNum, paliScript = 'roman' }) {
-  const displayTitle = bookTitle ? convertPaliScript(capitalizePali(bookTitle), paliScript) : 'Tipiṭaka Pāḷi';
+export default function MeditationLoader({ bookTitle, bookCode, chapterIdx, paraNum, paliScript = 'roman' }) {
+  let titleToUse = bookTitle;
+  // If title is missing or contains file extension (e.g. s0305t.tik), look it up from tree info
+  if (!titleToUse || titleToUse === bookCode || /\.(?:mul|att|tik|nrf)/i.test(titleToUse)) {
+    const info = lookupBookInfo(bookCode || bookTitle);
+    if (info?.title) {
+      titleToUse = info.title;
+    }
+  }
+
+  const isFileName = !titleToUse || /\.(?:mul|att|tik|nrf)/i.test(titleToUse);
+  const displayTitle = !isFileName
+    ? convertPaliScript(capitalizePali(titleToUse), paliScript)
+    : convertPaliScript('Tipiṭaka Pāḷi', paliScript);
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none bg-[var(--bg-primary)] animate-fade-in min-h-[50vh]">

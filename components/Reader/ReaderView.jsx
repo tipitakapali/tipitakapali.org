@@ -1145,6 +1145,7 @@ export default function ReaderView() {
       <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
         <MeditationLoader
           bookTitle={activeTab.title}
+          bookCode={activeTab.bookCode}
           chapterIdx={activeTab.currentChapterIdx}
           paraNum={activeParaNum}
           paliScript={settings?.paliScript}

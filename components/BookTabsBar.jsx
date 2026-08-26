@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Book, X, History, Menu } from 'lucide-react';
+import { Book, X, History } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 
 
@@ -114,18 +114,6 @@ export default function BookTabsBar() {
 
   return (
     <div className="book-tabs-bar select-none" onWheel={handleWheel}>
-      {/* Menu Icon before tabs when Navigation is closed or in Zen Mode */}
-      {(!isSidebarOpen || isZenMode) && (
-        <button
-          className="zen-menu-btn flex items-center justify-center h-[28px] px-2 mb-[3px] rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition shrink-0 cursor-pointer"
-          onClick={handleOpenNavAndExitZen}
-          title="Open Navigation Tree (Ctrl+B)"
-          aria-label="Open Navigation Tree"
-        >
-          <Menu size={16} />
-        </button>
-      )}
-
       <div className="tabs-scroll-container" ref={tabsScrollRef}>
         {openTabs.map((tab, idx) => {
           const isActive = tab.bookCode === activeBookCode;

@@ -16,7 +16,7 @@ import HelpModal from '../HelpModal';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { typeVelthuis } from '../../services/transliterate';
+import { typeVelthuis, convertPaliScript } from '../../services/transliterate';
 
 export default function NavigationTree() {
   const [treeData, setTreeData] = useState([]);
@@ -38,7 +38,7 @@ export default function NavigationTree() {
   const [isResizing, setIsResizing] = useState(false);
 
   const { isSidebarOpen, setIsSidebarOpen, setIsHeaderVisible, treeSelectedNode } = useTabs();
-  const { setIsZenMode } = useThemeSettings();
+  const { settings, setIsZenMode } = useThemeSettings();
   const treeContainerRef = useRef(null);
 
   // Load saved preferences and listen for dynamic dock position updates
@@ -373,11 +373,11 @@ export default function NavigationTree() {
               )}
               <button
                 onClick={() => setIsHelpOpen(true)}
-                className="font-bold text-[13.5px] sm:text-[14.5px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
-                title="Tipiṭaka Reader — Help & Guide (Press ?)"
-                aria-label="Tipiṭaka Reader Help and User Guide"
+                className="font-semibold text-xs text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
+                title="Chaṭṭha Saṅgāyana Tipiṭaka — Help & Guide (Press ?)"
+                aria-label="Chaṭṭha Saṅgāyana Tipiṭaka Help and User Guide"
               >
-                <span>TipitakaPali.org</span>
+                <span>{convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka', settings?.paliScript)}</span>
               </button>
             </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { fetchBook, fetchChapter, fetchMat } from '../services/api';
+import { fetchBook, fetchChapter, fetchMat, lookupBookInfo } from '../services/api';
 import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
@@ -520,11 +520,12 @@ export function TabProvider({ children }) {
       }
 
       // Optimistic tab creation - instant 0ms tab open in TabBar and switch to new tab
+      const bookInfo = lookupBookInfo(cleanCode);
       const optimisticTab = {
         bookCode: cleanCode,
-        title: options.title || cleanCode,
-        nikaya: options.nikaya || '',
-        category: options.category || '',
+        title: options.title || bookInfo?.title || cleanCode,
+        nikaya: options.nikaya || bookInfo?.nikaya || '',
+        category: options.category || bookInfo?.category || '',
         chapter_count: 1,
         chapters: [],
         toc: [],
