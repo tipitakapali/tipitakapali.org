@@ -364,6 +364,11 @@ export function DictionaryProvider({ children }) {
     }
   }, [inflectionCache]);
 
+  const clearDictionaryInput = useCallback(() => {
+    setQueryWord('');
+    setDisplayWord('');
+  }, []);
+
   const value = {
     isOpen,
     queryWord,
@@ -393,6 +398,8 @@ export function DictionaryProvider({ children }) {
     setClickLookupMode,
     toggleInflection,
     setDisplayWord,
+    setQueryWord,
+    clearDictionaryInput,
   };
 
   return (

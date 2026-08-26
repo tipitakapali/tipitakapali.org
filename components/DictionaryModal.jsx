@@ -223,6 +223,7 @@ export default function DictionaryModal() {
     setDockMode,
     setFontSizeMultiplier,
     setDisplayWord,
+    clearDictionaryInput,
   } = useDictionary();
 
   const { settings } = useThemeSettings();
@@ -304,10 +305,30 @@ export default function DictionaryModal() {
     [dictWidth, dockMode]
   );
 
-  // Synchronize local input with context display word
+  // Synchronize local input with context display word ONLY on new lookup
+  const lastSyncedWordRef = useRef('');
   useEffect(() => {
-    setLocalInput(displayWord || queryWord || '');
+    const currentWord = displayWord || queryWord || '';
+    if (currentWord && currentWord !== lastSyncedWordRef.current) {
+      setLocalInput(currentWord);
+      lastSyncedWordRef.current = currentWord;
+    }
   }, [displayWord, queryWord]);
+
+  // Dedicated instant clear handler that prevents re-sync loop
+  const handleClearInput = useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setLocalInput('');
+    lastSyncedWordRef.current = '';
+    if (clearDictionaryInput) {
+      clearDictionaryInput();
+    } else {
+      setDisplayWord('');
+    }
+  }, [clearDictionaryInput, setDisplayWord]);
 
   // Focus search input on desktop open only (avoid auto-keyboard and auto-highlight on mobile)
   useEffect(() => {
@@ -835,24 +856,10 @@ export default function DictionaryModal() {
             {localInput && (
               <button
                 type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setLocalInput('');
-                  setDisplayWord('');
-                }}
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setLocalInput('');
-                  setDisplayWord('');
-                }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setLocalInput('');
-                  setDisplayWord('');
-                }}
+                onMouseDown={handleClearInput}
+                onTouchStart={handleClearInput}
+                onPointerDown={handleClearInput}
+                onClick={handleClearInput}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
                 title="Clear input"
                 aria-label="Clear input"
