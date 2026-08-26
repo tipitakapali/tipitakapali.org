@@ -4,6 +4,60 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { fetchDictionaryLookup, fetchDictionaryInflection } from '../services/api';
 import { convertAnyToRoman, cleanDictionaryQuery } from '../services/transliterate';
 
+export const AVAILABLE_DICTIONARIES = [
+  {
+    id: 'dpd',
+    label: 'Digital Pāḷi Dictionary (DPD)',
+    shortLabel: 'DPD',
+    badge: 'Primary',
+    badgeClass: 'bg-[var(--accent-light)] text-[var(--accent)]',
+    desc: 'Over 90,000+ entries with complete grammar, roots, case inflections and compounds.',
+  },
+  {
+    id: 'pts',
+    label: "Pāḷi Text Society's PED (2015)",
+    shortLabel: 'PTS',
+    badge: 'Classic',
+    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    desc: 'Authoritative Rhys Davids & Stede English definitions (corrected 2015 reprint).',
+  },
+  {
+    id: 'abd',
+    label: 'Abhidhānappadīpikā (Pāḷi-Pāḷi)',
+    shortLabel: 'အဘိဓာန်',
+    badge: 'Ancient',
+    badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    desc: 'Ancient canonical Pāḷi-Pāḷi lexicon, synonyms and roots (Myanmar CST).',
+  },
+  {
+    id: 'psd',
+    label: 'Pāḷi-Sinhala Dictionary (PSD)',
+    shortLabel: 'පාලි-සිංහල',
+    badge: 'Sinhala',
+    badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    desc: 'Comprehensive Pāḷi to Sinhala dictionary definitions by Path Nirvana.',
+  },
+  {
+    id: 'sans',
+    label: 'Cologne Sanskrit Lexicons (MW / Apte / BHS)',
+    shortLabel: 'Sanskrit',
+    badge: 'Comparative',
+    badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    desc: 'Monier-Williams, V.S. Apte & Edgerton Buddhist Hybrid Sanskrit comparative lexicons.',
+  },
+  {
+    id: 'splitter',
+    label: 'DPD Compound Splitter & Sandhi',
+    shortLabel: 'Splitter',
+    badge: 'Sandhi',
+    badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    desc: 'Deconstructs long compound words (Samāsa) and euphonic Sandhi junctions.',
+  },
+];
+
+const DEFAULT_DICT_ORDER = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
+const DEFAULT_DICT_ENABLED = { dpd: true, pts: true, abd: true, psd: true, sans: true, splitter: true };
+
 const DictionaryContext = createContext();
 
 const STORAGE_KEYS = {
@@ -12,6 +66,8 @@ const STORAGE_KEYS = {
   CLICK_LOOKUP: 'tipitaka_dict_click_lookup_v1',
   CLICK_MODE: 'tipitaka_dict_click_mode_v1',
   LAST_TAB: 'tipitaka_dict_last_tab_v1',
+  DICT_ORDER: 'tipitaka_dict_order_v2',
+  DICT_ENABLED: 'tipitaka_dict_enabled_v2',
 };
 
 export function DictionaryProvider({ children }) {
@@ -23,6 +79,8 @@ export function DictionaryProvider({ children }) {
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1.0);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
   const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
+  const [dictOrder, setDictOrderState] = useState(DEFAULT_DICT_ORDER);
+  const [dictEnabled, setDictEnabledState] = useState(DEFAULT_DICT_ENABLED);
 
   // History stack for back/forward navigation inside dictionary
   const [history, setHistory] = useState([]);
@@ -69,6 +127,28 @@ export function DictionaryProvider({ children }) {
       const savedTab = localStorage.getItem(STORAGE_KEYS.LAST_TAB);
       if (savedTab && ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'].includes(savedTab)) {
         setActiveDictTab(savedTab);
+      }
+      const savedOrder = localStorage.getItem(STORAGE_KEYS.DICT_ORDER);
+      if (savedOrder) {
+        try {
+          const parsed = JSON.parse(savedOrder);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const merged = [...parsed];
+            for (const id of DEFAULT_DICT_ORDER) {
+              if (!merged.includes(id)) merged.push(id);
+            }
+            setDictOrderState(merged);
+          }
+        } catch (e) {}
+      }
+      const savedEnabled = localStorage.getItem(STORAGE_KEYS.DICT_ENABLED);
+      if (savedEnabled) {
+        try {
+          const parsed = JSON.parse(savedEnabled);
+          if (parsed && typeof parsed === 'object') {
+            setDictEnabledState((prev) => ({ ...prev, ...parsed }));
+          }
+        } catch (e) {}
       }
     } catch (e) {}
   }, []);
@@ -127,6 +207,64 @@ export function DictionaryProvider({ children }) {
     try {
       localStorage.setItem(STORAGE_KEYS.LAST_TAB, tab);
     } catch (e) {}
+  }, []);
+
+  const setDictOrder = useCallback((newOrder) => {
+    if (!Array.isArray(newOrder)) return;
+    setDictOrderState(newOrder);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(newOrder));
+    } catch (e) {}
+  }, []);
+
+  const moveDictUp = useCallback((dictId) => {
+    setDictOrderState((prev) => {
+      const idx = prev.indexOf(dictId);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      const temp = next[idx - 1];
+      next[idx - 1] = next[idx];
+      next[idx] = temp;
+      try {
+        localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const moveDictDown = useCallback((dictId) => {
+    setDictOrderState((prev) => {
+      const idx = prev.indexOf(dictId);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[idx + 1];
+      next[idx + 1] = next[idx];
+      next[idx] = temp;
+      try {
+        localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const toggleDictEnabled = useCallback((dictId) => {
+    setDictEnabledState((prev) => {
+      const next = { ...prev, [dictId]: !prev[dictId] };
+      try {
+        localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const setDictEnabled = useCallback((updater) => {
+    setDictEnabledState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      try {
+        localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   }, []);
 
   // Single-Request Instant Dictionary Lookup (All dictionaries fetched in 1 compressed response)
@@ -196,22 +334,21 @@ export function DictionaryProvider({ children }) {
 
         setLookupData(lookupResult);
 
-        // Auto-select tab: DPD if it has results, otherwise switch to first dictionary with results
-        if (dpdCount > 0) {
-          setActiveDictTab('dpd');
-        } else {
-          const priority = ['pts', 'abd', 'psd', 'sans', 'splitter'];
-          let switched = false;
-          for (const t of priority) {
-            if ((lookupResult.counts?.[t] || 0) > 0) {
-              setActiveDictTab(t);
-              switched = true;
-              break;
-            }
+        // Auto-select tab: First enabled dictionary with results in user's prioritized order
+        const activeOrder = (dictOrder || DEFAULT_DICT_ORDER).filter(
+          (id) => dictEnabled?.[id] !== false
+        );
+
+        let switched = false;
+        for (const t of activeOrder) {
+          if ((lookupResult.counts?.[t] || 0) > 0) {
+            setActiveDictTab(t);
+            switched = true;
+            break;
           }
-          if (!switched) {
-            setActiveDictTab('dpd');
-          }
+        }
+        if (!switched && activeOrder.length > 0) {
+          setActiveDictTab(activeOrder[0]);
         }
       }
     } catch (err) {
@@ -224,7 +361,7 @@ export function DictionaryProvider({ children }) {
         setIsBackgroundLoading(false);
       }
     }
-  }, [historyIndex]);
+  }, [historyIndex, dictOrder, dictEnabled]);
 
   // Open dictionary with word (or just open)
   const openDictionary = useCallback((word = '', initialTab = null) => {
@@ -318,6 +455,8 @@ export function DictionaryProvider({ children }) {
     fontSizeMultiplier,
     clickToLookupEnabled,
     clickLookupMode,
+    dictOrder,
+    dictEnabled,
     history,
     historyIndex,
     lookupData,
@@ -336,6 +475,11 @@ export function DictionaryProvider({ children }) {
     setFontSizeMultiplier,
     setClickToLookupEnabled,
     setClickLookupMode,
+    setDictOrder,
+    moveDictUp,
+    moveDictDown,
+    toggleDictEnabled,
+    setDictEnabled,
     toggleInflection,
     setDisplayWord,
     setQueryWord,

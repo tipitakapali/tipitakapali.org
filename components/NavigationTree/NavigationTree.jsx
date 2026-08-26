@@ -378,7 +378,7 @@ export default function NavigationTree() {
               )}
               <button
                 onClick={() => setIsHelpOpen(true)}
-                className="font-semibold text-xs text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
+                className="font-normal text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
                 title="Chaṭṭha Saṅgāyana Tipiṭaka — Help & Guide (Press ?)"
                 aria-label="Chaṭṭha Saṅgāyana Tipiṭaka Help and User Guide"
               >

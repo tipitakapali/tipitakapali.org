@@ -224,6 +224,8 @@ export default function DictionaryModal() {
     setFontSizeMultiplier,
     setDisplayWord,
     clearDictionaryInput,
+    dictOrder,
+    dictEnabled,
   } = useDictionary();
 
   const { settings } = useThemeSettings();
@@ -265,6 +267,29 @@ export default function DictionaryModal() {
       contentContainerRef.current.scrollTop = 0;
     }
   }, [setDictTab]);
+
+  // Dictionary tab specifications respecting custom order & enabled state
+  const DICT_TABS = useMemo(() => {
+    const rawTabs = [
+      { id: 'dpd', label: 'DPD', desc: 'Digital Pāḷi Dictionary', count: lookupData?.counts?.dpd || 0 },
+      { id: 'pts', label: 'PTS', desc: 'Pali Text Society PED', count: lookupData?.counts?.pts || 0 },
+      { id: 'abd', label: 'အဘိဓာန်', desc: 'Abhidhānappadīpikā (MM)', count: lookupData?.counts?.abd || 0 },
+      { id: 'psd', label: 'පාලි-සිංහල', desc: 'Pāli-Sinhala Dictionary', count: lookupData?.counts?.psd || 0 },
+      { id: 'sans', label: 'Sanskrit', desc: 'Apte / Monier-Williams', count: lookupData?.counts?.sans || 0 },
+      { id: 'splitter', label: 'Splitter', desc: 'Compound Deconstructor', count: lookupData?.counts?.splitter || 0 },
+    ];
+    const order = dictOrder || ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
+    const enabled = dictEnabled || { dpd: true, pts: true, abd: true, psd: true, sans: true, splitter: true };
+
+    const tabMap = new Map(rawTabs.map((t) => [t.id, t]));
+    const result = [];
+    for (const id of order) {
+      if (enabled[id] !== false && tabMap.has(id)) {
+        result.push(tabMap.get(id));
+      }
+    }
+    return result.length > 0 ? result : rawTabs;
+  }, [lookupData, dictOrder, dictEnabled]);
 
   // Resize handler for docked width (Left or Right panel)
   const startResizingWidth = useCallback(
@@ -458,11 +483,11 @@ export default function DictionaryModal() {
       }
     }
 
-    // 2. Horizontal swipe gesture to switch dictionary tabs (looping among dictionary tabs)
+    // 2. Horizontal swipe gesture to switch dictionary tabs (looping among enabled dictionary tabs)
     if (absX > 45 && absX > absY * 1.3) {
-      const tabIds = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
+      const tabIds = DICT_TABS.map((t) => t.id);
       const currentIndex = tabIds.indexOf(activeDictTab);
-      if (currentIndex !== -1) {
+      if (currentIndex !== -1 && tabIds.length > 1) {
         if (deltaX < 0) {
           // Swipe Left -> Next tab (looping)
           const nextIndex = (currentIndex + 1) % tabIds.length;
@@ -474,7 +499,7 @@ export default function DictionaryModal() {
         }
       }
     }
-  }, [activeDictTab, closeDictionary, handleTabSelect]);
+  }, [activeDictTab, closeDictionary, handleTabSelect, DICT_TABS]);
 
   // Handle word search submission
   const handleSearchSubmit = (e) => {
@@ -659,19 +684,6 @@ export default function DictionaryModal() {
     [queryWord, currentScript, performLookup]
   );
 
-  // Dictionary tab specifications
-  const DICT_TABS = useMemo(
-    () => [
-      { id: 'dpd', label: 'DPD', desc: 'Digital Pāḷi Dictionary', count: lookupData?.counts?.dpd || 0 },
-      { id: 'pts', label: 'PTS', desc: 'Pali Text Society PED', count: lookupData?.counts?.pts || 0 },
-      { id: 'abd', label: 'အဘိဓာန်', desc: 'Abhidhānappadīpikā (MM)', count: lookupData?.counts?.abd || 0 },
-      { id: 'psd', label: 'පාලි-සිංහල', desc: 'Pāli-Sinhala Dictionary', count: lookupData?.counts?.psd || 0 },
-      { id: 'sans', label: 'Sanskrit', desc: 'Apte / Monier-Williams', count: lookupData?.counts?.sans || 0 },
-      { id: 'splitter', label: 'Splitter', desc: 'Compound Deconstructor', count: lookupData?.counts?.splitter || 0 },
-    ],
-    [lookupData]
-  );
-
   // Active results list for current tab
   const currentTabResults = useMemo(() => {
     if (!lookupData) return [];
@@ -717,159 +729,86 @@ export default function DictionaryModal() {
       )}
 
       {/* ========================================================= */}
-      {/* Top Header Bar */}
+      {/* Streamlined Dictionary Header & Search Bar */}
       {/* ========================================================= */}
-      <div className="dict-header-bar px-3 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between gap-1.5 sm:gap-2 select-none shrink-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] flex items-center justify-center text-[var(--accent)] shrink-0">
-            <BookA size={16} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
-              Dictionary
-            </h3>
-          </div>
-        </div>
-
-        {/* Action Toolbar: History & Font Controls (Visible and center-aligned on mobile + desktop) */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {/* History Back / Forward */}
-          <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
-            <button
-              onClick={goBack}
-              disabled={historyIndex <= 0}
-              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-              title="Previous lookup (Back)"
-              aria-label="Previous lookup"
-            >
-              <ArrowLeft size={13} />
-            </button>
-            <button
-              onClick={goForward}
-              disabled={historyIndex >= history.length - 1}
-              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-              title="Next lookup (Forward)"
-              aria-label="Next lookup"
-            >
-              <ArrowRight size={13} />
-            </button>
-          </div>
-
-          {/* Font Size Adjust (Visible on mobile & desktop) */}
-          <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5 text-[11px]">
-            <button
-              onClick={() => setFontSizeMultiplier((f) => f - 0.1)}
-              className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
-              title="Smaller font"
-              aria-label="Smaller font"
-            >
-              A-
-            </button>
-            <span className="px-1 font-mono text-[10px] text-[var(--text-secondary)]">
-              {Math.round(fontSizeMultiplier * 100)}%
-            </span>
-            <button
-              onClick={() => setFontSizeMultiplier((f) => f + 0.1)}
-              className="px-1.5 py-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] font-bold transition cursor-pointer"
-              title="Larger font"
-              aria-label="Larger font"
-            >
-              A+
-            </button>
-          </div>
-
-          {/* Dock Position Switcher: Left Dock, Center Modal, Right Dock (Desktop only) */}
-          <div className="hidden md:flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-0.5">
-            <button
-              onClick={() => setDockMode('left')}
-              className={`p-1 rounded transition cursor-pointer ${dockMode === 'left' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-              title="Left Dock Panel mode (Tree docks Right)"
-            >
-              <PanelLeft size={13} />
-            </button>
-            <button
-              onClick={() => setDockMode('modal')}
-              className={`p-1 rounded transition cursor-pointer ${dockMode === 'modal' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-              title="Center Modal mode"
-            >
-              <Maximize2 size={13} />
-            </button>
-            <button
-              onClick={() => setDockMode('side')}
-              className={`p-1 rounded transition cursor-pointer ${dockMode === 'side' || dockMode === 'right' ? 'bg-[var(--accent-light)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-              title="Right Dock Panel mode (Tree docks Left)"
-            >
-              <PanelRight size={13} />
-            </button>
-          </div>
-
-          {/* Close Button with "Close" text label for easy touch */}
+      <div className="dict-header-bar p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+        {/* Previous / Next Lookup History Controls */}
+        <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-0.5 shrink-0 shadow-2xs">
           <button
-            onClick={handleSafeDismiss}
-            className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 text-xs font-semibold transition cursor-pointer min-h-[30px] touch-manipulation"
-            title="Close dictionary (Esc)"
-            aria-label="Close dictionary"
+            type="button"
+            onClick={goBack}
+            disabled={historyIndex <= 0}
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+            title="Previous lookup (Back)"
+            aria-label="Previous lookup"
           >
-            <X size={14} className="stroke-[2.5]" />
-            <span>Close</span>
+            <ArrowLeft size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={goForward}
+            disabled={historyIndex >= history.length - 1}
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+            title="Next lookup (Forward)"
+            aria-label="Next lookup"
+          >
+            <ArrowRight size={14} />
           </button>
         </div>
-      </div>
 
-      {/* ========================================================= */}
-      {/* Search Input Bar */}
-      {/* ========================================================= */}
-      <div className="p-2.5 sm:p-3 bg-[var(--bg-primary)] border-b border-[var(--border-color)] shrink-0">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={localInput}
-              onChange={(e) => {
-                const raw = e.target.value;
-                const isDeleting = raw.length < localInput.length;
-                let finalVal = raw;
-                if (!isDeleting) {
-                  const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-                  finalVal = hasNonLatin ? raw : typeVelthuis(raw);
-                }
-                setLocalInput(finalVal);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSearchSubmit(e);
-                }
-              }}
-              placeholder="Multi words, 17 Pāḷi scripts & Velthuis input accepted"
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-xs transition"
-            />
-            {localInput && (
-              <button
-                type="button"
-                onMouseDown={handleClearInput}
-                onTouchStart={handleClearInput}
-                onPointerDown={handleClearInput}
-                onClick={handleClearInput}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
-                title="Clear input"
-                aria-label="Clear input"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading || !localInput.trim()}
-            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:pointer-events-none shadow-xs transition shrink-0 cursor-pointer"
-          >
-            {isLoading ? 'Searching...' : 'Search'}
-          </button>
+        {/* Input Field with Dictionary Icon */}
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-0">
+          <BookA size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={localInput}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const isDeleting = raw.length < localInput.length;
+              let finalVal = raw;
+              if (!isDeleting) {
+                const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+                finalVal = hasNonLatin ? raw : typeVelthuis(raw);
+              }
+              setLocalInput(finalVal);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSearchSubmit(e);
+              }
+            }}
+            placeholder="Type Pāḷi word (Press Enter)..."
+            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
+          />
+          {localInput && (
+            <button
+              type="button"
+              onMouseDown={handleClearInput}
+              onTouchStart={handleClearInput}
+              onPointerDown={handleClearInput}
+              onClick={handleClearInput}
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
+              title="Clear input"
+              aria-label="Clear input"
+            >
+              <X size={14} />
+            </button>
+          )}
         </form>
+
+        {/* Close Button (Replacing Search Button) */}
+        <button
+          type="button"
+          onClick={handleSafeDismiss}
+          className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-200/80 dark:border-rose-900/50 text-xs font-semibold shadow-2xs transition cursor-pointer shrink-0"
+          title="Close dictionary (Esc)"
+          aria-label="Close dictionary"
+        >
+          <X size={14} className="stroke-[2.5]" />
+          <span className="hidden sm:inline">Close</span>
+        </button>
       </div>
 
       {/* ========================================================= */}

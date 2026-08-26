@@ -31,6 +31,9 @@
   --line-height-base: 1.85;
   --reader-max-width: 880px;
   --reader-text-align: left;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.42);
 }
 
 [data-theme="sepia"] {
@@ -51,6 +54,9 @@
   --highlight-bg: #ffe4a0;
   --highlight-border: #f5d47a;
   --tab-inactive-bg: #e2d1a6;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(110, 92, 70, 0.32);
+  --scrollbar-thumb-hover: rgba(110, 92, 70, 0.55);
 }
 
 [data-theme="dark"] {
@@ -71,6 +77,9 @@
   --highlight-bg: #4a3818;
   --highlight-border: #634b1f;
   --tab-inactive-bg: #1c1d1e;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.42);
 }
 
 [data-theme="oled"] {
@@ -91,6 +100,9 @@
   --highlight-bg: #47320b;
   --highlight-border: #66470f;
   --tab-inactive-bg: #0d0d0d;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.38);
 }
 
 
@@ -139,6 +151,48 @@
   -moz-hyphens: none !important;
   -ms-hyphens: none !important;
   hyphens: none !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Custom Theme-Adaptive Scrollbars (WebKit & Chromium browsers) */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Utility to completely hide scrollbars when explicitly requested */
+.no-scrollbar,
+.scrollbar-none {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 html, body {
@@ -440,11 +494,9 @@ aside.app-sidebar.dock-float.collapsed {
 }
 
 .sidebar-title {
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
