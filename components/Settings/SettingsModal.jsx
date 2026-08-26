@@ -245,7 +245,11 @@ export default function SettingsModal() {
                       <input
                         type="checkbox"
                         checked={clickToLookupEnabled}
-                        onChange={(e) => setClickToLookupEnabled(e.target.checked)}
+                        onChange={(e) => {
+                          const enabled = e.target.checked;
+                          setClickToLookupEnabled(enabled);
+                          updateSetting('dictLookupTrigger', enabled ? (clickLookupMode || 'single') : 'off');
+                        }}
                         className="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer"
                       />
                     </label>
@@ -259,14 +263,14 @@ export default function SettingsModal() {
                         setClickLookupMode('single');
                       }}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
-                        (settings.dictLookupTrigger || 'single') === 'single'
+                        clickToLookupEnabled && (clickLookupMode === 'single' || settings.dictLookupTrigger === 'single')
                           ? 'border-[var(--accent)] bg-[var(--accent-light)]'
                           : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-[var(--text-primary)]">Single Click</span>
-                        {(settings.dictLookupTrigger || 'single') === 'single' && (
+                        {clickToLookupEnabled && (clickLookupMode === 'single' || settings.dictLookupTrigger === 'single') && (
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>
@@ -283,14 +287,14 @@ export default function SettingsModal() {
                         setClickLookupMode('double');
                       }}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
-                        settings.dictLookupTrigger === 'double'
+                        clickToLookupEnabled && (clickLookupMode === 'double' || settings.dictLookupTrigger === 'double')
                           ? 'border-[var(--accent)] bg-[var(--accent-light)]'
                           : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-[var(--text-primary)]">Double Click</span>
-                        {settings.dictLookupTrigger === 'double' && (
+                        {clickToLookupEnabled && (clickLookupMode === 'double' || settings.dictLookupTrigger === 'double') && (
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>

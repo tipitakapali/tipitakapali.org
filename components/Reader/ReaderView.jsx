@@ -252,7 +252,7 @@ export default function ReaderView() {
     searchHighlight,
   } = useTabs();
 
-  const { openDictionary } = useDictionary();
+  const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
   const { settings, setIsZenMode } = useThemeSettings();
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
@@ -853,9 +853,11 @@ export default function ReaderView() {
       });
     }
 
-    // 3. Single-Click Dictionary Word Lookup (Task 4)
-    const triggerMode = settings?.dictLookupTrigger || 'single';
-    if (triggerMode === 'single') {
+    // 3. Single-Click Dictionary Word Lookup
+    const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
+    const mode = clickLookupMode || settings?.dictLookupTrigger || 'single';
+
+    if (isLookupActive && mode === 'single') {
       const selection = window.getSelection()?.toString()?.trim();
       // Only trigger if not dragging/selecting multiple words
       if (!selection || selection.length <= 1) {
@@ -927,9 +929,16 @@ export default function ReaderView() {
         }
       }
     }
-  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, settings?.dictLookupTrigger, openDictionary, recordClickedWord]);
+  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord]);
 
   const handleReaderDoubleClick = useCallback((e) => {
+    const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
+    const mode = clickLookupMode || settings?.dictLookupTrigger || 'single';
+
+    if (!isLookupActive || mode !== 'double') {
+      return;
+    }
+
     // 1. Check window selection first
     const selection = window.getSelection()?.toString()?.trim();
     let wordToLookup = '';
@@ -1001,7 +1010,7 @@ export default function ReaderView() {
     if (wordToLookup && wordToLookup.length >= 2) {
       openDictionary(wordToLookup);
     }
-  }, [openDictionary, activeTab, recordClickedWord]);
+  }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, activeTab, recordClickedWord]);
 
   const handleBreadcrumbClick = () => {
     document.body.classList.remove('zen-mode');
