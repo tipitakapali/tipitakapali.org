@@ -2017,9 +2017,214 @@ footer.app-footer.hidden-footer,
 }
 
 .result-nikaya-badge {
-  color: var(--text-muted);
-  font-weight: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px 2px 6px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   margin-left: auto;
+  flex-shrink: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.15s ease;
+}
+
+.result-nikaya-badge .nikaya-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.9;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px currentColor;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+/* Nikāya-specific palette — Light / Classic */
+.nikaya-badge-vinaya {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.nikaya-badge-digha {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+.nikaya-badge-majjhima {
+  background-color: #cffafe;
+  color: #0e7490;
+  border-color: #a5f3fc;
+}
+.nikaya-badge-samyutta {
+  background-color: #ffe4e6;
+  color: #9f1239;
+  border-color: #fecdd3;
+}
+.nikaya-badge-anguttara {
+  background-color: #dcfce7;
+  color: #14532d;
+  border-color: #bbf7d0;
+}
+.nikaya-badge-khuddaka {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+.nikaya-badge-abhidhamma {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+.nikaya-badge-sutta {
+  background-color: #ffe4e6;
+  color: #9f1239;
+  border-color: #fecdd3;
+}
+.nikaya-badge-anna {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.nikaya-badge-default {
+  background-color: var(--bg-card);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+/* Dark theme — vibrant on dark bg (matches tree badges) */
+[data-theme="dark"] .nikaya-badge-vinaya,
+.dark .nikaya-badge-vinaya {
+  background-color: rgba(217, 119, 6, 0.18);
+  color: #fde68a;
+  border-color: rgba(217, 119, 6, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-digha,
+.dark .nikaya-badge-digha {
+  background-color: rgba(67, 56, 202, 0.22);
+  color: #c7d2fe;
+  border-color: rgba(99, 102, 241, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-majjhima,
+.dark .nikaya-badge-majjhima {
+  background-color: rgba(14, 116, 144, 0.2);
+  color: #a5f3fc;
+  border-color: rgba(14, 116, 144, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-samyutta,
+.dark .nikaya-badge-samyutta {
+  background-color: rgba(190, 18, 60, 0.2);
+  color: #fecdd3;
+  border-color: rgba(190, 18, 60, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-anguttara,
+.dark .nikaya-badge-anguttara {
+  background-color: rgba(21, 128, 61, 0.2);
+  color: #bbf7d0;
+  border-color: rgba(21, 128, 61, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-khuddaka,
+.dark .nikaya-badge-khuddaka {
+  background-color: rgba(107, 33, 168, 0.22);
+  color: #e9d5ff;
+  border-color: rgba(107, 33, 168, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-abhidhamma,
+.dark .nikaya-badge-abhidhamma {
+  background-color: rgba(37, 99, 235, 0.18);
+  color: #bfdbfe;
+  border-color: rgba(37, 99, 235, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-sutta,
+.dark .nikaya-badge-sutta {
+  background-color: rgba(190, 18, 60, 0.2);
+  color: #fecdd3;
+  border-color: rgba(190, 18, 60, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-anna,
+.dark .nikaya-badge-anna {
+  background-color: rgba(5, 150, 105, 0.18);
+  color: #a7f3d0;
+  border-color: rgba(5, 150, 105, 0.38);
+}
+[data-theme="dark"] .nikaya-badge-default,
+.dark .nikaya-badge-default {
+  background-color: rgba(255,255,255,0.06);
+  color: #9ca3af;
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* OLED — same as dark but slightly deeper */
+[data-theme="oled"] .nikaya-badge-vinaya { background-color: rgba(217,119,6,0.14); color:#fde68a; border-color:rgba(217,119,6,0.32); }
+[data-theme="oled"] .nikaya-badge-digha { background-color: rgba(67,56,202,0.18); color:#c7d2fe; border-color:rgba(99,102,241,0.32); }
+[data-theme="oled"] .nikaya-badge-majjhima { background-color: rgba(14,116,144,0.16); color:#a5f3fc; border-color:rgba(14,116,144,0.32); }
+[data-theme="oled"] .nikaya-badge-samyutta { background-color: rgba(190,18,60,0.16); color:#fecdd3; border-color:rgba(190,18,60,0.32); }
+[data-theme="oled"] .nikaya-badge-anguttara { background-color: rgba(21,128,61,0.16); color:#bbf7d0; border-color:rgba(21,128,61,0.32); }
+[data-theme="oled"] .nikaya-badge-khuddaka { background-color: rgba(107,33,168,0.18); color:#e9d5ff; border-color:rgba(107,33,168,0.32); }
+[data-theme="oled"] .nikaya-badge-abhidhamma { background-color: rgba(37,99,235,0.14); color:#bfdbfe; border-color:rgba(37,99,235,0.32); }
+[data-theme="oled"] .nikaya-badge-sutta { background-color: rgba(190,18,60,0.16); color:#fecdd3; border-color:rgba(190,18,60,0.32); }
+[data-theme="oled"] .nikaya-badge-anna { background-color: rgba(5,150,105,0.14); color:#a7f3d0; border-color:rgba(5,150,105,0.32); }
+[data-theme="oled"] .nikaya-badge-default { background-color: rgba(255,255,255,0.05); color:#9ca3af; border-color:rgba(255,255,255,0.1); }
+
+/* Sepia — warm, muted (matches tree sepia) */
+[data-theme="sepia"] .nikaya-badge-vinaya {
+  background-color: #fef3c7;
+  color: #78350f;
+  border-color: #fde68a;
+}
+[data-theme="sepia"] .nikaya-badge-digha {
+  background-color: #e0e7ff;
+  color: #312e81;
+  border-color: #c7d2fe;
+}
+[data-theme="sepia"] .nikaya-badge-majjhima {
+  background-color: #cffafe;
+  color: #164e63;
+  border-color: #a5f3fc;
+}
+[data-theme="sepia"] .nikaya-badge-samyutta {
+  background-color: #ffe4e6;
+  color: #881337;
+  border-color: #fecdd3;
+}
+[data-theme="sepia"] .nikaya-badge-anguttara {
+  background-color: #dcfce7;
+  color: #14532d;
+  border-color: #bbf7d0;
+}
+[data-theme="sepia"] .nikaya-badge-khuddaka {
+  background-color: #f3e8ff;
+  color: #581c87;
+  border-color: #e9d5ff;
+}
+[data-theme="sepia"] .nikaya-badge-abhidhamma {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+  border-color: #bfdbfe;
+}
+[data-theme="sepia"] .nikaya-badge-sutta {
+  background-color: #ffe4e6;
+  color: #881337;
+  border-color: #fecdd3;
+}
+[data-theme="sepia"] .nikaya-badge-anna {
+  background-color: #d1fae5;
+  color: #064e3b;
+  border-color: #a7f3d0;
+}
+[data-theme="sepia"] .nikaya-badge-default {
+  background-color: #fdf6e7;
+  color: #6e5c46;
+  border-color: #dfcd9f;
 }
 
 .result-snippet {
