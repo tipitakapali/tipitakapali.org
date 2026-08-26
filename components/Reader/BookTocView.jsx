@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, X, BookOpen, ChevronRight, ListTree, FileText } from 'lucide-react';
+import { Search, X, BookOpen, ChevronRight } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali, normalizePaliForSearch, typeVelthuis } from '../../services/transliterate';
@@ -81,47 +81,21 @@ export default function BookTocView() {
                 {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
               </h1>
               {(activeTab.nikaya || activeTab.category) && (
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1">
-                  {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
-                  {activeTab.chapter_count ? ` • ${activeTab.chapter_count} chapters` : ''}
-                  {tocList.length ? ` • ${tocList.length} sections` : ''}
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${currentPitaka ? `toc-reading-${currentPitaka}` : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)]'}`}>
+                    <span className={`w-2 h-2 rounded-full ${currentPitaka ? `toc-bullet-dot toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
+                    {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
+                  </span>
+                  <span>
+                    {activeTab.chapter_count ? `• ${activeTab.chapter_count} chapters` : ''}
+                    {tocList.length ? ` • ${tocList.length} sections` : ''}
+                  </span>
                 </p>
               )}
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${currentPitaka ? `toc-reading-${currentPitaka}` : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)]'}`}>
-                  <span className={`w-2 h-2 rounded-full ${currentPitaka ? `toc-bullet-dot toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
-                  {currentPitaka ? currentPitaka.charAt(0).toUpperCase() + currentPitaka.slice(1) : activeTab.category || 'Tipiṭaka'}
-                </span>
-                {activeTab.bookCode && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)]">
-                    {activeTab.bookCode}
-                  </span>
-                )}
-              </div>
             </div>
           </div>
 
-          {/* Quick chapter pills — horizontal scroll */}
-          {chapters.length > 1 && (
-            <div className="mt-4">
-              <div className="text-xs font-semibold text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
-                <ListTree size={12} /> Chapters
-              </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                {chapters.map((ch) => (
-                  <button
-                    key={ch.chapter_index}
-                    onClick={() => handleChapterClick(ch.chapter_index)}
-                    className="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition inline-flex items-center gap-1.5"
-                    title={convertPaliScript(ch.title, settings?.paliScript)}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 toc-bullet-dot ${currentPitaka ? `toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
-                    <span className="truncate">{convertPaliScript(capitalizePali(ch.title), settings?.paliScript)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
 

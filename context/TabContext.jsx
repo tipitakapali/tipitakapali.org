@@ -272,8 +272,10 @@ export function TabProvider({ children }) {
     try {
       const minifiedTabs = tabs.map((t) => ({
         bookCode: t.bookCode,
-        currentChapterIdx: t.currentChapterIdx || 0,
+        currentChapterIdx: t.currentChapterIdx ?? null,
         lastParaNum: t.lastParaNum || (t.bookCode === activeBookCodeRef.current ? activeParaNumRef.current : undefined),
+        viewMode: t.viewMode || (t.isTocView ? 'toc' : undefined),
+        isTocView: t.isTocView || t.viewMode === 'toc' || false,
       }));
       localStorage.setItem(STORAGE_KEYS.TABS, JSON.stringify(minifiedTabs));
       if (activeCode) {
@@ -863,13 +865,29 @@ export function TabProvider({ children }) {
 
       const tab = openTabsRef.current.find((t) => t.bookCode === bookCode);
       if (tab) {
+        const isToc = tab.viewMode === 'toc' || tab.isTocView;
+        if (isToc) {
+          // TOC view: no chapter fetch, just show TOC
+          setTreeSelectedNode({ bookCode: tab.bookCode, chapterIdx: null });
+          setSearchHighlight(null);
+          updateUrlParams({ book: tab.bookCode, chapter: null, q: null, search: null });
+          persistTabs(openTabsRef.current, tab.bookCode);
+          addToHistory({
+            bookCode: tab.bookCode,
+            bookTitle: tab.title,
+            nikaya: tab.nikaya,
+            chapterIdx: 0,
+            chapterTitle: '',
+          });
+          return;
+        }
         if (
           !tab.para_to_chapter ||
           Object.keys(tab.para_to_chapter).length === 0 ||
           !tab.page_to_chapter ||
           Object.keys(tab.page_to_chapter).length === 0
         ) {
-          fetchBook(bookCode, { chapter: tab.currentChapterIdx || 0 })
+          fetchBook(bookCode, { chapter: tab.currentChapterIdx ?? 0 })
             .then((bData) => {
               if (bData) {
                 setOpenTabs((prev) =>
@@ -901,19 +919,19 @@ export function TabProvider({ children }) {
         if (tab.lastParaNum) {
           setActiveParaNum(tab.lastParaNum);
         } else {
-          const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx || 0);
+          const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx ?? 0);
           if (firstP) {
             setActiveParaNum(firstP);
           }
         }
         setTreeSelectedNode({
           bookCode: tab.bookCode,
-          chapterIdx: tab.currentChapterIdx || 0,
+          chapterIdx: tab.currentChapterIdx ?? 0,
         });
         setSearchHighlight(null);
         updateUrlParams({
           book: tab.bookCode,
-          chapter: (tab.currentChapterIdx || 0) + 1,
+          chapter: (tab.currentChapterIdx ?? 0) + 1,
           q: null,
           search: null,
         });
@@ -923,8 +941,8 @@ export function TabProvider({ children }) {
           bookCode: tab.bookCode,
           bookTitle: tab.title,
           nikaya: tab.nikaya,
-          chapterIdx: tab.currentChapterIdx || 0,
-          chapterTitle: tab.chapters?.[tab.currentChapterIdx || 0]?.title || '',
+          chapterIdx: tab.currentChapterIdx ?? 0,
+          chapterTitle: tab.chapters?.[tab.currentChapterIdx ?? 0]?.title || '',
         });
       }
     },
@@ -948,20 +966,16 @@ export function TabProvider({ children }) {
           const nextIdx = Math.min(idx, newTabs.length - 1);
           const nextTab = newTabs[nextIdx];
           setActiveBookCode(nextTab.bookCode);
-          const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
-          if (firstP) {
-            setActiveParaNum(firstP);
+          const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
+          if (isToc) {
+            setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
+            updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
+          } else {
+            const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx ?? 0);
+            if (firstP) setActiveParaNum(firstP);
+            setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: nextTab.currentChapterIdx ?? 0 });
+            updateUrlParams({ book: nextTab.bookCode, chapter: (nextTab.currentChapterIdx ?? 0) + 1, q: null, search: null });
           }
-          setTreeSelectedNode({
-            bookCode: nextTab.bookCode,
-            chapterIdx: nextTab.currentChapterIdx || 0,
-          });
-          updateUrlParams({
-            book: nextTab.bookCode,
-            chapter: (nextTab.currentChapterIdx || 0) + 1,
-            q: null,
-            search: null,
-          });
           persistTabs(newTabs, nextTab.bookCode);
         } else {
           setActiveBookCode(null);
@@ -989,20 +1003,16 @@ export function TabProvider({ children }) {
       setOpenTabs(newTabs);
       setActiveBookCode(bookCode);
 
-      const firstP = getFirstParaOfChapter(targetTab.para_to_chapter, targetTab.currentChapterIdx || 0);
-      if (firstP) {
-        setActiveParaNum(firstP);
+      const isToc = targetTab.viewMode === 'toc' || targetTab.isTocView;
+      if (isToc) {
+        setTreeSelectedNode({ bookCode: targetTab.bookCode, chapterIdx: null });
+        updateUrlParams({ book: targetTab.bookCode, chapter: null, q: null, search: null });
+      } else {
+        const firstP = getFirstParaOfChapter(targetTab.para_to_chapter, targetTab.currentChapterIdx ?? 0);
+        if (firstP) setActiveParaNum(firstP);
+        setTreeSelectedNode({ bookCode: targetTab.bookCode, chapterIdx: targetTab.currentChapterIdx ?? 0 });
+        updateUrlParams({ book: targetTab.bookCode, chapter: (targetTab.currentChapterIdx ?? 0) + 1, q: null, search: null });
       }
-      setTreeSelectedNode({
-        bookCode: targetTab.bookCode,
-        chapterIdx: targetTab.currentChapterIdx || 0,
-      });
-      updateUrlParams({
-        book: targetTab.bookCode,
-        chapter: (targetTab.currentChapterIdx || 0) + 1,
-        q: null,
-        search: null,
-      });
       persistTabs(newTabs, bookCode);
     },
     [updateUrlParams, persistTabs, setActiveParaNum]
@@ -1038,20 +1048,16 @@ export function TabProvider({ children }) {
       if (!activeStillPresent) {
         const nextTab = newTabs[0];
         setActiveBookCode(nextTab.bookCode);
-        const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
-        if (firstP) {
-          setActiveParaNum(firstP);
+        const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
+        if (isToc) {
+          setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
+          updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
+        } else {
+          const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx ?? 0);
+          if (firstP) setActiveParaNum(firstP);
+          setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: nextTab.currentChapterIdx ?? 0 });
+          updateUrlParams({ book: nextTab.bookCode, chapter: (nextTab.currentChapterIdx ?? 0) + 1, q: null, search: null });
         }
-        setTreeSelectedNode({
-          bookCode: nextTab.bookCode,
-          chapterIdx: nextTab.currentChapterIdx || 0,
-        });
-        updateUrlParams({
-          book: nextTab.bookCode,
-          chapter: (nextTab.currentChapterIdx || 0) + 1,
-          q: null,
-          search: null,
-        });
         persistTabs(newTabs, nextTab.bookCode);
       } else {
         persistTabs(newTabs, activeCode);
@@ -1076,20 +1082,16 @@ export function TabProvider({ children }) {
       if (!activeStillPresent) {
         const nextTab = newTabs[newTabs.length - 1];
         setActiveBookCode(nextTab.bookCode);
-        const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx || 0);
-        if (firstP) {
-          setActiveParaNum(firstP);
+        const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
+        if (isToc) {
+          setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
+          updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
+        } else {
+          const firstP = getFirstParaOfChapter(nextTab.para_to_chapter, nextTab.currentChapterIdx ?? 0);
+          if (firstP) setActiveParaNum(firstP);
+          setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: nextTab.currentChapterIdx ?? 0 });
+          updateUrlParams({ book: nextTab.bookCode, chapter: (nextTab.currentChapterIdx ?? 0) + 1, q: null, search: null });
         }
-        setTreeSelectedNode({
-          bookCode: nextTab.bookCode,
-          chapterIdx: nextTab.currentChapterIdx || 0,
-        });
-        updateUrlParams({
-          book: nextTab.bookCode,
-          chapter: (nextTab.currentChapterIdx || 0) + 1,
-          q: null,
-          search: null,
-        });
         persistTabs(newTabs, nextTab.bookCode);
       } else {
         persistTabs(newTabs, activeCode);
@@ -1224,7 +1226,11 @@ export function TabProvider({ children }) {
     }
 
     if (urlBook) {
-      const targetChapIdx = urlChapter ? Math.max(0, parseInt(urlChapter, 10) - 1) : 0;
+      let targetChapIdx = undefined;
+      if (urlChapter !== null && urlChapter !== undefined && String(urlChapter).trim() !== '') {
+        const parsed = parseInt(String(urlChapter).trim(), 10);
+        if (!isNaN(parsed)) targetChapIdx = Math.max(0, parsed > 0 ? parsed - 1 : 0);
+      }
       openBook(urlBook, {
         targetChapterIdx: targetChapIdx,
         targetParaNum: urlPara || undefined,
@@ -1248,9 +1254,16 @@ export function TabProvider({ children }) {
           const activeItem = parsedTabs.find((p) => p.bookCode === activeToOpen) || parsedTabs[0];
 
           let resumeParaNum = activeItem.lastParaNum;
-          let resumeChapIdx = activeItem.currentChapterIdx || 0;
+          let resumeChapIdx = activeItem.currentChapterIdx;
+          const isActiveToc = activeItem.isTocView || activeItem.viewMode === 'toc' || resumeChapIdx === null;
+          if (isActiveToc) {
+            resumeChapIdx = undefined;
+            resumeParaNum = undefined;
+          } else if (resumeChapIdx === undefined || resumeChapIdx === null) {
+            resumeChapIdx = 0;
+          }
 
-          if (!resumeParaNum && savedHistoryRaw) {
+          if (!resumeParaNum && savedHistoryRaw && !isActiveToc) {
             try {
               const parsedHist = JSON.parse(savedHistoryRaw);
               const histItem = parsedHist.find((h) => h.bookCode === activeItem.bookCode);
@@ -1261,7 +1274,7 @@ export function TabProvider({ children }) {
             } catch (_) {}
           }
 
-          // Open active book first to exact paragraph / chapter
+          // Open active book first to exact paragraph / chapter (or TOC if no chapter)
           openBook(activeItem.bookCode, {
             targetChapterIdx: resumeChapIdx,
             targetParaNum: resumeParaNum || undefined,
@@ -1271,10 +1284,13 @@ export function TabProvider({ children }) {
           // Load rest in background
           parsedTabs.forEach((item) => {
             if (item.bookCode !== activeItem.bookCode) {
-              fetchBook(item.bookCode, { chapter: item.currentChapterIdx || 0, buffer: 0 })
+              const isBgToc = item.isTocView || item.viewMode === 'toc' || item.currentChapterIdx === null;
+              const bgFetch = isBgToc ? fetchBookTocOnly(item.bookCode) : fetchBook(item.bookCode, { chapter: item.currentChapterIdx ?? 0, buffer: 0 });
+              bgFetch
                 .then((bData) => {
                   setOpenTabs((prev) => {
                     if (prev.some((t) => t.bookCode === bData.code)) return prev;
+                    const isToc = isBgToc;
                     return [
                       ...prev,
                       {
@@ -1290,10 +1306,12 @@ export function TabProvider({ children }) {
                         para_to_index: bData.para_to_index || {},
                         page_to_chapter: bData.page_to_chapter || {},
                         page_to_para: bData.page_to_para || {},
-                        loadedChapters: { ...bData.chapters_data },
+                        loadedChapters: isToc ? {} : { ...bData.chapters_data },
                         loadingChapters: {},
-                        currentChapterIdx: item.currentChapterIdx || 0,
+                        currentChapterIdx: isToc ? null : (item.currentChapterIdx ?? 0),
                         lastParaNum: item.lastParaNum,
+                        viewMode: isToc ? 'toc' : 'reader',
+                        isTocView: isToc,
                       },
                     ];
                   });

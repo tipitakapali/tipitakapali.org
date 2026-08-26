@@ -251,6 +251,7 @@ export default function ReaderView() {
     addToHistory,
     saveTabPosition,
     searchHighlight,
+    openBook,
   } = useTabs();
 
   const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
@@ -1019,6 +1020,40 @@ export default function ReaderView() {
     setIsHeaderVisible(true);
   };
 
+  const handleNikayaClick = (e) => {
+    e.stopPropagation();
+    if (containerRef.current) {
+      smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
+    }
+  };
+
+  const handleBookClick = (e) => {
+    e.stopPropagation();
+    if (activeTab?.bookCode) {
+      openBook(activeTab.bookCode, {});
+    }
+  };
+
+  const handleChapterBreadcrumbClick = (e) => {
+    e.stopPropagation();
+    if (!containerRef.current || activeTab?.currentChapterIdx == null) return;
+    const target =
+      containerRef.current.querySelector(`#chap-${activeTab.currentChapterIdx}`) ||
+      containerRef.current.querySelector(`[data-chapter="${activeTab.currentChapterIdx}"]`);
+    if (target) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const rect = target.getBoundingClientRect();
+      const currentScroll = containerRef.current.scrollTop;
+      const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+      smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+      if (settings?.pulseAnimation) {
+        target.classList.remove('pulse-highlight');
+        void target.offsetWidth;
+        target.classList.add('pulse-highlight');
+      }
+    }
+  };
+
   const handleChapterVisible = useCallback(
     (chapIdx) => {
       if (!activeTab) return;
@@ -1198,21 +1233,39 @@ export default function ReaderView() {
         }`}
       >
         <div
-          className="breadcrumbs truncate text-xs flex-1 cursor-pointer flex items-center gap-1.5"
+          className="breadcrumbs truncate text-xs flex-1 flex items-center gap-1.5 cursor-pointer"
           onClick={handleBreadcrumbClick}
           title="Click to reveal full navigation and sidebar"
         >
           {(activeTab.nikaya || activeTab.category) && (
             <>
-              <span className="truncate opacity-75">{convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}</span>
-              <span className="opacity-40">›</span>
+              <span
+                onClick={handleNikayaClick}
+                className="truncate opacity-75 hover:opacity-100 hover:text-[var(--accent)] cursor-pointer hover:underline transition-colors"
+                title="Scroll to top"
+              >
+                {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
+              </span>
+              <span className="opacity-40 select-none">›</span>
             </>
           )}
-          <span className="current truncate font-semibold text-[var(--accent)]">{convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}</span>
+          <span
+            onClick={handleBookClick}
+            className="current truncate font-semibold text-[var(--accent)] hover:underline cursor-pointer transition-colors"
+            title="Open book outline"
+          >
+            {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
+          </span>
           {currentChap && capitalizePali(currentChap.title) !== capitalizePali(activeTab.title) && (
             <>
-              <span className="opacity-40">›</span>
-              <span className="truncate text-[var(--text-muted)]">{convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript)}</span>
+              <span className="opacity-40 select-none">›</span>
+              <span
+                onClick={handleChapterBreadcrumbClick}
+                className="truncate text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer hover:underline transition-colors"
+                title="Scroll to chapter"
+              >
+                {convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript)}
+              </span>
             </>
           )}
         </div>
