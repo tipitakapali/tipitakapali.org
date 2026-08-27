@@ -35,7 +35,6 @@ export default function LanguageMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const activeTranslationCount = Object.values(settings.translations || {}).filter(Boolean).length;
   const translationOrder = useMemo(() => {
     const order = settings.translationOrder;
     if (Array.isArray(order) && order.length > 0) {
@@ -99,11 +98,6 @@ export default function LanguageMenu() {
       >
         <Languages size={14} className="text-[var(--accent)]" />
         <span className="hidden sm:inline">Language</span>
-        {activeTranslationCount > 0 && (
-          <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
-            {activeTranslationCount}
-          </span>
-        )}
       </button>
 
       {isOpen && (
@@ -151,7 +145,9 @@ export default function LanguageMenu() {
                 <button
                   type="button"
                   onClick={() => handleDisplayModeChange('stack')}
-                  className={`p-2.5 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer ${
+                  aria-label="Translation below Pāḷi (vertical)"
+                  title="Translation below Pāḷi (vertical)"
+                  className={`p-2.5 rounded-lg border text-left transition flex items-center justify-center cursor-pointer ${
                     translationDisplayMode === 'stack'
                       ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                       : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
@@ -161,14 +157,13 @@ export default function LanguageMenu() {
                     <Rows3 size={14} />
                     Stack
                   </span>
-                  <span className={`text-[10px] leading-tight ${translationDisplayMode === 'stack' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
-                    Translation below Pāḷi (vertical)
-                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDisplayModeChange('side')}
-                  className={`p-2.5 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer ${
+                  aria-label="Pāḷi | Translation (horizontal)"
+                  title="Pāḷi | Translation (horizontal)"
+                  className={`p-2.5 rounded-lg border text-left transition flex items-center justify-center cursor-pointer ${
                     translationDisplayMode === 'side'
                       ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                       : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
@@ -178,14 +173,8 @@ export default function LanguageMenu() {
                     <Columns2 size={14} />
                     Side by side
                   </span>
-                  <span className={`text-[10px] leading-tight ${translationDisplayMode === 'side' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
-                    Pāḷi | Translation (horizontal)
-                  </span>
                 </button>
               </div>
-              <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-snug">
-                Pali translation rendering will follow this layout when available.
-              </p>
             </div>
 
             {/* Section 3: Multi-Translation Layers (movable order) */}

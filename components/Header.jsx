@@ -17,7 +17,6 @@ export default function Header() {
     isHeaderVisible,
     openSearchModal,
     setIsBookmarkOpen,
-    bookmarks,
   } = useTabs();
 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
@@ -159,11 +158,6 @@ export default function Header() {
         >
           <Bookmark size={14} className="text-[var(--accent)]" />
           <span className="hidden sm:inline">Saved</span>
-          {bookmarks.length > 0 && (
-            <span className="text-[8.5px] sm:text-[9px] px-1 rounded bg-[var(--accent)] text-white font-bold">
-              {bookmarks.length}
-            </span>
-          )}
         </button>
 
         {/* Theme Menu (Icon-only on button, labels inside dropdown) */}

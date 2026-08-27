@@ -479,34 +479,6 @@ export default function SettingsModal() {
             {/* 3. Typography Tab */}
             {activeTab === 'typography' && (
               <div className="p-3.5 sm:p-5 space-y-5">
-                {/* Font Family */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
-                    Reader Font Family
-                  </label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {FONTS.map((f) => (
-                      <div
-                        key={f.id}
-                        onClick={() => updateSetting('fontFamily', f.id)}
-                        className={`p-3 rounded-lg border cursor-pointer transition flex items-center justify-between ${
-                          settings.fontFamily === f.id
-                            ? 'border-[var(--accent)] bg-[var(--accent-light)]'
-                            : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
-                        }`}
-                      >
-                        <div>
-                          <div className="text-sm font-semibold" style={{ fontFamily: f.family }}>
-                            {f.label}
-                          </div>
-                          <div className="text-xs text-[var(--text-muted)] mt-0.5">{f.desc}</div>
-                        </div>
-                        {settings.fontFamily === f.id && <Check size={16} className="text-[var(--accent)]" />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Font Size & Line Height */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -587,6 +559,34 @@ export default function SettingsModal() {
                       />
                       <span>Traditional Tipitaka Indents</span>
                     </label>
+                  </div>
+                </div>
+
+                {/* Reader Font Family - moved to last */}
+                <div className="pt-3 border-t border-[var(--border-color)]">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
+                    Reader Font Family
+                  </label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {FONTS.map((f) => (
+                      <div
+                        key={f.id}
+                        onClick={() => updateSetting('fontFamily', f.id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition flex items-center justify-between ${
+                          settings.fontFamily === f.id
+                            ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                            : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-semibold" style={{ fontFamily: f.family }}>
+                            {f.label}
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)] mt-0.5">{f.desc}</div>
+                        </div>
+                        {settings.fontFamily === f.id && <Check size={16} className="text-[var(--accent)]" />}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
