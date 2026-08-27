@@ -214,7 +214,7 @@ export default function SettingsModal() {
 
                 <div className="pt-4 border-t border-[var(--border-color)]">
                   <div className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1.5">
-                    Reset Application & Clear Storage
+                    Reset TipitakaPali.org Settings
                   </div>
                   <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-3">
                     It will restore TipitakaPali.org to the default settings. And the reset will also delete TipitakaPali.org&apos;s saved tabs, book positions, bookmarks, search history, dictionary order.
@@ -225,7 +225,7 @@ export default function SettingsModal() {
                     className="w-full py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-lg text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                   >
                     <RotateCcw size={14} />
-                    <span>Reset All Settings & Clear Storage</span>
+                    <span>Reset All Settings & Clear Bookmarks</span>
                   </button>
                 </div>
               </div>
@@ -891,7 +891,7 @@ export default function SettingsModal() {
                 <RotateCcw size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)]">Reset All Settings & Storage?</h4>
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">Reset TipitakaPali.org Settings</h4>
                 <p className="text-xs text-[var(--text-muted)]">This action cannot be undone.</p>
               </div>
             </div>
@@ -913,7 +913,7 @@ export default function SettingsModal() {
                 onClick={handleExecuteReset}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer"
               >
-                Yes, Reset Everything
+                Yes, Reset TipitakaPali.org
               </button>
             </div>
           </div>
