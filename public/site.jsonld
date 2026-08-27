@@ -1,0 +1,282 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://tipitakapali.org/#website",
+      "url": "https://tipitakapali.org/",
+      "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
+      "alternateName": [
+        "Tipitaka Pali",
+        "CSCD Pali Canon",
+        "VRI Tipitaka"
+      ],
+      "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with multi-script typography, DPD dictionary, and full-text search.",
+      "inLanguage": [
+        "pi",
+        "en",
+        "my",
+        "si",
+        "th",
+        "vi"
+      ],
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://tipitakapali.org/?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "DataCatalog",
+      "@id": "https://tipitakapali.org/#catalog",
+      "name": "Chaṭṭha Saṅgāyana Pali Canon Canonical Corpus",
+      "description": "217 books of the Theravada Buddhist Pali Canon including Vinaya, Sutta, and Abhidhamma Pitakas with Atthakatha and Tika commentaries.",
+      "url": "https://tipitakapali.org/",
+      "dataset": [
+        {
+          "@type": "Dataset",
+          "name": "Dhammasaṅgaṇi-Aṭṭhakathā",
+          "identifier": "abh01a.att",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh01a.att"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Dhammasaṅgaṇīpāḷi",
+          "identifier": "abh01m.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh01m.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Dhammasaṅgaṇī-Mūlaṭīkā",
+          "identifier": "abh01t.tik",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh01t.tik"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Sammohavinodanī-Aṭṭhakathā",
+          "identifier": "abh02a.att",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh02a.att"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Vibhaṅgapāḷi",
+          "identifier": "abh02m.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh02m.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Vibhaṅga-Mūlaṭīkā",
+          "identifier": "abh02t.tik",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh02t.tik"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Pañcapakaraṇa-Aṭṭhakathā",
+          "identifier": "abh03a.att",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03a.att"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Dhātukathāpāḷi",
+          "identifier": "abh03m1.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m1.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Paṭṭhānapāḷi-4",
+          "identifier": "abh03m10.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m10.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Paṭṭhānapāḷi-5",
+          "identifier": "abh03m11.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m11.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Puggalapaññattipāḷi",
+          "identifier": "abh03m2.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m2.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Kathāvatthupāḷi",
+          "identifier": "abh03m3.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m3.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Yamakapāḷi-1",
+          "identifier": "abh03m4.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m4.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Yamakapāḷi-2",
+          "identifier": "abh03m5.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m5.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Yamakapāḷi-3",
+          "identifier": "abh03m6.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m6.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Paṭṭhānapāḷi-1",
+          "identifier": "abh03m7.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m7.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Paṭṭhānapāḷi-2",
+          "identifier": "abh03m8.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m8.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Paṭṭhānapāḷi-3",
+          "identifier": "abh03m9.mul",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03m9.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Pañcapakaraṇa-Mūlaṭīkā",
+          "identifier": "abh03t.tik",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh03t.tik"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Dhammasaṅgaṇī-Anuṭīkā",
+          "identifier": "abh04t.nrf",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh04t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Pañcapakaraṇa-Anuṭīkā",
+          "identifier": "abh05t.nrf",
+          "inLanguage": "pi",
+          "genre": "Abhidhammapiṭake",
+          "url": "https://tipitakapali.org/book/abh05t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Abhidhammāvatāro-Nāmarūpaparicchedo",
+          "identifier": "abh06t.nrf",
+          "inLanguage": "pi",
+          "genre": "Abhidhammāvatāro",
+          "url": "https://tipitakapali.org/book/abh06t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Abhidhammatthasaṅgaho",
+          "identifier": "abh07t.nrf",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/abh07t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Abhidhammāvatāra-Purāṇaṭīkā",
+          "identifier": "abh08t.nrf",
+          "inLanguage": "pi",
+          "genre": "Abhidhammāvatāra-purāṇaṭīkā",
+          "url": "https://tipitakapali.org/book/abh08t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Abhidhammamātikāpāḷi",
+          "identifier": "abh09t.nrf",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/abh09t.nrf"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Visuddhimagga-1",
+          "identifier": "e0101n.mul",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/e0101n.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Visuddhimagga-2",
+          "identifier": "e0102n.mul",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/e0102n.mul"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Visuddhimagga-Mahāṭīkā-1",
+          "identifier": "e0103n.att",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/e0103n.att"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Visuddhimagga-Mahāṭīkā-2",
+          "identifier": "e0104n.att",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/e0104n.att"
+        },
+        {
+          "@type": "Dataset",
+          "name": "Visuddhimagga Nidānakathā",
+          "identifier": "e0105n.nrf",
+          "inLanguage": "pi",
+          "genre": "Buddhism",
+          "url": "https://tipitakapali.org/book/e0105n.nrf"
+        }
+      ]
+    }
+  ]
+}

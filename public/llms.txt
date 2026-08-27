@@ -1,0 +1,36 @@
+# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
+> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries.
+
+## Overview
+- **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
+- **Total Canonical Books**: 217 books.
+- **Total Chapters**: 2,695 chapters across 520,000+ paragraphs.
+- **Languages / Scripts**: Pāḷi in Roman (Latin with full diacritics), Devanagari, Myanmar, Sinhala, Thai, Khmer, Cyrillic, and 10+ other scripts.
+- **Canonical Piṭakas**:
+  1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
+  2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
+  3. **Abhidhamma Piṭaka** (Higher Doctrine): Dhammasaṅgaṇī, Vibhaṅga, Dhātukathā, Puggalapaññatti, Kathāvatthu, Yamaka, Paṭṭhāna, plus Aṭṭhakathā and Ṭīkā.
+  4. **Añña Texts**: Post-canonical grammars, Visuddhimagga, chronicles (Vaṃsa), and commentaries.
+
+## Key Reading Links
+- [Home & Canonical Navigation](https://tipitakapali.org/)
+- [Full Catalog & AI Documentation](https://tipitakapali.org/llms-full.txt)
+- [XML Sitemap](https://tipitakapali.org/sitemap.xml)
+
+## Reading URLs Syntax
+- Book: `https://tipitakapali.org/book/[book_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
+- Chapter: `https://tipitakapali.org/book/[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/s0101m.mul/2` for Chapter 2)
+- Specific Paragraph: `https://tipitakapali.org/book/[book_code]#para-[number]` (e.g. `https://tipitakapali.org/book/s0502m.mul#para-1` for Dhammapada Verse 1)
+
+## Public Static JSON API (Edge CDN 0ms)
+- Navigation Tree: `GET https://tipitakapali.org/api/tree`
+- Books List: `GET https://tipitakapali.org/api/books`
+- Book Details & Initial Chapters: `GET https://tipitakapali.org/api/book/[book_code]`
+- Chapter HTML: `GET https://tipitakapali.org/api/book/[book_code]/chapter/[chapter_index]`
+- Book Table of Contents: `GET https://tipitakapali.org/api/book/[book_code]/toc`
+- Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET https://tipitakapali.org/api/mat`
+
+## Dynamic Search & Dictionary Endpoints
+- Full-Text Search: `GET https://tipitakapali.org/api/search?q=[query]`
+- Dictionary Lookup: `GET https://tipitakapali.org/api/dict/lookup?w=[word]`
+- Inflection Lookup: `GET https://tipitakapali.org/api/dict/inf?w=[word]`

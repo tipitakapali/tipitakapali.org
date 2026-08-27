@@ -1,0 +1,254 @@
+# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog & Reference
+> Website: https://tipitakapali.org
+> Total Canonical Books: 217
+
+## Canonical Books Directory
+| Book Code | Title | Piṭaka | Category | Chapters | URL |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `abh01a.att` | Dhammasaṅgaṇi-Aṭṭhakathā | Abhidhammapiṭake | aṭṭhakathā | 8 | [Dhammasaṅgaṇi-Aṭṭhakathā](https://tipitakapali.org/book/abh01a.att) |
+| `abh01m.mul` | Dhammasaṅgaṇīpāḷi | Abhidhammapiṭake | mūla | 5 | [Dhammasaṅgaṇīpāḷi](https://tipitakapali.org/book/abh01m.mul) |
+| `abh01t.tik` | Dhammasaṅgaṇī-Mūlaṭīkā | Abhidhammapiṭake | ṭīkā | 9 | [Dhammasaṅgaṇī-Mūlaṭīkā](https://tipitakapali.org/book/abh01t.tik) |
+| `abh02a.att` | Sammohavinodanī-Aṭṭhakathā | Abhidhammapiṭake | aṭṭhakathā | 18 | [Sammohavinodanī-Aṭṭhakathā](https://tipitakapali.org/book/abh02a.att) |
+| `abh02m.mul` | Vibhaṅgapāḷi | Abhidhammapiṭake | mūla | 18 | [Vibhaṅgapāḷi](https://tipitakapali.org/book/abh02m.mul) |
+| `abh02t.tik` | Vibhaṅga-Mūlaṭīkā | Abhidhammapiṭake | ṭīkā | 36 | [Vibhaṅga-Mūlaṭīkā](https://tipitakapali.org/book/abh02t.tik) |
+| `abh03a.att` | Pañcapakaraṇa-Aṭṭhakathā | Abhidhammapiṭake | aṭṭhakathā | 66 | [Pañcapakaraṇa-Aṭṭhakathā](https://tipitakapali.org/book/abh03a.att) |
+| `abh03m1.mul` | Dhātukathāpāḷi | Abhidhammapiṭake | mūla | 15 | [Dhātukathāpāḷi](https://tipitakapali.org/book/abh03m1.mul) |
+| `abh03m10.mul` | Paṭṭhānapāḷi-4 | Abhidhammapiṭake | mūla | 21 | [Paṭṭhānapāḷi-4](https://tipitakapali.org/book/abh03m10.mul) |
+| `abh03m11.mul` | Paṭṭhānapāḷi-5 | Abhidhammapiṭake | mūla | 20 | [Paṭṭhānapāḷi-5](https://tipitakapali.org/book/abh03m11.mul) |
+| `abh03m2.mul` | Puggalapaññattipāḷi | Abhidhammapiṭake | mūla | 2 | [Puggalapaññattipāḷi](https://tipitakapali.org/book/abh03m2.mul) |
+| `abh03m3.mul` | Kathāvatthupāḷi | Abhidhammapiṭake | mūla | 31 | [Kathāvatthupāḷi](https://tipitakapali.org/book/abh03m3.mul) |
+| `abh03m4.mul` | Yamakapāḷi-1 | Abhidhammapiṭake | mūla | 5 | [Yamakapāḷi-1](https://tipitakapali.org/book/abh03m4.mul) |
+| `abh03m5.mul` | Yamakapāḷi-2 | Abhidhammapiṭake | mūla | 3 | [Yamakapāḷi-2](https://tipitakapali.org/book/abh03m5.mul) |
+| `abh03m6.mul` | Yamakapāḷi-3 | Abhidhammapiṭake | mūla | 2 | [Yamakapāḷi-3](https://tipitakapali.org/book/abh03m6.mul) |
+| `abh03m7.mul` | Paṭṭhānapāḷi-1 | Abhidhammapiṭake | mūla | 8 | [Paṭṭhānapāḷi-1](https://tipitakapali.org/book/abh03m7.mul) |
+| `abh03m8.mul` | Paṭṭhānapāḷi-2 | Abhidhammapiṭake | mūla | 17 | [Paṭṭhānapāḷi-2](https://tipitakapali.org/book/abh03m8.mul) |
+| `abh03m9.mul` | Paṭṭhānapāḷi-3 | Abhidhammapiṭake | mūla | 10 | [Paṭṭhānapāḷi-3](https://tipitakapali.org/book/abh03m9.mul) |
+| `abh03t.tik` | Pañcapakaraṇa-Mūlaṭīkā | Abhidhammapiṭake | ṭīkā | 5 | [Pañcapakaraṇa-Mūlaṭīkā](https://tipitakapali.org/book/abh03t.tik) |
+| `abh04t.nrf` | Dhammasaṅgaṇī-Anuṭīkā | Abhidhammapiṭake | añña | 8 | [Dhammasaṅgaṇī-Anuṭīkā](https://tipitakapali.org/book/abh04t.nrf) |
+| `abh05t.nrf` | Pañcapakaraṇa-Anuṭīkā | Abhidhammapiṭake | añña | 5 | [Pañcapakaraṇa-Anuṭīkā](https://tipitakapali.org/book/abh05t.nrf) |
+| `abh06t.nrf` | Abhidhammāvatāro-Nāmarūpaparicchedo | Abhidhammāvatāro | añña | 78 | [Abhidhammāvatāro-Nāmarūpaparicchedo](https://tipitakapali.org/book/abh06t.nrf) |
+| `abh07t.nrf` | Abhidhammatthasaṅgaho |  | añña | 18 | [Abhidhammatthasaṅgaho](https://tipitakapali.org/book/abh07t.nrf) |
+| `abh08t.nrf` | Abhidhammāvatāra-Purāṇaṭīkā | Abhidhammāvatāra-purāṇaṭīkā | añña | 49 | [Abhidhammāvatāra-Purāṇaṭīkā](https://tipitakapali.org/book/abh08t.nrf) |
+| `abh09t.nrf` | Abhidhammamātikāpāḷi |  | añña | 14 | [Abhidhammamātikāpāḷi](https://tipitakapali.org/book/abh09t.nrf) |
+| `e0101n.mul` | Visuddhimagga-1 |  | mūla | 12 | [Visuddhimagga-1](https://tipitakapali.org/book/e0101n.mul) |
+| `e0102n.mul` | Visuddhimagga-2 |  | mūla | 12 | [Visuddhimagga-2](https://tipitakapali.org/book/e0102n.mul) |
+| `e0103n.att` | Visuddhimagga-Mahāṭīkā-1 |  | aṭṭhakathā | 12 | [Visuddhimagga-Mahāṭīkā-1](https://tipitakapali.org/book/e0103n.att) |
+| `e0104n.att` | Visuddhimagga-Mahāṭīkā-2 |  | aṭṭhakathā | 12 | [Visuddhimagga-Mahāṭīkā-2](https://tipitakapali.org/book/e0104n.att) |
+| `e0105n.nrf` | Visuddhimagga Nidānakathā |  | añña | 37 | [Visuddhimagga Nidānakathā](https://tipitakapali.org/book/e0105n.nrf) |
+| `e0201n.nrf` | Niruttidīpanī |  | añña | 7 | [Niruttidīpanī](https://tipitakapali.org/book/e0201n.nrf) |
+| `e0301n.nrf` | Paramatthadīpanī Saṅgahamahāṭīkāpāṭha |  | añña | 13 | [Paramatthadīpanī Saṅgahamahāṭīkāpāṭha](https://tipitakapali.org/book/e0301n.nrf) |
+| `e0401n.nrf` | Anudīpanīpāṭha |  | añña | 9 | [Anudīpanīpāṭha](https://tipitakapali.org/book/e0401n.nrf) |
+| `e0501n.nrf` | Paṭṭhānuddesa Dīpanīpāṭha |  | añña | 23 | [Paṭṭhānuddesa Dīpanīpāṭha](https://tipitakapali.org/book/e0501n.nrf) |
+| `e0601n.nrf` | Namakkāraṭīkā |  | añña | 2 | [Namakkāraṭīkā](https://tipitakapali.org/book/e0601n.nrf) |
+| `e0602n.nrf` | Mahāpaṇāmapāṭha |  | añña | 3 | [Mahāpaṇāmapāṭha](https://tipitakapali.org/book/e0602n.nrf) |
+| `e0603n.nrf` | Lakkhaṇāto Buddhathomanāgāthā |  | añña | 3 | [Lakkhaṇāto Buddhathomanāgāthā](https://tipitakapali.org/book/e0603n.nrf) |
+| `e0604n.nrf` | Sutavandanā |  | añña | 1 | [Sutavandanā](https://tipitakapali.org/book/e0604n.nrf) |
+| `e0605n.nrf` | Jinālaṅkāra |  | añña | 30 | [Jinālaṅkāra](https://tipitakapali.org/book/e0605n.nrf) |
+| `e0606n.nrf` | Kamalāñjali |  | añña | 1 | [Kamalāñjali](https://tipitakapali.org/book/e0606n.nrf) |
+| `e0607n.nrf` | Pajjamadhu |  | añña | 1 | [Pajjamadhu](https://tipitakapali.org/book/e0607n.nrf) |
+| `e0608n.nrf` | Buddhaguṇagāthāvalī |  | añña | 1 | [Buddhaguṇagāthāvalī](https://tipitakapali.org/book/e0608n.nrf) |
+| `e0701n.nrf` | Cūḷaganthavaṃsa |  | añña | 5 | [Cūḷaganthavaṃsa](https://tipitakapali.org/book/e0701n.nrf) |
+| `e0702n.nrf` | Sāsanavaṃsa |  | añña | 11 | [Sāsanavaṃsa](https://tipitakapali.org/book/e0702n.nrf) |
+| `e0703n.nrf` | Mahāvaṃsa |  | añña | 63 | [Mahāvaṃsa](https://tipitakapali.org/book/e0703n.nrf) |
+| `e0801n.nrf` | Moggallānabyākaraṇaṃ |  | añña | 8 | [Moggallānabyākaraṇaṃ](https://tipitakapali.org/book/e0801n.nrf) |
+| `e0802n.nrf` | Kaccāyanabyākaraṇaṃ |  | añña | 9 | [Kaccāyanabyākaraṇaṃ](https://tipitakapali.org/book/e0802n.nrf) |
+| `e0803n.nrf` | Saddanītippakaraṇaṃ (Padamālā) |  | añña | 15 | [Saddanītippakaraṇaṃ (Padamālā)](https://tipitakapali.org/book/e0803n.nrf) |
+| `e0804n.nrf` | Saddanītippakaraṇaṃ (Dhātumālā) |  | añña | 5 | [Saddanītippakaraṇaṃ (Dhātumālā)](https://tipitakapali.org/book/e0804n.nrf) |
+| `e0805n.nrf` | Padarūpasiddhi |  | añña | 7 | [Padarūpasiddhi](https://tipitakapali.org/book/e0805n.nrf) |
+| `e0806n.nrf` | Moggallānapañcikā |  | añña | 7 | [Moggallānapañcikā](https://tipitakapali.org/book/e0806n.nrf) |
+| `e0807n.nrf` | Payogasiddhipāṭha |  | añña | 7 | [Payogasiddhipāṭha](https://tipitakapali.org/book/e0807n.nrf) |
+| `e0808n.nrf` | Vuttodayapāṭha |  | añña | 6 | [Vuttodayapāṭha](https://tipitakapali.org/book/e0808n.nrf) |
+| `e0809n.nrf` | Abhidhānappadīpikāpāṭha |  | añña | 5 | [Abhidhānappadīpikāpāṭha](https://tipitakapali.org/book/e0809n.nrf) |
+| `e0810n.nrf` | Abhidhānappadīpikāṭīkā |  | añña | 4 | [Abhidhānappadīpikāṭīkā](https://tipitakapali.org/book/e0810n.nrf) |
+| `e0811n.nrf` | Subodhālaṅkārapāṭha |  | añña | 5 | [Subodhālaṅkārapāṭha](https://tipitakapali.org/book/e0811n.nrf) |
+| `e0812n.nrf` | Subodhālaṅkāraṭīkā |  | añña | 6 | [Subodhālaṅkāraṭīkā](https://tipitakapali.org/book/e0812n.nrf) |
+| `e0813n.nrf` | Bālāvatāra Gaṇṭhipadatthavinicchayasāra |  | añña | 5 | [Bālāvatāra Gaṇṭhipadatthavinicchayasāra](https://tipitakapali.org/book/e0813n.nrf) |
+| `e0901n.nrf` | Dīghanikāya (Pu-Vi) | Suttantapiṭake | añña | 3 | [Dīghanikāya (Pu-Vi)](https://tipitakapali.org/book/e0901n.nrf) |
+| `e0902n.nrf` | Majjhimanikāya (Pu-Vi) | Suttantapiṭaka | añña | 2 | [Majjhimanikāya (Pu-Vi)](https://tipitakapali.org/book/e0902n.nrf) |
+| `e0903n.nrf` | Saṃyuttanikāya (Pu-Vi) | Suttantapiṭaka | añña | 5 | [Saṃyuttanikāya (Pu-Vi)](https://tipitakapali.org/book/e0903n.nrf) |
+| `e0904n.nrf` | Aṅguttaranikāya (Pu-Vi) | Suttantapiṭaka | añña | 1 | [Aṅguttaranikāya (Pu-Vi)](https://tipitakapali.org/book/e0904n.nrf) |
+| `e0905n.nrf` | Vinayapiṭaka (Pu-Vi) |  | añña | 5 | [Vinayapiṭaka (Pu-Vi)](https://tipitakapali.org/book/e0905n.nrf) |
+| `e0906n.nrf` | Abhidhammapiṭaka (Pu-Vi) |  | añña | 1 | [Abhidhammapiṭaka (Pu-Vi)](https://tipitakapali.org/book/e0906n.nrf) |
+| `e0907n.nrf` | Aṭṭhakathā (Pu-Vi) |  | añña | 1 | [Aṭṭhakathā (Pu-Vi)](https://tipitakapali.org/book/e0907n.nrf) |
+| `e1001n.nrf` | Kavidappaṇanīti |  | añña | 14 | [Kavidappaṇanīti](https://tipitakapali.org/book/e1001n.nrf) |
+| `e1002n.nrf` | Nītimañjarī |  | añña | 1 | [Nītimañjarī](https://tipitakapali.org/book/e1002n.nrf) |
+| `e1003n.nrf` | Dhammanīti |  | añña | 1 | [Dhammanīti](https://tipitakapali.org/book/e1003n.nrf) |
+| `e1004n.nrf` | Mahārahanīti |  | añña | 5 | [Mahārahanīti](https://tipitakapali.org/book/e1004n.nrf) |
+| `e1005n.nrf` | Lokanīti |  | añña | 7 | [Lokanīti](https://tipitakapali.org/book/e1005n.nrf) |
+| `e1006n.nrf` | Suttantanīti |  | añña | 2 | [Suttantanīti](https://tipitakapali.org/book/e1006n.nrf) |
+| `e1007n.nrf` | Sūrassatinīti |  | añña | 3 | [Sūrassatinīti](https://tipitakapali.org/book/e1007n.nrf) |
+| `e1008n.nrf` | Cāṇakyanīti |  | añña | 1 | [Cāṇakyanīti](https://tipitakapali.org/book/e1008n.nrf) |
+| `e1009n.nrf` | Naradakkhadīpanī |  | añña | 13 | [Naradakkhadīpanī](https://tipitakapali.org/book/e1009n.nrf) |
+| `e1010n.nrf` | Caturārakkhadīpanī |  | añña | 6 | [Caturārakkhadīpanī](https://tipitakapali.org/book/e1010n.nrf) |
+| `e1101n.nrf` | Rasavāhinī |  | añña | 5 | [Rasavāhinī](https://tipitakapali.org/book/e1101n.nrf) |
+| `e1102n.nrf` | Sīmavisodhanīpāṭha |  | añña | 6 | [Sīmavisodhanīpāṭha](https://tipitakapali.org/book/e1102n.nrf) |
+| `e1103n.nrf` | Vessantaragīti |  | añña | 1 | [Vessantaragīti](https://tipitakapali.org/book/e1103n.nrf) |
+| `e1201n.nrf` | Moggallāna Vuttivivaraṇapañcikā |  | añña | 1 | [Moggallāna Vuttivivaraṇapañcikā](https://tipitakapali.org/book/e1201n.nrf) |
+| `e1202n.nrf` | Thūpavaṃsa |  | añña | 14 | [Thūpavaṃsa](https://tipitakapali.org/book/e1202n.nrf) |
+| `e1203n.nrf` | Dāṭhāvaṃsa |  | añña | 1 | [Dāṭhāvaṃsa](https://tipitakapali.org/book/e1203n.nrf) |
+| `e1204n.nrf` | Dhātupāṭhavilāsiniyā |  | añña | 1 | [Dhātupāṭhavilāsiniyā](https://tipitakapali.org/book/e1204n.nrf) |
+| `e1205n.nrf` | Dhātuvaṃsa |  | añña | 5 | [Dhātuvaṃsa](https://tipitakapali.org/book/e1205n.nrf) |
+| `e1206n.nrf` | Hatthavanagallavihāravaṃsa |  | añña | 1 | [Hatthavanagallavihāravaṃsa](https://tipitakapali.org/book/e1206n.nrf) |
+| `e1207n.nrf` | Jinacaritaya |  | añña | 1 | [Jinacaritaya](https://tipitakapali.org/book/e1207n.nrf) |
+| `e1208n.nrf` | Jinavaṃsadīpaṃ |  | añña | 1 | [Jinavaṃsadīpaṃ](https://tipitakapali.org/book/e1208n.nrf) |
+| `e1209n.nrf` | Telakaṭāhagāthā |  | añña | 1 | [Telakaṭāhagāthā](https://tipitakapali.org/book/e1209n.nrf) |
+| `e1210n.nrf` | Milidaṭīkā |  | añña | 2 | [Milidaṭīkā](https://tipitakapali.org/book/e1210n.nrf) |
+| `e1211n.nrf` | Padamañjarī |  | añña | 1 | [Padamañjarī](https://tipitakapali.org/book/e1211n.nrf) |
+| `e1212n.nrf` | Padasādhanaṃ |  | añña | 1 | [Padasādhanaṃ](https://tipitakapali.org/book/e1212n.nrf) |
+| `e1213n.nrf` | Saddabindupakaraṇaṃ |  | añña | 1 | [Saddabindupakaraṇaṃ](https://tipitakapali.org/book/e1213n.nrf) |
+| `e1214n.nrf` | Kaccāyanadhātumañjusā |  | añña | 8 | [Kaccāyanadhātumañjusā](https://tipitakapali.org/book/e1214n.nrf) |
+| `e1215n.nrf` | Samantakūṭavaṇṇanā |  | añña | 1 | [Samantakūṭavaṇṇanā](https://tipitakapali.org/book/e1215n.nrf) |
+| `s0101a.att` | Sīlakkhandhavagga-Aṭṭhakathā | Dīghanikāye | aṭṭhakathā | 14 | [Sīlakkhandhavagga-Aṭṭhakathā](https://tipitakapali.org/book/s0101a.att) |
+| `s0101m.mul` | Sīlakkhandhavaggapāḷi | Dīghanikāyo | mūla | 13 | [Sīlakkhandhavaggapāḷi](https://tipitakapali.org/book/s0101m.mul) |
+| `s0101t.tik` | Sīlakkhandhavagga-Ṭīkā | Dīghanikāye | ṭīkā | 14 | [Sīlakkhandhavagga-Ṭīkā](https://tipitakapali.org/book/s0101t.tik) |
+| `s0102a.att` | Mahāvagga-Aṭṭhakathā | Dīghanikāye | aṭṭhakathā | 10 | [Mahāvagga-Aṭṭhakathā](https://tipitakapali.org/book/s0102a.att) |
+| `s0102m.mul` | Mahāvaggapāḷi | Dīghanikāyo | mūla | 10 | [Mahāvaggapāḷi](https://tipitakapali.org/book/s0102m.mul) |
+| `s0102t.tik` | Mahāvagga-Ṭīkā | Dīghanikāye | ṭīkā | 10 | [Mahāvagga-Ṭīkā](https://tipitakapali.org/book/s0102t.tik) |
+| `s0103a.att` | Pāthikavagga-Aṭṭhakathā | Dīghanikāye | aṭṭhakathā | 11 | [Pāthikavagga-Aṭṭhakathā](https://tipitakapali.org/book/s0103a.att) |
+| `s0103m.mul` | Pāthikavaggapāḷi | Dīghanikāyo | mūla | 11 | [Pāthikavaggapāḷi](https://tipitakapali.org/book/s0103m.mul) |
+| `s0103t.tik` | Pāthikavagga-Ṭīkā | Dīghanikāye | ṭīkā | 11 | [Pāthikavagga-Ṭīkā](https://tipitakapali.org/book/s0103t.tik) |
+| `s0104t.nrf` | Sīlakkhandhavagga-Abhinavaṭīkā-1 | Dīghanikāye | añña | 2 | [Sīlakkhandhavagga-Abhinavaṭīkā-1](https://tipitakapali.org/book/s0104t.nrf) |
+| `s0105t.nrf` | Sīlakkhandhavagga-Abhinavaṭīkā-2 | Dīghanikāye | añña | 12 | [Sīlakkhandhavagga-Abhinavaṭīkā-2](https://tipitakapali.org/book/s0105t.nrf) |
+| `s0201a.att` | Mūlapaṇṇāsa-Aṭṭhakathā | Majjhimanikāye | aṭṭhakathā | 6 | [Mūlapaṇṇāsa-Aṭṭhakathā](https://tipitakapali.org/book/s0201a.att) |
+| `s0201m.mul` | Mūlapaṇṇāsapāḷi | Majjhimanikāyo | mūla | 5 | [Mūlapaṇṇāsapāḷi](https://tipitakapali.org/book/s0201m.mul) |
+| `s0201t.tik` | Mūlapaṇṇāsa-Ṭīkā | Majjhimanikāye | ṭīkā | 6 | [Mūlapaṇṇāsa-Ṭīkā](https://tipitakapali.org/book/s0201t.tik) |
+| `s0202a.att` | Majjhimapaṇṇāsa-Aṭṭhakathā | Majjhimanikāye | aṭṭhakathā | 5 | [Majjhimapaṇṇāsa-Aṭṭhakathā](https://tipitakapali.org/book/s0202a.att) |
+| `s0202m.mul` | Majjhimapaṇṇāsapāḷi | Majjhimanikāye | mūla | 5 | [Majjhimapaṇṇāsapāḷi](https://tipitakapali.org/book/s0202m.mul) |
+| `s0202t.tik` | Majjhimapaṇṇāsa-Ṭīkā | Majjhimanikāye | ṭīkā | 5 | [Majjhimapaṇṇāsa-Ṭīkā](https://tipitakapali.org/book/s0202t.tik) |
+| `s0203a.att` | Uparipaṇṇāsa-Aṭṭhakathā | Majjhimanikāye | aṭṭhakathā | 5 | [Uparipaṇṇāsa-Aṭṭhakathā](https://tipitakapali.org/book/s0203a.att) |
+| `s0203m.mul` | Uparipaṇṇāsapāḷi | Majjhimanikāye | mūla | 5 | [Uparipaṇṇāsapāḷi](https://tipitakapali.org/book/s0203m.mul) |
+| `s0203t.tik` | Uparipaṇṇāsa-Ṭīkā | Majjhimanikāye | ṭīkā | 5 | [Uparipaṇṇāsa-Ṭīkā](https://tipitakapali.org/book/s0203t.tik) |
+| `s0301a.att` | Sagāthāvagga-Aṭṭhakathā | Saṃyuttanikāye | aṭṭhakathā | 12 | [Sagāthāvagga-Aṭṭhakathā](https://tipitakapali.org/book/s0301a.att) |
+| `s0301m.mul` | Sagāthāvaggapāḷi | Saṃyuttanikāyo | mūla | 11 | [Sagāthāvaggapāḷi](https://tipitakapali.org/book/s0301m.mul) |
+| `s0301t.tik` | Sagāthāvagga-Ṭīkā | Saṃyuttanikāye | ṭīkā | 12 | [Sagāthāvagga-Ṭīkā](https://tipitakapali.org/book/s0301t.tik) |
+| `s0302a.att` | Nidānavagga-Aṭṭhakathā | Saṃyuttanikāye | aṭṭhakathā | 10 | [Nidānavagga-Aṭṭhakathā](https://tipitakapali.org/book/s0302a.att) |
+| `s0302m.mul` | Nidānavaggapāḷi | Saṃyuttanikāyo | mūla | 10 | [Nidānavaggapāḷi](https://tipitakapali.org/book/s0302m.mul) |
+| `s0302t.tik` | Nidānavagga-Ṭīkā | Saṃyuttanikāye | ṭīkā | 10 | [Nidānavagga-Ṭīkā](https://tipitakapali.org/book/s0302t.tik) |
+| `s0303a.att` | Khandhavagga-Aṭṭhakathā | Saṃyuttanikāye | aṭṭhakathā | 13 | [Khandhavagga-Aṭṭhakathā](https://tipitakapali.org/book/s0303a.att) |
+| `s0303m.mul` | Khandhavaggapāḷi | Saṃyuttanikāyo | mūla | 13 | [Khandhavaggapāḷi](https://tipitakapali.org/book/s0303m.mul) |
+| `s0303t.tik` | Khandhavagga-Ṭīkā | Saṃyuttanikāye | ṭīkā | 13 | [Khandhavagga-Ṭīkā](https://tipitakapali.org/book/s0303t.tik) |
+| `s0304a.att` | Saḷāyatanavagga-Aṭṭhakathā | Saṃyuttanikāye | aṭṭhakathā | 10 | [Saḷāyatanavagga-Aṭṭhakathā](https://tipitakapali.org/book/s0304a.att) |
+| `s0304m.mul` | Saḷāyatanavaggapāḷi | Saṃyuttanikāyo | mūla | 10 | [Saḷāyatanavaggapāḷi](https://tipitakapali.org/book/s0304m.mul) |
+| `s0304t.tik` | Saḷāyatanavagga-Ṭīkā | Saṃyuttanikāye | ṭīkā | 10 | [Saḷāyatanavagga-Ṭīkā](https://tipitakapali.org/book/s0304t.tik) |
+| `s0305a.att` | Mahāvagga-Aṭṭhakathā | Saṃyuttanikāye | aṭṭhakathā | 12 | [Mahāvagga-Aṭṭhakathā](https://tipitakapali.org/book/s0305a.att) |
+| `s0305m.mul` | Mahāvaggapāḷi | Saṃyuttanikāyo | mūla | 12 | [Mahāvaggapāḷi](https://tipitakapali.org/book/s0305m.mul) |
+| `s0305t.tik` | Mahāvagga-Ṭīkā | Saṃyuttanikāye | ṭīkā | 12 | [Mahāvagga-Ṭīkā](https://tipitakapali.org/book/s0305t.tik) |
+| `s0401a.att` | Ekakanipāta-Aṭṭhakathā | Aṅguttaranikāye | aṭṭhakathā | 20 | [Ekakanipāta-Aṭṭhakathā](https://tipitakapali.org/book/s0401a.att) |
+| `s0401m.mul` | Ekakanipātapāḷi | Aṅguttaranikāyo | mūla | 20 | [Ekakanipātapāḷi](https://tipitakapali.org/book/s0401m.mul) |
+| `s0401t.tik` | Ekakanipāta-Ṭīkā | Aṅguttaranikāye | ṭīkā | 19 | [Ekakanipāta-Ṭīkā](https://tipitakapali.org/book/s0401t.tik) |
+| `s0402a.att` | Dukanipāta-Aṭṭhakathā | Aṅguttaranikāye | aṭṭhakathā | 64 | [Dukanipāta-Aṭṭhakathā](https://tipitakapali.org/book/s0402a.att) |
+| `s0402m1.mul` | Dukanipātapāḷi | Aṅguttaranikāyo | mūla | 19 | [Dukanipātapāḷi](https://tipitakapali.org/book/s0402m1.mul) |
+| `s0402m2.mul` | Tikanipātapāḷi | Aṅguttaranikāyo | mūla | 18 | [Tikanipātapāḷi](https://tipitakapali.org/book/s0402m2.mul) |
+| `s0402m3.mul` | Catukkanipātapāḷi | Aṅguttaranikāyo | mūla | 28 | [Catukkanipātapāḷi](https://tipitakapali.org/book/s0402m3.mul) |
+| `s0402t.tik` | Duka-Tika-Catukkanipāta-Ṭīkā | Aṅguttaranikāye | ṭīkā | 59 | [Duka-Tika-Catukkanipāta-Ṭīkā](https://tipitakapali.org/book/s0402t.tik) |
+| `s0403a.att` | Pañcakanipāta-Aṭṭhakathā | Aṅguttaranikāye | aṭṭhakathā | 47 | [Pañcakanipāta-Aṭṭhakathā](https://tipitakapali.org/book/s0403a.att) |
+| `s0403m1.mul` | Pañcakanipātapāḷi | Aṅguttaranikāyo | mūla | 29 | [Pañcakanipātapāḷi](https://tipitakapali.org/book/s0403m1.mul) |
+| `s0403m2.mul` | Chakkanipātapāḷi | Aṅguttaranikāyo | mūla | 13 | [Chakkanipātapāḷi](https://tipitakapali.org/book/s0403m2.mul) |
+| `s0403m3.mul` | Sattakanipātapāḷi | Aṅguttaranikāyo | mūla | 11 | [Sattakanipātapāḷi](https://tipitakapali.org/book/s0403m3.mul) |
+| `s0403t.tik` | Pañcaka-Chakka-Sattakanipāta-Ṭīkā | Aṅguttaranikāye | ṭīkā | 41 | [Pañcaka-Chakka-Sattakanipāta-Ṭīkā](https://tipitakapali.org/book/s0403t.tik) |
+| `s0404a.att` | Aṭṭhakanipāta-Aṭṭhakathā | Aṅguttaranikāye | aṭṭhakathā | 33 | [Aṭṭhakanipāta-Aṭṭhakathā](https://tipitakapali.org/book/s0404a.att) |
+| `s0404m1.mul` | Aṭṭhakanipātapāḷi | Aṅguttaranikāyo | mūla | 11 | [Aṭṭhakanipātapāḷi](https://tipitakapali.org/book/s0404m1.mul) |
+| `s0404m2.mul` | Navakanipātapāḷi | Aṅguttaranikāyo | mūla | 10 | [Navakanipātapāḷi](https://tipitakapali.org/book/s0404m2.mul) |
+| `s0404m3.mul` | Dasakanipātapāḷi | Aṅguttaranikāyo | mūla | 23 | [Dasakanipātapāḷi](https://tipitakapali.org/book/s0404m3.mul) |
+| `s0404m4.mul` | Ekādasakanipātapāḷi | Aṅguttaranikāyo | mūla | 4 | [Ekādasakanipātapāḷi](https://tipitakapali.org/book/s0404m4.mul) |
+| `s0404t.tik` | Aṭṭhakādinipāta-Ṭīkā | Aṅguttaranikāye | ṭīkā | 28 | [Aṭṭhakādinipāta-Ṭīkā](https://tipitakapali.org/book/s0404t.tik) |
+| `s0501a.att` | Khuddakapāṭha-Aṭṭhakathā (Paramatthajotikā 1) | Khuddakanikāye | aṭṭhakathā | 10 | [Khuddakapāṭha-Aṭṭhakathā (Paramatthajotikā 1)](https://tipitakapali.org/book/s0501a.att) |
+| `s0501m.mul` | Khuddakapāṭhapāḷi | Khuddakanikāye | mūla | 9 | [Khuddakapāṭhapāḷi](https://tipitakapali.org/book/s0501m.mul) |
+| `s0501t.nrf` | Nettivibhāvinī | Khuddakanikāye | añña | 6 | [Nettivibhāvinī](https://tipitakapali.org/book/s0501t.nrf) |
+| `s0502a.att` | Dhammapada-Aṭṭhakathā | Khuddakanikāye | aṭṭhakathā | 27 | [Dhammapada-Aṭṭhakathā](https://tipitakapali.org/book/s0502a.att) |
+| `s0502m.mul` | Dhammapadapāḷi | Khuddakanikāye | mūla | 26 | [Dhammapadapāḷi](https://tipitakapali.org/book/s0502m.mul) |
+| `s0503a.att` | Udāna-Aṭṭhakathā (Paramatthadīpanī 1) | Khuddakanikāye | aṭṭhakathā | 9 | [Udāna-Aṭṭhakathā (Paramatthadīpanī 1)](https://tipitakapali.org/book/s0503a.att) |
+| `s0503m.mul` | Udānapāḷi | Khuddakanikāye | mūla | 8 | [Udānapāḷi](https://tipitakapali.org/book/s0503m.mul) |
+| `s0504a.att` | Itivuttaka-Aṭṭhakathā (Paramatthadīpanī 2) | Khuddakanikāye | aṭṭhakathā | 5 | [Itivuttaka-Aṭṭhakathā (Paramatthadīpanī 2)](https://tipitakapali.org/book/s0504a.att) |
+| `s0504m.mul` | Itivuttakapāḷi | Khuddakanikāye | mūla | 4 | [Itivuttakapāḷi](https://tipitakapali.org/book/s0504m.mul) |
+| `s0505a.att` | Suttanipāta-Aṭṭhakathā (Paramatthajotikā 2) | Khuddakanikāye | aṭṭhakathā | 5 | [Suttanipāta-Aṭṭhakathā (Paramatthajotikā 2)](https://tipitakapali.org/book/s0505a.att) |
+| `s0505m.mul` | Suttanipātapāḷi | Khuddakanikāye | mūla | 5 | [Suttanipātapāḷi](https://tipitakapali.org/book/s0505m.mul) |
+| `s0506a.att` | Vimānavatthu-Aṭṭhakathā (Paramatthadīpanī 3) | Khuddakanikāye | aṭṭhakathā | 3 | [Vimānavatthu-Aṭṭhakathā (Paramatthadīpanī 3)](https://tipitakapali.org/book/s0506a.att) |
+| `s0506m.mul` | Vimānavatthupāḷi | Khuddakanikāye | mūla | 2 | [Vimānavatthupāḷi](https://tipitakapali.org/book/s0506m.mul) |
+| `s0507a.att` | Petavatthu-Aṭṭhakathā (Paramatthadīpanī 4) | Khuddakanikāye | aṭṭhakathā | 5 | [Petavatthu-Aṭṭhakathā (Paramatthadīpanī 4)](https://tipitakapali.org/book/s0507a.att) |
+| `s0507m.mul` | Petavatthupāḷi | Khuddakanikāye | mūla | 4 | [Petavatthupāḷi](https://tipitakapali.org/book/s0507m.mul) |
+| `s0508a1.att` | Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5) | Khuddakanikāye | aṭṭhakathā | 4 | [Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5)](https://tipitakapali.org/book/s0508a1.att) |
+| `s0508a2.att` | Theragāthā-Aṭṭhakathā-2 (Paramatthadīpanī 5) | Khuddakanikāye | aṭṭhakathā | 18 | [Theragāthā-Aṭṭhakathā-2 (Paramatthadīpanī 5)](https://tipitakapali.org/book/s0508a2.att) |
+| `s0508m.mul` | Theragāthāpāḷi | Khuddakanikāye | mūla | 21 | [Theragāthāpāḷi](https://tipitakapali.org/book/s0508m.mul) |
+| `s0509a.att` | Therīgāthā-Aṭṭhakathā (Paramatthadīpanī 6) | Khuddakanikāye | aṭṭhakathā | 16 | [Therīgāthā-Aṭṭhakathā (Paramatthadīpanī 6)](https://tipitakapali.org/book/s0509a.att) |
+| `s0509m.mul` | Therīgāthāpāḷi | Khuddakanikāye | mūla | 16 | [Therīgāthāpāḷi](https://tipitakapali.org/book/s0509m.mul) |
+| `s0510a.att` | Apadāna-Aṭṭhakathā (Visuddhajanavilāsinī) | Khuddakanikāye | aṭṭhakathā | 43 | [Apadāna-Aṭṭhakathā (Visuddhajanavilāsinī)](https://tipitakapali.org/book/s0510a.att) |
+| `s0510m1.mul` | Apadānapāḷi-1 | Khuddakanikāye | mūla | 42 | [Apadānapāḷi-1](https://tipitakapali.org/book/s0510m1.mul) |
+| `s0510m2.mul` | Apadānapāḷi-2 | Khuddakanikāye | mūla | 18 | [Apadānapāḷi-2](https://tipitakapali.org/book/s0510m2.mul) |
+| `s0511a.att` | Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī) | Khuddakanikāye | aṭṭhakathā | 29 | [Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī)](https://tipitakapali.org/book/s0511a.att) |
+| `s0511m.mul` | Buddhavaṃsapāḷi | Khuddakanikāye | mūla | 29 | [Buddhavaṃsapāḷi](https://tipitakapali.org/book/s0511m.mul) |
+| `s0512a.att` | Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7) | Khuddakanikāye | aṭṭhakathā | 4 | [Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7)](https://tipitakapali.org/book/s0512a.att) |
+| `s0512m.mul` | Cariyāpiṭakapāḷi | Khuddakanikāye | mūla | 3 | [Cariyāpiṭakapāḷi](https://tipitakapali.org/book/s0512m.mul) |
+| `s0513a1.att` | Jātaka-Aṭṭhakathā-1 | Khuddakanikāye | aṭṭhakathā | 2 | [Jātaka-Aṭṭhakathā-1](https://tipitakapali.org/book/s0513a1.att) |
+| `s0513a2.att` | Jātaka-Aṭṭhakathā-2 |  | aṭṭhakathā | 2 | [Jātaka-Aṭṭhakathā-2](https://tipitakapali.org/book/s0513a2.att) |
+| `s0513a3.att` | Jātaka-Aṭṭhakathā-3 | Khuddakanikāye | aṭṭhakathā | 6 | [Jātaka-Aṭṭhakathā-3](https://tipitakapali.org/book/s0513a3.att) |
+| `s0513a4.att` | Jātaka-Aṭṭhakathā-4 | Khuddakanikāye | aṭṭhakathā | 7 | [Jātaka-Aṭṭhakathā-4](https://tipitakapali.org/book/s0513a4.att) |
+| `s0513m.mul` | Jātakapāḷi-1 | Khuddakanikāye | mūla | 16 | [Jātakapāḷi-1](https://tipitakapali.org/book/s0513m.mul) |
+| `s0514a1.att` | Jātaka-Aṭṭhakathā-5 |  | aṭṭhakathā | 5 | [Jātaka-Aṭṭhakathā-5](https://tipitakapali.org/book/s0514a1.att) |
+| `s0514a2.att` | Jātaka-Aṭṭhakathā-6 | Khuddakanikāye | aṭṭhakathā | 1 | [Jātaka-Aṭṭhakathā-6](https://tipitakapali.org/book/s0514a2.att) |
+| `s0514a3.att` | Jātaka-Aṭṭhakathā-7 | Khuddakanikāye | aṭṭhakathā | 1 | [Jātaka-Aṭṭhakathā-7](https://tipitakapali.org/book/s0514a3.att) |
+| `s0514m.mul` | Jātakapāḷi-2 | Khuddakanikāye | mūla | 6 | [Jātakapāḷi-2](https://tipitakapali.org/book/s0514m.mul) |
+| `s0515a.att` | Mahāniddesa-Aṭṭhakathā (Saddhammappajotikā 1) | Khuddakanikāye | aṭṭhakathā | 17 | [Mahāniddesa-Aṭṭhakathā (Saddhammappajotikā 1)](https://tipitakapali.org/book/s0515a.att) |
+| `s0515m.mul` | Mahāniddesapāḷi | Khuddakanikāye | mūla | 16 | [Mahāniddesapāḷi](https://tipitakapali.org/book/s0515m.mul) |
+| `s0516a.att` | Cūḷaniddesa-Aṭṭhakathā (Saddhammappajotikā 2) | Khuddakanikāye | aṭṭhakathā | 2 | [Cūḷaniddesa-Aṭṭhakathā (Saddhammappajotikā 2)](https://tipitakapali.org/book/s0516a.att) |
+| `s0516m.mul` | Cūḷaniddesapāḷi | Khuddakanikāye | mūla | 3 | [Cūḷaniddesapāḷi](https://tipitakapali.org/book/s0516m.mul) |
+| `s0517a.att` | Paṭisambhidāmagga-Aṭṭhakathā (Saddhammappakāsinī) | Khuddakanikāye | aṭṭhakathā | 24 | [Paṭisambhidāmagga-Aṭṭhakathā (Saddhammappakāsinī)](https://tipitakapali.org/book/s0517a.att) |
+| `s0517m.mul` | Paṭisambhidāmaggapāḷi | Khuddakanikāye | mūla | 3 | [Paṭisambhidāmaggapāḷi](https://tipitakapali.org/book/s0517m.mul) |
+| `s0518m.nrf` | Milindapañhapāḷi | Khuddakanikāye | añña | 5 | [Milindapañhapāḷi](https://tipitakapali.org/book/s0518m.nrf) |
+| `s0519a.att` | Nettippakaraṇa-Aṭṭhakathā | Khuddakanikāye | aṭṭhakathā | 7 | [Nettippakaraṇa-Aṭṭhakathā](https://tipitakapali.org/book/s0519a.att) |
+| `s0519m.mul` | Nettippakaraṇapāḷi | Khuddakanikāye | mūla | 6 | [Nettippakaraṇapāḷi](https://tipitakapali.org/book/s0519m.mul) |
+| `s0519t.tik` | Nettippakaraṇa-Ṭīkā | Khuddakanikāye | ṭīkā | 7 | [Nettippakaraṇa-Ṭīkā](https://tipitakapali.org/book/s0519t.tik) |
+| `s0520m.nrf` | Peṭakopadesapāḷi | Khuddakanikāye | añña | 8 | [Peṭakopadesapāḷi](https://tipitakapali.org/book/s0520m.nrf) |
+| `vin01a.att` | Pārājikakaṇḍa-Aṭṭhakathā | Vinayapiṭake | aṭṭhakathā | 6 | [Pārājikakaṇḍa-Aṭṭhakathā](https://tipitakapali.org/book/vin01a.att) |
+| `vin01m.mul` | Pārājikapāḷi | Vinayapiṭake | mūla | 5 | [Pārājikapāḷi](https://tipitakapali.org/book/vin01m.mul) |
+| `vin01t1.tik` | Sāratthadīpanī-Ṭīkā-1 | Vinayapiṭake | ṭīkā | 2 | [Sāratthadīpanī-Ṭīkā-1](https://tipitakapali.org/book/vin01t1.tik) |
+| `vin01t2.tik` | Sāratthadīpanī-Ṭīkā-2 | Vinayapiṭake | ṭīkā | 4 | [Sāratthadīpanī-Ṭīkā-2](https://tipitakapali.org/book/vin01t2.tik) |
+| `vin02a1.att` | Pācittiya-Aṭṭhakathā | Vinayapiṭake | aṭṭhakathā | 9 | [Pācittiya-Aṭṭhakathā](https://tipitakapali.org/book/vin02a1.att) |
+| `vin02a2.att` | Mahāvagga-Aṭṭhakathā | Vinayapiṭake | aṭṭhakathā | 10 | [Mahāvagga-Aṭṭhakathā](https://tipitakapali.org/book/vin02a2.att) |
+| `vin02a3.att` | Cūḷavagga-Aṭṭhakathā | Vinayapiṭake | aṭṭhakathā | 12 | [Cūḷavagga-Aṭṭhakathā](https://tipitakapali.org/book/vin02a3.att) |
+| `vin02a4.att` | Parivāra-Aṭṭhakathā | Vinayapiṭake | aṭṭhakathā | 18 | [Parivāra-Aṭṭhakathā](https://tipitakapali.org/book/vin02a4.att) |
+| `vin02m1.mul` | Pācittiyapāḷi | Vinayapiṭake | mūla | 11 | [Pācittiyapāḷi](https://tipitakapali.org/book/vin02m1.mul) |
+| `vin02m2.mul` | Mahāvaggapāḷi | Vinayapiṭake | mūla | 10 | [Mahāvaggapāḷi](https://tipitakapali.org/book/vin02m2.mul) |
+| `vin02m3.mul` | Cūḷavaggapāḷi | Vinayapiṭake | mūla | 12 | [Cūḷavaggapāḷi](https://tipitakapali.org/book/vin02m3.mul) |
+| `vin02m4.mul` | Parivārapāḷi | Vinayapiṭake | mūla | 18 | [Parivārapāḷi](https://tipitakapali.org/book/vin02m4.mul) |
+| `vin02t.tik` | Sāratthadīpanī-Ṭīkā-3 | Vinayapiṭake | ṭīkā | 48 | [Sāratthadīpanī-Ṭīkā-3](https://tipitakapali.org/book/vin02t.tik) |
+| `vin04t.nrf` | Dvemātikāpāḷi - Kaṅkhāvitaraṇī-Aṭṭhakathā |  | añña | 17 | [Dvemātikāpāḷi - Kaṅkhāvitaraṇī-Aṭṭhakathā](https://tipitakapali.org/book/vin04t.nrf) |
+| `vin05t.nrf` | Vinayasaṅgaha-Aṭṭhakathā | Vinayapiṭake | añña | 35 | [Vinayasaṅgaha-Aṭṭhakathā](https://tipitakapali.org/book/vin05t.nrf) |
+| `vin06t.nrf` | Vajirabuddhi-Ṭīkā | Vinayapiṭake | añña | 6 | [Vajirabuddhi-Ṭīkā](https://tipitakapali.org/book/vin06t.nrf) |
+| `vin07t.nrf` | Vimativinodanī-Ṭīkā | Vinayapiṭake | añña | 57 | [Vimativinodanī-Ṭīkā](https://tipitakapali.org/book/vin07t.nrf) |
+| `vin08t.nrf` | Vinayālaṅkāra-Ṭīkā | Vinayapiṭake | añña | 36 | [Vinayālaṅkāra-Ṭīkā](https://tipitakapali.org/book/vin08t.nrf) |
+| `vin09t.nrf` | Kaṅkhāvitaraṇīpurāṇa-Ṭīkā |  | añña | 25 | [Kaṅkhāvitaraṇīpurāṇa-Ṭīkā](https://tipitakapali.org/book/vin09t.nrf) |
+| `vin10t.nrf` | Vinayavinicchaya-Uttaravinicchaya |  | añña | 8 | [Vinayavinicchaya-Uttaravinicchaya](https://tipitakapali.org/book/vin10t.nrf) |
+| `vin11t.nrf` | Vinayavinicchaya-Ṭīkā | Vinayapiṭake | añña | 48 | [Vinayavinicchaya-Ṭīkā](https://tipitakapali.org/book/vin11t.nrf) |
+| `vin12t.nrf` | Pācityādiyojanāpāḷi | Vinayapiṭake | añña | 5 | [Pācityādiyojanāpāḷi](https://tipitakapali.org/book/vin12t.nrf) |
+| `vin13t.nrf` | Khuddasikkhā-Mūlasikkhā |  | añña | 5 | [Khuddasikkhā-Mūlasikkhā](https://tipitakapali.org/book/vin13t.nrf) |
+
+## Complete REST & JSON API Reference
+
+### 1. Navigation Tree Hierarchy
+- Endpoint: `GET https://tipitakapali.org/api/tree`
+- Description: Full hierarchical navigation JSON containing Nikayas, Vaggas, and book nodes.
+
+### 2. Books Catalog
+- Endpoint: `GET https://tipitakapali.org/api/books`
+- Description: Returns summary metadata, chapter counts, and Piṭaka classification for all 217 books.
+
+### 3. Book Metadata & Content
+- Endpoint: `GET https://tipitakapali.org/api/book/{book_code}`
+- Example: `GET /api/book/s0101m.mul`
+- Description: Returns table of contents, paragraph mapping, and initial chapter content.
+
+### 4. Chapter Content
+- Endpoint: `GET https://tipitakapali.org/api/book/{book_code}/chapter/{chapter_index}`
+- Example: `GET /api/book/s0101m.mul/chapter/1`
+- Description: Returns pure HTML content of the requested chapter.
+
+### 5. Full-Text Search (FTS5)
+- Endpoint: `GET https://tipitakapali.org/api/search?q={query}&pitaka={all|vinaya|sutta|abhidhamma}&mat={all|mula|attha|tika}&limit=50`
+- Example: `GET /api/search?q=anatta&pitaka=sutta`
+- Description: Ultra-fast full-text search across 520,000+ canonical paragraphs.
+
+### 6. Pāḷi Dictionary Lookup
+- Endpoint: `GET https://tipitakapali.org/api/dict/lookup?w={pali_word}&dict={all|dpd|pts|abd|psd}`
+- Example: `GET /api/dict/lookup?w=dhamma`
+- Description: Comprehensive lexical lookup across Digital Pāḷi Dictionary (DPD), PTS Pali-English Dictionary, Abhidhānappadīpikā, etc.

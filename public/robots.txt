@@ -1,0 +1,50 @@
+# robots.txt for Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
+# =========================================================
+
+# 1. General Search Engine Crawlers (Google, Bing, Yandex, Baidu, DuckDuckGo)
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+User-agent: YandexBot
+User-agent: Sogou
+Allow: /
+Allow: /_next/
+Allow: /api/
+Allow: /book/
+Allow: /chapter/
+Disallow: /api/search*
+
+# 2. Leading AI Crawlers, Search Agents & LLM Scrapers
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: PerplexityBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Amazonbot
+User-agent: Bytespider
+User-agent: CCBot
+User-agent: Diffbot
+User-agent: FacebookBot
+User-agent: cohere-ai
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /api/
+Allow: /book/
+Allow: /chapter/
+
+# 3. Default for all other user agents
+User-agent: *
+Allow: /
+Allow: /_next/
+Allow: /api/
+Disallow: /api/search*
+
+# 4. Sitemaps and AI Entry Points
+Sitemap: https://tipitakapali.org/sitemap.xml
+Host: tipitakapali.org

@@ -301,10 +301,10 @@ def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     functions_api_dir.mkdir(parents=True, exist_ok=True)
     functions_dict_dir.mkdir(parents=True, exist_ok=True)
 
-    # If raw IP is provided, default to domain https://api.cuong.eu.org for Cloudflare Worker compliance
+    # If raw IP is provided, default to domain https://api.tipitakapali.org for Cloudflare Worker compliance
     configured_vps = vps_url.rstrip('/')
     if '85.190.97.158' in configured_vps:
-        fallback_vps = 'https://api.cuong.eu.org'
+        fallback_vps = 'https://api.tipitakapali.org'
     else:
         fallback_vps = configured_vps
 
@@ -690,6 +690,13 @@ def main():
         help="Public URL of VPS backend for dynamic search/dictionary queries (default: http://85.190.97.158)"
     )
     parser.add_argument(
+        "--site-url",
+        default=os.environ.get("SITE_URL", "https://tipitakapali.org"),
+        help="Canonical public site URL for sitemap and SEO (default: https://tipitakapali.org)"
+    )
+
+
+    parser.add_argument(
         "--skip-build",
         action="store_true",
         help="Skip 'npm run build' and only export static database JSON"
@@ -780,7 +787,59 @@ def main():
     generate_cloudflare_redirects(dist_dir)
     generate_cloudflare_headers(dist_dir)
 
-    # 6. Synchronize with Git repository
+    # 6. Generate SEO & AI Agent Metadata (sitemap.xml, robots.txt, llms.txt, llms-full.txt, site.jsonld)
+    try:
+        from generate_seo_ai_metadata import (
+            generate_sitemap_xml,
+            generate_robots_txt,
+            generate_llms_txt,
+            generate_llms_full_txt,
+            generate_schema_jsonld,
+        )
+
+        log_info(f"Generating SEO & AI Agent metadata files for {args.site_url}...")
+        conn_seo = sqlite3.connect(str(db_path))
+        conn_seo.row_factory = sqlite3.Row
+        cur_seo = conn_seo.cursor()
+        cur_seo.execute("SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id")
+        seo_books = [dict(r) for r in cur_seo.fetchall()]
+        cur_seo.execute("SELECT book_code, chapter_index, title FROM chapters ORDER BY book_code, chapter_index")
+        seo_chapters = [dict(r) for r in cur_seo.fetchall()]
+        conn_seo.close()
+
+        seo_catalog = {}
+        if paths['catalog_path'].exists():
+            try:
+                with open(paths['catalog_path'], 'r', encoding='utf-8') as f:
+                    seo_catalog = json.load(f)
+            except Exception:
+                pass
+
+        s_url = args.site_url.rstrip('/')
+        sitemap_content = generate_sitemap_xml(seo_books, seo_chapters, s_url)
+        robots_content = generate_robots_txt(s_url)
+        llms_content = generate_llms_txt(s_url, len(seo_books), len(seo_chapters))
+        llms_full_content = generate_llms_full_txt(s_url, seo_books, seo_catalog)
+        jsonld_content = generate_schema_jsonld(s_url, seo_books)
+
+        for target in [dist_dir, web_app_dir / 'public', git_repo_dir]:
+            if target.exists():
+                with open(target / 'sitemap.xml', 'w', encoding='utf-8') as f:
+                    f.write(sitemap_content)
+                with open(target / 'robots.txt', 'w', encoding='utf-8') as f:
+                    f.write(robots_content)
+                with open(target / 'llms.txt', 'w', encoding='utf-8') as f:
+                    f.write(llms_content)
+                with open(target / 'llms-full.txt', 'w', encoding='utf-8') as f:
+                    f.write(llms_full_content)
+                with open(target / 'site.jsonld', 'w', encoding='utf-8') as f:
+                    f.write(jsonld_content)
+
+        log_success(f"Generated sitemap.xml ({len(seo_books) + len(seo_chapters) + 1:,} URLs), robots.txt, llms.txt, llms-full.txt, site.jsonld")
+    except Exception as e:
+        log_warn(f"SEO/AI metadata generation note: {e}")
+
+    # 7. Synchronize with Git repository
     sync_to_git_repo(
         dist_dir=dist_dir,
         git_repo_dir=git_repo_dir,
@@ -789,9 +848,10 @@ def main():
         auto_push=args.git_push
     )
 
-    # 7. Display complete summary
+    # 8. Display complete summary
     print_summary(dist_dir, git_repo_dir, args.vps_url)
 
 if __name__ == '__main__':
     main()
+
 
