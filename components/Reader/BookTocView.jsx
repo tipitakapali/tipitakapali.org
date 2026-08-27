@@ -69,33 +69,30 @@ export default function BookTocView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] overflow-hidden">
-      {/* Header */}
-      <div className="shrink-0 px-4 sm:px-6 py-4 sm:py-6 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+      {/* Header — compact 1-line to maximize reading space */}
+      <div className="shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
         <div className="max-w-3xl mx-auto w-full">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-light)] border border-[var(--accent-border)] flex items-center justify-center shrink-0">
-              <BookOpen size={20} className="text-[var(--accent)]" />
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] border border-[var(--accent-border)] flex items-center justify-center shrink-0">
+              <BookOpen size={14} className="text-[var(--accent)]" />
             </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-xl font-bold text-[var(--text-primary)] leading-tight truncate">
-                {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
-              </h1>
-              {(activeTab.nikaya || activeTab.category) && (
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${currentPitaka ? `toc-reading-${currentPitaka}` : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)]'}`}>
-                    <span className={`w-2 h-2 rounded-full ${currentPitaka ? `toc-bullet-dot toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
-                    {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
-                  </span>
-                  <span>
-                    {activeTab.chapter_count ? `• ${activeTab.chapter_count} chapters` : ''}
-                    {tocList.length ? ` • ${tocList.length} sections` : ''}
-                  </span>
-                </p>
-              )}
-            </div>
+            <h1 className="text-sm sm:text-[15px] font-bold text-[var(--text-primary)] leading-none truncate shrink min-w-0">
+              {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
+            </h1>
+            {(activeTab.nikaya || activeTab.category) && (
+              <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${currentPitaka ? `toc-reading-${currentPitaka}` : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)]'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${currentPitaka ? `toc-bullet-dot toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
+                <span className="truncate max-w-[14ch]">{convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}</span>
+              </span>
+            )}
+            <span className="text-xs text-[var(--text-muted)] truncate shrink-0 hidden md:inline">
+              {activeTab.chapter_count ? `• ${activeTab.chapter_count} ch` : ''}
+              {tocList.length ? ` • ${tocList.length} sec` : ''}
+            </span>
+            <span className="text-xs text-[var(--text-muted)] truncate shrink-0 md:hidden">
+              {activeTab.chapter_count || tocList.length ? `• ${activeTab.chapter_count || tocList.length} sec` : ''}
+            </span>
           </div>
-
-
         </div>
       </div>
 

@@ -75,7 +75,13 @@ export function DictionaryProvider({ children }) {
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
   const [activeDictTab, setActiveDictTab] = useState('dpd');
-  const [dockMode, setDockModeState] = useState('modal'); // 'modal' | 'left' | 'side' | 'right'
+  const [dockMode, setDockModeState] = useState(() => {
+    // Default: Right Dock on desktop, Center Modal on mobile (small screen)
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? 'modal' : 'side';
+    }
+    return 'side';
+  }); // 'modal' | 'left' | 'side' | 'right'
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1.0);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
   const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
@@ -108,6 +114,10 @@ export function DictionaryProvider({ children }) {
         setDockModeState(savedDock);
       } else if (savedDock === 'top' || savedDock === 'bottom') {
         setDockModeState('side');
+      } else if (!savedDock) {
+        // No saved preference: apply responsive default (Right Dock on desktop, Center Modal on mobile)
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        setDockModeState(isMobile ? 'modal' : 'side');
       }
       const savedFont = localStorage.getItem(STORAGE_KEYS.FONT_SIZE);
       if (savedFont) {
