@@ -1740,8 +1740,8 @@ mark.search-hit {
 /* Bottom Footer */
 footer.app-footer {
   height: 48px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center !important;

@@ -45,7 +45,7 @@ export default function Footer() {
 
   return (
     <>
-      <footer className={`app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-[var(--bg-secondary)] border-t border-[var(--border-color)] px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border ${
+      <footer className={`app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-transparent px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border ${
         isHidden ? 'hidden-footer' : ''
       }`}>
         {/* Navigation Buttons Group */}
