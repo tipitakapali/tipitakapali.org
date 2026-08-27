@@ -768,7 +768,7 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Streamlined Dictionary Header & Search Bar */}
       {/* ========================================================= */}
-      <div className={`dict-header-bar bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none ${
+      <div className={`dict-header-bar bg-[var(--bg-secondary)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none ${
         dockMode === 'modal' ? 'pt-2 sm:pt-2.5 px-2 sm:px-2.5 pb-0' : 'pt-0 pb-0 px-2 sm:px-2.5'
       }`}>
         {/* Previous / Next Lookup History Controls */}
@@ -852,7 +852,7 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Dictionary Switcher Tabs Bar */}
       {/* ========================================================= */}
-      <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
         {DICT_TABS.map((tab) => {
           const isActive = activeDictTab === tab.id;
           const hasMatches = tab.count > 0;
