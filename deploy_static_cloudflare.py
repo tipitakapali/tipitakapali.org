@@ -587,9 +587,13 @@ def generate_cloudflare_headers(dist_dir: Path):
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
 
-# Long-term Immutable Caching for Next.js Static JS/CSS Assets (1 Year)
+# Long-term Immutable Caching for Next.js Static JS/CSS Assets & Fonts (1 Year)
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
 
 /icons/*
   Cache-Control: public, max-age=2592000, immutable
@@ -602,6 +606,7 @@ def generate_cloudflare_headers(dist_dir: Path):
 /*.json
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
+
 """
     with open(headers_file, 'w', encoding='utf-8') as f:
         f.write(content)
