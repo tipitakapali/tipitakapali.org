@@ -345,11 +345,11 @@ export default function SearchModal() {
 
           {/* Piṭaka Filter Dropdown */}
           <div className="search-filter-item">
-            <span className="search-filter-label">Piṭaka:</span>
+            <span className={`search-filter-label ${pitakaFilter !== 'all' ? '!text-red-600 font-bold' : ''}`}>Piṭaka:</span>
             <select
               value={pitakaFilter}
               onChange={(e) => handleFilterChange('pitaka', e.target.value)}
-              className="search-select-dropdown"
+              className={`search-select-dropdown ${pitakaFilter !== 'all' ? '!border-red-500 !text-red-600 !bg-red-50 font-semibold dark:!bg-red-950/30 dark:!border-red-400 dark:!text-red-400' : ''}`}
             >
               {PITAKA_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -361,11 +361,11 @@ export default function SearchModal() {
 
           {/* Word Distance Dropdown */}
           <div className="search-filter-item">
-            <span className="search-filter-label">Distance:</span>
+            <span className={`search-filter-label ${distanceFilter !== 'any' ? '!text-red-600 font-bold' : ''}`}>Distance:</span>
             <select
               value={distanceFilter}
               onChange={(e) => handleFilterChange('distance', e.target.value)}
-              className="search-select-dropdown"
+              className={`search-select-dropdown ${distanceFilter !== 'any' ? '!border-red-500 !text-red-600 !bg-red-50 font-semibold dark:!bg-red-950/30 dark:!border-red-400 dark:!text-red-400' : ''}`}
             >
               {DISTANCE_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>

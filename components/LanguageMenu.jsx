@@ -1,16 +1,21 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Languages, ChevronDown, Check, Globe, Sparkles } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Languages, ChevronDown, Check, Globe, Sparkles, ChevronUp, Rows3, Columns2 } from 'lucide-react';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 
 const TRANSLATIONS = [
-  { id: 'english', label: 'English Translation', flag: '🇬🇧', desc: 'Bhikkhu Bodhi & PTS editions' },
-  { id: 'vietnamese', label: 'Bản dịch Tiếng Việt', flag: '🇻🇳', desc: 'HT. Thích Minh Châu' },
-  { id: 'myanmar', label: 'Myanmar Translation', flag: '🇲🇲', desc: 'Pitaka translation committee' },
-  { id: 'thai', label: 'Thai Translation', flag: '🇹🇭', desc: 'Mahachulalongkornrajavidyalaya' },
-  { id: 'sinhala', label: 'Sinhala Translation', flag: '🇱🇰', desc: 'Buddha Jayanthi Tipitaka' },
+  { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • -not available-' },
+  { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -not available-' },
+  { id: 'vietnamese', label: 'Bản dịch Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -not available-' },
+  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -not available-' },
+  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -not available-' },
+  { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'German Translation • -not available-' },
+  { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: 'Japanese Translation • -not available-' },
+  { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'Khmer Translation • -not available-' },
+  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -not available-' },
+  { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Russian Translation • -not available-' },
 ];
 
 export default function LanguageMenu() {
@@ -31,6 +36,24 @@ export default function LanguageMenu() {
   }, [isOpen]);
 
   const activeTranslationCount = Object.values(settings.translations || {}).filter(Boolean).length;
+  const translationOrder = useMemo(() => {
+    const order = settings.translationOrder;
+    if (Array.isArray(order) && order.length > 0) {
+      // Merge with TRANSLATIONS to handle added/removed ids gracefully
+      const knownIds = TRANSLATIONS.map((t) => t.id);
+      const filtered = order.filter((id) => knownIds.includes(id));
+      for (const id of knownIds) if (!filtered.includes(id)) filtered.push(id);
+      return filtered;
+    }
+    return TRANSLATIONS.map((t) => t.id);
+  }, [settings.translationOrder]);
+
+  const orderedTranslations = useMemo(() => {
+    const map = new Map(TRANSLATIONS.map((t) => [t.id, t]));
+    return translationOrder.map((id) => map.get(id)).filter(Boolean);
+  }, [translationOrder]);
+
+  const translationDisplayMode = settings.translationDisplayMode || 'stack';
 
   const handleToggleTranslation = (tId) => {
     const current = settings.translations || {};
@@ -41,6 +64,29 @@ export default function LanguageMenu() {
     updateSetting('translations', updated);
   };
 
+  const handleMoveTranslation = (dictId, direction) => {
+    const idx = translationOrder.indexOf(dictId);
+    if (idx === -1) return;
+    const next = [...translationOrder];
+    if (direction === 'up' && idx > 0) {
+      const tmp = next[idx - 1];
+      next[idx - 1] = next[idx];
+      next[idx] = tmp;
+    } else if (direction === 'down' && idx < next.length - 1) {
+      const tmp = next[idx + 1];
+      next[idx + 1] = next[idx];
+      next[idx] = tmp;
+    } else {
+      return;
+    }
+    updateSetting('translationOrder', next);
+  };
+
+  const handleDisplayModeChange = (mode) => {
+    if (!['stack', 'side'].includes(mode)) return;
+    updateSetting('translationDisplayMode', mode);
+  };
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -48,8 +94,8 @@ export default function LanguageMenu() {
         className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
           isOpen ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
         }`}
-        title="Pali script and translation Language"
-        aria-label="Pali script and translation Language"
+	  title="Pāḷi script and translation Language"
+	  aria-label="Pāḷi  script and translation Language"
       >
         <Languages size={14} className="text-[var(--accent)]" />
         <span className="hidden sm:inline">Language</span>
@@ -61,23 +107,23 @@ export default function LanguageMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-72 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-[100] overflow-hidden text-[var(--text-primary)] animate-fade-in">
+        <div className="absolute right-0 mt-1.5 w-80 sm:w-[340px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl z-[100] overflow-hidden text-[var(--text-primary)] animate-fade-in flex flex-col max-h-[85vh]">
           {/* Header */}
-          <div className="px-3.5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+          <div className="px-3.5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--accent)]">
               <Globe size={14} />
-              <span>Pali script and translation Language</span>
+	      <span>Pāḷi script and translation Language</span>
             </div>
           </div>
 
-          <div className="p-3.5 space-y-4">
+          <div className="p-3.5 space-y-4 overflow-y-auto flex-1 min-h-0">
             {/* Section 1: Pali Script as a Select Dropdown */}
             <div>
               <label
                 htmlFor="paliScriptSelect"
                 className="block text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5"
               >
-                Pali script (17 scripts)
+	      Pāḷi script (17 scripts)
               </label>
               <select
                 id="paliScriptSelect"
@@ -96,11 +142,57 @@ export default function LanguageMenu() {
               </select>
             </div>
 
-            {/* Section 2: Multi-Translation Layers */}
+            {/* Section 2: Translation Display Mode */}
+            <div className="pt-3 border-t border-[var(--border-color)]">
+              <span className="block text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                Translation display
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDisplayModeChange('stack')}
+                  className={`p-2.5 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    translationDisplayMode === 'stack'
+                      ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                      : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-bold">
+                    <Rows3 size={14} />
+                    Stack
+                  </span>
+                  <span className={`text-[10px] leading-tight ${translationDisplayMode === 'stack' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                    Translation below Pāḷi (vertical)
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisplayModeChange('side')}
+                  className={`p-2.5 rounded-lg border text-left transition flex flex-col gap-1 cursor-pointer ${
+                    translationDisplayMode === 'side'
+                      ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                      : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-bold">
+                    <Columns2 size={14} />
+                    Side by side
+                  </span>
+                  <span className={`text-[10px] leading-tight ${translationDisplayMode === 'side' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                    Pāḷi | Translation (horizontal)
+                  </span>
+                </button>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-snug">
+                Pali translation rendering will follow this layout when available.
+              </p>
+            </div>
+
+            {/* Section 3: Multi-Translation Layers (movable order) */}
             <div className="pt-3 border-t border-[var(--border-color)]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  AI translation
+                  Translation
                 </span>
                 <span className="text-[10px] text-[var(--accent)] font-semibold flex items-center gap-1">
                   <Sparkles size={10} />
@@ -108,31 +200,62 @@ export default function LanguageMenu() {
                 </span>
               </div>
 
-              <div className="space-y-1">
-                {TRANSLATIONS.map((trans) => {
+              <div className="space-y-1.5">
+                {orderedTranslations.map((trans, idx) => {
                   const isChecked = Boolean(settings.translations?.[trans.id]);
+                  const isFirst = idx === 0;
+                  const isLast = idx === orderedTranslations.length - 1;
                   return (
-                    <label
+                    <div
                       key={trans.id}
-                      className="px-2.5 py-1.5 rounded-lg border border-transparent hover:bg-[var(--bg-secondary)] cursor-pointer flex items-center justify-between transition select-none"
+                      className={`px-2 py-1.5 rounded-lg border flex items-center justify-between gap-2 transition select-none ${
+                        isChecked
+                          ? 'bg-[var(--bg-card)] border-[var(--border-color)]'
+                          : 'bg-[var(--bg-secondary)]/40 border-[var(--border-color)]/50 opacity-80'
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{trans.flag}</span>
-                        <div>
-                          <div className="text-xs font-semibold">{trans.label}</div>
-                          <div className="text-[10px] text-[var(--text-muted)]">{trans.desc}</div>
+                      <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
+                        <span className="text-sm shrink-0">{trans.flag}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold truncate">{trans.label}</div>
+                          <div className="text-[10px] text-[var(--text-muted)] truncate">{trans.desc}</div>
                         </div>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleTranslation(trans.id)}
+                          className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer shrink-0"
+                        />
+                      </label>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveTranslation(trans.id, 'up')}
+                          disabled={isFirst}
+                          className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--border-color)]"
+                          title="Move up"
+                          aria-label="Move translation up"
+                        >
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveTranslation(trans.id, 'down')}
+                          disabled={isLast}
+                          className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--border-color)]"
+                          title="Move down"
+                          aria-label="Move translation down"
+                        >
+                          <ChevronDown size={13} />
+                        </button>
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleTranslation(trans.id)}
-                        className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer"
-                      />
-                    </label>
+                    </div>
                   );
                 })}
               </div>
+              <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
+                Use ▲ ▼ to change order — order controls display priority when multiple translations are enabled.
+              </p>
             </div>
           </div>
         </div>

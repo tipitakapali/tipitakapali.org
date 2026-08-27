@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+const DEFAULT_TRANSLATION_ORDER = ['english', 'myanmar', 'vietnamese', 'sinhala', 'thai', 'german', 'japanese', 'khmer', 'korean', 'russian'];
+
 const DEFAULT_SETTINGS = {
   theme: 'light',
   accentColor: 'burgundy',
@@ -28,7 +30,14 @@ const DEFAULT_SETTINGS = {
     myanmar: false,
     thai: false,
     sinhala: false,
+    german: false,
+    japanese: false,
+    khmer: false,
+    russian: false,
+    korean: false,
   },
+  translationOrder: [...DEFAULT_TRANSLATION_ORDER],
+  translationDisplayMode: 'stack', // 'stack' | 'side'
 };
 
 const ThemeSettingsContext = createContext();
@@ -43,7 +52,29 @@ export function ThemeSettingsProvider({ children }) {
     try {
       const saved = localStorage.getItem('tipitaka_advanced_settings');
       if (saved) {
-        setSettingsState((prev) => ({ ...prev, ...JSON.parse(saved) }));
+        const parsed = JSON.parse(saved);
+        // Merge and migrate translationOrder / translationDisplayMode for older saves
+        setSettingsState((prev) => {
+          const merged = { ...prev, ...parsed };
+          // Ensure translationOrder exists and contains all known ids
+          if (!Array.isArray(merged.translationOrder) || merged.translationOrder.length === 0) {
+            merged.translationOrder = [...DEFAULT_TRANSLATION_ORDER];
+          } else {
+            const seen = new Set(merged.translationOrder);
+            for (const id of DEFAULT_TRANSLATION_ORDER) {
+              if (!seen.has(id)) merged.translationOrder.push(id);
+            }
+            // Filter out stale ids not in default list (keep custom order but drop unknowns)
+            merged.translationOrder = merged.translationOrder.filter((id) => DEFAULT_TRANSLATION_ORDER.includes(id));
+            if (merged.translationOrder.length === 0) merged.translationOrder = [...DEFAULT_TRANSLATION_ORDER];
+          }
+          if (!['stack', 'side'].includes(merged.translationDisplayMode)) {
+            merged.translationDisplayMode = 'stack';
+          }
+          // Ensure translations object has all keys
+          merged.translations = { ...prev.translations, ...(parsed.translations || {}) };
+          return merged;
+        });
       }
     } catch (e) {
       console.error('Error loading settings from localStorage:', e);
@@ -99,6 +130,7 @@ export function ThemeSettingsProvider({ children }) {
     root.setAttribute('data-font', settings.fontFamily);
     root.setAttribute('data-density', settings.treeDensity);
     root.setAttribute('data-script', settings.paliScript || 'roman');
+    root.setAttribute('data-translation-mode', settings.translationDisplayMode || 'stack');
 
     root.style.setProperty('--font-size-base', `${settings.fontSize}px`);
     root.style.setProperty('--line-height-base', `${settings.lineHeight}`);
