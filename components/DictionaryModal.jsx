@@ -768,7 +768,9 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Streamlined Dictionary Header & Search Bar */}
       {/* ========================================================= */}
-      <div className="dict-header-bar p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+      <div className={`dict-header-bar bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none ${
+        dockMode === 'modal' ? 'pt-2 sm:pt-2.5 px-2 sm:px-2.5 pb-0' : 'pt-0 pb-0 px-2 sm:px-2.5'
+      }`}>
         {/* Previous / Next Lookup History Controls */}
         <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-0.5 shrink-0 shadow-2xs">
           <button
