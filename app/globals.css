@@ -1778,15 +1778,30 @@ footer.app-footer.hidden-footer,
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   font-size: 11.5px;
+  line-height: 1;
+  height: 28px;
   color: var(--text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 5px;
   transition: all 0.12s ease;
   flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.footer-nav-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.footer-nav-btn span {
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 .footer-nav-btn:hover:not(:disabled) {

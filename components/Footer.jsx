@@ -53,12 +53,12 @@ export default function Footer() {
           {/* Text Size Button */}
           <button
             onClick={() => setIsFontSizeOpen(true)}
-            className={`footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0 ${
+            className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
               isFontSizeOpen ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
             }`}
             title="Adjust Text Size"
           >
-            <Type size={13} className="text-[var(--accent)]" />
+            <Type size={13} className="text-[var(--accent)] shrink-0" />
             <span>Size</span>
           </button>
 
@@ -66,13 +66,13 @@ export default function Footer() {
           <button
             onClick={() => setIsMatModalOpen(true)}
             disabled={!activeTab}
-            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Jump to Connected Mūla, Aṭṭhakathā, Ṭīkā"
           >
-            <Layers size={13} className="text-[var(--accent)]" />
+            <Layers size={13} className="text-[var(--accent)] shrink-0" />
             <span>MAT</span>
             {activeParaNum && (
-              <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold">
+              <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold leading-none inline-flex items-center">
                 {activeParaNum}
               </span>
             )}
@@ -82,10 +82,10 @@ export default function Footer() {
           <button
             onClick={() => openGoToModal('para')}
             disabled={!activeTab}
-            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Go to Paragraph or Page Number"
           >
-            <Navigation size={13} className="text-[var(--accent)]" />
+            <Navigation size={13} className="text-[var(--accent)] shrink-0" />
             <span>Go</span>
           </button>
 
@@ -93,10 +93,10 @@ export default function Footer() {
           <button
             onClick={() => setIsTocOpen(true)}
             disabled={!activeTab}
-            className="footer-nav-btn flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Open Book Table of Contents"
           >
-            <ListTree size={14} className="text-[var(--accent)]" />
+            <ListTree size={14} className="text-[var(--accent)] shrink-0" />
             <span>Toc</span>
           </button>
         </div>

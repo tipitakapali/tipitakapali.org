@@ -211,12 +211,16 @@ export function MainAppContent({ params: rawParams }) {
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <Header />
       <BookTabsBar />
-      <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative w-full max-w-full">
         <NavigationTree />
-        <ReaderView />
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-full" style={{ order: 10 }}>
+          <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
+            <ReaderView />
+          </div>
+          <Footer />
+        </div>
         <DictionaryModal />
       </div>
-      <Footer />
       <SearchModal />
       <SettingsModal />
     </div>
