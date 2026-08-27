@@ -1,5 +1,4 @@
 
-server_api/db/
 
 *.db-*
 *.db.bak
