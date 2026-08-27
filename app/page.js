@@ -210,10 +210,10 @@ export function MainAppContent({ params: rawParams }) {
   return (
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <Header />
-      <BookTabsBar />
       <div className="flex flex-1 min-h-0 overflow-hidden relative w-full max-w-full">
         <NavigationTree />
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-full" style={{ order: 10 }}>
+          <BookTabsBar />
           <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
             <ReaderView />
           </div>
