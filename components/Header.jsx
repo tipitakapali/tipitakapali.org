@@ -113,13 +113,10 @@ export default function Header() {
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
-            placeholder="Full text Search (Press /)..."
+            placeholder="Full text Search (Press / to begin)"
             readOnly
             className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full py-1.5 pl-8 pr-9 text-xs text-[var(--text-primary)] cursor-pointer outline-none transition focus:border-[var(--accent)]"
           />
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)]">
-            /
-          </span>
         </div>
       </div>
 
