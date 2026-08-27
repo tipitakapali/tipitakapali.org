@@ -119,7 +119,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
         <div className="px-4 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between text-xs">
           <div className="truncate flex items-center gap-1.5">
             <span className="text-[var(--text-muted)]">Current Position:</span>
-            <span className="font-semibold text-[var(--text-primary)] truncate max-w-[220px]">
+            <span className="mat-pali-title font-semibold text-[var(--text-primary)] truncate max-w-[220px]">
               {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
             </span>
           </div>
@@ -159,7 +159,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
+                      <span className="mat-pali-title font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate">
                         {convertPaliScript(capitalizePali(item.title), settings?.paliScript)}
                       </span>
                       <span

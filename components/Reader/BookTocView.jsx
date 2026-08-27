@@ -76,13 +76,13 @@ export default function BookTocView() {
             <div className="w-7 h-7 rounded-lg bg-[var(--accent-light)] border border-[var(--accent-border)] flex items-center justify-center shrink-0">
               <BookOpen size={14} className="text-[var(--accent)]" />
             </div>
-            <h1 className="text-sm sm:text-[15px] font-bold text-[var(--text-primary)] leading-none truncate shrink min-w-0">
+            <h1 className="toc-pali-title text-sm sm:text-[15px] font-bold text-[var(--text-primary)] leading-none truncate shrink min-w-0">
               {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
             </h1>
             {(activeTab.nikaya || activeTab.category) && (
               <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${currentPitaka ? `toc-reading-${currentPitaka}` : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)]'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${currentPitaka ? `toc-bullet-dot toc-dot-${currentPitaka}` : 'bg-[var(--accent)]'}`} />
-                <span className="truncate max-w-[14ch]">{convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}</span>
+                <span className="toc-pali-title truncate max-w-[14ch]">{convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}</span>
               </span>
             )}
             <span className="text-xs text-[var(--text-muted)] truncate shrink-0 hidden md:inline">
@@ -130,7 +130,7 @@ export default function BookTocView() {
             filteredToc.map((item) => {
               const { depth } = getTocItemHierarchy(item);
               let itemClass = 'w-full text-left rounded-lg cursor-pointer transition flex items-center justify-between group ';
-              let titleClass = 'truncate leading-relaxed ';
+              let titleClass = 'toc-pali-title truncate leading-relaxed ';
               let indentClass = '';
               if (depth === 0) {
                 indentClass = 'pl-3 pr-3 py-2.5';

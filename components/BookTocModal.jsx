@@ -155,7 +155,7 @@ export default function BookTocModal({ isOpen, onClose }) {
           <div className="flex items-center gap-2.5 overflow-hidden">
             <ListTree size={18} className="text-[var(--accent)] shrink-0" />
             <div className="overflow-hidden">
-              <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">
+              <h3 className="toc-pali-title text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">
                 {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
               </h3>
               <div className="text-xs text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
@@ -207,7 +207,7 @@ export default function BookTocModal({ isOpen, onClose }) {
               // Distinct indentation & typographic hierarchy for Chapter > Title > Subhead
               let itemClass =
                 'w-full text-left rounded-lg cursor-pointer transition flex items-center justify-between group ';
-              let titleClass = 'truncate leading-relaxed ';
+              let titleClass = 'toc-pali-title truncate leading-relaxed ';
               let indentClass = '';
 
               if (depth === 0) {
