@@ -1,14 +1,29 @@
 import React, { Suspense } from 'react';
+import fs from 'fs';
+import path from 'path';
 import { MainAppContent } from '../../page';
 import { capitalizePali } from '../../../services/transliterate';
 
-export async function generateMetadata({ params, searchParams }) {
+export async function generateStaticParams() {
+  try {
+    const catalogPath = path.join(process.cwd(), 'server_api', 'cst_books_catalog.json');
+    if (fs.existsSync(catalogPath)) {
+      const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+      return Object.keys(catalog).map((code) => ({
+        slug: [code],
+      }));
+    }
+  } catch (e) {}
+  return [{ slug: ['default'] }];
+}
+
+
+export async function generateMetadata({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
-  const unwrappedSearch = searchParams && typeof searchParams.then === 'function' ? await searchParams : searchParams;
 
   const slug0 = unwrappedParams?.slug?.[0] ? decodeURIComponent(unwrappedParams.slug[0]) : '';
   let bookCode = slug0;
-  let chapterParam = unwrappedSearch?.chapter || unwrappedSearch?.c || unwrappedParams?.slug?.[1];
+  let chapterParam = unwrappedParams?.slug?.[1];
 
   const chapSuffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) {
@@ -24,52 +39,22 @@ export async function generateMetadata({ params, searchParams }) {
   }
 
   try {
-    const res = await fetch(`http://127.0.0.1:5000/api/book/${encodeURIComponent(bookCode)}?chapter=0&buffer=0`, {
-      next: { revalidate: 86400 },
-      signal: AbortSignal.timeout(1200),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const bookTitle = capitalizePali(data.title || bookCode);
-      const nikaya = data.nikaya ? capitalizePali(data.nikaya) : '';
-
-      let targetChapIdx = 0;
-      if (chapterParam !== undefined && chapterParam !== null) {
-        const parsed = parseInt(chapterParam, 10);
-        targetChapIdx = Math.max(0, parsed > 0 ? parsed - 1 : 0);
-      }
-
-      const currentChap = data.chapters?.[targetChapIdx];
-      const chapTitle = currentChap?.title ? capitalizePali(currentChap.title) : '';
-
-      let title = '';
-      let subject = '';
-
-      if (chapTitle && chapTitle !== bookTitle) {
-        subject = `${bookTitle} › ${chapTitle}`;
-        title = `${subject} | Tipiṭaka Pāḷi`;
-      } else if (nikaya && nikaya !== bookTitle) {
-        subject = `${bookTitle} (${nikaya})`;
-        title = `${subject} | Tipiṭaka Pāḷi`;
-      } else {
-        subject = bookTitle;
-        title = `${bookTitle} | Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi`;
-      }
-
-      const description = `Complete ${subject} with rich typography, multi-script support, and full-text search.`;
-
-      return {
-        title,
-        description,
-        openGraph: {
+    const catalogPath = path.join(process.cwd(), 'server_api', 'cst_books_catalog.json');
+    if (fs.existsSync(catalogPath)) {
+      const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+      const entry = catalog[bookCode];
+      if (entry) {
+        const bookTitle = capitalizePali(entry.mat?.mula_title || entry.mat?.attha_title || entry.mat?.tika_title || bookCode);
+        const nikaya = entry.pitaka ? capitalizePali(entry.pitaka) : '';
+        const title = `${bookTitle} | Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi`;
+        const description = `Complete ${bookTitle} (${entry.longNavPath || nikaya}) with rich typography, multi-script support, and full-text search.`;
+        return {
           title,
           description,
-        },
-        twitter: {
-          title,
-          description,
-        },
-      };
+          openGraph: { title, description },
+          twitter: { title, description },
+        };
+      }
     }
   } catch (err) {
     console.warn('generateMetadata error:', err);
@@ -80,6 +65,7 @@ export async function generateMetadata({ params, searchParams }) {
     description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
   };
 }
+
 
 export default async function BookPage({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;

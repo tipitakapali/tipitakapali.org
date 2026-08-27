@@ -4,6 +4,8 @@
 *.db.bak
 *.db
 *.zip
+public/api/
+
 
 
 # Logs
