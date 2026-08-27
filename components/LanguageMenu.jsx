@@ -8,7 +8,7 @@ import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 const TRANSLATIONS = [
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • -not available-' },
   { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -not available-' },
-  { id: 'vietnamese', label: 'Bản dịch Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -not available-' },
+  { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -not available-' },
   { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -not available-' },
   { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -not available-' },
   { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'German Translation • -not available-' },
