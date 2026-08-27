@@ -15,6 +15,7 @@ import HelpModal from '../HelpModal';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
+import { useDictionary } from '../../context/DictionaryContext';
 import { typeVelthuis, convertPaliScript, normalizePaliForSearch } from '../../services/transliterate';
 
 export default function NavigationTree() {
@@ -38,7 +39,17 @@ export default function NavigationTree() {
 
   const { isSidebarOpen, setIsSidebarOpen, setIsHeaderVisible, treeSelectedNode } = useTabs();
   const { settings, setIsZenMode } = useThemeSettings();
+  const { isOpen: isDictOpen, closeDictionary } = useDictionary();
   const treeContainerRef = useRef(null);
+  const prevSidebarOpenRef = useRef(isSidebarOpen);
+
+  // Auto-close dictionary when sidebar is opened to give more reading space
+  useEffect(() => {
+    if (!prevSidebarOpenRef.current && isSidebarOpen && isDictOpen) {
+      closeDictionary();
+    }
+    prevSidebarOpenRef.current = isSidebarOpen;
+  }, [isSidebarOpen, isDictOpen, closeDictionary]);
 
   // Load saved preferences and listen for dynamic dock position updates
   useEffect(() => {
