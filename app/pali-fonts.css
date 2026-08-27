@@ -280,14 +280,25 @@ html[data-script="thai"] .sidebar-title span,
 html[data-script="thai"] .tree-row,
 html[data-script="thai"] .tree-text,
 html[data-script="thai"] .result-snippet,
-html[data-script="thai"] .chapter-pill {
+html[data-script="thai"] .chapter-pill,
+html[data-script="thai"] .breadcrumbs,
+html[data-script="thai"] .breadcrumbs span,
+html[data-script="thai"] .search-summary-bar,
+html[data-script="thai"] .search-summary-bar span,
+html[data-script="thai"] .welcome-view input,
+html[data-script="thai"] .dict-header-bar input,
+html[data-script="thai"] .modal-header input,
+html[data-script="thai"] .modal-card input,
+html[data-script="thai"] .modal-card-search input,
+html[data-script="thai"] .modal-overlay input {
   font-size: calc(1em * 1.32);
 }
 html[data-script]:not([data-script="roman"]) .book-tab {
   font-size: calc(1em * 1.18);
 }
 html[data-script="thai"] .welcome-title {
-  font-size: calc(1em * 1.22);
+  font-size: calc(1em * 1.38);
+  line-height: 1.45;
 }
 html[data-script="laos"] { --font-reader: "Noto Sans Lao", sans-serif; }
 html[data-script="khmer"] { --font-reader: "Noto Sans Khmer", sans-serif; }
@@ -402,7 +413,15 @@ html[data-script]:not([data-script="roman"]) .breadcrumbs span,
 html[data-script]:not([data-script="roman"]) .chapter-pill,
 html[data-script]:not([data-script="roman"]) .toc-title,
 html[data-script]:not([data-script="roman"]) .welcome-title,
-html[data-script]:not([data-script="roman"]) .welcome-view p {
+html[data-script]:not([data-script="roman"]) .welcome-view input,
+html[data-script]:not([data-script="roman"]) .dict-header-bar input,
+html[data-script]:not([data-script="roman"]) .modal-header input,
+html[data-script]:not([data-script="roman"]) .modal-card input,
+html[data-script]:not([data-script="roman"]) .modal-card-search input,
+html[data-script]:not([data-script="roman"]) .modal-overlay input,
+html[data-script]:not([data-script="roman"]) .search-summary-bar,
+html[data-script]:not([data-script="roman"]) .search-summary-bar span,
+html[data-script]:not([data-script="roman"]) input[type="text"].pali-input {
   font-family: var(--font-reader);
 }
 
