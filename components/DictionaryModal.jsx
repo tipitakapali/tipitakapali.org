@@ -871,8 +871,8 @@ export default function DictionaryModal() {
               title={tab.desc}
             >
               <span>{tab.label}</span>
-              <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
-                {hasMatches ? (
+              {hasMatches ? (
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center ${
                       isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
@@ -880,14 +880,12 @@ export default function DictionaryModal() {
                   >
                     {displayCount}
                   </span>
-                ) : isTabPending ? (
+                </span>
+              ) : isTabPending ? (
+                <span className="inline-flex items-center justify-center w-[22px] h-[16px] shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/60 animate-pulse inline-block" />
-                ) : (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] invisible" aria-hidden="true">
-                    0
-                  </span>
-                )}
-              </span>
+                </span>
+              ) : null}
             </button>
           );
         })}
