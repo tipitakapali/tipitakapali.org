@@ -32,13 +32,18 @@ import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary, AVAILABLE_DICTIONARIES } from '../../context/DictionaryContext';
 import HelpGuideContent from '../Help/HelpGuideContent';
 
+// Bookmarks are intentionally preserved when the reader is reset,
+// so users never lose the places they have saved. Keep this in sync
+// with STORAGE_KEYS.BOOKMARKS in context/TabContext.jsx.
+const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v2';
+
 const TABS = [
   { id: 'backup', label: 'Backup & Reset', icon: RotateCcw },
   { id: 'dictionary', label: 'Dictionary', icon: BookA },
   { id: 'typography', label: 'Typography', icon: Type },
   { id: 'layout', label: 'Layout & Tree', icon: Layout },
   { id: 'themes', label: 'Themes & Colors', icon: Palette },
-  { id: 'display', label: 'Display Options', icon: Eye },
+  { id: 'display', label: 'Page Editions', icon: Eye },
   { id: 'help', label: 'Help & Guide', icon: HelpCircle },
 ];
 
@@ -99,10 +104,15 @@ export default function SettingsModal() {
 
   const handleExecuteReset = () => {
     try {
+      // Keep the user's saved bookmarks intact across the reset.
+      const savedBookmarks = localStorage.getItem(BOOKMARKS_STORAGE_KEY);
       localStorage.clear();
+      if (savedBookmarks !== null) {
+        localStorage.setItem(BOOKMARKS_STORAGE_KEY, savedBookmarks);
+      }
       sessionStorage.clear();
     } catch (e) {
-      console.error('Failed to clear storage:', e);
+      console.error('Failed to reset settings:', e);
     }
     resetToDefaults();
     setShowResetConfirm(false);
@@ -213,19 +223,18 @@ export default function SettingsModal() {
                 </div>
 
                 <div className="pt-4 border-t border-[var(--border-color)]">
-                  <div className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1.5">
-                    Reset TipitakaPali.org Settings
+                  <div className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">
+                    Start Fresh — Restore Default Settings
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-3">
-                    It will restore TipitakaPali.org to the default settings. And the reset will also delete TipitakaPali.org&apos;s saved tabs, book positions, bookmarks, search history, dictionary order.
-                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-2">
+                    If things ever look off, or you&apos;d simply like a fresh start, this returns TipitakaPali.org&apos;s display options (fonts, themes, layout) back to their original settings.</p>
                   <button
                     type="button"
                     onClick={() => setShowResetConfirm(true)}
-                    className="w-full py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-lg text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/60 transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                    className="w-full py-2.5 px-4 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg text-xs font-semibold hover:border-[var(--accent)] hover:text-[var(--accent)] transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                   >
                     <RotateCcw size={14} />
-                    <span>Reset All Settings & Clear Bookmarks</span>
+                    <span>Restore Default Settings</span>
                   </button>
                 </div>
               </div>
@@ -883,22 +892,27 @@ export default function SettingsModal() {
       {showResetConfirm && (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => setShowResetConfirm(false)}>
           <div
-            className="w-full max-w-md bg-[var(--bg-primary)] border border-rose-300 dark:border-rose-900 rounded-2xl shadow-2xl p-5 space-y-4 text-[var(--text-primary)]"
+            className="w-full max-w-md bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-2xl shadow-2xl p-5 space-y-4 text-[var(--text-primary)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-600 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--accent)] flex items-center justify-center shrink-0">
                 <RotateCcw size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[var(--text-primary)]">Reset TipitakaPali.org Settings</h4>
-                <p className="text-xs text-[var(--text-muted)]">This action cannot be undone.</p>
+                <h4 className="text-sm font-bold text-[var(--text-primary)]">Restore default settings?</h4>
+                <p className="text-xs text-[var(--text-muted)]">You can adjust everything again anytime.</p>
               </div>
             </div>
 
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              It will restore TipitakaPali.org to the default settings. And the reset will also delete TipitakaPali.org&apos;s saved tabs, book positions, bookmarks, search history, dictionary order.
+              This returns all reader preferences — fonts, themes, layout, dictionary order, recently opened tabs, reading positions and search history — back to TipitakaPali.org&apos;s original defaults.
             </p>
+
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 text-xs leading-relaxed">
+              <BookOpen size={14} className="shrink-0 mt-0.5" />
+              <span>Your bookmarks stay safe — they will be exactly where you left them.</span>
+            </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
@@ -911,9 +925,9 @@ export default function SettingsModal() {
               <button
                 type="button"
                 onClick={handleExecuteReset}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold shadow-sm transition cursor-pointer"
               >
-                Yes, Reset TipitakaPali.org
+                Yes, Restore Defaults
               </button>
             </div>
           </div>
