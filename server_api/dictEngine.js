@@ -164,20 +164,29 @@ function restoreDpdDefi(df) {
   return restoreMinifiedLinksAndFeedback(defi);
 }
 
-// Query synonyms for word
+// Query synonyms for word — with in-memory LRU to share across DPD + others (single DB hit per word)
+const SYN_CACHE_MAX = 3000;
+const synCache = new Map();
 function getSynonyms(word) {
   if (!dbs.SYN) return [];
+  if (synCache.has(word)) return synCache.get(word);
   try {
     const fchar = getFChar(word, 'SYN', false);
     const rows = dbs.SYN.prepare(`SELECT word FROM ${fchar} WHERE synonym = ?`).all(word);
-    return rows.map((r) => r.word);
+    const result = rows.map((r) => r.word);
+    if (synCache.size >= SYN_CACHE_MAX) {
+      const firstKey = synCache.keys().next().value;
+      synCache.delete(firstKey);
+    }
+    synCache.set(word, result);
+    return result;
   } catch (e) {
     return [];
   }
 }
 
-// Single-word DPD Query
-function lookupSingleDPD(word) {
+// Single-word DPD Query — accepts cachedSyns to avoid duplicate SYN query (see lookupDPDFast/lookupOthers)
+function lookupSingleDPD(word, cachedSyns = null) {
   if (word.startsWith('##')) {
     try {
       const row = dbs.DPD.prepare("SELECT word, defi FROM misc WHERE word = ? LIMIT 1").get(word);
@@ -190,7 +199,7 @@ function lookupSingleDPD(word) {
     return [];
   }
 
-  const syns = getSynonyms(word);
+  const syns = cachedSyns !== null ? cachedSyns : getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
   const exactMatches = [];
@@ -236,14 +245,14 @@ function normalizeDictWord(rawWord) {
   return text.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-// Query DPD Dictionary (supports multi-word phrases)
-function lookupDPD(rawWord) {
+// Query DPD Dictionary (supports multi-word phrases) — cachedSyns reused from caller to avoid duplicate SYN hit
+function lookupDPD(rawWord, cachedSyns = null) {
   if (!dbs.DPD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
-    const fullMatches = lookupSingleDPD(word);
+    const fullMatches = lookupSingleDPD(word, cachedSyns);
     if (fullMatches.length > 0) return fullMatches;
 
     const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
@@ -254,12 +263,12 @@ function lookupDPD(rawWord) {
     return results;
   }
 
-  return lookupSingleDPD(word);
+  return lookupSingleDPD(word, cachedSyns);
 }
 
-// Single-word PTS Query
-function lookupSinglePTS(word) {
-  const syns = getSynonyms(word);
+// Single-word PTS Query — accepts cachedSyns (shared synonym lookup)
+function lookupSinglePTS(word, cachedSyns = null) {
+  const syns = cachedSyns !== null ? cachedSyns : getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
   const exactMatches = [];
@@ -286,14 +295,14 @@ function lookupSinglePTS(word) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query PTS PED Dictionary (supports multi-word phrases)
-function lookupPTS(rawWord) {
+// Query PTS PED Dictionary (supports multi-word phrases) — cachedSyns shared
+function lookupPTS(rawWord, cachedSyns = null) {
   if (!dbs.PTS) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
-    const fullMatches = lookupSinglePTS(word);
+    const fullMatches = lookupSinglePTS(word, cachedSyns);
     if (fullMatches.length > 0) return fullMatches;
 
     const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
@@ -304,12 +313,12 @@ function lookupPTS(rawWord) {
     return results;
   }
 
-  return lookupSinglePTS(word);
+  return lookupSinglePTS(word, cachedSyns);
 }
 
-// Single-word Abhidhān Query
-function lookupSingleABD(word) {
-  const syns = getSynonyms(word);
+// Single-word Abhidhān Query — accepts cachedSyns
+function lookupSingleABD(word, cachedSyns = null) {
+  const syns = cachedSyns !== null ? cachedSyns : getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
   const exactMatches = [];
@@ -336,14 +345,14 @@ function lookupSingleABD(word) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query Abhidhānappadīpikā (supports multi-word phrases)
-function lookupABD(rawWord) {
+// Query Abhidhānappadīpikā (supports multi-word phrases) — cachedSyns shared
+function lookupABD(rawWord, cachedSyns = null) {
   if (!dbs.ABD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
-    const fullMatches = lookupSingleABD(word);
+    const fullMatches = lookupSingleABD(word, cachedSyns);
     if (fullMatches.length > 0) return fullMatches;
 
     const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
@@ -354,12 +363,12 @@ function lookupABD(rawWord) {
     return results;
   }
 
-  return lookupSingleABD(word);
+  return lookupSingleABD(word, cachedSyns);
 }
 
-// Single-word PSD Query
-function lookupSinglePSD(word) {
-  const syns = getSynonyms(word);
+// Single-word PSD Query — accepts cachedSyns
+function lookupSinglePSD(word, cachedSyns = null) {
+  const syns = cachedSyns !== null ? cachedSyns : getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
   const exactMatches = [];
@@ -390,14 +399,14 @@ function lookupSinglePSD(word) {
   return [...exactMatches, ...relatedMatches];
 }
 
-// Query Pāli-Sinhala Dictionary (supports multi-word phrases)
-function lookupPSD(rawWord) {
+// Query Pāli-Sinhala Dictionary (supports multi-word phrases) — cachedSyns shared
+function lookupPSD(rawWord, cachedSyns = null) {
   if (!dbs.PSD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
   if (word.includes(' ')) {
-    const fullMatches = lookupSinglePSD(word);
+    const fullMatches = lookupSinglePSD(word, cachedSyns);
     if (fullMatches.length > 0) return fullMatches;
 
     const tokens = [...new Set(word.split(/\s+/).filter(Boolean))].slice(0, 20);
@@ -408,7 +417,7 @@ function lookupPSD(rawWord) {
     return results;
   }
 
-  return lookupSinglePSD(word);
+  return lookupSinglePSD(word, cachedSyns);
 }
 
 // Single-word Sanskrit Query
@@ -582,7 +591,7 @@ function lookupDPDFast(rawWord, useSplitter = false) {
   }
 
   const syns = getSynonyms(word);
-  const dpd = lookupDPD(word, useSplitter);
+  const dpd = lookupDPD(word, syns);
 
   const result = {
     word,
@@ -636,9 +645,11 @@ function lookupOthers(rawWord) {
     if (cached) return cached;
   }
 
-  const pts = lookupPTS(word);
-  const abd = lookupABD(word);
-  const psd = lookupPSD(word);
+  // Share single SYN lookup across PTS/ABD/PSD (synCache ensures cross-request reuse too)
+  const sharedSyns = getSynonyms(word);
+  const pts = lookupPTS(word, sharedSyns);
+  const abd = lookupABD(word, sharedSyns);
+  const psd = lookupPSD(word, sharedSyns);
   const sans = lookupSANS(word);
   const splitter = lookupSplitter(word);
 

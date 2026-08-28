@@ -330,8 +330,13 @@ export function DictionaryProvider({ children }) {
     }
 
     try {
-      // ── Phase 1: Instant DPD lookup (primary dictionary, ~2 DB queries, small payload) ──
-      const dpdData = await fetchDictionaryLookup(cleanWord, 'dpd');
+      // ── Parallel-Progressive: fire DPD + others together, render DPD instantly ──
+      const dpdPromise = fetchDictionaryLookup(cleanWord, 'dpd');
+      const othersPromise = fetchDictionaryLookup(cleanWord, 'others');
+      setIsBackgroundLoading(true);
+
+      // Phase 1: DPD resolves first → paint immediately (no extra RTT)
+      const dpdData = await dpdPromise;
       if (currentSeq !== lookupSeqRef.current) return;
 
       const dpdCount = dpdData?.counts?.dpd || dpdData?.dpd?.length || 0;
@@ -348,7 +353,7 @@ export function DictionaryProvider({ children }) {
         return entry;
       });
 
-      // Show DPD results immediately (user sees results in ~30-80ms instead of ~200-500ms)
+      // Show DPD results immediately (user sees results in ~30-80ms, others fetch already in-flight)
       const immediateLookup = {
         word: cleanWord,
         hasResults: dpdCount > 0,
@@ -378,10 +383,8 @@ export function DictionaryProvider({ children }) {
         }
       }
 
-      // ── Phase 2: Background fetch for secondary dictionaries ──
-      setIsBackgroundLoading(true);
-
-      const othersData = await fetchDictionaryLookup(cleanWord, 'others');
+      // ── Phase 2: Secondary dictionaries (already in-flight via parallel Promise) ──
+      const othersData = await othersPromise;
       if (currentSeq !== lookupSeqRef.current) return;
 
       const ptsCount = othersData?.counts?.pts || othersData?.pts?.length || 0;

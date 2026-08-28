@@ -294,12 +294,19 @@ def build_nextjs_static(web_app_dir: Path):
 def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     """
     Generate Cloudflare Pages Edge Functions (/functions/api/...)
-    Proxies dynamic operations (FTS search, dictionary, health) to VPS backend.
+    Dynamic ops (dict lookup/inf + FTS search) are now fetched DIRECTLY from
+    https://api.tipitakapali.org (see web_app_next/services/api.js:getApiBase)
+    to eliminate extra Worker hop. Only health proxy is kept.
     """
     functions_api_dir = dist_dir / 'functions' / 'api'
-    functions_dict_dir = functions_api_dir / 'dict'
     functions_api_dir.mkdir(parents=True, exist_ok=True)
-    functions_dict_dir.mkdir(parents=True, exist_ok=True)
+    # Remove stale proxy files/dirs (Worker hop eliminated — direct VPS)
+    functions_dict_dir = functions_api_dir / 'dict'
+    if functions_dict_dir.exists():
+        shutil.rmtree(functions_dict_dir)
+    stale_search = functions_api_dir / 'search.js'
+    if stale_search.exists():
+        stale_search.unlink()
 
     # If raw IP is provided, default to domain https://api.tipitakapali.org for Cloudflare Worker compliance
     configured_vps = vps_url.rstrip('/')
@@ -308,203 +315,10 @@ def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     else:
         fallback_vps = configured_vps
 
-    log_info(f"Generating Cloudflare Pages Edge Functions (VPS Target: {fallback_vps})...")
+    log_info(f"Generating Cloudflare Pages Edge Functions (VPS Target: {fallback_vps}) — dict+search directly via VPS, only health Worker")
 
-    # 1. Search Proxy Function (/functions/api/search.js)
-    search_proxy_code = f"""// Cloudflare Pages Edge Function - Dynamic Full-Text Search Proxy
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-  const cleanBase = vpsBase.replace(/\\/+$/, '');
-  const targetUrl = cleanBase + '/api/search' + url.search;
-
-  if (context.request.method === 'OPTIONS') {{
-    return new Response(null, {{
-      status: 204,
-      headers: {{
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-        'Access-Control-Max-Age': '86400',
-      }},
-    }});
-  }}
-
-  try {{
-    let body = undefined;
-    if (context.request.method === 'POST' || context.request.method === 'PUT') {{
-      try {{
-        body = await context.request.text();
-      }} catch (e) {{}}
-    }}
-
-    const res = await fetch(targetUrl, {{
-      method: context.request.method,
-      headers: {{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Cloudflare-Edge-Search-Proxy/2.0',
-      }},
-      body: body,
-    }});
-
-    const headers = new Headers(res.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-
-    return new Response(res.body, {{
-      status: res.status,
-      statusText: res.statusText,
-      headers: headers,
-    }});
-  }} catch (err) {{
-    return new Response(JSON.stringify({{
-      error: 'Backend search proxy request failed',
-      target: targetUrl,
-      detail: err.message,
-    }}), {{
-      status: 502,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-}}
-"""
-    with open(functions_api_dir / 'search.js', 'w', encoding='utf-8') as f:
-        f.write(search_proxy_code)
-
-    # 2. Dictionary Lookup Proxy Function (/functions/api/dict/lookup.js)
-    dict_lookup_code = f"""// Cloudflare Pages Edge Function - Dynamic Dictionary Lookup Proxy
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-  const cleanBase = vpsBase.replace(/\\/+$/, '');
-  const targetUrl = cleanBase + '/api/dict/lookup' + url.search;
-
-  if (context.request.method === 'OPTIONS') {{
-    return new Response(null, {{
-      status: 204,
-      headers: {{
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-        'Access-Control-Max-Age': '86400',
-      }},
-    }});
-  }}
-
-  try {{
-    let body = undefined;
-    if (context.request.method === 'POST' || context.request.method === 'PUT') {{
-      try {{
-        body = await context.request.text();
-      }} catch (e) {{}}
-    }}
-
-    const res = await fetch(targetUrl, {{
-      method: context.request.method,
-      headers: {{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Cloudflare-Edge-Dict-Proxy/2.0',
-      }},
-      body: body,
-    }});
-
-    const headers = new Headers(res.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-
-    return new Response(res.body, {{
-      status: res.status,
-      statusText: res.statusText,
-      headers: headers,
-    }});
-  }} catch (err) {{
-    return new Response(JSON.stringify({{
-      error: 'Backend dictionary proxy lookup failed',
-      target: targetUrl,
-      detail: err.message,
-    }}), {{
-      status: 502,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-}}
-"""
-    with open(functions_dict_dir / 'lookup.js', 'w', encoding='utf-8') as f:
-        f.write(dict_lookup_code)
-
-    # 3. Dictionary Inflection Proxy Function (/functions/api/dict/inf.js)
-    dict_inf_code = f"""// Cloudflare Pages Edge Function - Dynamic Inflection Proxy
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-  const cleanBase = vpsBase.replace(/\\/+$/, '');
-  const targetUrl = cleanBase + '/api/dict/inf' + url.search;
-
-  if (context.request.method === 'OPTIONS') {{
-    return new Response(null, {{
-      status: 204,
-      headers: {{
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-        'Access-Control-Max-Age': '86400',
-      }},
-    }});
-  }}
-
-  try {{
-    let body = undefined;
-    if (context.request.method === 'POST') {{
-      try {{ body = await context.request.text(); }} catch (e) {{}}
-    }}
-
-    const res = await fetch(targetUrl, {{
-      method: context.request.method,
-      headers: {{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Cloudflare-Edge-Dict-Inf-Proxy/2.0',
-      }},
-      body: body,
-    }});
-
-    const headers = new Headers(res.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-
-    return new Response(res.body, {{
-      status: res.status,
-      statusText: res.statusText,
-      headers: headers,
-    }});
-  }} catch (err) {{
-    return new Response(JSON.stringify({{
-      error: 'Backend inflection lookup failed',
-      target: targetUrl,
-      detail: err.message,
-    }}), {{
-      status: 502,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-}}
-"""
-    with open(functions_dict_dir / 'inf.js', 'w', encoding='utf-8') as f:
-        f.write(dict_inf_code)
+    # 2 & 3. Dict + Search proxies REMOVED — served directly from https://api.tipitakapali.org
+    # (see services/api.js:getApiBase). No functions/api/search.js or functions/api/dict/* generated.
 
     # 4. Health Proxy Function (/functions/api/health.js)
     health_proxy_code = f"""// Cloudflare Pages Edge Function - Health Status Proxy

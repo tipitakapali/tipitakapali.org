@@ -268,9 +268,10 @@ export async function searchTipitaka(query, options = {}) {
 
   const qs = params.toString();
   const cacheKey = `search_${qs}`;
+  const base = getApiBase();
 
   return cachedFetch(cacheKey, async () => {
-    const res = await fetch(`/api/search?${qs}`);
+    const res = await fetch(`${base}/api/search?${qs}`);
     if (!res.ok) throw new Error('Search query failed');
     return res.json();
   }, 10 * 60 * 1000);
@@ -278,6 +279,28 @@ export async function searchTipitaka(query, options = {}) {
 
 import { cleanDictionaryQuery } from './transliterate';
 import { setDpdFeedbackTemplate, dpd_feedback_s } from './dpdFeedback';
+
+// Direct VPS base for dynamic ops (dict + search) — bypasses Cloudflare Worker proxy hop
+// In static export on https://tipitakapali.org, fetch goes straight to VPS.
+// In dev (localhost / 127.0.0.1) keep relative for next.config.js rewrites.
+function getApiBase() {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // Allow override via env (e.g. NEXT_PUBLIC_API_URL)
+    if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+    }
+    if (host === 'tipitakapali.org' || host.endsWith('.tipitakapali.org')) {
+      return 'https://api.tipitakapali.org';
+    }
+  }
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+  return '';
+}
+// Backward compat alias
+const getDictApiBase = getApiBase;
 
 export async function fetchDictionaryLookup(word, dictType = 'all', options = {}) {
   const cleanWord = cleanDictionaryQuery(word || '').trim();
@@ -290,11 +313,12 @@ export async function fetchDictionaryLookup(word, dictType = 'all', options = {}
 
   const qs = params.toString();
   const cacheKey = `dict_${qs}`;
+  const base = getDictApiBase();
 
   return cachedFetch(
     cacheKey,
     async () => {
-      const res = await fetch(`/api/dict/lookup?${qs}`);
+      const res = await fetch(`${base}/api/dict/lookup?${qs}`);
       if (!res.ok) throw new Error(`Dictionary lookup failed for ${cleanWord}`);
       return res.json();
     },
@@ -313,6 +337,7 @@ export async function fetchOthersLookup(word, options = {}) {
 /**
  * Fetches the dynamic DPD feedback template from database (payload ##tipitakapalidpdfeedback)
  * Adapted from ref/tipitakapali.org/web/handleClick_dev.js (getFeedbackTemplateFromDb)
+ * Uses direct VPS path via fetchDictionaryLookup (already bypasses Worker).
  */
 export async function getFeedbackTemplateFromDb(urlVisiting = 'unknown') {
   try {
@@ -336,10 +361,11 @@ export async function fetchDictionaryInflection(query) {
   if (!cleanQuery) return null;
 
   const cacheKey = `dict_inf_${cleanQuery}`;
+  const base = getDictApiBase();
   return cachedFetch(
     cacheKey,
     async () => {
-      const res = await fetch(`/api/dict/inf?w=${encodeURIComponent(cleanQuery)}`);
+      const res = await fetch(`${base}/api/dict/inf?w=${encodeURIComponent(cleanQuery)}`);
       if (!res.ok) throw new Error(`Inflection lookup failed for ${cleanQuery}`);
       return res.json();
     },
