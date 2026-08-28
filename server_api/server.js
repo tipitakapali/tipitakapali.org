@@ -7,7 +7,9 @@ const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
 
-const PORT = parseInt(process.env.PORT || '5000', 10);
+// Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
+// Override with PORT when running in another environment.
+const PORT = parseInt(process.env.PORT || '8400', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 // Locate tipitaka.db database

@@ -5,11 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:cf": "node server_cf.js",
     "dev": "node --watch server.js",
     "pm2:start": "npx pm2 start ecosystem.config.js",
     "pm2:stop": "npx pm2 stop ecosystem.config.js",
     "pm2:restart": "npx pm2 restart ecosystem.config.js",
-    "pm2:logs": "npx pm2 logs tipitaka-api",
+    "pm2:logs": "npx pm2 logs api.tipitakapali.org",
     "pm2:status": "npx pm2 status"
   },
   "dependencies": {

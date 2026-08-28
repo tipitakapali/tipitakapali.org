@@ -1,19 +1,19 @@
 module.exports = {
   apps: [
     {
-      name: 'tipitaka-api',
+      name: 'api.tipitakapali.org',
       script: 'server.js',
-      instances: 'max',
-      exec_mode: 'cluster',
+      instances: 1,
+      exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 5000,
+        PORT: 8400,
         HOST: '0.0.0.0',
         LOG_LEVEL: 'warn',
       },
       env_development: {
         NODE_ENV: 'development',
-        PORT: 5000,
+        PORT: 8400,
         HOST: '0.0.0.0',
         LOG_LEVEL: 'info',
       },

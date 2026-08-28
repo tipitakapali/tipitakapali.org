@@ -30,7 +30,7 @@ Ultra-fast, production-ready REST API built with **Node.js 24**, **Fastify**, an
 
 ### Standard Run (Node.js)
 ```bash
-# Start server on port 5000
+# Start server on the existing API port (8400 by default)
 npm start
 
 # Or in development mode with auto-reload
@@ -46,9 +46,9 @@ pm2 start ecosystem.config.js
 pm2 status
 
 # View live logs
-pm2 logs tipitaka-api
+pm2 logs api.tipitakapali.org
 
 # Stop / Restart
-pm2 restart tipitaka-api
-pm2 stop tipitaka-api
+pm2 restart api.tipitakapali.org
+pm2 stop api.tipitakapali.org
 ```
