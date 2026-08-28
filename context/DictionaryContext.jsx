@@ -78,7 +78,7 @@ export function DictionaryProvider({ children }) {
   const [dockMode, setDockModeState] = useState('side'); // 'modal' | 'left' | 'side' | 'right'
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
-  const [clickLookupMode, setClickLookupModeState] = useState('double'); // 'single' | 'double'
+  const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
   const [activeDictTab, setActiveDictTab] = useState('dpd');
   const [dictOrder, setDictOrderState] = useState(DEFAULT_DICT_ORDER);
   const [dictEnabled, setDictEnabledState] = useState(DEFAULT_DICT_ENABLED);

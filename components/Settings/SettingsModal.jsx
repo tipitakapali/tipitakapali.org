@@ -40,10 +40,10 @@ const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v2';
 const TABS = [
   { id: 'backup', label: 'Reset', icon: RotateCcw },
   { id: 'dictionary', label: 'Dictionary', icon: BookA },
-  { id: 'typography', label: 'Typography', icon: Type },
-  { id: 'layout', label: 'Layout', icon: Layout },
   { id: 'themes', label: 'Themes', icon: Palette },
+  { id: 'typography', label: 'Typography', icon: Type },
   { id: 'display', label: 'Page Editions', icon: Eye },
+  { id: 'layout', label: 'Layout', icon: Layout },
   { id: 'help', label: 'Help', icon: HelpCircle },
 ];
 
@@ -273,14 +273,14 @@ export default function SettingsModal() {
                         setClickLookupMode('single');
                       }}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
-                        clickToLookupEnabled && (clickLookupMode === 'single' || settings.dictLookupTrigger === 'single')
+                        clickToLookupEnabled && clickLookupMode === 'single'
                           ? 'border-[var(--accent)] bg-[var(--accent-light)]'
                           : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-[var(--text-primary)]">Single Click</span>
-                        {clickToLookupEnabled && (clickLookupMode === 'single' || settings.dictLookupTrigger === 'single') && (
+                        {clickToLookupEnabled && clickLookupMode === 'single' && (
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>
@@ -294,14 +294,14 @@ export default function SettingsModal() {
                         setClickLookupMode('double');
                       }}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
-                        clickToLookupEnabled && (clickLookupMode === 'double' || settings.dictLookupTrigger === 'double')
+                        clickToLookupEnabled && clickLookupMode === 'double'
                           ? 'border-[var(--accent)] bg-[var(--accent-light)]'
                           : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--accent-border)]'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-[var(--text-primary)]">Double Click</span>
-                        {clickToLookupEnabled && (clickLookupMode === 'double' || settings.dictLookupTrigger === 'double') && (
+                        {clickToLookupEnabled && clickLookupMode === 'double' && (
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>
