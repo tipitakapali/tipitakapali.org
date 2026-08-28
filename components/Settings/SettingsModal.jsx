@@ -283,9 +283,6 @@ export default function SettingsModal() {
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-                        Click any Pāḷi word once in the reader to look up definitions instantly.
-                      </p>
                     </button>
 
                     <button
@@ -307,9 +304,6 @@ export default function SettingsModal() {
                           <Check size={14} className="text-[var(--accent)]" />
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-                        Double-click words to look up (preserves standard browser text selection).
-                      </p>
                     </button>
                   </div>
                 </div>
@@ -321,9 +315,9 @@ export default function SettingsModal() {
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'left', label: 'Left Dock', icon: PanelLeft, desc: 'Docked left (Tree docks right)' },
-                      { id: 'modal', label: 'Center Modal', icon: Maximize2, desc: 'Floating center popup' },
-                      { id: 'side', label: 'Right Dock', icon: PanelRight, desc: 'Docked right (Tree docks left)' },
+                      { id: 'left', label: 'Left Dock', icon: PanelLeft },
+                      { id: 'modal', label: 'Center Modal', icon: Maximize2 },
+                      { id: 'side', label: 'Right Dock', icon: PanelRight },
                     ].map((m) => {
                       const Icon = m.icon;
                       const isSelected = dockMode === m.id || (m.id === 'side' && dockMode === 'right');
@@ -332,28 +326,20 @@ export default function SettingsModal() {
                           key={m.id}
                           type="button"
                           onClick={() => setDockMode(m.id)}
-                          className={`p-2.5 text-left rounded-lg border transition flex flex-col justify-between cursor-pointer ${
+                          className={`py-2 px-2.5 rounded-lg border transition flex items-center justify-center gap-1.5 cursor-pointer text-xs font-bold ${
                             isSelected
-                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold shadow-xs'
+                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs'
                               : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-gray-400'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5 text-xs font-bold">
-                            <Icon size={14} />
-                            <span>{m.label}</span>
-                          </div>
-                          <div
-                            className={`text-[10px] mt-1 leading-tight ${
-                              isSelected ? 'text-white/80' : 'text-[var(--text-muted)]'
-                            }`}
-                          >
-                            {m.desc}
-                          </div>
+                          <Icon size={14} />
+                          <span>{m.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
+
 
                 {/* 3. Dictionary Font Size */}
                 <div className="pt-3 border-t border-[var(--border-color)]">
