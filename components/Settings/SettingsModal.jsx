@@ -38,13 +38,13 @@ import HelpGuideContent from '../Help/HelpGuideContent';
 const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v2';
 
 const TABS = [
-  { id: 'backup', label: 'Backup & Reset', icon: RotateCcw },
+  { id: 'backup', label: 'Reset', icon: RotateCcw },
   { id: 'dictionary', label: 'Dictionary', icon: BookA },
   { id: 'typography', label: 'Typography', icon: Type },
-  { id: 'layout', label: 'Layout & Tree', icon: Layout },
-  { id: 'themes', label: 'Themes & Colors', icon: Palette },
+  { id: 'layout', label: 'Layout', icon: Layout },
+  { id: 'themes', label: 'Themes', icon: Palette },
   { id: 'display', label: 'Page Editions', icon: Eye },
-  { id: 'help', label: 'Help & Guide', icon: HelpCircle },
+  { id: 'help', label: 'Help', icon: HelpCircle },
 ];
 
 const FONTS = [

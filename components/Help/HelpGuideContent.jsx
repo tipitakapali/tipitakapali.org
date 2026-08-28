@@ -158,7 +158,56 @@ export default function HelpGuideContent({ showTabBar = true }) {
             </p>
           </div>
         </div>
+
+        {/* Mobile & Desktop App Downloads */}
+        <div className="pt-3 border-t border-[var(--border-color)] flex flex-col items-center gap-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            Download Tipiṭaka Pāḷi App for Offline Study
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
+            <a
+              href="https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Download on the App Store (iOS / iPadOS / macOS)"
+            >
+              <img
+                src="/download-on-the-app-store.svg"
+                alt="Download on the App Store"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+            <a
+              href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Get it on Google Play (Android)"
+            >
+              <img
+                src="/Google_Play_Store_badge_EN.svg"
+                alt="Get it on Google Play"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+            <a
+              href="https://github.com/tipitakapali/tipitakapali.org/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Download for Desktop (Windows, macOS, Linux)"
+            >
+              <img
+                src="/download-for-desktop.svg"
+                alt="Download for Desktop"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+          </div>
+        </div>
       </section>
+
 
       {/* 2. Full-Text Search (FTS5) */}
       <section id="topic-search" className="scroll-mt-14 space-y-4 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
@@ -430,11 +479,13 @@ export default function HelpGuideContent({ showTabBar = true }) {
               <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono font-bold text-[11px] text-[var(--accent)]">? or F1</kbd>
             </div>
             <div className="p-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-between">
-              <span>Close Overlays & Modals</span>
+              <span>Eka Mode (Exit) / Close Modals</span>
               <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono font-bold text-[11px] text-[var(--accent)]">Esc</kbd>
             </div>
+
           </div>
         </div>
+
 
         {/* Page Editions Guide */}
         <div className="bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] space-y-3">
@@ -557,6 +608,57 @@ export default function HelpGuideContent({ showTabBar = true }) {
           </div>
         </div>
 
+        {/* Store & App Download Links */}
+        <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] flex flex-col items-center gap-2.5 text-center">
+          <div className="text-xs font-bold text-[var(--text-primary)]">
+            Install Tipiṭaka Pāḷi on your devices
+          </div>
+          <div className="text-[11px] text-[var(--text-muted)] max-w-md">
+            Available on iOS, iPadOS, macOS, Android, Windows, and Linux with full offline capability.
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mt-1">
+            <a
+              href="https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Download on the App Store (iOS / iPadOS / macOS)"
+            >
+              <img
+                src="/download-on-the-app-store.svg"
+                alt="Download on the App Store"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+            <a
+              href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Get it on Google Play (Android)"
+            >
+              <img
+                src="/Google_Play_Store_badge_EN.svg"
+                alt="Get it on Google Play"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+            <a
+              href="https://github.com/tipitakapali/tipitakapali.org/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+              title="Download for Desktop (Windows, macOS, Linux)"
+            >
+              <img
+                src="/download-for-desktop.svg"
+                alt="Download for Desktop"
+                className="h-[34px] sm:h-[36px] w-auto object-contain"
+              />
+            </a>
+          </div>
+        </div>
+
         {/* Closing Blessing */}
         <div className="text-center pt-2 border-t border-[var(--border-color)] text-[13px] font-bold text-[var(--accent)]">
           Ciraṃ tiṭṭhatu saddhammo, dhamme hontu sagāravā.
@@ -564,6 +666,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
             "May the True Dhamma endure long, and may all beings revere the Dhamma."
           </div>
         </div>
+
       </section>
       </div>
     </div>

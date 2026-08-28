@@ -430,18 +430,22 @@ export default function NavigationTree() {
                 <PanelRight size={12} />
               </button>
 
-              {/* Hide / Close Button */}
+              {/* Hide / Close Button -> Enter Eka Mode */}
               <button
-                className="tree-action-btn tree-action-close p-1 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white transition"
+                className="tree-action-btn tree-action-close p-1 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white transition cursor-pointer"
                 onClick={() => {
                   setIsSidebarOpen(false);
-                  setIsHeaderVisible(false);
+                  setIsZenMode(true);
+                  if (typeof document !== 'undefined') {
+                    document.body.classList.add('zen-mode');
+                  }
                 }}
-                title="Close Navigation Tree"
-                aria-label="Close Navigation Tree"
+                title="Close Sidebar & Enter Eka Reading Mode"
+                aria-label="Close Sidebar & Enter Eka Reading Mode"
               >
                 <X size={13} className="stroke-[2.5]" />
               </button>
+
             </div>
           </div>
 

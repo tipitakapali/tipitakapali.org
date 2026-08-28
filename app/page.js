@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, Suspense } from 'react';
+import React, { useEffect, useRef, useCallback, Suspense } from 'react';
+import { Minimize2 } from 'lucide-react';
+
 import Header from '../components/Header';
 import BookTabsBar from '../components/BookTabsBar';
 import NavigationTree from '../components/NavigationTree/NavigationTree';
@@ -15,9 +17,11 @@ import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openSearchModal, activeTab, activeBookCode } = useTabs();
-  const { settings } = useThemeSettings();
+  const { openBook, openSearchModal, activeTab, activeBookCode, setIsSidebarOpen, setIsHeaderVisible } = useTabs();
+  const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
+
+
 
 
   // Dynamic Browser, Search & SEO friendly Title & Meta Synchronizer
@@ -203,9 +207,28 @@ export function MainAppContent({ params: rawParams }) {
         targetParaIndex: explicitParaIndex,
       });
     }
-
-
   }, [openBook, openSearchModal, params]);
+
+  // Full exit Eka mode handler — restores app header, book tabs bar, breadcrumbs, and footer (leaves sidebar as-is)
+  const handleExitZen = useCallback(() => {
+    setIsZenMode(false);
+    setIsHeaderVisible(true);
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('zen-mode');
+    }
+  }, [setIsZenMode, setIsHeaderVisible]);
+
+  // Keyboard shortcut to exit Eka mode
+  useEffect(() => {
+    if (!isZenMode) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleExitZen();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isZenMode, handleExitZen]);
 
   return (
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -216,17 +239,39 @@ export function MainAppContent({ params: rawParams }) {
           <BookTabsBar />
           <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
             <ReaderView />
+            {/* Floating Exit Eka Mode Button - Aligned near the text reading column */}
+            {isZenMode && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4 sm:px-6 z-40">
+                <div
+                  className="w-full flex justify-end pointer-events-none"
+                  style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleExitZen}
+                    className="pointer-events-auto w-9 h-9 rounded-full bg-[var(--bg-card)]/90 hover:bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] text-[var(--accent)] shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center cursor-pointer select-none group opacity-80 hover:opacity-100 mr-1 sm:mr-0"
+                    title="Exit Eka Mode (Esc)"
+                    aria-label="Exit Eka Mode"
+                  >
+                    <Minimize2 size={16} className="group-hover:rotate-90 transition-transform duration-300" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <Footer />
         </div>
         <DictionaryModal />
       </div>
+
+
       <SearchModal />
       <SettingsModal />
     </div>
-
   );
 }
+
+
 
 export default function Home({ params }) {
   return (

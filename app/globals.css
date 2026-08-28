@@ -107,7 +107,13 @@
 
 
 
-/* Custom Accent Colors */
+/* Custom Accent Colors - Light / Default */
+[data-accent="burgundy"] {
+  --accent: #8b2500;
+  --accent-hover: #a82e00;
+  --accent-light: #fbeee8;
+  --accent-border: #f0c4b4;
+}
 [data-accent="saffron"] {
   --accent: #b26a00;
   --accent-hover: #d17c00;
@@ -121,19 +127,116 @@
   --accent-border: #b7e2c9;
 }
 [data-accent="indigo"] {
-  --accent: #304ffe;
-  --accent-hover: #536dfe;
-  --accent-light: #ebf0ff;
-  --accent-border: #c2d1ff;
+  --accent: #3730a3;
+  --accent-hover: #4338ca;
+  --accent-light: #eef2ff;
+  --accent-border: #c7d2fe;
 }
 [data-accent="slate"] {
-  --accent: #455a64;
-  --accent-hover: #546e7a;
-  --accent-light: #eceff1;
-  --accent-border: #cfd8dc;
+  --accent: #475569;
+  --accent-hover: #64748b;
+  --accent-light: #f1f5f9;
+  --accent-border: #cbd5e1;
+}
+
+/* Custom Accent Colors - Sepia Theme */
+[data-theme="sepia"][data-accent="burgundy"] {
+  --accent: #9c4113;
+  --accent-hover: #b84e18;
+  --accent-light: #f7dfce;
+  --accent-border: #eec2a4;
+}
+[data-theme="sepia"][data-accent="saffron"] {
+  --accent: #b26a00;
+  --accent-hover: #d17c00;
+  --accent-light: rgba(178, 106, 0, 0.14);
+  --accent-border: rgba(178, 106, 0, 0.32);
+}
+[data-theme="sepia"][data-accent="emerald"] {
+  --accent: #1b6e4a;
+  --accent-hover: #238b5e;
+  --accent-light: rgba(27, 110, 74, 0.14);
+  --accent-border: rgba(27, 110, 74, 0.32);
+}
+[data-theme="sepia"][data-accent="indigo"] {
+  --accent: #3730a3;
+  --accent-hover: #4338ca;
+  --accent-light: rgba(55, 48, 163, 0.14);
+  --accent-border: rgba(55, 48, 163, 0.32);
+}
+[data-theme="sepia"][data-accent="slate"] {
+  --accent: #475569;
+  --accent-hover: #64748b;
+  --accent-light: rgba(71, 85, 105, 0.14);
+  --accent-border: rgba(71, 85, 105, 0.32);
+}
+
+/* Custom Accent Colors - Dark Theme (High contrast on dark charcoal) */
+[data-theme="dark"][data-accent="burgundy"] {
+  --accent: #e07a3c;
+  --accent-hover: #f08e50;
+  --accent-light: rgba(224, 122, 60, 0.16);
+  --accent-border: rgba(224, 122, 60, 0.36);
+}
+[data-theme="dark"][data-accent="saffron"] {
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-light: rgba(245, 158, 11, 0.16);
+  --accent-border: rgba(245, 158, 11, 0.36);
+}
+[data-theme="dark"][data-accent="emerald"] {
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --accent-light: rgba(16, 185, 129, 0.16);
+  --accent-border: rgba(16, 185, 129, 0.36);
+}
+[data-theme="dark"][data-accent="indigo"] {
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-light: rgba(129, 140, 248, 0.16);
+  --accent-border: rgba(129, 140, 248, 0.36);
+}
+[data-theme="dark"][data-accent="slate"] {
+  --accent: #94a3b8;
+  --accent-hover: #cbd5e1;
+  --accent-light: rgba(148, 163, 184, 0.16);
+  --accent-border: rgba(148, 163, 184, 0.36);
+}
+
+/* Custom Accent Colors - OLED Theme (High contrast on true black) */
+[data-theme="oled"][data-accent="burgundy"] {
+  --accent: #e07a3c;
+  --accent-hover: #f08e50;
+  --accent-light: rgba(224, 122, 60, 0.20);
+  --accent-border: rgba(224, 122, 60, 0.42);
+}
+[data-theme="oled"][data-accent="saffron"] {
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-light: rgba(245, 158, 11, 0.20);
+  --accent-border: rgba(245, 158, 11, 0.42);
+}
+[data-theme="oled"][data-accent="emerald"] {
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --accent-light: rgba(16, 185, 129, 0.20);
+  --accent-border: rgba(16, 185, 129, 0.42);
+}
+[data-theme="oled"][data-accent="indigo"] {
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-light: rgba(129, 140, 248, 0.20);
+  --accent-border: rgba(129, 140, 248, 0.42);
+}
+[data-theme="oled"][data-accent="slate"] {
+  --accent: #94a3b8;
+  --accent-hover: #cbd5e1;
+  --accent-light: rgba(148, 163, 184, 0.20);
+  --accent-border: rgba(148, 163, 184, 0.42);
 }
 
 /* Font Families */
+
 [data-font="gentium"] { --font-reader: "Gentium Plus", serif; }
 [data-font="garamond"] { --font-reader: "EB Garamond", serif; }
 [data-font="serif"] { --font-reader: Georgia, serif; }
@@ -223,7 +326,7 @@ html, body {
   pointer-events: none !important;
 }
 
-/* Zen Mode (Header, Tabs Bar & Footer Hidden) */
+/* Eka Mode (Header, Tabs Bar, Breadcrumbs & Footer Hidden) */
 body.zen-mode .app-header {
   display: none !important;
 }
@@ -232,9 +335,14 @@ body.zen-mode .book-tabs-bar {
   display: none !important;
 }
 
+body.zen-mode .content-header {
+  display: none !important;
+}
+
 body.zen-mode .app-footer {
   display: none !important;
 }
+
 
 /* Display Toggles */
 body.hide-pb span.pb, body.hide-pb .pb { display: none !important; }

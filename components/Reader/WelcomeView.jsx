@@ -237,6 +237,59 @@ export default function WelcomeView() {
           </div>
         </div>
       )}
+      {/* Store & App Download Links */}
+      <div className="w-full mt-7 pt-5 border-t border-[var(--border-color)]/60 flex flex-col items-center gap-2.5 select-none">
+        <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-muted)]">
+          Get Tipiṭaka Pāḷi for Mobile & Desktop
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          {/* iOS App Store */}
+          <a
+            href="https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            title="Download on the App Store (iOS / iPadOS / macOS)"
+          >
+            <img
+              src="/download-on-the-app-store.svg"
+              alt="Download on the App Store"
+              className="h-[38px] sm:h-[40px] w-auto object-contain"
+            />
+          </a>
+
+          {/* Google Play Store */}
+          <a
+            href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            title="Get it on Google Play (Android)"
+          >
+            <img
+              src="/Google_Play_Store_badge_EN.svg"
+              alt="Get it on Google Play"
+              className="h-[38px] sm:h-[40px] w-auto object-contain"
+            />
+          </a>
+
+          {/* Desktop Releases */}
+          <a
+            href="https://github.com/tipitakapali/tipitakapali.org/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            title="Download for Desktop (Windows, macOS, Linux)"
+          >
+            <img
+              src="/download-for-desktop.svg"
+              alt="Download for Desktop"
+              className="h-[38px] sm:h-[40px] w-auto object-contain"
+            />
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
+

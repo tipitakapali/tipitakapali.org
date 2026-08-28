@@ -8,7 +8,9 @@ import {
   Navigation,
   Type,
   X,
+  Maximize2,
 } from 'lucide-react';
+
 
 import BookTocModal from './BookTocModal';
 import BookmarkModal from './BookmarkModal';
@@ -34,8 +36,10 @@ export default function Footer() {
     setIsBookmarkOpen,
     isHeaderVisible,
     isSidebarOpen,
+    setIsSidebarOpen,
   } = useTabs();
-  const { settings, updateSetting } = useThemeSettings();
+  const { settings, updateSetting, setIsZenMode } = useThemeSettings();
+
 
   const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
@@ -99,8 +103,27 @@ export default function Footer() {
             <ListTree size={14} className="text-[var(--accent)] shrink-0" />
             <span>Toc</span>
           </button>
+
+          {/* Eka Mode / Expand Button */}
+          <button
+            onClick={() => {
+              setIsZenMode(true);
+              setIsSidebarOpen(false);
+              if (typeof document !== 'undefined') {
+                document.body.classList.add('zen-mode');
+              }
+            }}
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
+            title="Enter Eka Mode (Distraction-free reading)"
+          >
+            <Maximize2 size={13} className="text-[var(--accent)] shrink-0" />
+            <span>Eka</span>
+          </button>
         </div>
       </footer>
+
+
+
 
       {/* Font Size Modal */}
       {isFontSizeOpen && (
