@@ -20,7 +20,7 @@ export default function HelpModal({ isOpen, onClose }) {
         <div className="px-5 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <HelpCircle size={18} className="text-[var(--accent)]" />
-            <h2 className="text-sm sm:text-base font-bold">Tipiṭaka Reader — Help & User Guide</h2>
+            <h2 className="text-sm sm:text-base font-bold">TipitakaPali.org — Help & User Guide</h2>
           </div>
           <button
             onClick={onClose}

@@ -983,7 +983,7 @@ export default function DictionaryModal() {
             <div className="pt-2">
               <span className="text-[11px] text-[var(--text-muted)] block mb-2">Try quick lookup:</span>
               <div className="flex flex-wrap items-center justify-center gap-1.5">
-                {['buddha', 'dhamma', 'saṅgha', 'bhikkhu', 'nibbāna', 'anatta', 'dukkha', 'paññā', 'samādhi', 'mettā'].map((w) => (
+		{['buddha', 'dhamma', 'saṅgha', 'nibbāna', 'anatta', 'how are you', 'venerable paññindriya', 'sīla', 'samādhi', 'paññā', 'mettā'].map((w) => (
                   <button
                     key={w}
                     onClick={() => performLookup(w, true)}

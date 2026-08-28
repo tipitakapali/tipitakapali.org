@@ -233,10 +233,11 @@ export function TabProvider({ children }) {
   }, []);
 
   // Helper to update URL search parameters without reloading (1-based chapter in URL)
-  // Helper to update URL search parameters and clean path without reloading (1-based chapter in URL)
+  // Preserves existing hash (#para1091 / #p1091 / #pindex-*) — fixing fragment race
   const updateUrlParams = useCallback((paramsToUpdate) => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location);
+    const preservedHash = window.location.hash || '';
 
     if (paramsToUpdate) {
       // If book is provided, set clean path /book/:bookCode
@@ -260,8 +261,9 @@ export function TabProvider({ children }) {
       });
     }
 
-    const newUrl = url.pathname + (url.search || '');
-    if (window.location.pathname + window.location.search !== newUrl) {
+    const newUrl = url.pathname + (url.search || '') + preservedHash;
+    const currentFull = window.location.pathname + window.location.search + window.location.hash;
+    if (currentFull !== newUrl) {
       window.history.replaceState({}, '', newUrl);
     }
   }, []);
@@ -1197,9 +1199,10 @@ export function TabProvider({ children }) {
   }, []);
 
   // Automatic Session Resumption on page load / revisit
+  // Hash-aware (#para1091 / #pindex-*) — co-exists with MainAppContent's hash handler
+  // If URL has hash para, it takes priority and must NOT be treated as TOC request
   useEffect(() => {
     if (typeof window === 'undefined' || isInitializedRef.current) return;
-    isInitializedRef.current = true;
 
     const url = new URL(window.location);
     const pathname = url.pathname;
@@ -1207,6 +1210,20 @@ export function TabProvider({ children }) {
     let urlChapter = url.searchParams.get('chapter') || url.searchParams.get('c');
     let urlQuery = url.searchParams.get('q') || url.searchParams.get('search');
     let urlPara = url.searchParams.get('para') || url.searchParams.get('p');
+    let urlHashPara = null;
+    let urlHashPindex = null;
+    const rawHash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
+    if (rawHash) {
+      const numMatch = rawHash.match(/^(?:para-?|p)?(\d+)$/i);
+      if (numMatch) urlHashPara = numMatch[1];
+      else if (rawHash.startsWith('pindex-')) {
+        const pidx = parseInt(rawHash.replace('pindex-', ''), 10);
+        if (!isNaN(pidx)) urlHashPindex = pidx;
+      }
+    }
+    // Hash fragment takes priority over ?para=
+    if (urlHashPara) urlPara = urlHashPara;
+    const hashPindex = urlHashPindex;
 
     if (!urlBook && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
       const raw = pathname.replace(/^\/(?:book|chapter)\//, '');
@@ -1226,20 +1243,11 @@ export function TabProvider({ children }) {
     }
 
     if (urlBook) {
-      let targetChapIdx = undefined;
-      if (urlChapter !== null && urlChapter !== undefined && String(urlChapter).trim() !== '') {
-        const parsed = parseInt(String(urlChapter).trim(), 10);
-        if (!isNaN(parsed)) targetChapIdx = Math.max(0, parsed > 0 ? parsed - 1 : 0);
-      }
-      openBook(urlBook, {
-        targetChapterIdx: targetChapIdx,
-        targetParaNum: urlPara || undefined,
-        highlightQuery: urlQuery || undefined,
-        searchQuery: urlQuery || undefined,
-      });
+      // Delegate URL-driven opens (including #para1091 hash) to MainAppContent (app/page.js:116)
+      // to avoid duplicate openBook race that caused TOC flash and hash loss.
+      // MainAppContent handles hash + ?q= + path parsing; TabContext resumes only when no URL book.
       return;
     }
-
 
     // Resume from localStorage
     try {

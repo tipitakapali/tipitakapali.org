@@ -292,6 +292,28 @@ export default function HelpGuideContent({ showTabBar = true }) {
               <strong>Footnotes & Variant Readings Included:</strong> The search index preserves all scholarly variant readings (e.g. <code className="font-mono text-[var(--accent)]">syā.</code>, <code className="font-mono text-[var(--accent)]">ka.</code>, <code className="font-mono text-[var(--accent)]">pī.</code>) and manuscript annotations.
             </div>
           </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1.5">
+            <div className="font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+              <ExternalLink size={14} className="text-[var(--accent)]" />
+              <span>Search via URL — Shareable & Bookmarkable (&ldquo;?q=&rdquo;)</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              TipitakaPali.org now supports <code className="font-mono text-[var(--accent)]">?q=</code> in the address bar (also <code className="font-mono text-[var(--accent)]">?search=</code>). Visiting <code className="font-mono text-[var(--accent)]">https://tipitakapali.org/?q={"{search_term_string}"}</code> auto-opens the search modal — ideal for sharing, bookmarks, and AI agents (<code className="font-mono">llms.txt</code> / <code className="font-mono">site.jsonld:SearchAction</code>).
+            </p>
+            <ul className="grid grid-cols-1 gap-1.5 text-[11px]">
+              <li className="p-1.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-between gap-2">
+                <span><code className="font-mono text-[var(--accent)]">https://tipitakapali.org/?q=anatta</code> — full-text FTS5</span>
+                <span className="text-[10px] text-[var(--text-muted)]">q= required</span>
+              </li>
+              <li className="p-1.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)]">
+                Combine with filters via URL as well: <code className="font-mono text-[var(--accent)]">?q=mettā&pitaka=sutta&mat=mula</code> (handled by advanced search modal after open).
+              </li>
+              <li className="p-1.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)]">
+                Tip: Copy URL after searching — it retains <code className="font-mono text-[var(--accent)]">?q=</code> via <code className="font-mono">history.replaceState</code> for easy sharing.
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
