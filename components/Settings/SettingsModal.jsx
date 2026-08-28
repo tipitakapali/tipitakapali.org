@@ -81,6 +81,7 @@ export default function SettingsModal() {
 
   const {
     dockMode,
+    isMobileScreen,
     setDockMode,
     fontSizeMultiplier,
     setFontSizeMultiplier,
@@ -321,16 +322,23 @@ export default function SettingsModal() {
                     ].map((m) => {
                       const Icon = m.icon;
                       const isSelected = dockMode === m.id || (m.id === 'side' && dockMode === 'right');
+                      const isDisabled = isMobileScreen && m.id !== 'modal';
                       return (
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => setDockMode(m.id)}
-                          className={`py-2 px-2.5 rounded-lg border transition flex items-center justify-center gap-1.5 cursor-pointer text-xs font-bold ${
-                            isSelected
-                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs'
-                              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-gray-400'
+                          disabled={isDisabled}
+                          onClick={() => {
+                            if (!isDisabled) setDockMode(m.id);
+                          }}
+                          className={`py-2 px-2.5 rounded-lg border transition flex items-center justify-center gap-1.5 text-xs font-bold ${
+                            isDisabled
+                              ? 'opacity-35 cursor-not-allowed bg-[var(--bg-secondary)]/50 border-[var(--border-color)]/60 text-[var(--text-muted)] select-none'
+                              : isSelected
+                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs cursor-pointer'
+                              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-gray-400 cursor-pointer'
                           }`}
+                          title={isDisabled ? 'Side docking requires a desktop screen (≥768px)' : m.label}
                         >
                           <Icon size={14} />
                           <span>{m.label}</span>
@@ -338,7 +346,13 @@ export default function SettingsModal() {
                       );
                     })}
                   </div>
+                  {isMobileScreen && (
+                    <p className="text-[10.5px] text-[var(--text-muted)] mt-1.5">
+                      * Docked side panels require desktop screens (≥768px). Center modal is automatically used on mobile devices.
+                    </p>
+                  )}
                 </div>
+
 
 
                 {/* 3. Dictionary Font Size */}

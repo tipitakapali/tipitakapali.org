@@ -223,8 +223,12 @@ html, body {
   pointer-events: none !important;
 }
 
-/* Zen Mode (Header & Footer Hidden) */
+/* Zen Mode (Header, Tabs Bar & Footer Hidden) */
 body.zen-mode .app-header {
+  display: none !important;
+}
+
+body.zen-mode .book-tabs-bar {
   display: none !important;
 }
 
@@ -255,7 +259,20 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   z-index: 40;
   overflow-x: auto;
   scrollbar-width: none;
+  transition: margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, height 0.28s ease, padding 0.28s ease;
 }
+
+.book-tabs-bar.hidden-tabs-bar {
+  margin-top: calc(-1 * var(--tabs-height, 36px)) !important;
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+}
+
 
 .book-tabs-bar::-webkit-scrollbar {
   display: none;
@@ -2735,36 +2752,34 @@ div.dict-dock-panel.dock-side {
   border-bottom-color: var(--accent);
 }
 
-/* Clicked/Tapped Word Highlight in Reader & Dictionary */
+/* Clicked/Tapped Word Highlight in Reader & Dictionary (High contrast yellow for all themes including OLED) */
 .reader-clicked-word,
 .dict-clicked-word {
-  background-color: var(--accent-light, rgba(99, 102, 241, 0.15)) !important;
+  background-color: #ffff00 !important;
+  color: #000000 !important;
   border-radius: 4px;
   padding: 1px 3px;
   margin: 0 -1px;
-  color: inherit;
-  font-weight: inherit;
+  font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 0 0 1px var(--accent-border, rgba(99, 102, 241, 0.25));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
   display: inline;
 }
 
 [data-theme="dark"] .reader-clicked-word,
 [data-theme="dark"] .dict-clicked-word,
+[data-theme="oled"] .reader-clicked-word,
+[data-theme="oled"] .dict-clicked-word,
+[data-theme="sepia"] .reader-clicked-word,
+[data-theme="sepia"] .dict-clicked-word,
 .dark .reader-clicked-word,
 .dark .dict-clicked-word {
-  background-color: rgba(99, 102, 241, 0.3) !important;
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.35);
-  color: inherit;
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
-[data-theme="sepia"] .reader-clicked-word,
-[data-theme="sepia"] .dict-clicked-word {
-  background-color: rgba(180, 83, 9, 0.2) !important;
-  box-shadow: 0 0 0 1px rgba(180, 83, 9, 0.25);
-  color: inherit;
-}
 
 .inflection-highlight {
   background-color: var(--accent-light) !important;

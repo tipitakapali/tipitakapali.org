@@ -106,6 +106,25 @@ export function DictionaryProvider({ children }) {
   // Active expanded section target IDs (e.g. Set of targetIds like 'declension_buddha_1')
   const [expandedSections, setExpandedSections] = useState({});
 
+  const [isMobileScreen, setIsMobileScreen] = useState(() => {
+
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobileScreen(mobile);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Load user preferences from localStorage
   useEffect(() => {
     try {
@@ -119,6 +138,7 @@ export function DictionaryProvider({ children }) {
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
         setDockModeState(isMobile ? 'modal' : 'side');
       }
+
       const savedFont = localStorage.getItem(STORAGE_KEYS.FONT_SIZE);
       if (savedFont) {
         const num = parseFloat(savedFont);
@@ -458,14 +478,19 @@ export function DictionaryProvider({ children }) {
     setDisplayWord('');
   }, []);
 
+  const effectiveDockMode = isMobileScreen ? 'modal' : dockMode;
+
   const value = {
     isOpen,
     queryWord,
     displayWord,
     activeDictTab,
-    dockMode,
+    dockMode: effectiveDockMode,
+    rawDockMode: dockMode,
+    isMobileScreen,
     fontSizeMultiplier,
     clickToLookupEnabled,
+
     clickLookupMode,
     dictOrder,
     dictEnabled,

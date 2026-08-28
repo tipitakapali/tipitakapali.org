@@ -7,7 +7,7 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertPaliScript, capitalizePali, normalizePaliForSearch } from '../services/transliterate';
 
 export default function HistoryModal({ isOpen, onClose }) {
-  const { recentHistory, clearHistory, openBook } = useTabs();
+  const { recentHistory, clearHistory, openBook, closeAllTabs } = useTabs();
   const { settings } = useThemeSettings();
   const [filterText, setFilterText] = useState('');
 
@@ -47,36 +47,58 @@ export default function HistoryModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 animate-fade-in">
-      <div className="modal-card bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+    <div className="modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
+      <div
+        className="modal-card bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="modal-header px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 font-bold text-sm text-[var(--accent)]">
-            <History size={16} />
-            <span>Recent Reading History</span>
+        <div className="modal-header px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-2 shrink-0 select-none">
+          {/* Left: Clear All History */}
+          <div className="flex items-center min-w-[75px] shrink-0">
+            {recentHistory.length > 0 ? (
+              <button
+                className="text-[11px] font-bold text-[var(--text-muted)] hover:text-red-500 px-2 sm:px-2.5 py-1 rounded-lg border border-[var(--border-color)] hover:border-red-400 bg-[var(--bg-card)] transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                onClick={clearHistory}
+                title="Clear all recent history entries"
+              >
+                <Trash2 size={12} />
+                <span>Clear All</span>
+              </button>
+            ) : <div className="w-[75px]" />}
+          </div>
+
+          {/* Center: Recent Tabs Title */}
+          <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-[var(--accent)] justify-center flex-1 text-center truncate">
+            <History size={16} className="shrink-0" />
+            <span>Recent Tabs</span>
             <span className="text-[11px] font-normal text-[var(--text-muted)]">
               ({recentHistory.length})
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            {recentHistory.length > 0 && (
-              <button
-                className="text-[11px] text-[var(--text-muted)] hover:text-red-500 px-2 py-1 rounded hover:bg-[var(--bg-card)] transition flex items-center gap-1"
-                onClick={clearHistory}
-                title="Clear all reading history"
-              >
-                <Trash2 size={12} />
-                <span>Clear</span>
-              </button>
-            )}
+
+          {/* Right: Close All Open Tabs & Dismiss */}
+          <div className="flex items-center justify-end gap-1.5 min-w-[75px] shrink-0">
             <button
-              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition ml-1"
+              className="text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] px-2 sm:px-2.5 py-1 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] bg-[var(--bg-card)] transition cursor-pointer shadow-2xs whitespace-nowrap"
+              onClick={() => {
+                closeAllTabs();
+                onClose();
+              }}
+              title="Close all open reading tabs"
+            >
+              <span>Close All Tabs</span>
+            </button>
+            <button
+              className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition cursor-pointer"
               onClick={onClose}
+              title="Close (Esc)"
             >
               <X size={16} />
             </button>
           </div>
         </div>
+
 
         {/* Search Filter */}
         <div className="px-4 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-primary)] shrink-0">

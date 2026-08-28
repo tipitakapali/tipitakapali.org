@@ -23,10 +23,14 @@ export default function BookTabsBar() {
     recentHistory,
     setIsHistoryOpen,
     isSidebarOpen,
+    isHeaderVisible,
     setIsSidebarOpen,
     setIsHeaderVisible,
   } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
+
+  const isHidden = !isHeaderVisible && !isSidebarOpen;
+
 
   const tabsScrollRef = useRef(null);
   const menuRef = useRef(null);
@@ -155,7 +159,7 @@ export default function BookTabsBar() {
   };
 
   return (
-    <div className="book-tabs-bar select-none" onWheel={handleWheel}>
+    <div className={`book-tabs-bar select-none ${isHidden ? 'hidden-tabs-bar' : ''}`} onWheel={handleWheel}>
       <div className="tabs-scroll-container" ref={tabsScrollRef}>
         {openTabs.map((tab, idx) => {
           const isActive = tab.bookCode === activeBookCode;
@@ -208,8 +212,8 @@ export default function BookTabsBar() {
       <button
         className="new-tab-btn flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer shrink-0"
         onClick={() => setIsHistoryOpen(true)}
-        title="Recent Reading History"
-        aria-label="Recent Reading History"
+        title="Recent Tabs"
+        aria-label="Recent Tabs"
       >
         <History size={14} className="text-[var(--accent)]" />
         {recentHistory.length > 0 && (
@@ -218,6 +222,7 @@ export default function BookTabsBar() {
           </span>
         )}
       </button>
+
 
       {/* Tab Context Menu */}
       {contextMenu && (

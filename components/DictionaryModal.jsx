@@ -291,7 +291,23 @@ export default function DictionaryModal() {
     return result.length > 0 ? result : rawTabs;
   }, [lookupData, dictOrder, dictEnabled]);
 
+  // Only display tabs that have lookup results (Task 4)
+  const visibleTabs = useMemo(() => {
+    return DICT_TABS.filter((t) => t.count > 0);
+  }, [DICT_TABS]);
+
+  // Auto-switch to first available tab with results if current tab has none
+  useEffect(() => {
+    if (visibleTabs.length > 0) {
+      const hasActive = visibleTabs.some((t) => t.id === activeDictTab);
+      if (!hasActive) {
+        setDictTab(visibleTabs[0].id);
+      }
+    }
+  }, [visibleTabs, activeDictTab, setDictTab]);
+
   // Resize handler for docked width (Left or Right panel)
+
   const startResizingWidth = useCallback(
     (mouseDownEvent) => {
       mouseDownEvent.preventDefault();
@@ -473,8 +489,9 @@ export default function DictionaryModal() {
     };
   }, []);
 
-  // Touch Gesture Handling: Horizontal Swipe between Tabs (looping) + Pull Down to Dismiss
+  // Touch Gesture Handling: Horizontal Swipe between available Tabs (Task 7: swipe down disabled)
   const touchStartRef = useRef({ x: 0, y: 0, time: 0, isHeader: false });
+
 
   const handleTouchStart = useCallback((e) => {
     if (e.touches.length !== 1) return;
@@ -506,20 +523,11 @@ export default function DictionaryModal() {
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
 
-    // 1. Pull down gesture to dismiss (minimum 70px vertical swipe downwards)
-    if (deltaY > 70 && absY > absX * 1.3) {
-      const isAtTop = !contentContainerRef.current || contentContainerRef.current.scrollTop <= 5;
-      if (start.isHeader || isAtTop) {
-        closeDictionary();
-        return;
-      }
-    }
-
-    // 2. Horizontal swipe gesture to switch dictionary tabs (looping among enabled dictionary tabs)
-    if (absX > 45 && absX > absY * 1.3) {
-      const tabIds = DICT_TABS.map((t) => t.id);
+    // Horizontal swipe gesture to switch dictionary tabs among tabs that have results
+    if (absX > 45 && absX > absY * 1.3 && visibleTabs.length > 1) {
+      const tabIds = visibleTabs.map((t) => t.id);
       const currentIndex = tabIds.indexOf(activeDictTab);
-      if (currentIndex !== -1 && tabIds.length > 1) {
+      if (currentIndex !== -1) {
         if (deltaX < 0) {
           // Swipe Left -> Next tab (looping)
           const nextIndex = (currentIndex + 1) % tabIds.length;
@@ -531,7 +539,7 @@ export default function DictionaryModal() {
         }
       }
     }
-  }, [activeDictTab, closeDictionary, handleTabSelect, DICT_TABS]);
+  }, [activeDictTab, handleTabSelect, visibleTabs]);
 
   // Handle word search submission
   const handleSearchSubmit = (e) => {
@@ -768,9 +776,8 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Streamlined Dictionary Header & Search Bar */}
       {/* ========================================================= */}
-      <div className={`dict-header-bar bg-[var(--bg-secondary)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none ${
-        dockMode === 'modal' ? 'pt-2 sm:pt-2.5 px-2 sm:px-2.5 pb-0' : 'pt-0 pb-0 px-2 sm:px-2.5'
-      }`}>
+      <div className="dict-header-bar bg-[var(--bg-secondary)] pt-2 sm:pt-2.5 px-2 sm:px-2.5 pb-0 flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+
         {/* Previous / Next Lookup History Controls */}
         <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-0.5 shrink-0 shadow-2xs">
           <button
@@ -850,48 +857,44 @@ export default function DictionaryModal() {
       </div>
 
       {/* ========================================================= */}
-      {/* Dictionary Switcher Tabs Bar */}
+      {/* Dictionary Switcher Tabs Bar (Only display tabs with results - Task 4) */}
       {/* ========================================================= */}
-      <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-        {DICT_TABS.map((tab) => {
-          const isActive = activeDictTab === tab.id;
-          const hasMatches = tab.count > 0;
-          const isTabPending = isBackgroundLoading && tab.id !== 'dpd' && tab.count === 0;
-          const displayCount = tab.count > 99 ? '99+' : tab.count;
+      {visibleTabs.length > 0 && (
+        <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+          {visibleTabs.map((tab) => {
+            const isActive = activeDictTab === tab.id;
+            const hasMatches = tab.count > 0;
+            const displayCount = tab.count > 99 ? '99+' : tab.count;
 
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabSelect(tab.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none shrink-0 transition-colors ${
-                isActive
-                  ? 'bg-[var(--accent)] text-white shadow-xs'
-                  : hasMatches
-                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--accent)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
-              }`}
-              title={tab.desc}
-            >
-              <span>{tab.label}</span>
-              {hasMatches ? (
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center ${
-                      isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
-                    }`}
-                  >
-                    {displayCount}
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabSelect(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none shrink-0 transition-colors ${
+                  isActive
+                    ? 'bg-[var(--accent)] text-white shadow-xs'
+                    : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[var(--accent)]'
+                }`}
+                title={tab.desc}
+              >
+                <span>{tab.label}</span>
+                {hasMatches && (
+                  <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center ${
+                        isActive ? 'bg-white/25 text-white' : 'bg-[var(--accent-light)] text-[var(--accent)]'
+                      }`}
+                    >
+                      {displayCount}
+                    </span>
                   </span>
-                </span>
-              ) : isTabPending ? (
-                <span className="inline-flex items-center justify-center w-[22px] h-[16px] shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/60 animate-pulse inline-block" />
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
 
       {/* ========================================================= */}
       {/* Definition Content Body (Lean & Seamless without chunky borders) */}
