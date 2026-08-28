@@ -52,3 +52,20 @@ pm2 logs api.tipitakapali.org
 pm2 restart api.tipitakapali.org
 pm2 stop api.tipitakapali.org
 ```
+
+### Auto-Start PM2 on Boot
+`pm2 start` alone only runs the app for the current session — after a machine reboot nothing will restart it. To make the API start automatically on boot:
+
+```bash
+# 1. Start the app (as above)
+pm2 start ecosystem.config.js
+
+# 2. Install the boot script (run with sudo if needed, and execute
+#    the command pm2 prints if it asks you to)
+pm2 startup
+
+# 3. Snapshot the current process list so PM2 restores it at boot
+pm2 save
+```
+
+> **Note**: `pm2 save` must be run after the app has been started, or the snapshot won't include `api.tipitakapali.org`. Re-run `pm2 save` whenever you add, remove, or restart apps so the saved snapshot stays in sync.
