@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 
 // Locate dictionary database directory (strictly server_api/db)
 const DB_DIR = path.resolve(__dirname, 'db');
@@ -52,7 +52,7 @@ function initDictDatabases() {
     for (const [key, filename] of Object.entries(DB_FILES)) {
       const fullPath = path.join(DB_DIR, filename);
       if (fs.existsSync(fullPath)) {
-        const db = new DatabaseSync(fullPath, { readOnly: true });
+        const db = new Database(fullPath, { readonly: true });
         db.exec(`
           PRAGMA synchronous = NORMAL;
           PRAGMA temp_store = MEMORY;

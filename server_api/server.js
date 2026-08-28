@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
@@ -26,7 +26,7 @@ if (!DB_PATH) {
 console.log(`[Database] Using SQLite database at: ${DB_PATH}`);
 
 // Initialize SQLite database connection (Native Fast Synchronous Engine)
-const db = new DatabaseSync(DB_PATH, { readOnly: true });
+const db = new Database(DB_PATH, { readonly: true });
 
 // Optimize SQLite engine parameters with standard lightweight settings
 db.exec(`
@@ -47,7 +47,7 @@ let FTS_DB_PATH = FTS_DB_CANDIDATES.find((p) => fs.existsSync(p));
 let dbFts = null;
 if (FTS_DB_PATH) {
   try {
-    dbFts = new DatabaseSync(FTS_DB_PATH, { readOnly: true });
+    dbFts = new Database(FTS_DB_PATH, { readonly: true });
     dbFts.exec(`
       PRAGMA synchronous = NORMAL;
       PRAGMA temp_store = MEMORY;

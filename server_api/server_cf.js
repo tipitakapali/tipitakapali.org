@@ -28,7 +28,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
@@ -53,7 +53,7 @@ if (!FTS_DB_PATH) {
 }
 
 // Initialize SQLite FTS connection (Native Fast Synchronous Engine, read-only)
-const dbFts = new DatabaseSync(FTS_DB_PATH, { readOnly: true });
+const dbFts = new Database(FTS_DB_PATH, { readonly: true });
 dbFts.exec(`
   PRAGMA synchronous = NORMAL;
   PRAGMA temp_store = MEMORY;

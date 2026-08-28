@@ -1,6 +1,6 @@
 # Chaṭṭha Saṅgāyana Tipiṭaka — Fastify Node.js Backend API
 
-Ultra-fast, production-ready REST API built with **Node.js 24**, **Fastify**, and **native SQLite C++ engine (`node:sqlite`)** designed to serve 217 Tipiṭaka books and 520,000+ paragraphs with sub-millisecond latency.
+Ultra-fast, production-ready REST API built with **Node.js 24**, **Fastify**, and **better-sqlite3** (the fastest synchronous SQLite driver for Node.js) designed to serve 217 Tipiṭaka books and 520,000+ paragraphs with sub-millisecond latency.
 
 ---
 
