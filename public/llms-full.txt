@@ -243,12 +243,24 @@
 - Example: `GET /api/book/s0101m.mul/chapter/1`
 - Description: Returns pure HTML content of the requested chapter.
 
-### 5. Full-Text Search (FTS5)
-- Endpoint: `GET https://tipitakapali.org/api/search?q={query}&pitaka={all|vinaya|sutta|abhidhamma}&mat={all|mula|attha|tika}&limit=50`
-- Example: `GET /api/search?q=anatta&pitaka=sutta`
-- Description: Ultra-fast full-text search across 520,000+ canonical paragraphs.
+### 5. Full-Text Search (FTS5) — Direct VPS
+- Endpoint: `GET https://api.tipitakapali.org/api/search?q={query}&pitaka={all|vinaya|sutta|abhidhamma}&mat={all|mula|attha|tika}&limit=50`
+- Example: `GET https://api.tipitakapali.org/api/search?q=anatta&pitaka=sutta` (also `GET {site_url}/api/search?q=anatta`)
+- Description: Ultra-fast FTS5 across 520,000+ paragraphs. CORS `*`, `Cache-Control: public, max-age=86400`.
 
-### 6. Pāḷi Dictionary Lookup
-- Endpoint: `GET https://tipitakapali.org/api/dict/lookup?w={pali_word}&dict={all|dpd|pts|abd|psd}`
-- Example: `GET /api/dict/lookup?w=dhamma`
-- Description: Comprehensive lexical lookup across Digital Pāḷi Dictionary (DPD), PTS Pali-English Dictionary, Abhidhānappadīpikā, etc.
+### 6. Pāḷi Dictionary Lookup — AI Tool-Use (Direct VPS)
+- Endpoint: `GET https://api.tipitakapali.org/api/dict/lookup?w={pali_word}&dict={dpd|others|all|pts|abd|psd|sans|splitter}`
+- Example DPD (primary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd` → `{word,counts:{dpd:2}, dpd:[{word,html}]}`
+- Example Others (secondary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others` → `{counts:{pts,abd,psd,sans,splitter}, pts:[], ...}`
+- All-in-one: `GET https://api.tipitakapali.org/api/dict/lookup?w=dhamma&dict=all`
+- Also via edge: `GET {site_url}/api/dict/lookup?w=dhamma&dict=dpd` (proxied, slower)
+- Description: DPD (90k+ entries), PTS PED 2015, Abhidhānappadīpikā, Pāḷi-Sinhala, Sanskrit. `w` accepts Velthuis/`ṁ→ṃ`. No auth, `GET` preferred, `POST {w,dict}` also.
+
+### 7. Inflection Lookup
+- Endpoint: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_{lemma}_1`
+- Example: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1`
+- Description: Declension/conjugation tables. Returns `{word, html}`.
+
+### 8. OpenAPI & AI Plugin
+- OpenAPI: `GET https://tipitakapali.org/openapi.json` (for ChatGPT/MCP tool import)
+- AI Plugin: `GET https://tipitakapali.org/.well-known/ai-plugin.json`

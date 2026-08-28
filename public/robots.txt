@@ -16,7 +16,7 @@ Allow: /book/
 Allow: /chapter/
 Disallow: /api/search*
 
-# 2. Leading AI Crawlers, Search Agents & LLM Scrapers
+# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow dict tool use
 User-agent: GPTBot
 User-agent: ChatGPT-User
 User-agent: OAI-SearchBot
@@ -35,16 +35,33 @@ Allow: /
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /api/
+Allow: /api/dict/lookup
+Allow: /api/dict/inf
 Allow: /book/
 Allow: /chapter/
+
+# 2b. Canonical AI Tool API (direct VPS) — always allow
+# AI tools should call https://api.tipitakapali.org/api/dict/lookup?w={word}&dict=dpd|others
+# and https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd as live example
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: PerplexityBot
+Allow: /api/dict/
 
 # 3. Default for all other user agents
 User-agent: *
 Allow: /
 Allow: /_next/
 Allow: /api/
+Allow: /api/dict/lookup
+Allow: /api/dict/inf
 Disallow: /api/search*
 
 # 4. Sitemaps and AI Entry Points
 Sitemap: https://tipitakapali.org/sitemap.xml
 Host: tipitakapali.org
+# AI Tool Docs
+# Canonical Dict API: https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd
+# Canonical Dict Others: https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others
+# OpenAPI: https://tipitakapali.org/openapi.json
+# AI Plugin: https://tipitakapali.org/.well-known/ai-plugin.json

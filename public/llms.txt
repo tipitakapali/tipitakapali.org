@@ -16,6 +16,8 @@
 - [Home & Canonical Navigation](https://tipitakapali.org/)
 - [Full Catalog & AI Documentation](https://tipitakapali.org/llms-full.txt)
 - [XML Sitemap](https://tipitakapali.org/sitemap.xml)
+- [OpenAPI for AI Tools](https://tipitakapali.org/openapi.json)
+- [AI Plugin Manifest](https://tipitakapali.org/.well-known/ai-plugin.json)
 
 ## Reading URLs Syntax
 - Book: `https://tipitakapali.org/book/[book_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
@@ -30,7 +32,19 @@
 - Book Table of Contents: `GET https://tipitakapali.org/api/book/[book_code]/toc`
 - Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET https://tipitakapali.org/api/mat`
 
-## Dynamic Search & Dictionary Endpoints
-- Full-Text Search: `GET https://tipitakapali.org/api/search?q=[query]`
-- Dictionary Lookup: `GET https://tipitakapali.org/api/dict/lookup?w=[word]`
-- Inflection Lookup: `GET https://tipitakapali.org/api/dict/inf?w=[word]`
+## AI Tool-Use: Canonical Dictionary & Search (Direct VPS — no Worker hop)
+> Canonical base for AI agents: `https://api.tipitakapali.org` (CORS `*`, `Cache-Control: public, max-age=86400`)
+
+- **DPD Primary Lookup (recommended first):** `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd`
+  - Example live: `curl "https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd"` → `{word, counts:{dpd:2}, dpd:[{word,html}]}`
+- **Secondary Dictionaries (PTS, ABD, PSD, Sanskrit, Splitter):** `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others`
+  - Returns `{counts:{pts,abd,psd,sans,splitter}, pts:[], abd:[], psd:[], sans:[], splitter:[]}`
+- **All at once:** `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=all` or `GET https://tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=all`
+- **Inflection:** `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1` → `{word, html}`
+- **Full-Text Search:** `GET https://api.tipitakapali.org/api/search?q=anatta&pitaka=sutta&mat=mula&limit=50`
+- Params: `w` (Pāḷi word, Velthuis or Unicode, `ṁ→ṃ` normalized), `dict` (`dpd`|`others`|`all`|`pts`|`abd`|`psd`|`sans`|`splitter`), `d=yes` for splitter.
+- No auth, `CORS *`, `GET` preferred (POST also via `{w,dict}` JSON).
+
+## Legacy Edge Proxies (also work, but direct VPS is faster)
+- `GET https://tipitakapali.org/api/dict/lookup?w=[word]&dict=dpd` → proxied to VPS
+- `GET https://tipitakapali.org/api/search?q=[query]` → proxied to VPS

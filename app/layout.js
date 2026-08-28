@@ -102,14 +102,24 @@ const jsonLdWebsite = {
   url: 'https://tipitakapali.org/',
   description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with multi-script typography, DPD dictionary, and full-text search.',
   inLanguage: ['pi', 'en', 'my', 'si', 'th', 'vi'],
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: 'https://tipitakapali.org/?q={search_term_string}',
+  potentialAction: [
+    {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: 'https://tipitakapali.org/?q={search_term_string}',
+      },
+      'query-input': 'required name=search_term_string',
     },
-    'query-input': 'required name=search_term_string',
-  },
+    {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: 'https://api.tipitakapali.org/api/dict/lookup?w={search_term_string}&dict=dpd',
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  ],
 };
 
 export default function RootLayout({ children }) {

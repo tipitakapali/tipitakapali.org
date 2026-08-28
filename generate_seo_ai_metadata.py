@@ -100,6 +100,7 @@ def generate_sitemap_xml(books, chapters, site_url):
 
 def generate_robots_txt(site_url):
     """Generate SEO and AI crawler friendly robots.txt."""
+    api_url = "https://api.tipitakapali.org"
     return f"""# robots.txt for Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
 # =========================================================
 
@@ -118,7 +119,7 @@ Allow: /book/
 Allow: /chapter/
 Disallow: /api/search*
 
-# 2. Leading AI Crawlers, Search Agents & LLM Scrapers
+# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow dict tool use
 User-agent: GPTBot
 User-agent: ChatGPT-User
 User-agent: OAI-SearchBot
@@ -137,23 +138,41 @@ Allow: /
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /api/
+Allow: /api/dict/lookup
+Allow: /api/dict/inf
 Allow: /book/
 Allow: /chapter/
+
+# 2b. Canonical AI Tool API (direct VPS) — always allow
+# AI tools should call {api_url}/api/dict/lookup?w={{word}}&dict=dpd|others
+# and {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd as live example
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: PerplexityBot
+Allow: /api/dict/
 
 # 3. Default for all other user agents
 User-agent: *
 Allow: /
 Allow: /_next/
 Allow: /api/
+Allow: /api/dict/lookup
+Allow: /api/dict/inf
 Disallow: /api/search*
 
 # 4. Sitemaps and AI Entry Points
 Sitemap: {site_url}/sitemap.xml
 Host: {site_url.replace('https://', '').replace('http://', '')}
+# AI Tool Docs
+# Canonical Dict API: {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd
+# Canonical Dict Others: {api_url}/api/dict/lookup?w=mett%C4%81&dict=others
+# OpenAPI: {site_url}/openapi.json
+# AI Plugin: {site_url}/.well-known/ai-plugin.json
 """
 
 def generate_llms_txt(site_url, books_count, chapters_count):
     """Generate /llms.txt adhering to the LLM agent standard (https://llmstxt.org)."""
+    api_url = "https://api.tipitakapali.org"
     return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
 > Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries.
 
@@ -172,6 +191,8 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 - [Home & Canonical Navigation]({site_url}/)
 - [Full Catalog & AI Documentation]({site_url}/llms-full.txt)
 - [XML Sitemap]({site_url}/sitemap.xml)
+- [OpenAPI for AI Tools]({site_url}/openapi.json)
+- [AI Plugin Manifest]({site_url}/.well-known/ai-plugin.json)
 
 ## Reading URLs Syntax
 - Book: `{site_url}/book/[book_code]` (e.g. `{site_url}/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
@@ -186,10 +207,22 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 - Book Table of Contents: `GET {site_url}/api/book/[book_code]/toc`
 - Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET {site_url}/api/mat`
 
-## Dynamic Search & Dictionary Endpoints
-- Full-Text Search: `GET {site_url}/api/search?q=[query]`
-- Dictionary Lookup: `GET {site_url}/api/dict/lookup?w=[word]`
-- Inflection Lookup: `GET {site_url}/api/dict/inf?w=[word]`
+## AI Tool-Use: Canonical Dictionary & Search (Direct VPS — no Worker hop)
+> Canonical base for AI agents: `{api_url}` (CORS `*`, `Cache-Control: public, max-age=86400`)
+
+- **DPD Primary Lookup (recommended first):** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd`
+  - Example live: `curl "{api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd"` → `{{word, counts:{{dpd:2}}, dpd:[{{word,html}}]}}`
+- **Secondary Dictionaries (PTS, ABD, PSD, Sanskrit, Splitter):** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=others`
+  - Returns `{{counts:{{pts,abd,psd,sans,splitter}}, pts:[], abd:[], psd:[], sans:[], splitter:[]}}`
+- **All at once:** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=all` or `GET {site_url}/api/dict/lookup?w=mett%C4%81&dict=all`
+- **Inflection:** `GET {api_url}/api/dict/inf?w=declension_mett%C4%81_1` → `{{word, html}}`
+- **Full-Text Search:** `GET {api_url}/api/search?q=anatta&pitaka=sutta&mat=mula&limit=50`
+- Params: `w` (Pāḷi word, Velthuis or Unicode, `ṁ→ṃ` normalized), `dict` (`dpd`|`others`|`all`|`pts`|`abd`|`psd`|`sans`|`splitter`), `d=yes` for splitter.
+- No auth, `CORS *`, `GET` preferred (POST also via `{{w,dict}}` JSON).
+
+## Legacy Edge Proxies (also work, but direct VPS is faster)
+- `GET {site_url}/api/dict/lookup?w=[word]&dict=dpd` → proxied to VPS
+- `GET {site_url}/api/search?q=[query]` → proxied to VPS
 """
 
 def generate_llms_full_txt(site_url, books, catalog):
@@ -235,21 +268,34 @@ def generate_llms_full_txt(site_url, books, catalog):
         "- Example: `GET /api/book/s0101m.mul/chapter/1`",
         "- Description: Returns pure HTML content of the requested chapter.",
         "",
-        "### 5. Full-Text Search (FTS5)",
-        f"- Endpoint: `GET {site_url}/api/search?q={{query}}&pitaka={{all|vinaya|sutta|abhidhamma}}&mat={{all|mula|attha|tika}}&limit=50`",
-        "- Example: `GET /api/search?q=anatta&pitaka=sutta`",
-        "- Description: Ultra-fast full-text search across 520,000+ canonical paragraphs.",
+        "### 5. Full-Text Search (FTS5) — Direct VPS",
+        f"- Endpoint: `GET https://api.tipitakapali.org/api/search?q={{query}}&pitaka={{all|vinaya|sutta|abhidhamma}}&mat={{all|mula|attha|tika}}&limit=50`",
+        "- Example: `GET https://api.tipitakapali.org/api/search?q=anatta&pitaka=sutta` (also `GET {site_url}/api/search?q=anatta`)",
+        "- Description: Ultra-fast FTS5 across 520,000+ paragraphs. CORS `*`, `Cache-Control: public, max-age=86400`.",
         "",
-        "### 6. Pāḷi Dictionary Lookup",
-        f"- Endpoint: `GET {site_url}/api/dict/lookup?w={{pali_word}}&dict={{all|dpd|pts|abd|psd}}`",
-        "- Example: `GET /api/dict/lookup?w=dhamma`",
-        "- Description: Comprehensive lexical lookup across Digital Pāḷi Dictionary (DPD), PTS Pali-English Dictionary, Abhidhānappadīpikā, etc.",
+        "### 6. Pāḷi Dictionary Lookup — AI Tool-Use (Direct VPS)",
+        f"- Endpoint: `GET https://api.tipitakapali.org/api/dict/lookup?w={{pali_word}}&dict={{dpd|others|all|pts|abd|psd|sans|splitter}}`",
+        "- Example DPD (primary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd` → `{word,counts:{dpd:2}, dpd:[{word,html}]}`",
+        "- Example Others (secondary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others` → `{counts:{pts,abd,psd,sans,splitter}, pts:[], ...}`",
+        "- All-in-one: `GET https://api.tipitakapali.org/api/dict/lookup?w=dhamma&dict=all`",
+        "- Also via edge: `GET {site_url}/api/dict/lookup?w=dhamma&dict=dpd` (proxied, slower)",
+        "- Description: DPD (90k+ entries), PTS PED 2015, Abhidhānappadīpikā, Pāḷi-Sinhala, Sanskrit. `w` accepts Velthuis/`ṁ→ṃ`. No auth, `GET` preferred, `POST {w,dict}` also.",
+        "",
+        "### 7. Inflection Lookup",
+        f"- Endpoint: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_{{lemma}}_1`",
+        "- Example: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1`",
+        "- Description: Declension/conjugation tables. Returns `{word, html}`.",
+        "",
+        "### 8. OpenAPI & AI Plugin",
+        f"- OpenAPI: `GET {site_url}/openapi.json` (for ChatGPT/MCP tool import)",
+        f"- AI Plugin: `GET {site_url}/.well-known/ai-plugin.json`",
     ])
 
     return "\n".join(lines)
 
 def generate_schema_jsonld(site_url, books):
     """Generate Schema.org JSON-LD structured data for Google Rich Results."""
+    api_url = "https://api.tipitakapali.org"
     schema = {
         "@context": "https://schema.org",
         "@graph": [
@@ -261,14 +307,24 @@ def generate_schema_jsonld(site_url, books):
                 "alternateName": ["Tipitaka Pali", "CSCD Pali Canon", "VRI Tipitaka"],
                 "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with multi-script typography, DPD dictionary, and full-text search.",
                 "inLanguage": ["pi", "en", "my", "si", "th", "vi"],
-                "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": {
-                        "@type": "EntryPoint",
-                        "urlTemplate": f"{site_url}/?q={{search_term_string}}"
+                "potentialAction": [
+                    {
+                        "@type": "SearchAction",
+                        "target": {
+                            "@type": "EntryPoint",
+                            "urlTemplate": f"{site_url}/?q={{search_term_string}}"
+                        },
+                        "query-input": "required name=search_term_string"
                     },
-                    "query-input": "required name=search_term_string"
-                }
+                    {
+                        "@type": "SearchAction",
+                        "target": {
+                            "@type": "EntryPoint",
+                            "urlTemplate": f"{api_url}/api/dict/lookup?w={{search_term_string}}&dict=dpd"
+                        },
+                        "query-input": "required name=search_term_string"
+                    }
+                ]
             },
             {
                 "@type": "DataCatalog",
@@ -355,6 +411,10 @@ def main():
         paths['next_git_dir'],
     ]
 
+    # Copy AI tool manifests if present in public/
+    openapi_src = paths['public_dir'] / 'openapi.json'
+    ai_plugin_src = paths['public_dir'] / '.well-known' / 'ai-plugin.json'
+
     files_written = 0
     for t_dir in target_dirs:
         if t_dir.exists():
@@ -368,6 +428,13 @@ def main():
                 f.write(llms_full_content)
             with open(t_dir / 'site.jsonld', 'w', encoding='utf-8') as f:
                 f.write(jsonld_content)
+            # Sync AI tool files to dist/next_git if they exist
+            if t_dir != paths['public_dir']:
+                if openapi_src.exists():
+                    (t_dir / 'openapi.json').write_text(openapi_src.read_text(encoding='utf-8'), encoding='utf-8')
+                if ai_plugin_src.exists():
+                    (t_dir / '.well-known').mkdir(parents=True, exist_ok=True)
+                    (t_dir / '.well-known' / 'ai-plugin.json').write_text(ai_plugin_src.read_text(encoding='utf-8'), encoding='utf-8')
             files_written += 5
             print(f"[✓] Saved SEO & AI files into: {t_dir}")
 

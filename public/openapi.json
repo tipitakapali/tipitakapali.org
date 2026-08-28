@@ -1,0 +1,62 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi API",
+    "version": "3.0.0",
+    "description": "Pāḷi Canon static edge API (tree/books/chapters) + dynamic VPS API (dict/search). Canonical AI tool base https://api.tipitakapali.org. CORS *."
+  },
+  "servers": [
+    { "url": "https://api.tipitakapali.org", "description": "Canonical VPS (direct, fastest for AI tools)" },
+    { "url": "https://tipitakapali.org", "description": "Edge (proxied, also works)" }
+  ],
+  "paths": {
+    "/api/dict/lookup": {
+      "get": {
+        "operationId": "dictLookup",
+        "summary": "Pāḷi dictionary lookup (DPD + secondary)",
+        "description": "Live example: w=mett%C4%81&dict=dpd and w=mett%C4%81&dict=others. w accepts Velthuis/Unicode (ṁ→ṃ). No auth, CORS *.",
+        "parameters": [
+          { "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Pāḷi word", "example": "mettā" },
+          { "name": "dict", "in": "query", "required": false, "schema": { "type": "string", "enum": ["all", "dpd", "others", "pts", "abd", "psd", "sans", "splitter"], "default": "all" }, "example": "dpd" },
+          { "name": "d", "in": "query", "required": false, "schema": { "type": "string", "enum": ["yes"] }, "description": "useSplitter" }
+        ],
+        "responses": {
+          "200": {
+            "description": "dict=all/dpd/others returns {word, counts:{dpd,pts,...}, dpd:[{word,html}], pts:[], ...}; single dict returns {word, results:[...]}",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      },
+      "post": {
+        "operationId": "dictLookupPost",
+        "summary": "Dictionary lookup via POST",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "w": { "type": "string" }, "dict": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "same as GET" } }
+      }
+    },
+    "/api/dict/inf": {
+      "get": {
+        "operationId": "dictInf",
+        "summary": "Inflection table",
+        "parameters": [{ "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "example": "declension_mettā_1" }],
+        "responses": { "200": { "description": "{word, html}" } }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "ftsSearch",
+        "summary": "FTS5 search 520k paras",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "example": "anatta" },
+          { "name": "pitaka", "in": "query", "schema": { "type": "string" } },
+          { "name": "mat", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "{total,count,results:[{book_code,snippet}]}}}" } }
+      }
+    },
+    "/api/tree": { "get": { "summary": "Navigation tree (edge static)", "responses": { "200": { "description": "tree json" } } } },
+    "/api/books": { "get": { "summary": "Books catalog", "responses": { "200": { "description": "books" } } } }
+  }
+}

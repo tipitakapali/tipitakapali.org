@@ -1,0 +1,16 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
+  "name_for_model": "tipitaka_pali",
+  "description_for_human": "Complete Pāḷi Canon (VRI) with DPD dictionary & FTS5 search.",
+  "description_for_model": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon. Use /api/dict/lookup for word definitions (DPD primary, others for secondary) and /api/search for full-text search. Canonical AI base https://api.tipitakapali.org.",
+  "auth": { "type": "none" },
+  "api": {
+    "type": "openapi",
+    "url": "https://tipitakapali.org/openapi.json",
+    "is_user_authenticated": false
+  },
+  "logo_url": "https://tipitakapali.org/android-chrome-512x512.png",
+  "contact_email": "tipitakapali.org@gmail.com",
+  "legal_info_url": "https://tipitakapali.org/"
+}
