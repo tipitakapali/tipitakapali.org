@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { fetchDictionaryLookup, fetchDictionaryInflection } from '../services/api';
+import { fetchDictionaryLookup, fetchDictionaryInflection, getFeedbackTemplateFromDb } from '../services/api';
 import { convertAnyToRoman, cleanDictionaryQuery } from '../services/transliterate';
+import { restoreMinifiedLinks } from '../services/dpdFeedback';
 
 export const AVAILABLE_DICTIONARIES = [
   {
@@ -39,60 +40,54 @@ export const AVAILABLE_DICTIONARIES = [
   },
   {
     id: 'sans',
-    label: 'Cologne Sanskrit Lexicons (MW / Apte / BHS)',
+    label: 'Sanskrit Dictionaries',
     shortLabel: 'Sanskrit',
     badge: 'Comparative',
     badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-    desc: 'Monier-Williams, V.S. Apte & Edgerton Buddhist Hybrid Sanskrit comparative lexicons.',
+    desc: 'Comparative Sanskrit roots and definitions (Apte Practical & Monier-Williams).',
   },
   {
     id: 'splitter',
-    label: 'DPD Compound Splitter & Sandhi',
+    label: 'DPD Word Splitter / Deconstructor',
     shortLabel: 'Splitter',
-    badge: 'Sandhi',
-    badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
-    desc: 'Deconstructs long compound words (Samāsa) and euphonic Sandhi junctions.',
+    badge: 'Analysis',
+    badgeClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+    desc: 'Automated compound word breakups and sandhi decomposition.',
   },
 ];
+
+const STORAGE_KEYS = {
+  DOCK_MODE: 'tipitaka_dict_dock_mode',
+  FONT_SIZE: 'tipitaka_dict_font_size_multiplier',
+  CLICK_LOOKUP: 'tipitaka_dict_click_lookup',
+  CLICK_MODE: 'tipitaka_dict_click_mode',
+  LAST_TAB: 'tipitaka_dict_last_tab',
+  DICT_ORDER: 'tipitaka_dict_order',
+  DICT_ENABLED: 'tipitaka_dict_enabled',
+};
 
 const DEFAULT_DICT_ORDER = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
 const DEFAULT_DICT_ENABLED = { dpd: true, pts: true, abd: true, psd: true, sans: true, splitter: true };
 
-const DictionaryContext = createContext();
-
-const STORAGE_KEYS = {
-  DOCK_MODE: 'tipitaka_dict_dock_mode_v1',
-  FONT_SIZE: 'tipitaka_dict_font_size_v1',
-  CLICK_LOOKUP: 'tipitaka_dict_click_lookup_v1',
-  CLICK_MODE: 'tipitaka_dict_click_mode_v1',
-  LAST_TAB: 'tipitaka_dict_last_tab_v1',
-  DICT_ORDER: 'tipitaka_dict_order_v2',
-  DICT_ENABLED: 'tipitaka_dict_enabled_v2',
-};
+const DictionaryContext = createContext(null);
 
 export function DictionaryProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
-  const [activeDictTab, setActiveDictTab] = useState('dpd');
-  const [dockMode, setDockModeState] = useState(() => {
-    // Default: Right Dock on desktop, Center Modal on mobile (small screen)
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768 ? 'modal' : 'side';
-    }
-    return 'side';
-  }); // 'modal' | 'left' | 'side' | 'right'
-  const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1.0);
+  const [dockMode, setDockModeState] = useState('side'); // 'modal' | 'left' | 'side' | 'right'
+  const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
-  const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
+  const [clickLookupMode, setClickLookupModeState] = useState('double'); // 'single' | 'double'
+  const [activeDictTab, setActiveDictTab] = useState('dpd');
   const [dictOrder, setDictOrderState] = useState(DEFAULT_DICT_ORDER);
   const [dictEnabled, setDictEnabledState] = useState(DEFAULT_DICT_ENABLED);
 
-  // History stack for back/forward navigation inside dictionary
+  // History navigation stack
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Results & Loading state (Stage 1 Priority DPD + Stage 2 Async Enrichment)
+  // Lookup results state
   const [lookupData, setLookupData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
@@ -107,7 +102,6 @@ export function DictionaryProvider({ children }) {
   const [expandedSections, setExpandedSections] = useState({});
 
   const [isMobileScreen, setIsMobileScreen] = useState(() => {
-
     if (typeof window !== 'undefined') {
       return window.innerWidth < 768;
     }
@@ -123,6 +117,11 @@ export function DictionaryProvider({ children }) {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch dynamic DPD feedback template on first visit (payload ##tipitakapalidpdfeedback)
+  useEffect(() => {
+    getFeedbackTemplateFromDb();
   }, []);
 
   // Load user preferences from localStorage
@@ -342,6 +341,18 @@ export function DictionaryProvider({ children }) {
 
         const hasAny = data.hasResults || dpdCount > 0 || ptsCount > 0 || abdCount > 0 || psdCount > 0 || sansCount > 0 || splitterCount > 0;
 
+        // Restore minified links and DPD feedback placeholders
+        const processedDpd = (data.dpd || []).map((entry) => {
+          if (entry && typeof entry === 'object') {
+            return {
+              ...entry,
+              html: entry.html ? restoreMinifiedLinks(entry.html) : '',
+              defi: entry.defi ? restoreMinifiedLinks(entry.defi) : '',
+            };
+          }
+          return entry;
+        });
+
         const lookupResult = {
           word: cleanWord,
           hasResults: hasAny,
@@ -354,7 +365,7 @@ export function DictionaryProvider({ children }) {
             sans: sansCount,
             splitter: splitterCount,
           },
-          dpd: data.dpd || [],
+          dpd: processedDpd,
           pts: data.pts || [],
           abd: data.abd || [],
           psd: data.psd || [],

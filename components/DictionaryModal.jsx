@@ -25,6 +25,7 @@ import { useDictionary } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertAnyToRoman, convertPaliScript, cleanDictionaryQuery } from '../services/transliterate';
 import { fetchDictionaryInflection } from '../services/api';
+import { restoreMinifiedLinks } from '../services/dpdFeedback';
 
 // Helper to highlight exact matching inflections in table cells (CC BY-NC-SA 4.0 DPD)
 function highlightInflections(searchTerm, container, targetScript = 'roman') {
@@ -101,12 +102,14 @@ function extractWordFromPointerEvent(e) {
 
 // Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons, definitions, & EPD English headwords untouched)
 function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
-  if (!rawHtml || !targetScript || targetScript === 'roman') return rawHtml;
-  if (typeof window === 'undefined') return rawHtml;
+  if (!rawHtml) return '';
+  const restored = dictType === 'dpd' ? restoreMinifiedLinks(rawHtml) : rawHtml;
+  if (!targetScript || targetScript === 'roman') return restored;
+  if (typeof window === 'undefined') return restored;
 
   try {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const doc = parser.parseFromString(restored, 'text/html');
 
     if (dictType === 'dpd') {
       // 1. Process sections / entries in DPD
@@ -693,9 +696,9 @@ export default function DictionaryModal() {
         return;
       }
 
-      // 3. Handle external links (e.g. feedback links, sutta external links)
-      const externalLink = e.target.closest('a[href^="http"], a.link');
-      if (externalLink && externalLink.getAttribute('href')?.startsWith('http')) {
+      // 3. Handle external & feedback links (e.g. Google Forms, mailto, GitHub releases, sutta links)
+      const externalLink = e.target.closest('a[href^="http"], a[href^="https"], a[href^="mailto"], a.link, a.dpd-link');
+      if (externalLink) {
         return;
       }
 
@@ -714,7 +717,12 @@ export default function DictionaryModal() {
         }
       }
 
-      // 5. Handle clicking ANY word inside the dictionary text results (Task 3)
+      // 5. Handle clicking ANY word inside the dictionary text results
+      // Don't trigger if clicked inside buttons, inputs, links, resizers, feedback boxes, or audio
+      if (e.target.closest('button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback')) {
+        return;
+      }
+
       const clickedWord = extractWordFromPointerEvent(e);
       const cleanClicked = clickedWord ? cleanDictionaryQuery(clickedWord) : '';
       if (cleanClicked && cleanClicked.length >= 2) {

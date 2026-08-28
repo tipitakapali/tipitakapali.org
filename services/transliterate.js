@@ -392,6 +392,11 @@ export function highlightHtmlText(
 export function cleanDictionaryQuery(rawInput) {
   if (!rawInput || typeof rawInput !== 'string') return '';
 
+  // Preserve internal metadata & template payloads (e.g. ##tipitakapalidpdfeedback, ##tipitakapaliversion)
+  if (rawInput.trim().startsWith('##')) {
+    return rawInput.trim();
+  }
+
   let text = rawInput;
 
   // 1. Normalize niggahita / anusvara: replace all ṁ / Ṁ with ṃ behind the scenes

@@ -277,6 +277,7 @@ export async function searchTipitaka(query, options = {}) {
 }
 
 import { cleanDictionaryQuery } from './transliterate';
+import { setDpdFeedbackTemplate, dpd_feedback_s } from './dpdFeedback';
 
 export async function fetchDictionaryLookup(word, dictType = 'all', options = {}) {
   const cleanWord = cleanDictionaryQuery(word || '').trim();
@@ -309,6 +310,27 @@ export async function fetchOthersLookup(word, options = {}) {
   return fetchDictionaryLookup(word, 'others', options);
 }
 
+/**
+ * Fetches the dynamic DPD feedback template from database (payload ##tipitakapalidpdfeedback)
+ * Adapted from ref/tipitakapali.org/web/handleClick_dev.js (getFeedbackTemplateFromDb)
+ */
+export async function getFeedbackTemplateFromDb(urlVisiting = 'unknown') {
+  try {
+    const res = await fetchDictionaryLookup('##tipitakapalidpdfeedback', 'dpd');
+    if (res && res.dpd && res.dpd.length > 0) {
+      const fbEntry = res.dpd[0];
+      const fbHtml = fbEntry.html || fbEntry.defi || '';
+      if (fbHtml && fbHtml.trim().length > 10) {
+        setDpdFeedbackTemplate(fbHtml.trim());
+        return fbHtml.trim();
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching feedback string from db:', err);
+  }
+  return dpd_feedback_s;
+}
+
 export async function fetchDictionaryInflection(query) {
   const cleanQuery = (query || '').trim();
   if (!cleanQuery) return null;
@@ -324,4 +346,5 @@ export async function fetchDictionaryInflection(query) {
     7 * 24 * 60 * 60 * 1000
   );
 }
+
 

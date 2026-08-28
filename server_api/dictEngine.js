@@ -73,6 +73,19 @@ function initDictDatabases() {
       console.log(`[DictEngine] Loaded DPD goldendict processor (${Object.keys(goldendict.family_root_json || {}).length} root families)`);
     }
 
+    // Load dynamic DPD feedback template from misc table in DPD database (payload ##tipitakapalidpdfeedback)
+    try {
+      if (dbs.DPD) {
+        const row = dbs.DPD.prepare("SELECT defi FROM misc WHERE word = '##tipitakapalidpdfeedback' LIMIT 1").get();
+        if (row && row.defi) {
+          dpdFeedbackTemplate = row.defi;
+          console.log('[DictEngine] Loaded dynamic DPD feedback template from misc table');
+        }
+      }
+    } catch (e) {
+      console.warn('[DictEngine] Could not load dynamic feedback template from misc table:', e.message);
+    }
+
     return true;
   } catch (err) {
     console.error('[DictEngine] Initialization failed:', err);
@@ -99,7 +112,9 @@ function getFChar(word, dbKey, useSplitter = false) {
   return prefix;
 }
 
-const DPD_FEEDBACK_TEMPLATE = `<p>ID <b>#tpo_id@ #tpo_word@</b></p><p>Digital Pāḷi Dictionary is a work in progress, made available for testing and feedback purposes.</p><p><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org" target="_blank">Add a missing word</a><span>. Please use this </span><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org" target="_blank">online form</a> to add missing words, especially from Vinaya, commentaries, and other later texts. If you prefer to work offline, here is a <a class="link" href="https://github.com/digitalpalidictionary/dpd-db/raw/main/docs/DPD%20Add%20Words.xlsx" download="true" target="_blank">spreadsheet to download</a><span>, fill in and submit.</span></p><p><a class="link" href="https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=#tpo_link@&entry.1433863141=Tipitakapali.org" target="_blank">Correct a mistake</a><span>. Did you spot a mistake in the dictionary? Please report it. It generally takes less than a minute and your corrections and suggestions help to improve the quality of this dictionary for everyone who uses it.</span></p><p><a class="link" href="https://digitalpalidictionary.github.io/" target="_blank">Visit the DPD website</a><span>. Get more detailed information about installation and upgrades, advanced settings and features.</span></p><p><a class="link" href="mailto:digitalpalidictionary@gmail.com?subject=Help%20with%20DPD">Help with coding or Pāḷi</a><span>. If you'd like to support the project, please get in touch.</span></p>`;
+const DPD_FEEDBACK_TEMPLATE = `<p>ID <b>#tpo_id@ #tpo_word@</b></p><p>Digital Pāḷi Dictionary is a work in progress, made available for testing and feedback purposes.</p><p><a class="dpd-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org+2026-03-03" target="_blank">Add a missing word</a><span>. Please use this </span><a class="dpd-link" href="https://docs.google.com/forms/d/e/1FAIpQLSfResxEUiRCyFITWPkzoQ2HhHEvUS5fyg68Rl28hFH6vhHlaA/viewform?usp=pp_url&entry.1433863141=Tipitakapali.org+2026-03-03" target="_blank">online form</a> to add missing words, especially from Vinaya, commentaries, and other later texts. If you prefer to work offline, here is a <a class="dpd-link" href="https://github.com/digitalpalidictionary/dpd-db/raw/main/misc/DPD%20Add%20Words.xlsx" download="true" target="_blank">spreadsheet to download</a><span>, fill in and submit. </span></p><p><a class="dpd-link" href="https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=#tpo_link@&entry.1433863141=Tipitakapali.org+2026-03-03" target="_blank">Correct a mistake</a><span>. Did you spot a mistake in the dictionary? Please report it. It generally takes less than a minute and your corrections and suggestions help to improve the quality of this dictionary for everyone who uses it.</span></p><p><a class="dpd-link" href="https://github.com/digitalpalidictionary/dpd-db/releases">Get updated</a><span>. You are using DPD Tipitakapali.org updated on <b>2026-03-03</b>. Check for an update every full moon uposatha day.</span></p><p><a class="dpd-link" href="https://digitalpalidictionary.github.io/">Visit the website</a><span>. Get more detailed information about installation and upgrades, advanced settings and features.</span></p><p><a class="dpd-link" href="mailto:digitalpalidictionary@gmail.com?subject=I'd%20like%20to%20help%20with%20code!&body=Please%20let%20me%20know%20how%20I%20can%20get%20involved%20with%20the%20development%20of%20DPD.">Help with coding</a><span>. If you're a coder and would like to support the project, please get in touch.</span></p><p><a class="dpd-link" href="mailto:digitalpalidictionary@gmail.com?subject=I%20want%20to%20help%20with%20DPD!&body=Please%20let%20me%20know%20how%20I%20can%20get%20involved%20with%20the%20development%20of%20DPD.">Help with Pāḷi</a><span>. If you have Pāḷi grammar skills and would like to assist, please make email contact.</span></p><p><a class="dpd-link" href="https://forms.gle/gJ7ouhJriYREPm1s8" target="_blank">Join the mailing list</a><span>. Get notified of updates and new features as soon as they become available.</span></p>`;
+
+let dpdFeedbackTemplate = DPD_FEEDBACK_TEMPLATE;
 
 const reDPDLinks = [
   ['https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform', 'L#0@'],
@@ -120,9 +135,9 @@ function restoreMinifiedLinksAndFeedback(html) {
 
   feedbackMatchIds.forEach(([entireMatchStr, idAndLemma]) => {
     const [id, lemma] = (idAndLemma || '').split('=');
-    let st = DPD_FEEDBACK_TEMPLATE.replaceAll('#tpo_id@', id || '');
+    let st = dpdFeedbackTemplate.replaceAll('#tpo_id@', id || '');
     st = st.replaceAll('#tpo_word@', lemma || '');
-    st = st.replaceAll('#tpo_link@', encodeURIComponent(lemma || ''));
+    st = st.replaceAll('#tpo_link@', (lemma || '').replaceAll(' ', '%20'));
     html = html.replace(entireMatchStr, st);
   });
 
@@ -191,6 +206,18 @@ function getSynonyms(word) {
 
 // Single-word DPD Query
 function lookupSingleDPD(word) {
+  if (word.startsWith('##')) {
+    try {
+      const row = dbs.DPD.prepare("SELECT word, defi FROM misc WHERE word = ? LIMIT 1").get(word);
+      if (row) {
+        return [{ word: row.word, isExact: true, html: restoreMinifiedLinksAndFeedback(row.defi) }];
+      }
+    } catch (e) {
+      console.error('[DictEngine] Error querying misc table for', word, e.message);
+    }
+    return [];
+  }
+
   const syns = getSynonyms(word);
   const wordsToQuery = [...new Set([word, ...syns])];
 
@@ -221,6 +248,7 @@ function lookupSingleDPD(word) {
 
 function normalizeDictWord(rawWord) {
   if (!rawWord || typeof rawWord !== 'string') return '';
+  if (rawWord.startsWith('##')) return rawWord.trim();
   let text = rawWord;
   // 1. Replace all ṁ / Ṁ with ṃ
   text = text.replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
