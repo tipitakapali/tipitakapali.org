@@ -105,10 +105,10 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.38);
 }
 
-[data-theme="paper"] {
+[data-theme="classic"] {
   --bg-primary: #f0eee5;
   --bg-secondary: #f4f4eb;
-  --bg-sidebar: #f0ebe3;
+  --bg-sidebar: #f0eee5;
   --bg-sidebar-hover: #e8e2d6;
   --bg-card: #ffffff;
   --text-primary: #141413;
@@ -128,9 +128,8 @@
   --scrollbar-thumb-hover: rgba(20, 20, 19, 0.32);
 }
 
-[data-theme="dusk"],
-[data-theme="night"] {
-  /* Dusk — Dracula, calm tech (night alias for compat) */
+[data-theme="dusk"] {
+  /* Dusk — Dracula, calm tech */
   --bg-primary: #282a36;
   --bg-secondary: #1e1f29;
   --bg-sidebar: #21222c;
@@ -284,36 +283,31 @@
 }
 
 /* Custom Accent Colors - Dusk/Dracula — warm amber, respectful */
-[data-theme="dusk"][data-accent="burgundy"],
-[data-theme="night"][data-accent="burgundy"] {
+[data-theme="dusk"][data-accent="burgundy"] {
   --accent: #ffb86c;
   --accent-hover: #ffcb8e;
   --accent-light: rgba(255, 184, 108, 0.14);
   --accent-border: rgba(255, 184, 108, 0.32);
 }
-[data-theme="dusk"][data-accent="saffron"],
-[data-theme="night"][data-accent="saffron"] {
+[data-theme="dusk"][data-accent="saffron"] {
   --accent: #f1fa8c;
   --accent-hover: #f8ffaa;
   --accent-light: rgba(241, 250, 140, 0.14);
   --accent-border: rgba(241, 250, 140, 0.32);
 }
-[data-theme="dusk"][data-accent="emerald"],
-[data-theme="night"][data-accent="emerald"] {
+[data-theme="dusk"][data-accent="emerald"] {
   --accent: #50fa7b;
   --accent-hover: #69ff8a;
   --accent-light: rgba(80, 250, 123, 0.14);
   --accent-border: rgba(80, 250, 123, 0.32);
 }
-[data-theme="dusk"][data-accent="indigo"],
-[data-theme="night"][data-accent="indigo"] {
+[data-theme="dusk"][data-accent="indigo"] {
   --accent: #bd93f9;
   --accent-hover: #caa9ff;
   --accent-light: rgba(189, 147, 249, 0.14);
   --accent-border: rgba(189, 147, 249, 0.32);
 }
-[data-theme="dusk"][data-accent="slate"],
-[data-theme="night"][data-accent="slate"] {
+[data-theme="dusk"][data-accent="slate"] {
   --accent: #8be9fd;
   --accent-hover: #a4efff;
   --accent-light: rgba(139, 233, 253, 0.14);

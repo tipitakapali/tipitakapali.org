@@ -19,7 +19,7 @@ export default function WelcomeView() {
   const { openSearchModal, isSidebarOpen, setIsHeaderVisible } = useTabs();
 
   // Light variants for light/sepia to avoid harsh black on light UI
-  const isLightBadge = settings?.theme === 'light' || settings?.theme === 'sepia';
+  const isLightBadge = settings?.theme === 'classic' || settings?.theme === 'white' || settings?.theme === 'sepia';
   const appStoreSrc = isLightBadge ? '/download-on-the-app-store-light.svg' : '/download-on-the-app-store.svg';
   const playStoreSrc = isLightBadge ? '/Google_Play_Store_badge_EN_light.svg' : '/Google_Play_Store_badge_EN.svg';
   const desktopSrc = isLightBadge ? '/download-for-desktop-light.svg' : '/download-for-desktop.svg';

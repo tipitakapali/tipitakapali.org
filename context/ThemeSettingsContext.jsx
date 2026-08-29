@@ -7,7 +7,7 @@ const DEFAULT_TRANSLATION_ORDER = ['english', 'myanmar', 'vietnamese', 'sinhala'
 const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v2';
 
 const DEFAULT_SETTINGS = {
-  theme: 'light',
+  theme: 'classic',
   accentColor: 'burgundy',
   fontFamily: 'gentium',
   fontSize: 22,

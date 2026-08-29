@@ -67,17 +67,17 @@ export default function Header() {
   }, [toggleSidebar, openSearchModal]);
 
   const currentThemeIcon =
-    settings.theme === 'dusk' || settings.theme === 'night'
+    settings.theme === 'dusk'
       ? '🌃'
-      : settings.theme === 'paper'
-      ? '📄'
+      : settings.theme === 'classic'
+      ? '☀️'
       : settings.theme === 'sepia'
       ? '📜'
       : settings.theme === 'dark'
       ? '🌙'
       : settings.theme === 'oled'
       ? '🌌'
-      : '☀️';
+      : '📄';
 
   const isHidden = !isHeaderVisible && !isSidebarOpen;
 
@@ -180,8 +180,8 @@ export default function Header() {
                 Theme
               </div>
               {[
-                { id: 'light', icon: '☀️', label: 'Light' },
-                { id: 'paper', icon: '📄', label: 'Paper' },
+                { id: 'classic', icon: '☀️', label: 'Classic' },
+                { id: 'white', icon: '📄', label: 'White' },
                 { id: 'sepia', icon: '📜', label: 'Sepia' },
                 { id: 'dark', icon: '🌙', label: 'Dark' },
                 { id: 'dusk', icon: '🌃', label: 'Dusk' },
