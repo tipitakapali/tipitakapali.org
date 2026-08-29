@@ -3529,16 +3529,15 @@ section.MWS {
 .dpd-splitter-section {
   padding: 12px 16px;
   border-radius: 10px;
-  border: 1.5px solid #6366f1;
-  background: var(--bg-card);
+  border: none;
+  background: transparent;
   margin: 4px 0;
   font-size: var(--dict-font-size, 15px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 [data-theme="dark"] .dpd-splitter-section {
-  border-color: #818cf8;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 .dpd-splitter-section .p2w {
