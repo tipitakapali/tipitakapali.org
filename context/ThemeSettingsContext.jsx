@@ -6,6 +6,34 @@ const DEFAULT_TRANSLATION_ORDER = ['english', 'vietnamese', 'myanmar', 'chinese'
 
 const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v3';
 
+// One-per-theme page background (matches --bg-primary in globals.css). iOS Safari tints
+// its chrome to this value. Key 'default' is the :root background (no data-theme attr set).
+const THEME_BACKGROUND = {
+  classic: '#f0eee5',
+  sepia: '#fbf0d9',
+  dark: '#18191a',
+  oled: '#000000',
+  dusk: '#282a36',
+  default: '#fdfdfc',
+};
+
+// meta[name=theme-color] + standalone status bar update when theme changes.
+function applyBrowserThemeColor(theme) {
+  if (typeof document === 'undefined') return;
+  const bg = THEME_BACKGROUND[theme] || THEME_BACKGROUND.default;
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', bg);
+  // For dark themes, tint the standalone (added-to-homescreen) status bar transparent dark.
+  const dark = theme === 'dark' || theme === 'oled' || theme === 'dusk';
+  const sb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (sb) sb.setAttribute('content', dark ? 'black-translucent' : 'default');
+}
+
 const DEFAULT_SETTINGS = {
   theme: 'classic',
   accentColor: 'burgundy',
@@ -132,6 +160,7 @@ export function ThemeSettingsProvider({ children }) {
 
     const root = document.documentElement;
     root.setAttribute('data-theme', settings.theme);
+    applyBrowserThemeColor(settings.theme);
     root.setAttribute('data-accent', settings.accentColor);
     root.setAttribute('data-font', settings.fontFamily);
     root.setAttribute('data-density', settings.treeDensity);

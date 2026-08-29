@@ -92,6 +92,8 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  // Initial iOS Safari theme-color (classic bg-primary); updated dynamically per theme in ThemeSettingsContext.
+  themeColor: '#f0eee5',
 };
 
 const jsonLdWebsite = {
@@ -130,6 +132,7 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
         />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
         <ThemeSettingsProvider>
