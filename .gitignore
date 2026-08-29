@@ -1,5 +1,5 @@
-
-
+cloudflare_pages_dist/
+next_tipitakapali.org/
 *.db-*
 *.db.bak
 *.db

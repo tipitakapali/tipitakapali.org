@@ -81,8 +81,8 @@ def find_paths():
 
     catalog_path = web_app_dir / 'server_api' / 'cst_books_catalog.json'
     tree_json_path = web_app_dir / 'server_api' / 'tree.json'
-    dist_dir = root_dir / 'cloudflare_pages_dist'
-    git_repo_dir = root_dir / 'next_tipitakapali.org'
+    dist_dir = web_app_dir / 'cloudflare_pages_dist'
+    git_repo_dir = web_app_dir / 'next_tipitakapali.org'
 
     return {
         'root_dir': root_dir,
