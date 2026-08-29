@@ -128,6 +128,30 @@
   --scrollbar-thumb-hover: rgba(20, 20, 19, 0.32);
 }
 
+[data-theme="night"] {
+  /* Night — Dracula, calm tech */
+  --bg-primary: #282a36;
+  --bg-secondary: #1e1f29;
+  --bg-sidebar: #21222c;
+  --bg-sidebar-hover: #343746;
+  --bg-card: #343746;
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfbfbf;
+  --text-muted: #6272a4;
+  --accent: #50fa7b;
+  --accent-hover: #43e06a;
+  --accent-light: rgba(80, 250, 123, 0.14);
+  --accent-border: rgba(80, 250, 123, 0.32);
+  --border-color: #44475a;
+  --tree-line: #44475a;
+  --highlight-bg: #44475a;
+  --highlight-border: #6272a4;
+  --tab-inactive-bg: #21222c;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(248, 248, 242, 0.18);
+  --scrollbar-thumb-hover: rgba(248, 248, 242, 0.32);
+}
+
 
 
 /* Custom Accent Colors - Light / Default */
@@ -256,6 +280,38 @@
   --accent-hover: #cbd5e1;
   --accent-light: rgba(148, 163, 184, 0.20);
   --accent-border: rgba(148, 163, 184, 0.42);
+}
+
+/* Custom Accent Colors - Night/Dracula — warm amber, respectful */
+[data-theme="night"][data-accent="burgundy"] {
+  --accent: #ffb86c;
+  --accent-hover: #ffcb8e;
+  --accent-light: rgba(255, 184, 108, 0.14);
+  --accent-border: rgba(255, 184, 108, 0.32);
+}
+[data-theme="night"][data-accent="saffron"] {
+  --accent: #f1fa8c;
+  --accent-hover: #f8ffaa;
+  --accent-light: rgba(241, 250, 140, 0.14);
+  --accent-border: rgba(241, 250, 140, 0.32);
+}
+[data-theme="night"][data-accent="emerald"] {
+  --accent: #50fa7b;
+  --accent-hover: #69ff8a;
+  --accent-light: rgba(80, 250, 123, 0.14);
+  --accent-border: rgba(80, 250, 123, 0.32);
+}
+[data-theme="night"][data-accent="indigo"] {
+  --accent: #bd93f9;
+  --accent-hover: #caa9ff;
+  --accent-light: rgba(189, 147, 249, 0.14);
+  --accent-border: rgba(189, 147, 249, 0.32);
+}
+[data-theme="night"][data-accent="slate"] {
+  --accent: #8be9fd;
+  --accent-hover: #a4efff;
+  --accent-light: rgba(139, 233, 253, 0.14);
+  --accent-border: rgba(139, 233, 253, 0.32);
 }
 
 /* Font Families */
