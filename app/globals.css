@@ -5,7 +5,7 @@
 :root {
   --bg-primary: #fdfdfc;
   --bg-secondary: #f6f5f0;
-  --bg-sidebar: #f4f3ec;
+  --bg-sidebar: #fdfdfc;
   --bg-sidebar-hover: #eae8dd;
   --bg-card: #ffffff;
   --text-primary: #1f2328;
@@ -39,7 +39,7 @@
 [data-theme="sepia"] {
   --bg-primary: #fbf0d9;
   --bg-secondary: #f4e4c1;
-  --bg-sidebar: #efe0bc;
+  --bg-sidebar: #fbf0d9;
   --bg-sidebar-hover: #e5d3aa;
   --bg-card: #fdf6e7;
   --text-primary: #433422;
@@ -62,7 +62,7 @@
 [data-theme="dark"] {
   --bg-primary: #18191a;
   --bg-secondary: #242526;
-  --bg-sidebar: #1e1f20;
+  --bg-sidebar: #18191a;
   --bg-sidebar-hover: #2d2f31;
   --bg-card: #28292a;
   --text-primary: #e4e6eb;
@@ -85,7 +85,7 @@
 [data-theme="oled"] {
   --bg-primary: #000000;
   --bg-secondary: #111111;
-  --bg-sidebar: #0a0a0a;
+  --bg-sidebar: #000000;
   --bg-sidebar-hover: #1a1a1a;
   --bg-card: #141414;
   --text-primary: #f0f0f0;
@@ -132,7 +132,7 @@
   /* Dusk — Dracula, calm tech */
   --bg-primary: #282a36;
   --bg-secondary: #1e1f29;
-  --bg-sidebar: #21222c;
+  --bg-sidebar: #282a36;
   --bg-sidebar-hover: #343746;
   --bg-card: #343746;
   --text-primary: #f8f8f2;
