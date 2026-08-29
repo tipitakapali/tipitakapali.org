@@ -56,10 +56,10 @@ const FONTS = [
 
 const THEMES = [
   { id: 'light', label: 'Light (Classic)', bg: '#fdfdfc', fg: '#1f2328', border: '#e2e0d5', accent: '#8b2500' },
-  { id: 'paper', label: 'Paper', bg: '#FAF8F6', fg: '#141413', border: '#e8e0d0', accent: '#8b2500' },
+  { id: 'paper', label: 'Paper', bg: '#f0eee5', fg: '#141413', border: '#e8e0d0', accent: '#8b2500' },
   { id: 'sepia', label: 'Warm Sepia', bg: '#fbf0d9', fg: '#433422', border: '#dfcd9f', accent: '#9c4113' },
   { id: 'dark', label: 'Dark Charcoal', bg: '#1e1f20', fg: '#e4e6eb', border: '#3a3b3c', accent: '#d97736' },
-  { id: 'night', label: 'Night', bg: '#282a36', fg: '#f8f8f2', border: '#44475a', accent: '#50fa7b' },
+  { id: 'dusk', label: 'Dusk', bg: '#282a36', fg: '#f8f8f2', border: '#44475a', accent: '#50fa7b' },
   { id: 'oled', label: 'OLED Black', bg: '#000000', fg: '#f0f0f0', border: '#222222', accent: '#e07a3c' },
 ];
 

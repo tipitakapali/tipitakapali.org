@@ -67,7 +67,7 @@ export default function Header() {
   }, [toggleSidebar, openSearchModal]);
 
   const currentThemeIcon =
-    settings.theme === 'night'
+    settings.theme === 'dusk' || settings.theme === 'night'
       ? '🌃'
       : settings.theme === 'paper'
       ? '📄'
@@ -184,7 +184,7 @@ export default function Header() {
                 { id: 'paper', icon: '📄', label: 'Paper' },
                 { id: 'sepia', icon: '📜', label: 'Sepia' },
                 { id: 'dark', icon: '🌙', label: 'Dark' },
-                { id: 'night', icon: '🌃', label: 'Night' },
+                { id: 'dusk', icon: '🌃', label: 'Dusk' },
                 { id: 'oled', icon: '🌌', label: 'OLED' },
               ].map((t) => (
                 <button
