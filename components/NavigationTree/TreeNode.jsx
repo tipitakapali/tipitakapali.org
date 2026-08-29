@@ -20,6 +20,7 @@ const TreeNode = memo(function TreeNode({
   node,
   depth = 0,
   pitakaType = null,
+  textType = null, // Inherited text type (mula | attha | tika) from ancestor group node
   filterText = '',
   matchingNodeIds,
   expandedMap,
@@ -62,29 +63,81 @@ const TreeNode = memo(function TreeNode({
   }
 
   const labelParts = useMemo(() => {
-    if (!node?.text) return { main: '', suffix: null, type: null };
+    if (!node?.text) return { main: '', suffix: null, suffixType: null, typeWord: null, effectiveType: null };
 
     // Match parenthetical suffix, e.g. "Vinayapiṭaka (Mūla)" -> "Vinayapiṭaka" + "(Mūla)"
     const match = node.text.match(/^(.*?)\s*(\([^\)]+\))$/);
-    if (match) {
-      const main = convertPaliScript(match[1].trim(), settings?.paliScript);
-      const suffix = convertPaliScript(match[2].trim(), settings?.paliScript);
-      const lowerRaw = match[2].toLowerCase();
+    let core = (match ? match[1] : node.text).trim();
+    const suffix = match ? match[2].trim() : null;
 
-      let type = 'generic';
-      if (lowerRaw.includes('mūla') || lowerRaw.includes('mula')) type = 'mula';
-      else if (lowerRaw.includes('aṭṭhakathā') || lowerRaw.includes('atthakatha')) type = 'attha';
-      else if (lowerRaw.includes('ṭīkā') || lowerRaw.includes('tika')) type = 'tika';
+    // Type of the parenthetical suffix, if any
+    let suffixType = null;
+    if (suffix) {
+      const lowerRaw = suffix.toLowerCase();
+      if (lowerRaw.includes('mūla') || lowerRaw.includes('mula')) suffixType = 'mula';
+      else if (lowerRaw.includes('aṭṭhakathā') || lowerRaw.includes('atthakatha')) suffixType = 'attha';
+      else if (lowerRaw.includes('ṭīkā') || lowerRaw.includes('tika')) suffixType = 'tika';
+      else suffixType = 'generic';
+    }
 
-      return { main, suffix, type };
+    // For grouping/folder nodes, lift a trailing text-type word out of the name,
+    // e.g. "Dīghanikāya Aṭṭhakathā (Sumaṅgalavilāsinī)" -> main "Dīghanikāya" + type word "Aṭṭhakathā"
+    let typeWord = null;
+    if (!isBookNode && !isChapterNode) {
+      const tw = core.match(/^(.*?)\s+(Mūla|Aṭṭhakathā|Ṭīkā)$/);
+      if (tw) {
+        core = tw[1].trim();
+        const word = tw[2];
+        typeWord = {
+          label: convertPaliScript(word, settings?.paliScript),
+          type: { Mūla: 'mula', Aṭṭhakathā: 'attha', Ṭīkā: 'tika' }[word],
+        };
+      }
+    }
+
+    // Effective text type: own suffix type (if a real text type), else lifted type word, else null
+    let effectiveType = null;
+    if (suffixType === 'mula' || suffixType === 'attha' || suffixType === 'tika') {
+      effectiveType = suffixType;
+    } else if (typeWord) {
+      effectiveType = typeWord.type;
     }
 
     return {
-      main: convertPaliScript(node.text, settings?.paliScript),
-      suffix: null,
-      type: null,
+      main: convertPaliScript(core, settings?.paliScript),
+      suffix: suffix ? convertPaliScript(suffix, settings?.paliScript) : null,
+      suffixType,
+      typeWord,
+      effectiveType,
     };
-  }, [node?.text, settings?.paliScript]);
+  }, [node?.text, settings?.paliScript, isBookNode, isChapterNode]);
+
+  // Effective text type: own (Mūla/Aṭṭhakathā/Ṭīkā) type, otherwise inherited from ancestor group
+  const effectiveTextType = useMemo(() => {
+    if (labelParts.effectiveType) return labelParts.effectiveType;
+    return textType;
+  }, [labelParts.effectiveType, textType]);
+
+  // Text-type tag(s): shown only on grouping/folder nodes (expandable, not a book/chapter).
+  // Books and chapter leaves never show a tag.
+  const tagDisplay = useMemo(() => {
+    if (isBookNode || isChapterNode) return [];
+    const tags = [];
+    if (labelParts.typeWord) {
+      tags.push({ label: `(${labelParts.typeWord.label})`, type: labelParts.typeWord.type });
+    }
+    if (labelParts.suffix) {
+      tags.push({ label: labelParts.suffix, type: labelParts.suffixType });
+    }
+    if (tags.length === 0 && hasChildren && effectiveTextType) {
+      const labels = { mula: 'Mūla', attha: 'Aṭṭhakathā', tika: 'Ṭīkā' };
+      tags.push({
+        label: `(${convertPaliScript(labels[effectiveTextType], settings?.paliScript)})`,
+        type: effectiveTextType,
+      });
+    }
+    return tags;
+  }, [isBookNode, isChapterNode, labelParts.typeWord, labelParts.suffix, labelParts.suffixType, hasChildren, effectiveTextType, settings?.paliScript]);
 
   // Determine Piṭaka category (Vinaya, Sutta, Abhidhamma, Añña)
   const currentPitaka = useMemo(() => {
@@ -243,11 +296,11 @@ const TreeNode = memo(function TreeNode({
         <span className="tree-icon flex items-center justify-center w-4 shrink-0">{renderIcon()}</span>
         <span className="tree-label truncate flex-1 font-medium">
           {labelParts.main}
-          {labelParts.suffix && (
-            <span className={`tree-type-tag tree-tag-${labelParts.type}`}>
-              {labelParts.suffix}
+          {tagDisplay.map((tag, i) => (
+            <span key={i} className={`tree-type-tag tree-tag-${tag.type}`}>
+              {tag.label}
             </span>
-          )}
+          ))}
         </span>
       </div>
 
@@ -259,6 +312,7 @@ const TreeNode = memo(function TreeNode({
               node={child}
               depth={depth + 1}
               pitakaType={currentPitaka}
+              textType={effectiveTextType}
               filterText={filterText}
               matchingNodeIds={matchingNodeIds}
               expandedMap={expandedMap}

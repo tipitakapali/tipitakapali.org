@@ -85,7 +85,7 @@ export function lookupBookInfo(bookCode) {
   // 2. Try loading from tree cache if not yet indexed
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('tipitaka_tree_cache_v4');
+      const stored = localStorage.getItem('tipitaka_tree_cache_v5');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -118,7 +118,7 @@ export async function fetchTree() {
     // 2. Persistent browser cache (0ms instant render on refresh/revisit)
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('tipitaka_tree_cache_v4');
+        const stored = localStorage.getItem('tipitaka_tree_cache_v5');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -140,7 +140,7 @@ export async function fetchTree() {
       const data = await res.json();
       if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
         try {
-          localStorage.setItem('tipitaka_tree_cache_v4', JSON.stringify(data));
+          localStorage.setItem('tipitaka_tree_cache_v5', JSON.stringify(data));
         } catch (e) {}
       }
       indexTreeData(data);
