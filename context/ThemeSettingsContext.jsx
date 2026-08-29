@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DEFAULT_TRANSLATION_ORDER = ['english', 'vietnamese', 'myanmar', 'chinese', 'german', 'japanese', 'khmer', 'korean', 'lao', 'portuguese', 'russian', 'sinhala', 'tamil', 'thai'];
 
-const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v2';
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v3';
 
 const DEFAULT_SETTINGS = {
   theme: 'classic',
