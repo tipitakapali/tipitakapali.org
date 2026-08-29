@@ -223,6 +223,9 @@ const TreeNode = memo(function TreeNode({
   };
 
   const renderIcon = () => {
+    // Icon colored by text type (mula/attha/tika) when known, else by piṭaka category
+    const typeIconCls = effectiveTextType ? `tree-icon-${effectiveTextType}` : null;
+
     if (isActiveChapter) {
       const pitakaPingCls = currentPitaka ? `tree-ping-${currentPitaka}` : 'tree-ping-default';
       return (
@@ -244,13 +247,13 @@ const TreeNode = memo(function TreeNode({
 
     // Depth 1: Sub-layer Folders (Mūla, Aṭṭhakathā, Ṭīkā)
     if (depth === 1) {
-      const pitakaCls = currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-pitaka';
-      return <FolderTree size={15} className={`${pitakaCls} opacity-90`} />;
+      const cls = typeIconCls || (currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-pitaka');
+      return <FolderTree size={15} className={`${cls} opacity-90`} />;
     }
 
     // Books
     if (isBookNode) {
-      const bookCls = currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-book';
+      const bookCls = typeIconCls || (currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-book');
       return <Book size={14.5} className={bookCls} />;
     }
 
@@ -261,7 +264,7 @@ const TreeNode = memo(function TreeNode({
 
     // Other Folders
     if (hasChildren) {
-      const folderCls = currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-folder';
+      const folderCls = typeIconCls || (currentPitaka ? `tree-icon-${currentPitaka}` : 'tree-icon-folder');
       return <Folder size={14.5} className={`${folderCls} opacity-80`} />;
     }
 

@@ -971,6 +971,9 @@ aside.app-sidebar.dock-float.collapsed {
 .tree-icon-sutta { color: #be123c; }
 .tree-icon-abhidhamma { color: #2563eb; }
 .tree-icon-anna { color: #059669; }
+.tree-icon-mula { color: #6d28d9; }
+.tree-icon-attha { color: #c2410c; }
+.tree-icon-tika { color: #0e7490; }
 
 /* Dark Theme Support for Pitakas */
 [data-theme="dark"] .tree-icon-vinaya,
@@ -984,12 +987,21 @@ aside.app-sidebar.dock-float.collapsed {
 
 [data-theme="dark"] .tree-icon-anna,
 .dark .tree-icon-anna { color: #34d399; }
+[data-theme="dark"] .tree-icon-mula,
+.dark .tree-icon-mula { color: #c4b5fd; }
+[data-theme="dark"] .tree-icon-attha,
+.dark .tree-icon-attha { color: #fdba74; }
+[data-theme="dark"] .tree-icon-tika,
+.dark .tree-icon-tika { color: #67e8f9; }
 
 /* Sepia Theme Support for Pitakas */
 [data-theme="sepia"] .tree-icon-vinaya { color: #b45309; }
 [data-theme="sepia"] .tree-icon-sutta { color: #9f1239; }
 [data-theme="sepia"] .tree-icon-abhidhamma { color: #1d4ed8; }
 [data-theme="sepia"] .tree-icon-anna { color: #047857; }
+[data-theme="sepia"] .tree-icon-mula { color: #581c87; }
+[data-theme="sepia"] .tree-icon-attha { color: #7c2d12; }
+[data-theme="sepia"] .tree-icon-tika { color: #0369a1; }
 
 /* Reading Indicator (Ping Radar Dot) with Pitaka Colors */
 .tree-ping-default .tree-ping-dot-radar,
