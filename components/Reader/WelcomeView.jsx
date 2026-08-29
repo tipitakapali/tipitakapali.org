@@ -18,6 +18,12 @@ export default function WelcomeView() {
 
   const { openSearchModal, isSidebarOpen, setIsHeaderVisible } = useTabs();
 
+  // Light variants for light/sepia to avoid harsh black on light UI
+  const isLightBadge = settings?.theme === 'light' || settings?.theme === 'sepia';
+  const appStoreSrc = isLightBadge ? '/download-on-the-app-store-light.svg' : '/download-on-the-app-store.svg';
+  const playStoreSrc = isLightBadge ? '/Google_Play_Store_badge_EN_light.svg' : '/Google_Play_Store_badge_EN.svg';
+  const desktopSrc = isLightBadge ? '/download-for-desktop-light.svg' : '/download-for-desktop.svg';
+
   const handleOpenTree = () => {
     setIsZenMode(false);
     setIsSidebarOpen(true);
@@ -145,20 +151,20 @@ export default function WelcomeView() {
           </div>
         </button>
 
-        {/* 4. Study with Tipiṭaka Saya */}
+        {/* 4. Study with AI Assistant */}
         <button
           onClick={() => setIsAISayaOpen(true)}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !bg-gradient-to-br from-[var(--bg-card)] to-[var(--accent-light)]/40 !min-h-0"
         >
-          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">NEW</div>
+          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">AI</div>
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:scale-105 transition shrink-0">
             <Bot size={16} />
           </div>
           <div className="min-w-0 flex-1 pr-6">
             <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-violet-600 transition flex items-center gap-1 truncate">
-              Tipiṭaka Saya <Sparkles size={11} className="text-violet-500 shrink-0" />
+              AI Assistant <Sparkles size={11} className="text-violet-500 shrink-0" />
             </h3>
-            <p className="!text-[11px] !leading-tight !truncate">Your Pāḷi study companion</p>
+            <p className="!text-[11px] !leading-tight !truncate">Your Tipiṭaka Study companion</p>
           </div>
         </button>
       </div>
@@ -187,7 +193,7 @@ export default function WelcomeView() {
         </form>
       </div>
 
-      {/* Tipiṭaka Saya Modal */}
+      {/* AI Assistant Modal */}
       {isAISayaOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setIsAISayaOpen(false)}>
           <div
@@ -200,8 +206,8 @@ export default function WelcomeView() {
                   <Bot size={18} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm">Tipiṭaka Saya</h3>
-                  <p className="text-xs text-white/80">Your Pāḷi study companion • tipitakapali.org</p>
+                  <h3 className="font-bold text-sm">AI Assistant</h3>
+                  <p className="text-xs text-white/80">Your Tipiṭaka Study companion • tipitakapali.org</p>
                 </div>
               </div>
               <button onClick={() => setIsAISayaOpen(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
@@ -214,12 +220,12 @@ export default function WelcomeView() {
                   <Bot size={14} className="text-white" />
                 </div>
                 <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-[var(--text-primary)] shadow-sm">
-                  <p>Sādhu! I am <b>Tipiṭaka Saya</b> — ask me about Pāḷi grammar, translation, or Dhamma concepts.</p>
+                  <p>Sādhu! I am <b>AI Assistant</b> — ask me about Pāḷi grammar, translation, or Dhamma concepts.</p>
                   <p className="text-xs text-[var(--text-muted)] mt-1.5">Try: “Explain paṭiccasamuppāda in simple terms” or “What is the difference between samādhi and jhāna?”</p>
                 </div>
               </div>
               <div className="text-center py-2">
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">Coming soon — AI tab will open here</span>
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">Not available yet — AI tab will open here</span>
               </div>
             </div>
             <form onSubmit={handleAISubmit} className="p-3 bg-[var(--bg-primary)] border-t border-[var(--border-color)] flex items-center gap-2">
@@ -227,7 +233,7 @@ export default function WelcomeView() {
                 type="text"
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Ask Tipiṭaka Saya anything…"
+                placeholder="Ask AI Assistant anything…"
                 className="flex-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2.5 px-3.5 text-sm outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
               />
               <button type="submit" className="p-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white transition shadow-sm">
@@ -237,24 +243,24 @@ export default function WelcomeView() {
           </div>
         </div>
       )}
-      {/* Store & App Download Links */}
+      {/* Store & App Download Links — theme-aware: card wrapper softens black badges on light */}
       <div className="w-full mt-7 pt-5 border-t border-[var(--border-color)]/60 flex flex-col items-center gap-2.5 select-none">
         <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-muted)]">
           Get Tipiṭaka Pāḷi for Mobile & Desktop
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+        <div className="welcome-badges flex flex-wrap items-center justify-center gap-3 sm:gap-4">
           {/* iOS App Store */}
           <a
             href="https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213"
             target="_blank"
             rel="noopener noreferrer"
-            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            className="transition-all duration-200 hover:scale-[1.03] active:scale-95 inline-flex items-center shrink-0 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--accent)] hover:shadow-md"
             title="Download on the App Store (iOS / iPadOS / macOS)"
           >
             <img
-              src="/download-on-the-app-store.svg"
+              src={appStoreSrc}
               alt="Download on the App Store"
-              className="h-[38px] sm:h-[40px] w-auto object-contain"
+              className="h-[38px] sm:h-[40px] w-auto object-contain block"
             />
           </a>
 
@@ -263,13 +269,13 @@ export default function WelcomeView() {
             href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
             target="_blank"
             rel="noopener noreferrer"
-            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            className="transition-all duration-200 hover:scale-[1.03] active:scale-95 inline-flex items-center shrink-0 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--accent)] hover:shadow-md"
             title="Get it on Google Play (Android)"
           >
             <img
-              src="/Google_Play_Store_badge_EN.svg"
+              src={playStoreSrc}
               alt="Get it on Google Play"
-              className="h-[38px] sm:h-[40px] w-auto object-contain"
+              className="h-[38px] sm:h-[40px] w-auto object-contain block"
             />
           </a>
 
@@ -278,13 +284,13 @@ export default function WelcomeView() {
             href="https://github.com/tipitakapali/tipitakapali.org/releases"
             target="_blank"
             rel="noopener noreferrer"
-            className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-xs rounded-lg overflow-hidden shrink-0"
+            className="transition-all duration-200 hover:scale-[1.03] active:scale-95 inline-flex items-center shrink-0 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--accent)] hover:shadow-md"
             title="Download for Desktop (Windows, macOS, Linux)"
           >
             <img
-              src="/download-for-desktop.svg"
+              src={desktopSrc}
               alt="Download for Desktop"
-              className="h-[38px] sm:h-[40px] w-auto object-contain"
+              className="h-[38px] sm:h-[40px] w-auto object-contain block"
             />
           </a>
         </div>
