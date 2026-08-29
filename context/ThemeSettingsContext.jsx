@@ -4,13 +4,15 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DEFAULT_TRANSLATION_ORDER = ['english', 'myanmar', 'vietnamese', 'sinhala', 'thai', 'german', 'japanese', 'khmer', 'korean', 'russian'];
 
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v2';
+
 const DEFAULT_SETTINGS = {
   theme: 'light',
   accentColor: 'burgundy',
   fontFamily: 'gentium',
-  fontSize: 25,
+  fontSize: 22,
   lineHeight: 1.85,
-  textAlign: 'left',
+  textAlign: 'justify',
   paragraphIndent: true,
   readerMaxWidth: '880px',
   showPageBreaks: false,
@@ -50,7 +52,7 @@ export function ThemeSettingsProvider({ children }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('tipitaka_advanced_settings');
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         // Merge and migrate translationOrder / translationDisplayMode for older saves
@@ -86,7 +88,7 @@ export function ThemeSettingsProvider({ children }) {
     setSettingsState((prev) => {
       const updated = { ...prev, [key]: value };
       try {
-        localStorage.setItem('tipitaka_advanced_settings', JSON.stringify(updated));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error('Error saving settings to localStorage:', e);
       }
@@ -98,7 +100,7 @@ export function ThemeSettingsProvider({ children }) {
     setSettingsState((prev) => {
       const updated = { ...prev, ...newObj };
       try {
-        localStorage.setItem('tipitaka_advanced_settings', JSON.stringify(updated));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
         console.error('Error saving settings to localStorage:', e);
       }
@@ -109,7 +111,7 @@ export function ThemeSettingsProvider({ children }) {
   const resetToDefaults = () => {
     setSettingsState(DEFAULT_SETTINGS);
     try {
-      localStorage.setItem('tipitaka_advanced_settings', JSON.stringify(DEFAULT_SETTINGS));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
     } catch (e) {}
   };
 

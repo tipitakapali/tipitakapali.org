@@ -9,6 +9,8 @@ import {
   Type,
   X,
   Maximize2,
+  AlignLeft,
+  AlignJustify,
 } from 'lucide-react';
 
 
@@ -38,7 +40,7 @@ export default function Footer() {
     isSidebarOpen,
     setIsSidebarOpen,
   } = useTabs();
-  const { settings, updateSetting, setIsZenMode } = useThemeSettings();
+  const { settings, updateSetting, updateSettings, setIsZenMode } = useThemeSettings();
 
 
   const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
@@ -125,23 +127,23 @@ export default function Footer() {
 
 
 
-      {/* Font Size Modal */}
+      {/* Size Menu — Typography Quick Controls */}
       {isFontSizeOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-2xs animate-fade-in text-[var(--text-primary)]"
           onClick={() => setIsFontSizeOpen(false)}
         >
           <div
-            className="w-full max-w-[280px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl p-4 text-xs animate-in zoom-in-95 duration-100 select-none flex flex-col gap-3.5"
+            className="w-full max-w-[360px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl text-xs animate-in zoom-in-95 duration-100 select-none flex flex-col max-h-[85vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[var(--border-color)]/60 pb-2.5">
+            <div className="flex items-center justify-between border-b border-[var(--border-color)]/60 px-4 py-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded-md bg-[var(--accent-light)] text-[var(--accent)]">
                   <Type size={15} />
                 </div>
-                <span className="font-bold text-xs text-[var(--text-primary)]">Text Size</span>
+                <span className="font-bold text-xs text-[var(--text-primary)]">Text Size & Typography</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-1.5 py-0.5 focus-within:border-[var(--accent)] transition">
@@ -168,65 +170,118 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Stepper Buttons */}
-            <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={() => updateSetting('fontSize', Math.max(8, settings.fontSize - 1))}
-                className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
-                title="Decrease font size"
-              >
-                A−
-              </button>
-              <button
-                onClick={() => updateSetting('fontSize', 25)}
-                className="px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer shadow-2xs"
-                title="Reset to default (25px)"
-              >
-                Reset (25)
-              </button>
-              <button
-                onClick={() => updateSetting('fontSize', settings.fontSize + 1)}
-                className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
-                title="Increase font size"
-              >
-                A+
-              </button>
-            </div>
-
-            {/* Slider */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                <span>12px</span>
-                <span>48px</span>
-              </div>
-              <input
-                type="range"
-                min="12"
-                max="48"
-                step="1"
-                value={Math.min(48, Math.max(12, settings.fontSize))}
-                onChange={(e) => updateSetting('fontSize', parseInt(e.target.value, 10))}
-                className="w-full accent-[var(--accent)] cursor-pointer h-1.5 bg-[var(--bg-secondary)] rounded-lg"
-              />
-            </div>
-
-            {/* Quick Presets */}
-            <div className="pt-2 border-t border-[var(--border-color)]/60">
-              <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick Presets</div>
-              <div className="grid grid-cols-6 gap-1">
-                {[16, 18, 20, 22, 24, 28].map((sz) => (
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              {/* Text Alignment */}
+              <div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Text Alignment</div>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={sz}
-                    onClick={() => updateSetting('fontSize', sz)}
-                    className={`py-1 rounded text-[10.5px] font-mono transition cursor-pointer text-center ${
-                      settings.fontSize === sz
-                        ? 'bg-[var(--accent)] text-white font-bold shadow-2xs'
-                        : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)]/50'
+                    onClick={() => updateSetting('textAlign', 'left')}
+                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      settings.textAlign === 'left'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
                     }`}
                   >
-                    {sz}
+                    <AlignLeft size={14} />
+                    <span>Left</span>
                   </button>
-                ))}
+                  <button
+                    onClick={() => updateSetting('textAlign', 'justify')}
+                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      settings.textAlign === 'justify'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
+                    }`}
+                  >
+                    <AlignJustify size={14} />
+                    <span>Justified</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Line Height */}
+              <div className="pt-3 border-t border-[var(--border-color)]/60 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-semibold">
+                  <span className="text-[var(--text-secondary)]">Line Height</span>
+                  <span className="font-mono text-[var(--accent)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">{settings.lineHeight}</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-mono">
+                  <span>1.4</span>
+                  <span>2.6</span>
+                </div>
+                <input
+                  type="range"
+                  min="1.4"
+                  max="2.6"
+                  step="0.05"
+                  value={settings.lineHeight}
+                  onChange={(e) => updateSetting('lineHeight', parseFloat(e.target.value))}
+                  className="w-full accent-[var(--accent)] cursor-pointer h-1.5 bg-[var(--bg-secondary)] rounded-lg"
+                />
+              </div>
+
+              {/* Font Size — Stepper Buttons */}
+              <div className="pt-3 border-t border-[var(--border-color)]/60 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => updateSetting('fontSize', Math.max(8, settings.fontSize - 1))}
+                  className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                  title="Decrease font size"
+                >
+                  A−
+                </button>
+                <button
+                  onClick={() => updateSettings({ fontSize: 22, lineHeight: 1.85 })}
+                  className="px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer shadow-2xs"
+                  title="Reset to defaults (22px / 1.85)"
+                >
+                  Reset (22)
+                </button>
+                <button
+                  onClick={() => updateSetting('fontSize', settings.fontSize + 1)}
+                  className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                  title="Increase font size"
+                >
+                  A+
+                </button>
+              </div>
+
+              {/* Font Size Slider */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
+                  <span>12px</span>
+                  <span className="font-bold text-[var(--accent)]">{settings.fontSize}px</span>
+                  <span>48px</span>
+                </div>
+                <input
+                  type="range"
+                  min="12"
+                  max="48"
+                  step="1"
+                  value={Math.min(48, Math.max(12, settings.fontSize))}
+                  onChange={(e) => updateSetting('fontSize', parseInt(e.target.value, 10))}
+                  className="w-full accent-[var(--accent)] cursor-pointer h-1.5 bg-[var(--bg-secondary)] rounded-lg"
+                />
+              </div>
+
+              {/* Quick Presets */}
+              <div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick Presets</div>
+                <div className="grid grid-cols-6 gap-1">
+                  {[16, 18, 20, 25, 28, 32].map((sz) => (
+                    <button
+                      key={sz}
+                      onClick={() => updateSetting('fontSize', sz)}
+                      className={`py-1 rounded text-[10.5px] font-mono transition cursor-pointer text-center ${
+                        settings.fontSize === sz
+                          ? 'bg-[var(--accent)] text-white font-bold shadow-2xs'
+                          : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)]/50'
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

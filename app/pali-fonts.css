@@ -263,10 +263,11 @@ html[data-script="myanmar"] { --font-reader: "Pyidaungsu", sans-serif; }
 html[data-script="devanagari"] { --font-reader: "Noto Sans Devanagari", sans-serif; }
 html[data-script="thai"] { --font-reader: "THSarabunPali", serif; }
 
-/* Thai script appears visually smaller at same px — scale up for readability (Task 2) — BIGGER */
+/* Thai script appears visually smaller at same px — scale up for readability (Task 2) — BIGGER
+   line-height now respects --line-height-base via calc so Size slider works for Thai too */
 html[data-script="thai"] .reader-container {
   font-size: calc(var(--font-size-base) * 1.35);
-  line-height: 2.1;
+  line-height: calc(var(--line-height-base) * 1.135);
 }
 html[data-script="thai"] .dp9,
 html[data-script="thai"] .pts15,
@@ -313,11 +314,11 @@ html[data-script="tibetan"] { --font-reader: "Noto Serif Tibetan", serif; }
 html[data-script="cyrillic"] { --font-reader: "Noto Sans", sans-serif; }
 html[data-script="roman"] { /* keep user --font-reader (gentium/garamond/etc) */ }
 
-/* Ensure reader content and transliterated UI use the script font */
+/* Ensure reader content and transliterated UI use the script font.
+   line-height now derives from --line-height-base so Size slider works for all scripts */
 html[data-script="sinhala"] .reader-container,
 html[data-script="myanmar"] .reader-container,
 html[data-script="devanagari"] .reader-container,
-html[data-script="thai"] .reader-container,
 html[data-script="laos"] .reader-container,
 html[data-script="khmer"] .reader-container,
 html[data-script="bengali"] .reader-container,
@@ -331,7 +332,12 @@ html[data-script="brahmi"] .reader-container,
 html[data-script="tibetan"] .reader-container,
 html[data-script="cyrillic"] .reader-container {
   font-family: var(--font-reader);
-  line-height: 1.9;
+  line-height: calc(var(--line-height-base) * 1.03);
+}
+/* Thai overrides generic + adds larger multiplier — keep after generic */
+html[data-script="thai"] .reader-container {
+  font-family: var(--font-reader);
+  line-height: calc(var(--line-height-base) * 1.135);
 }
 
 /* Dictionary Pali words — must use same font as main text when script changes.

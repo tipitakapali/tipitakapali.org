@@ -27,10 +27,10 @@
   --tabs-height: 38px;
   --footer-height: 34px;
   --font-serif: 'Gentium Plus', 'EB Garamond', Georgia, 'Times New Roman', serif;
-  --font-size-base: 25px;
+  --font-size-base: 22px;
   --line-height-base: 1.85;
   --reader-max-width: 880px;
-  --reader-text-align: left;
+  --reader-text-align: justify;
   --scrollbar-track: transparent;
   --scrollbar-thumb: rgba(0, 0, 0, 0.22);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.42);
