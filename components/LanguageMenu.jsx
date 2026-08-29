@@ -6,16 +6,22 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 
 const TRANSLATIONS = [
+  // Pinned to top (user's preferred priority)
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • -not available-' },
-  { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -not available-' },
   { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -not available-' },
-  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -not available-' },
-  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -not available-' },
+  { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -not available-' },
+  // Alphabetical by language name
+  { id: 'chinese', label: '中文', flag: '🇨🇳', desc: 'Chinese Translation • -not available-' },
   { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'German Translation • -not available-' },
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: 'Japanese Translation • -not available-' },
   { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'Khmer Translation • -not available-' },
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -not available-' },
+  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'Lao Translation • -not available-' },
+  { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Portuguese Translation • -not available-' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Russian Translation • -not available-' },
+  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -not available-' },
+  { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'Tamil Translation • -not available-' },
+  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -not available-' },
 ];
 
 export default function LanguageMenu() {

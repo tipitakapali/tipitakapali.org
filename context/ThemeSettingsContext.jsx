@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const DEFAULT_TRANSLATION_ORDER = ['english', 'myanmar', 'vietnamese', 'sinhala', 'thai', 'german', 'japanese', 'khmer', 'korean', 'russian'];
+const DEFAULT_TRANSLATION_ORDER = ['english', 'vietnamese', 'myanmar', 'chinese', 'german', 'japanese', 'khmer', 'korean', 'lao', 'portuguese', 'russian', 'sinhala', 'tamil', 'thai'];
 
 const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v2';
 
@@ -37,6 +37,10 @@ const DEFAULT_SETTINGS = {
     khmer: false,
     russian: false,
     korean: false,
+    chinese: false,
+    lao: false,
+    tamil: false,
+    portuguese: false,
   },
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
   translationDisplayMode: 'stack', // 'stack' | 'side'
