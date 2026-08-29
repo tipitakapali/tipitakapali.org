@@ -67,7 +67,9 @@ export default function Header() {
   }, [toggleSidebar, openSearchModal]);
 
   const currentThemeIcon =
-    settings.theme === 'sepia'
+    settings.theme === 'paper'
+      ? '📄'
+      : settings.theme === 'sepia'
       ? '📜'
       : settings.theme === 'dark'
       ? '🌙'
@@ -177,6 +179,7 @@ export default function Header() {
               </div>
               {[
                 { id: 'light', icon: '☀️', label: 'Light' },
+                { id: 'paper', icon: '📄', label: 'Paper' },
                 { id: 'sepia', icon: '📜', label: 'Sepia' },
                 { id: 'dark', icon: '🌙', label: 'Dark' },
                 { id: 'oled', icon: '🌌', label: 'OLED' },
