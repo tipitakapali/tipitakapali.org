@@ -1,0 +1,22 @@
+# Cloudflare Pages Redirects & Internal Rewrites
+# =================================================
+# Generated for https://tipitakapali.org (static export)
+# See export_static_cloudflare_pages.py:generate_cloudflare_redirects()
+
+# 1. API Static Route Rewrites (Seamless JSON Serving)
+/api/tree                              /api/tree.json                             200
+/api/books                             /api/books.json                            200
+/api/mat                               /api/mat.json                              200
+/api/book/:code/chapter/:idx           /api/book/:code/chapter/:idx.json          200
+/api/book/:code/toc                    /api/book/:code/toc.json                   200
+/api/book/:code/mat                    /api/book/:code/mat.json                   200
+/api/book/:code                        /api/book/:code.json                       200
+
+# 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes
+# These must stay 200 rewrites (not redirects) so Next.js App Router can handle /book/* and /chapter/* client-side
+/book/*       /index.html                   200
+/chapter/*    /index.html                   200
+
+# 3. Legacy URLs — any unmatched path (404) redirects to homepage
+# Catches old php/html/cscd/legacy routes and any 404, preserving valid static assets (/_next/*, /fonts/*, /icons/*, /api/* are real files and served before this rule)
+/*            /                             302

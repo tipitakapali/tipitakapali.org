@@ -362,7 +362,7 @@ export async function onRequest(context) {{
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
-    """Generate '_redirects' file for Cloudflare Pages routing and SPA fallbacks."""
+    """Generate '_redirects' file for Cloudflare Pages routing, SPA fallbacks, and legacy 404→homepage redirect."""
     redirects_file = dist_dir / '_redirects'
     log_info("Generating Cloudflare Pages '_redirects'...")
 
@@ -378,10 +378,13 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code                        /api/book/:code.json                       200
 
-# 2. Client-side Single Page Application (SPA) Route Fallbacks
+# 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes (200 rewrite, not redirect)
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
-/*            /index.html                   200
+
+# 3. Legacy URLs — any unmatched path (404) redirects to homepage
+# Catches old php/html/cscd/legacy routes and any 404, preserving valid static assets (/_next/*, /fonts/*, /icons/*, /api/* are real files and served before this rule)
+/*            /                             302
 """
     with open(redirects_file, 'w', encoding='utf-8') as f:
         f.write(content)
