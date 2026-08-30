@@ -75,7 +75,7 @@ export function indexTreeData(treeNodes) {
 
 export function lookupBookInfo(bookCode) {
   if (!bookCode || typeof bookCode !== 'string') return null;
-  const clean = bookCode.replace('.xml', '').toLowerCase();
+  const clean = splitScriptCode(bookCode.replace('.xml', '')).bookCode.toLowerCase();
 
   // 1. Check in-memory map
   if (bookCodeToInfoMap.has(clean)) {
@@ -183,7 +183,7 @@ export async function fetchBooks() {
 }
 
 export async function fetchBook(bookCode, options = {}) {
-  let cleanCode = bookCode.replace('.xml', '');
+  let cleanCode = splitScriptCode(bookCode.replace('.xml', '')).bookCode;
   let resolvedChapter = options.chapter;
 
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -218,7 +218,7 @@ export async function fetchBookTocOnly(bookCode) {
 }
 
 export async function fetchChapter(bookCode, chapterIndex) {
-  let cleanCode = bookCode.replace('.xml', '');
+  let cleanCode = splitScriptCode(bookCode.replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
   const cacheKey = `chapter_${cleanCode}_${chapterIndex}`;
@@ -232,7 +232,7 @@ export async function fetchChapter(bookCode, chapterIndex) {
 
 
 export async function fetchToc(bookCode) {
-  const cleanCode = bookCode.replace('.xml', '');
+  const cleanCode = splitScriptCode(bookCode.replace('.xml', '')).bookCode;
   const cacheKey = `toc_${cleanCode}`;
 
   return cachedFetch(cacheKey, async () => {
@@ -243,7 +243,7 @@ export async function fetchToc(bookCode) {
 }
 
 export async function fetchMat(bookCode) {
-  let cleanCode = bookCode.replace('.xml', '');
+  let cleanCode = splitScriptCode(bookCode.replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
   const cacheKey = `mat_${cleanCode}`;
@@ -277,7 +277,7 @@ export async function searchTipitaka(query, options = {}) {
   }, 10 * 60 * 1000);
 }
 
-import { cleanDictionaryQuery } from './transliterate';
+import { cleanDictionaryQuery, splitScriptCode } from './transliterate';
 import { setDpdFeedbackTemplate, dpd_feedback_s } from './dpdFeedback';
 
 // Direct VPS base for dynamic ops (dict + search) — bypasses Cloudflare Worker proxy hop

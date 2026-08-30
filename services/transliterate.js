@@ -187,6 +187,49 @@ export const PALI_SCRIPTS_LIST = [
   { id: "brahmi", label: "Brahmi", native: "𑀩𑁆𑀭𑀸𑀳𑁆𑀫𑀻", desc: "Ancient Ashokan Brahmi script" },
 ];
 
+// URL script prefixes → canonical paliScript ids (see PALI_SCRIPTS_LIST above).
+// 'ro' (roman) is the default and intentionally omitted.
+export const SCRIPT_URL_PREFIXES = {
+  si: 'sinhala',
+  hi: 'devanagari',
+  thai: 'thai',
+  laos: 'laos',
+  my: 'myanmar',
+  km: 'khmer',
+  beng: 'bengali',
+  gurm: 'gurmukhi',
+  tham: 'taitham',
+  guja: 'gujarati',
+  telu: 'telugu',
+  kann: 'kannada',
+  mala: 'malayalam',
+  brah: 'brahmi',
+  tibt: 'tibetan',
+  cyrl: 'cyrillic',
+};
+
+/**
+ * Splits an optional script prefix off a book code.
+ * e.g. "si.abh03m10.mul"  -> { scriptId: "sinhala",   prefix: "si",   bookCode: "abh03m10.mul" }
+ *      "abh03m10.mul"     -> { scriptId: null,          prefix: null,  bookCode: "abh03m10.mul" }
+ * Prefixes are matched case-insensitively; only the 16 non-default script codes
+ * (SCRIPT_URL_PREFIXES) are recognized, so real book codes are never affected.
+ */
+export function splitScriptCode(bookCode) {
+  if (!bookCode || typeof bookCode !== 'string') {
+    return { scriptId: null, prefix: null, bookCode };
+  }
+  const match = bookCode.match(/^([a-z]+)\.(.*)$/i);
+  if (match) {
+    const prefix = match[1].toLowerCase();
+    const scriptId = SCRIPT_URL_PREFIXES[prefix];
+    if (scriptId) {
+      return { scriptId, prefix, bookCode: match[2] };
+    }
+  }
+  return { scriptId: null, prefix: null, bookCode };
+}
+
 export function convertPaliScript(text, toScript) {
   if (!text || !toScript) return text;
   const targetKey = SCRIPT_MAP[toScript.toString().toLowerCase()];

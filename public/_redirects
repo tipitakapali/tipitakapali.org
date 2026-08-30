@@ -12,11 +12,12 @@
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code                        /api/book/:code.json                       200
 
-# 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes
-# These must stay 200 rewrites (not redirects) so Next.js App Router can handle /book/* and /chapter/* client-side
-# Legacy chapter URLs /chapter/{code}{chapterIndex} (e.g. /chapter/abh03m10.mul8) are
-# 301-redirected to /book/{code}?chapter={chapterIndex+1} by the Pages Function
-# /functions/chapter/[[path]].js, which takes precedence over the /chapter/* rule below.
+# 2. Client-side SPA Fallbacks — /book/* and /chapter/* are handled primarily by Cloudflare
+# Pages Functions, which take precedence over _redirects and serve the index shell for
+# non-file paths (incl. script-prefixed codes like /book/si.s0102m.mul). These 200 rewrites
+# remain as a harmless fallback:
+# - /functions/book/[[path]].js       serves the real book file if present, else the SPA shell
+# - /functions/chapter/[[path]].js    301-redirects legacy /chapter/{code}{N}, else the SPA shell
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 

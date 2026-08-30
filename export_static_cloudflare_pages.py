@@ -323,7 +323,7 @@ def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     # 4. Legacy Chapter URL Redirect Function (/functions/chapter/[[path]].js)
     # Old static-site URLs like /chapter/abh03m10.mul8 (0-indexed chapter suffix)
     # are permanently 301-redirected to /book/abh03m10.mul?chapter=9.
-    # Any other /chapter/* path (new SPA routes) falls back to index.html.
+    # Any other /chapter/* path (new SPA routes) falls back to the SPA shell (/).
     functions_chapter_dir = dist_dir / 'functions' / 'chapter'
     functions_chapter_dir.mkdir(parents=True, exist_ok=True)
     chapter_redirect_code = r'''// Cloudflare Pages Edge Function - Legacy Chapter URL Redirects
@@ -362,14 +362,60 @@ export async function onRequest(context) {
   }
 
   // Not a legacy chapter-suffixed URL — this is a new-style SPA route such as
-  // /chapter/{code} or /chapter/{code}/{n}. Serve index.html exactly like the
-  // _redirects rewrite used to, since Functions take precedence over _redirects.
-  const indexUrl = new URL('/index.html', url.origin);
-  return context.env.ASSETS.fetch(new Request(indexUrl, context.request));
+  // /chapter/{code} or /chapter/{code}/{n}. Serve the SPA shell at "/" so the
+  // client-side router opens the right chapter. Note: fetch "/" and NOT
+  // "/index.html" — Cloudflare 308-canonicalizes /index.html -> /, which would
+  // bounce the whole URL to the homepage.
+  const shellUrl = new URL('/', url.origin);
+  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
 }
 '''
     with open(functions_chapter_dir / '[[path]].js', 'w', encoding='utf-8') as f:
         f.write(chapter_redirect_code)
+
+    # 5. Book SPA Shell Function (/functions/book/[[path]].js)
+    # Direct visits to /book/* that don't exactly match a generated file return 404
+    # because Cloudflare's _redirects proxying (`/book/* /index.html 200`) is
+    # unreliable for splat->index SPA fallbacks. This breaks script-prefixed codes
+    # (e.g. /book/si.s0102m.mul) and chapter deep-links (/book/s0102m.mul/5).
+    # Strategy: try to serve the real static asset first (keeps pre-rendered SEO
+    # pages for real codes); if it 404s, serve the SPA shell at "/" so the app's
+    # client-side router (which reads window.location.pathname) opens the right book.
+    functions_book_dir = dist_dir / 'functions' / 'book'
+    functions_book_dir.mkdir(parents=True, exist_ok=True)
+    book_shell_code = r'''// Cloudflare Pages Edge Function - /book/* SPA Shell & Script-Prefix Fallback
+// =============================================================================
+// The Next.js static export pre-renders a full HTML page for every real book code
+// (e.g. /book/s0102m.mul served from s0102m.mul.html via clean URLs) so search
+// engines get full metadata.
+//
+// But Cloudflare's _redirects proxying of `/book/* /index.html 200` is unreliable
+// and 404s any /book/* path that isn't a real generated file. That broke:
+//   - script-prefixed books:  /book/si.s0102m.mul
+//   - chapter deep-links:     /book/s0102m.mul/5
+//
+// This function runs ahead of _redirects and static assets:
+//   1. Try to serve the real static file first (real codes keep their SEO HTML).
+//   2. If it 404s, serve the SPA shell at "/" so the client router takes over.
+//      (Fetch "/" and NOT "/index.html" — Cloudflare 308-canonicalizes
+//       /index.html -> /, which would bounce the URL to the homepage.)
+//
+export async function onRequest(context) {
+  // 1. Serve the actual static file if it exists (real codes keep pre-rendered HTML).
+  const asset = await context.env.ASSETS.fetch(context.request);
+  if (asset.status !== 404) {
+    return asset;
+  }
+
+  // 2. Not a real generated file — serve the SPA shell; the app reads the pathname
+  //    from window.location and opens the matching book + script client-side.
+  const url = new URL(context.request.url);
+  const shellUrl = new URL('/', url.origin);
+  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
+}
+'''
+    with open(functions_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(book_shell_code)
 
     # 5. Health Proxy Function (/functions/api/health.js)
     health_proxy_code = f"""// Cloudflare Pages Edge Function - Health Status Proxy
@@ -409,7 +455,7 @@ export async function onRequest(context) {{
     with open(functions_api_dir / 'health.js', 'w', encoding='utf-8') as f:
         f.write(health_proxy_code)
 
-    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js (legacy 301 redirects) + /functions/api/health.js")
+    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js (legacy 301 redirects) + /functions/book/[[path]].js (SPA shell) + /functions/api/health.js")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -429,10 +475,12 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code                        /api/book/:code.json                       200
 
-# 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes (200 rewrite, not redirect)
-#    Legacy chapter URLs /chapter/{code}{chapterIndex} (e.g. /chapter/abh03m10.mul8) are
-#    301-redirected to /book/{code}?chapter={chapterIndex+1} by the Pages Function
-#    /functions/chapter/[[path]].js, which takes precedence over the /chapter/* rule below.
+# 2. Client-side SPA Fallbacks — /book/* and /chapter/* are handled primarily by Cloudflare
+#    Pages Functions, which take precedence over _redirects and serve the index shell for
+#    non-file paths (incl. script-prefixed codes like /book/si.s0102m.mul). These 200 rewrites
+#    remain as a harmless fallback:
+#    - /functions/book/[[path]].js       serves the real book file if present, else the SPA shell
+#    - /functions/chapter/[[path]].js    301-redirects legacy /chapter/{code}{N}, else the SPA shell
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 

@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import fs from 'fs';
 import path from 'path';
 import { MainAppContent } from '../../page';
-import { capitalizePali } from '../../../services/transliterate';
+import { capitalizePali, splitScriptCode, convertPaliScript } from '../../../services/transliterate';
 
 export async function generateStaticParams() {
   try {
@@ -25,6 +25,11 @@ export async function generateMetadata({ params }) {
   let bookCode = slug0;
   let chapterParam = unwrappedParams?.slug?.[1];
 
+  // Optional script prefix (e.g. si.abh03m10.mul -> abh03m10.mul)
+  const scriptSplit = splitScriptCode(bookCode);
+  bookCode = scriptSplit.bookCode;
+  const scriptId = scriptSplit.scriptId;
+
   const chapSuffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) {
     bookCode = chapSuffixMatch[1];
@@ -46,8 +51,12 @@ export async function generateMetadata({ params }) {
       if (entry) {
         const bookTitle = capitalizePali(entry.mat?.mula_title || entry.mat?.attha_title || entry.mat?.tika_title || bookCode);
         const nikaya = entry.pitaka ? capitalizePali(entry.pitaka) : '';
-        const title = `${bookTitle} | Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi`;
-        const description = `Complete ${bookTitle} (${entry.longNavPath || nikaya}) with rich typography, multi-script support, and full-text search.`;
+        const appName = scriptId
+          ? convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', scriptId)
+          : 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi';
+        const displayTitle = scriptId ? convertPaliScript(bookTitle, scriptId) : bookTitle;
+        const title = `${displayTitle} | ${appName}`;
+        const description = `Complete ${displayTitle} (${entry.longNavPath || nikaya}) with rich typography, multi-script support, and full-text search.`;
         return {
           title,
           description,

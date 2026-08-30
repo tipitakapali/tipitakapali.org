@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { fetchBook, fetchChapter, fetchMat, lookupBookInfo, fetchBookTocOnly } from '../services/api';
+import { splitScriptCode } from '../services/transliterate';
 import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
@@ -89,7 +90,7 @@ function getChapterIdxForParaIndex(chapters, targetParaIndex) {
 export function TabProvider({ children }) {
 
 
-  const { setIsZenMode } = useThemeSettings();
+  const { setIsZenMode, updateSetting } = useThemeSettings();
 
   const [openTabs, setOpenTabs] = useState([]);
   const [activeBookCode, setActiveBookCode] = useState(null);
@@ -118,6 +119,9 @@ export function TabProvider({ children }) {
   const activeParaNumRef = useRef(null);
 
   const tabScrollMemoryRef = useRef({});
+  // bookCode -> URL script prefix (e.g. 'si') for tabs opened via script-prefixed URLs,
+  // so updateUrlParams keeps the prefix in the address bar (deep-links stay script-specific)
+  const tabScriptPrefixRef = useRef({});
   const isInitializedRef = useRef(false);
 
   openTabsRef.current = openTabs;
@@ -240,9 +244,10 @@ export function TabProvider({ children }) {
     const preservedHash = window.location.hash || '';
 
     if (paramsToUpdate) {
-      // If book is provided, set clean path /book/:bookCode
+      // If book is provided, set path /book/:bookCode (re-adding the tab's script prefix, e.g. si.)
       if (paramsToUpdate.book) {
-        url.pathname = `/book/${paramsToUpdate.book}`;
+        const prefix = tabScriptPrefixRef.current[paramsToUpdate.book];
+        url.pathname = `/book/${prefix ? `${prefix}.${paramsToUpdate.book}` : paramsToUpdate.book}`;
         url.searchParams.delete('book');
         url.searchParams.delete('book_code');
       } else if (paramsToUpdate.book === null) {
@@ -409,6 +414,15 @@ export function TabProvider({ children }) {
     async (bookCode, options = {}) => {
       if (!bookCode) return;
       let cleanCode = bookCode.replace('.xml', '');
+
+      // Optional script prefix (e.g. si.abh03m10.mul -> abh03m10.mul): apply the script
+      // app-wide (global setting) and remember the prefix so the URL keeps it.
+      const scriptSplit = splitScriptCode(cleanCode);
+      if (scriptSplit.scriptId) {
+        cleanCode = scriptSplit.bookCode;
+        updateSetting('paliScript', scriptSplit.scriptId);
+      }
+
       let hasTargetChapter = options.targetChapterIdx !== undefined && options.targetChapterIdx !== null;
       let targetChapIdx = hasTargetChapter ? options.targetChapterIdx : null;
 
@@ -420,6 +434,11 @@ export function TabProvider({ children }) {
           targetChapIdx = parseInt(chapSuffixMatch[2], 10);
           hasTargetChapter = true;
         }
+      }
+
+      // Record the script prefix keyed by the final (chapter-suffix-stripped) book code
+      if (scriptSplit.scriptId) {
+        tabScriptPrefixRef.current[cleanCode] = scriptSplit.prefix;
       }
 
       const rawParaNum = options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '') : null;
@@ -856,7 +875,7 @@ export function TabProvider({ children }) {
         setLoadingBook(false);
       }
     },
-    [updateUrlParams, loadChapter, bufferAdjacentChapters, persistTabs, addToHistory]
+    [updateUrlParams, loadChapter, bufferAdjacentChapters, persistTabs, addToHistory, updateSetting]
   );
 
   // Switch tabs smoothly with instant scroll position restoration
@@ -959,6 +978,7 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx === -1) return;
+      delete tabScriptPrefixRef.current[bookCode];
 
       const newTabs = currentTabs.filter((t) => t.bookCode !== bookCode);
       setOpenTabs(newTabs);
@@ -1002,6 +1022,10 @@ export function TabProvider({ children }) {
       if (!targetTab) return;
 
       const newTabs = [targetTab];
+      // Drop script-prefix entries for every tab that is being closed
+      for (const t of currentTabs) {
+        if (t.bookCode !== bookCode) delete tabScriptPrefixRef.current[t.bookCode];
+      }
       setOpenTabs(newTabs);
       setActiveBookCode(bookCode);
 
@@ -1022,6 +1046,7 @@ export function TabProvider({ children }) {
 
   // Close all tabs
   const closeAllTabs = useCallback(() => {
+    tabScriptPrefixRef.current = {};
     setOpenTabs([]);
     setActiveBookCode(null);
     setTreeSelectedNode(null);
@@ -1040,6 +1065,7 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx <= 0) return;
+      for (let i = 0; i < idx; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
 
       const newTabs = currentTabs.slice(idx);
       setOpenTabs(newTabs);
@@ -1074,6 +1100,7 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx === -1 || idx >= currentTabs.length - 1) return;
+      for (let i = idx + 1; i < currentTabs.length; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
 
       const newTabs = currentTabs.slice(0, idx + 1);
       setOpenTabs(newTabs);
