@@ -17,7 +17,10 @@
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 
-# 3. Legacy URLs — instant 302 to homepage (message preserved in 404.html for direct hits)
-#    Catches old php/html/cscd/legacy routes. Preserves valid static assets (/_next/*, /fonts/*, /icons/*, /api/* are real files and served before this rule).
-#    Any unmatched path → 302 → / (homepage). Direct access to /404.html still shows the "Lost in Saṃsāra" message (app/not-found.jsx).
-/*            /                             302
+# 3. Legacy URLs — handled by 404.html (Lost in Saṃsāra)
+#    No catch-all /* here — Cloudflare automatically serves 404.html with 404 status for any unmatched path.
+#    404.html (app/not-found.jsx) shows your "Lost in Saṃsāra" message + countdown + meta refresh → / (homepage).
+#    This keeps homepage at 200 (no loop) and still shows the message for legacy URLs.
+#    For instant server 302 to / (without showing message), use Cloudflare Pages Function instead of _redirects,
+#    or uncomment the next line (will hide the message for legacy URLs and requires homepage exclusions):
+# /*            /                             302

@@ -7,6 +7,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Reduce Legacy JavaScript: browserslist in package.json ["baseline widely available"]
+  // saves ES5 transforms; remaining 14 KiB is Next's mandatory fetch/URL polyfill (Turbopack)
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   ...(isExport
     ? {
         output: 'export',
