@@ -382,8 +382,9 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 
-# 3. Legacy URLs — any unmatched path (404) redirects to homepage
-# Catches old php/html/cscd/legacy routes and any 404, preserving valid static assets (/_next/*, /fonts/*, /icons/*, /api/* are real files and served before this rule)
+# 3. Legacy URLs — instant 302 to homepage (message preserved in 404.html for direct hits)
+#    Catches old php/html/cscd/legacy routes. Preserves valid static assets (/_next/*, /fonts/*, /icons/*, /api/* are real files and served before this rule).
+#    Any unmatched path → 302 → / (homepage). Direct access to /404.html still shows the "Lost in Saṃsāra" message (app/not-found.jsx).
 /*            /                             302
 """
     with open(redirects_file, 'w', encoding='utf-8') as f:

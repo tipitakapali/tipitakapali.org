@@ -58,11 +58,13 @@ export default function WelcomeView() {
   return (
     <div className="welcome-view">
       <img
-        src="/apple-touch-icon.png"
+        src="/logo.svg"
         alt="TipiṭakaPali.org"
-        className="welcome-icon w-16 h-16 rounded-2xl object-cover shadow-md border border-[var(--border-color)] mb-3"
+        className="welcome-icon w-16 h-16 rounded-2xl object-contain bg-white shadow-md border border-[var(--border-color)] p-1.5 mb-3"
         width={64}
         height={64}
+        loading="eager"
+        decoding="async"
       />
       <h1 className="welcome-title">{convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka', settings?.paliScript)}</h1>
       <p className="welcome-desc">
