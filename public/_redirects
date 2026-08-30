@@ -14,6 +14,9 @@
 
 # 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes
 # These must stay 200 rewrites (not redirects) so Next.js App Router can handle /book/* and /chapter/* client-side
+# Legacy chapter URLs /chapter/{code}{chapterIndex} (e.g. /chapter/abh03m10.mul8) are
+# 301-redirected to /book/{code}?chapter={chapterIndex+1} by the Pages Function
+# /functions/chapter/[[path]].js, which takes precedence over the /chapter/* rule below.
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 

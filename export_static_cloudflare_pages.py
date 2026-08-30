@@ -320,7 +320,58 @@ def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     # 2 & 3. Dict + Search proxies REMOVED — served directly from https://api.tipitakapali.org
     # (see services/api.js:getApiBase). No functions/api/search.js or functions/api/dict/* generated.
 
-    # 4. Health Proxy Function (/functions/api/health.js)
+    # 4. Legacy Chapter URL Redirect Function (/functions/chapter/[[path]].js)
+    # Old static-site URLs like /chapter/abh03m10.mul8 (0-indexed chapter suffix)
+    # are permanently 301-redirected to /book/abh03m10.mul?chapter=9.
+    # Any other /chapter/* path (new SPA routes) falls back to index.html.
+    functions_chapter_dir = dist_dir / 'functions' / 'chapter'
+    functions_chapter_dir.mkdir(parents=True, exist_ok=True)
+    chapter_redirect_code = r'''// Cloudflare Pages Edge Function - Legacy Chapter URL Redirects
+// =============================================================
+// The pre-Next.js static site served each chapter as a separate file with a
+// 0-indexed chapter suffix appended to the book code, e.g.:
+//
+//   /chapter/abh03m10.mul8        (chapter_index 8)
+//
+// The Next.js app's canonical URL for the same chapter is 1-indexed:
+//
+//   /book/abh03m10.mul?chapter=9
+//
+// This function issues a permanent 301 redirect for every legacy URL of the
+// form /chapter/{bookCode}{chapterIndex}, so search engines consolidate on
+// the new canonical URLs.
+//
+// Examples:
+//   /chapter/abh03m10.mul8  ->  301  /book/abh03m10.mul?chapter=9
+//   /chapter/abh03m10.mul0  ->  301  /book/abh03m10.mul?chapter=1
+//   /chapter/s0402m1.mul3   ->  301  /book/s0402m1.mul?chapter=4
+//
+export async function onRequest(context) {
+  const url = new URL(context.request.url);
+
+  // Match /chapter/{code}{chapterIndex} where code ends in .mul/.att/.tik/.nrf
+  // and chapterIndex is one or more digits (0-based), with optional trailing slash.
+  const match = url.pathname.match(/^\/chapter\/(.+?\.(?:mul|att|tik|nrf))(\d+)\/?$/i);
+
+  if (match) {
+    const bookCode = match[1];
+    const chapterIndex = parseInt(match[2], 10);
+    const chapter = chapterIndex + 1;
+    const target = url.origin + '/book/' + bookCode + '?chapter=' + chapter;
+    return Response.redirect(target, 301);
+  }
+
+  // Not a legacy chapter-suffixed URL — this is a new-style SPA route such as
+  // /chapter/{code} or /chapter/{code}/{n}. Serve index.html exactly like the
+  // _redirects rewrite used to, since Functions take precedence over _redirects.
+  const indexUrl = new URL('/index.html', url.origin);
+  return context.env.ASSETS.fetch(new Request(indexUrl, context.request));
+}
+'''
+    with open(functions_chapter_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(chapter_redirect_code)
+
+    # 5. Health Proxy Function (/functions/api/health.js)
     health_proxy_code = f"""// Cloudflare Pages Edge Function - Health Status Proxy
 export async function onRequest(context) {{
   const url = new URL(context.request.url);
@@ -358,7 +409,7 @@ export async function onRequest(context) {{
     with open(functions_api_dir / 'health.js', 'w', encoding='utf-8') as f:
         f.write(health_proxy_code)
 
-    log_success("Generated all Cloudflare Pages Edge Functions in /functions/api")
+    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js (legacy 301 redirects) + /functions/api/health.js")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -379,6 +430,9 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code                        /api/book/:code.json                       200
 
 # 2. Client-side Single Page Application (SPA) Route Fallbacks — valid app routes (200 rewrite, not redirect)
+#    Legacy chapter URLs /chapter/{code}{chapterIndex} (e.g. /chapter/abh03m10.mul8) are
+#    301-redirected to /book/{code}?chapter={chapterIndex+1} by the Pages Function
+#    /functions/chapter/[[path]].js, which takes precedence over the /chapter/* rule below.
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 
