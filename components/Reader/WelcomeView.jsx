@@ -58,7 +58,7 @@ export default function WelcomeView() {
   return (
     <div className="welcome-view">
       <img
-        src="/logo.svg"
+        src="/tipitakapali_org_logo.svg"
         alt="TipiṭakaPali.org"
         className="welcome-icon w-16 h-16 rounded-2xl object-contain bg-white shadow-md border border-[var(--border-color)] p-1.5 mb-3"
         width={64}

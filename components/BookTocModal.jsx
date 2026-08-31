@@ -29,12 +29,15 @@ function getTocItemHierarchy(item) {
 }
 
 export default function BookTocModal({ isOpen, onClose }) {
-  const { activeTab, openBook } = useTabs();
+  const { activeTab, openBook, loadingBook } = useTabs();
   const { settings } = useThemeSettings();
   const [filterQuery, setFilterQuery] = useState('');
   const [activeTocIdx, setActiveTocIdx] = useState(-1);
   const inputRef = useRef(null);
   const listContainerRef = useRef(null);
+
+  const tocList = activeTab?.toc || [];
+  const isTocLoading = activeTab?.isLoading || (tocList.length === 0 && loadingBook);
 
   // Compute currently reading paragraph index and corresponding TOC item
   useEffect(() => {
@@ -87,8 +90,6 @@ export default function BookTocModal({ isOpen, onClose }) {
       setFilterQuery('');
     }
   }, [isOpen]);
-
-  const tocList = activeTab?.toc || [];
 
   // Determine Piṭaka category (Vinaya, Sutta, Abhidhamma, Añña) for coloring
   const currentPitaka = useMemo(() => {
@@ -194,9 +195,20 @@ export default function BookTocModal({ isOpen, onClose }) {
           ref={listContainerRef}
           className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scroll-smooth select-none"
         >
-          {filteredToc.length === 0 ? (
+          {isTocLoading ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center select-none animate-fade-in">
+              <div className="relative flex items-center justify-center mb-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--accent-light)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-sm">
+                  <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                </div>
+              </div>
+              <p className="text-xs font-semibold text-[var(--text-primary)]">
+                Loading Table of Contents…
+              </p>
+            </div>
+          ) : filteredToc.length === 0 ? (
             <div className="text-center py-12 text-sm text-[var(--text-muted)]">
-              No matching sections found.
+              {filterQuery ? `No matching sections found for “${filterQuery}”.` : 'No Table of Contents sections recorded for this book.'}
             </div>
           ) : (
             filteredToc.map((item) => {

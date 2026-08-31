@@ -472,8 +472,9 @@ export function TabProvider({ children }) {
 
         // TOC request — show book TOC (no auto chapter 1)
         if (isTocRequest) {
+          const needsTocFetch = !tab.toc || tab.toc.length === 0 || !tab.chapters || tab.chapters.length === 0;
           const nextTabsToc = currentTabs.map((t) =>
-            t.bookCode === cleanCode ? { ...t, viewMode: 'toc', isTocView: true, currentChapterIdx: null } : t
+            t.bookCode === cleanCode ? { ...t, viewMode: 'toc', isTocView: true, currentChapterIdx: null, isLoading: needsTocFetch } : t
           );
           setOpenTabs(nextTabsToc);
           persistTabs(nextTabsToc, cleanCode);
@@ -482,7 +483,8 @@ export function TabProvider({ children }) {
           updateUrlParams({ book: cleanCode, chapter: null, q: null, search: null });
           setTargetScrollIntent(null);
           setSearchHighlight(null);
-          if (!tab.toc || tab.toc.length === 0 || !tab.chapters || tab.chapters.length === 0) {
+          if (needsTocFetch) {
+            setLoadingBook(true);
             fetchBookTocOnly(cleanCode)
               .then((bData) => {
                 if (bData) {
@@ -509,7 +511,10 @@ export function TabProvider({ children }) {
                   );
                 }
               })
-              .catch(() => {});
+              .catch(() => {})
+              .finally(() => {
+                setLoadingBook(false);
+              });
           }
           addToHistory({
             bookCode: cleanCode,

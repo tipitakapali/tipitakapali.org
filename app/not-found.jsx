@@ -47,14 +47,15 @@ export default function NotFound() {
         />
 
         <div className="flex w-full max-w-[640px] flex-col items-center animate-[fadeIn_0.6s_ease-out_both]">
-          {/* Lotus / Dhamma icon in soft pill */}
-          <div
-            className="mb-7 flex h-[72px] w-[72px] select-none items-center justify-center rounded-[22px] border bg-[var(--bg-card)] text-[42px] shadow-sm"
-            style={{ borderColor: 'var(--border-color)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}
-            aria-hidden
-          >
-            🪷
-          </div>
+          <img
+            src="/tipitakapali_org_logo.svg"
+            alt="TipiṭakaPali.org"
+            className="mb-7 w-[72px] h-[72px] rounded-2xl object-contain bg-white shadow-md border border-[var(--border-color)] p-1.5"
+            width={72}
+            height={72}
+            loading="eager"
+            decoding="async"
+          />
 
           <h1
             className="text-balance font-bold tracking-tight text-[var(--accent)] text-[32px] leading-none sm:text-[42px]"

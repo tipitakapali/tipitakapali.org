@@ -19,7 +19,7 @@ function getTocItemHierarchy(item) {
 }
 
 export default function BookTocView() {
-  const { activeTab, openBook } = useTabs();
+  const { activeTab, openBook, loadingBook } = useTabs();
   const { settings } = useThemeSettings();
   const [filterQuery, setFilterQuery] = useState('');
   const inputRef = useRef(null);
@@ -27,6 +27,7 @@ export default function BookTocView() {
 
   const tocList = activeTab?.toc || [];
   const chapters = activeTab?.chapters || [];
+  const isTocLoading = activeTab?.isLoading || (tocList.length === 0 && loadingBook);
 
   const currentPitaka = useMemo(() => {
     if (!activeTab) return null;
@@ -122,9 +123,23 @@ export default function BookTocView() {
       {/* TOC List — scrollable */}
       <div ref={listRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 bg-[var(--bg-primary)]">
         <div className="max-w-3xl mx-auto w-full space-y-1">
-          {filteredToc.length === 0 ? (
+          {isTocLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center select-none animate-fade-in">
+              <div className="relative flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-[var(--accent-light)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-sm">
+                  <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Loading Table of Contents…
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                Buffering book sections & outline
+              </p>
+            </div>
+          ) : filteredToc.length === 0 ? (
             <div className="text-center py-16 text-sm text-[var(--text-muted)]">
-              No matching sections found for “{filterQuery}”.
+              {filterQuery ? `No matching sections found for “${filterQuery}”.` : 'No Table of Contents sections recorded for this book.'}
             </div>
           ) : (
             filteredToc.map((item) => {
@@ -180,11 +195,13 @@ export default function BookTocView() {
               );
             })
           )}
-          <div className="pt-6 pb-2 text-center">
-            <p className="text-xs text-[var(--text-muted)]">
-              Click any section to read
-            </p>
-          </div>
+          {!isTocLoading && filteredToc.length > 0 && (
+            <div className="pt-6 pb-2 text-center">
+              <p className="text-xs text-[var(--text-muted)]">
+                Click any section to read
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
