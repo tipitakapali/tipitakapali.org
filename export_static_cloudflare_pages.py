@@ -342,9 +342,9 @@ def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
 // the new canonical URLs.
 //
 // Examples:
-//   /chapter/abh03m10.mul8  ->  301  /book/abh03m10.mul?chapter=9
-//   /chapter/abh03m10.mul0  ->  301  /book/abh03m10.mul?chapter=1
-//   /chapter/s0402m1.mul3   ->  301  /book/s0402m1.mul?chapter=4
+//   /chapter/abh03m10.mul8  ->  301  /book/abh03m10.mul/9
+//   /chapter/abh03m10.mul0  ->  301  /book/abh03m10.mul/1
+//   /chapter/s0402m1.mul3   ->  301  /book/s0402m1.mul/4
 //
 export async function onRequest(context) {
   const url = new URL(context.request.url);
@@ -357,7 +357,7 @@ export async function onRequest(context) {
     const bookCode = match[1];
     const chapterIndex = parseInt(match[2], 10);
     const chapter = chapterIndex + 1;
-    const target = url.origin + '/book/' + bookCode + '?chapter=' + chapter;
+    const target = url.origin + '/book/' + bookCode + '/' + chapter;
     return Response.redirect(target, 301);
   }
 

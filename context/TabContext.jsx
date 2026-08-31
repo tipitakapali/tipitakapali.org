@@ -236,7 +236,7 @@ export function TabProvider({ children }) {
     } catch (e) {}
   }, []);
 
-  // Helper to update URL search parameters without reloading (1-based chapter in URL)
+  // Helper to update URL search parameters and path without reloading (clean /book/:code/:chapter path)
   // Preserves existing hash (#para1091 / #p1091 / #pindex-*) — fixing fragment race
   const updateUrlParams = useCallback((paramsToUpdate) => {
     if (typeof window === 'undefined') return;
@@ -244,20 +244,32 @@ export function TabProvider({ children }) {
     const preservedHash = window.location.hash || '';
 
     if (paramsToUpdate) {
-      // If book is provided, set path /book/:bookCode (re-adding the tab's script prefix, e.g. si.)
-      if (paramsToUpdate.book) {
-        const prefix = tabScriptPrefixRef.current[paramsToUpdate.book];
-        url.pathname = `/book/${prefix ? `${prefix}.${paramsToUpdate.book}` : paramsToUpdate.book}`;
-        url.searchParams.delete('book');
-        url.searchParams.delete('book_code');
-      } else if (paramsToUpdate.book === null) {
+      const bookTarget = paramsToUpdate.book !== undefined ? paramsToUpdate.book : activeBookCodeRef.current;
+      const chapterTarget = paramsToUpdate.chapter !== undefined ? paramsToUpdate.chapter : null;
+
+      if (bookTarget === null) {
         url.pathname = '/';
         url.searchParams.delete('book');
         url.searchParams.delete('book_code');
+        url.searchParams.delete('chapter');
+        url.searchParams.delete('c');
+      } else if (bookTarget) {
+        const prefix = tabScriptPrefixRef.current[bookTarget];
+        const fullBookCode = prefix ? `${prefix}.${bookTarget}` : bookTarget;
+
+        if (chapterTarget && parseInt(chapterTarget, 10) > 0) {
+          url.pathname = `/book/${fullBookCode}/${chapterTarget}`;
+        } else {
+          url.pathname = `/book/${fullBookCode}`;
+        }
+        url.searchParams.delete('book');
+        url.searchParams.delete('book_code');
+        url.searchParams.delete('chapter');
+        url.searchParams.delete('c');
       }
 
       Object.entries(paramsToUpdate).forEach(([k, v]) => {
-        if (k === 'book') return;
+        if (k === 'book' || k === 'chapter' || k === 'c' || k === 'book_code') return;
         if (v === null || v === undefined) {
           url.searchParams.delete(k);
         } else {
