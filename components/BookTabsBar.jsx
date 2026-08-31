@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Book, X, History } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 
@@ -57,14 +57,44 @@ export default function BookTabsBar() {
     };
   }, [contextMenu]);
 
-  useEffect(() => {
-    if (tabsScrollRef.current) {
-      const activeEl = tabsScrollRef.current.querySelector('.book-tab.active');
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      }
+  const scrollToActiveTab = useCallback((behavior = 'smooth') => {
+    if (!tabsScrollRef.current) return;
+    const container = tabsScrollRef.current;
+    const activeEl = container.querySelector('.book-tab.active');
+    if (!activeEl) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const tabRect = activeEl.getBoundingClientRect();
+
+    // Check if the tab is already fully visible with safety margin
+    const isFullyVisible =
+      tabRect.left >= containerRect.left + 16 &&
+      tabRect.right <= containerRect.right - 16;
+
+    if (!isFullyVisible) {
+      const tabOffsetLeft = activeEl.offsetLeft;
+      const targetScrollLeft = tabOffsetLeft - (container.clientWidth / 2) + (activeEl.clientWidth / 2);
+
+      container.scrollTo({
+        left: Math.max(0, targetScrollLeft),
+        behavior,
+      });
     }
-  }, [activeBookCode]);
+  }, []);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      scrollToActiveTab('smooth');
+    });
+    const timer = setTimeout(() => {
+      scrollToActiveTab('smooth');
+    }, 60);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      clearTimeout(timer);
+    };
+  }, [activeBookCode, openTabs.length, scrollToActiveTab]);
 
   const handleWheel = (e) => {
     if (tabsScrollRef.current && e.deltaY !== 0) {
