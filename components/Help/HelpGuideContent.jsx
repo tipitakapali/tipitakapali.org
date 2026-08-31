@@ -456,7 +456,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
               Aṭṭhakathā
             </span>
             <div className="font-semibold text-[var(--text-primary)] mt-1">Ancient Commentaries</div>
-            <div className="text-[10.5px] text-[var(--text-muted)]">Expositions by Ācariya Buddhaghosa, Dhammapāla, and ancient Mahāvihāra elders.</div>
+            <div className="text-[10.5px] text-[var(--text-muted)]">Commentaties clarifying the Mūla</div>
           </div>
 
           <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-purple-500/30 space-y-1">
@@ -464,7 +464,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
               Ṭīkā
             </span>
             <div className="font-semibold text-[var(--text-primary)] mt-1">Sub-Commentaries</div>
-            <div className="text-[10.5px] text-[var(--text-muted)]">Detailed philosophical and linguistic sub-commentaries clarifying the Aṭṭhakathā.</div>
+            <div className="text-[10.5px] text-[var(--text-muted)]">Sub-commentaries clarifying the Aṭṭhakathā.</div>
           </div>
         </div>
 
