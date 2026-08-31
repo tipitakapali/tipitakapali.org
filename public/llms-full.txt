@@ -1,9 +1,32 @@
-# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog & Reference
+# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog & Multi-Script Reference
 > Website: https://tipitakapali.org
 > Total Canonical Books: 217
 
-## Canonical Books Directory
-| Book Code | Title | Piṭaka | Category | Chapters | URL |
+## Multi-Script Deep-Linking Guide for AI Agents
+Users can open any canonical text directly in their preferred script by prefixing the book code:
+
+| Script Code | Script Name | Native | Sample Book URL | Sample Chapter 1 URL |
+| :--- | :--- | :--- | :--- | :--- |
+| *(default)* | Roman / Latin (IAST) | Roman | `https://tipitakapali.org/book/s0101m.mul` | `https://tipitakapali.org/book/s0101m.mul/1` |
+| `si` | Sinhala | සිංහල | `https://tipitakapali.org/book/si.s0101m.mul` | `https://tipitakapali.org/book/si.s0101m.mul/1` |
+| `hi` | Devanagari / Hindi | देवनागरी | `https://tipitakapali.org/book/hi.s0101m.mul` | `https://tipitakapali.org/book/hi.s0101m.mul/1` |
+| `thai` | Thai | ไทย | `https://tipitakapali.org/book/thai.s0101m.mul` | `https://tipitakapali.org/book/thai.s0101m.mul/1` |
+| `laos` | Lao | ລາວ | `https://tipitakapali.org/book/laos.s0101m.mul` | `https://tipitakapali.org/book/laos.s0101m.mul/1` |
+| `my` | Myanmar / Burmese | မြန်မာ | `https://tipitakapali.org/book/my.s0101m.mul` | `https://tipitakapali.org/book/my.s0101m.mul/1` |
+| `km` | Khmer | ខ្មែរ | `https://tipitakapali.org/book/km.s0101m.mul` | `https://tipitakapali.org/book/km.s0101m.mul/1` |
+| `beng` | Bengali | বাংলা | `https://tipitakapali.org/book/beng.s0101m.mul` | `https://tipitakapali.org/book/beng.s0101m.mul/1` |
+| `gurm` | Gurmukhi | ਗੁਰਮੁਖੀ | `https://tipitakapali.org/book/gurm.s0101m.mul` | `https://tipitakapali.org/book/gurm.s0101m.mul/1` |
+| `tham` | Tai Tham / Lanna | ᨲ᩠ᩅᩫᨾᩮᩥᩬᨦ | `https://tipitakapali.org/book/tham.s0101m.mul` | `https://tipitakapali.org/book/tham.s0101m.mul/1` |
+| `guja` | Gujarati | ગુજરાતી | `https://tipitakapali.org/book/guja.s0101m.mul` | `https://tipitakapali.org/book/guja.s0101m.mul/1` |
+| `telu` | Telugu | తెలుగు | `https://tipitakapali.org/book/telu.s0101m.mul` | `https://tipitakapali.org/book/telu.s0101m.mul/1` |
+| `kann` | Kannada | ಕನ್ನಡ | `https://tipitakapali.org/book/kann.s0101m.mul` | `https://tipitakapali.org/book/kann.s0101m.mul/1` |
+| `mala` | Malayalam | മലയാളം | `https://tipitakapali.org/book/mala.s0101m.mul` | `https://tipitakapali.org/book/mala.s0101m.mul/1` |
+| `brah` | Brahmi | 𑀩𑁆𑀭𑀸𑀳𑁆𑀫𑀻 | `https://tipitakapali.org/book/brah.s0101m.mul` | `https://tipitakapali.org/book/brah.s0101m.mul/1` |
+| `tibt` | Tibetan | བོད་སྐད། | `https://tipitakapali.org/book/tibt.s0101m.mul` | `https://tipitakapali.org/book/tibt.s0101m.mul/1` |
+| `cyrl` | Cyrillic | кириллица | `https://tipitakapali.org/book/cyrl.s0101m.mul` | `https://tipitakapali.org/book/cyrl.s0101m.mul/1` |
+
+## Canonical Books Directory (217 Books)
+| Book Code | Title | Piṭaka | Category | Chapters | Default Roman URL |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `abh01a.att` | Dhammasaṅgaṇi-Aṭṭhakathā | Abhidhammapiṭake | aṭṭhakathā | 8 | [Dhammasaṅgaṇi-Aṭṭhakathā](https://tipitakapali.org/book/abh01a.att) |
 | `abh01m.mul` | Dhammasaṅgaṇīpāḷi | Abhidhammapiṭake | mūla | 5 | [Dhammasaṅgaṇīpāḷi](https://tipitakapali.org/book/abh01m.mul) |

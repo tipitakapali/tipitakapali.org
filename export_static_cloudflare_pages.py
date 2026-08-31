@@ -709,14 +709,15 @@ def main():
     generate_cloudflare_redirects(dist_dir)
     generate_cloudflare_headers(dist_dir)
 
-    # 6. Generate SEO & AI Agent Metadata (sitemap.xml, robots.txt, llms.txt, llms-full.txt, site.jsonld)
+    # 6. Generate SEO & AI Agent Metadata (sitemaps, robots.txt, llms.txt, llms-full.txt, site.jsonld)
     try:
         from generate_seo_ai_metadata import (
-            generate_sitemap_xml,
+            generate_all_sitemaps,
             generate_robots_txt,
             generate_llms_txt,
             generate_llms_full_txt,
             generate_schema_jsonld,
+            PALI_SCRIPTS,
         )
 
         log_info(f"Generating SEO & AI Agent metadata files for {args.site_url}...")
@@ -738,7 +739,7 @@ def main():
                 pass
 
         s_url = args.site_url.rstrip('/')
-        sitemap_content = generate_sitemap_xml(seo_books, seo_chapters, s_url)
+        sitemaps = generate_all_sitemaps(seo_books, seo_chapters, s_url)
         robots_content = generate_robots_txt(s_url)
         llms_content = generate_llms_txt(s_url, len(seo_books), len(seo_chapters))
         llms_full_content = generate_llms_full_txt(s_url, seo_books, seo_catalog)
@@ -746,8 +747,9 @@ def main():
 
         for target in [dist_dir, web_app_dir / 'public', git_repo_dir]:
             if target.exists():
-                with open(target / 'sitemap.xml', 'w', encoding='utf-8') as f:
-                    f.write(sitemap_content)
+                for s_name, s_xml in sitemaps.items():
+                    with open(target / s_name, 'w', encoding='utf-8') as f:
+                        f.write(s_xml)
                 with open(target / 'robots.txt', 'w', encoding='utf-8') as f:
                     f.write(robots_content)
                 with open(target / 'llms.txt', 'w', encoding='utf-8') as f:
@@ -757,7 +759,8 @@ def main():
                 with open(target / 'site.jsonld', 'w', encoding='utf-8') as f:
                     f.write(jsonld_content)
 
-        log_success(f"Generated sitemap.xml ({len(seo_books) + len(seo_chapters) + 1:,} URLs), robots.txt, llms.txt, llms-full.txt, site.jsonld")
+        total_indexed_urls = 1 + len(seo_books) + len(seo_chapters) + len(PALI_SCRIPTS) * (len(seo_books) + len(seo_chapters))
+        log_success(f"Generated {len(sitemaps)} XML sitemaps ({total_indexed_urls:,} URLs across 17 scripts), robots.txt, llms.txt, llms-full.txt, site.jsonld")
     except Exception as e:
         log_warn(f"SEO/AI metadata generation note: {e}")
 

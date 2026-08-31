@@ -5,7 +5,7 @@
 - **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
 - **Total Canonical Books**: 217 books.
 - **Total Chapters**: 2,695 chapters across 520,000+ paragraphs.
-- **Languages / Scripts**: Pāḷi in Roman (Latin with full diacritics), Devanagari, Myanmar, Sinhala, Thai, Khmer, Cyrillic, and 10+ other scripts.
+- **Languages / Scripts**: Pāḷi in Roman (Latin with full IAST diacritics) + 16 Asian & historic scripts.
 - **Canonical Piṭakas**:
   1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
   2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
@@ -15,14 +15,35 @@
 ## Key Reading Links
 - [Home & Canonical Navigation](https://tipitakapali.org/)
 - [Full Catalog & AI Documentation](https://tipitakapali.org/llms-full.txt)
-- [XML Sitemap](https://tipitakapali.org/sitemap.xml)
+- [XML Sitemap Index](https://tipitakapali.org/sitemap.xml)
 - [OpenAPI for AI Tools](https://tipitakapali.org/openapi.json)
 - [AI Plugin Manifest](https://tipitakapali.org/.well-known/ai-plugin.json)
 
-## Reading URLs Syntax
-- Book: `https://tipitakapali.org/book/[book_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
-- Chapter: `https://tipitakapali.org/book/[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/s0101m.mul/2` for Chapter 2)
-- Specific Paragraph: `https://tipitakapali.org/book/[book_code]#para-[number]` (e.g. `https://tipitakapali.org/book/s0502m.mul#para-1` for Dhammapada Verse 1)
+## Reading URLs & Multi-Script Syntax
+- **Default Roman Book**: `https://tipitakapali.org/book/[book_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
+- **Multi-Script Book**: `https://tipitakapali.org/book/[script_code].[book_code]` (e.g. `https://tipitakapali.org/book/hi.s0101m.mul` for Devanagari, `https://tipitakapali.org/book/si.s0101m.mul` for Sinhala, `https://tipitakapali.org/book/my.s0101m.mul` for Myanmar, `https://tipitakapali.org/book/thai.s0101m.mul` for Thai)
+- **Default Roman Chapter**: `https://tipitakapali.org/book/[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/s0101m.mul/2` for Chapter 2)
+- **Multi-Script Chapter**: `https://tipitakapali.org/book/[script_code].[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/hi.s0101m.mul/2` for Devanagari Chapter 2)
+- **Specific Paragraph**: `https://tipitakapali.org/book/[book_code]#para-[number]` (e.g. `https://tipitakapali.org/book/s0502m.mul#para-1` for Dhammapada Verse 1)
+
+### Supported 16 Pāḷi Script Codes:
+- `si`: **Sinhala** (සිංහල) → `https://tipitakapali.org/book/si.s0101m.mul`
+- `hi`: **Devanagari / Hindi** (देवनागरी) → `https://tipitakapali.org/book/hi.s0101m.mul`
+- `thai`: **Thai** (ไทย) → `https://tipitakapali.org/book/thai.s0101m.mul`
+- `laos`: **Lao** (ລາວ) → `https://tipitakapali.org/book/laos.s0101m.mul`
+- `my`: **Myanmar / Burmese** (မြန်မာ) → `https://tipitakapali.org/book/my.s0101m.mul`
+- `km`: **Khmer** (ខ្មែរ) → `https://tipitakapali.org/book/km.s0101m.mul`
+- `beng`: **Bengali** (বাংলা) → `https://tipitakapali.org/book/beng.s0101m.mul`
+- `gurm`: **Gurmukhi** (ਗੁਰਮੁਖੀ) → `https://tipitakapali.org/book/gurm.s0101m.mul`
+- `tham`: **Tai Tham / Lanna** (ᨲ᩠ᩅᩫᨾᩮᩥᩬᨦ) → `https://tipitakapali.org/book/tham.s0101m.mul`
+- `guja`: **Gujarati** (ગુજરાતી) → `https://tipitakapali.org/book/guja.s0101m.mul`
+- `telu`: **Telugu** (తెలుగు) → `https://tipitakapali.org/book/telu.s0101m.mul`
+- `kann`: **Kannada** (ಕನ್ನಡ) → `https://tipitakapali.org/book/kann.s0101m.mul`
+- `mala`: **Malayalam** (മലയാളം) → `https://tipitakapali.org/book/mala.s0101m.mul`
+- `brah`: **Brahmi** (𑀩𑁆𑀭𑀸𑀳𑁆𑀫𑀻) → `https://tipitakapali.org/book/brah.s0101m.mul`
+- `tibt`: **Tibetan** (བོད་སྐད།) → `https://tipitakapali.org/book/tibt.s0101m.mul`
+- `cyrl`: **Cyrillic** (кириллица) → `https://tipitakapali.org/book/cyrl.s0101m.mul`
+*(Note: Roman/Latin is the default and uses the standard URL without a prefix)*
 
 ## Public Static JSON API (Edge CDN 0ms)
 - Navigation Tree: `GET https://tipitakapali.org/api/tree`

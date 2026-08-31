@@ -11,14 +11,27 @@
         "CSCD Pali Canon",
         "VRI Tipitaka"
       ],
-      "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with multi-script typography, DPD dictionary, and full-text search.",
+      "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 16 multi-script typography options, DPD dictionary, and full-text search.",
       "inLanguage": [
         "pi",
+        "pi-Latn",
         "en",
-        "my",
-        "si",
-        "th",
-        "vi"
+        "pi-Sinh",
+        "pi-Deva",
+        "pi-Thai",
+        "pi-Laoo",
+        "pi-Mymr",
+        "pi-Khmr",
+        "pi-Beng",
+        "pi-Guru",
+        "pi-Lana",
+        "pi-Gujr",
+        "pi-Telu",
+        "pi-Knda",
+        "pi-Mlym",
+        "pi-Brah",
+        "pi-Tibt",
+        "pi-Cyrl"
       ],
       "potentialAction": [
         {
@@ -43,7 +56,7 @@
       "@type": "DataCatalog",
       "@id": "https://tipitakapali.org/#catalog",
       "name": "Chaṭṭha Saṅgāyana Pali Canon Canonical Corpus",
-      "description": "217 books of the Theravada Buddhist Pali Canon including Vinaya, Sutta, and Abhidhamma Pitakas with Atthakatha and Tika commentaries.",
+      "description": "217 books of the Theravada Buddhist Pali Canon including Vinaya, Sutta, and Abhidhamma Pitakas with Atthakatha and Tika commentaries across 16 scripts.",
       "url": "https://tipitakapali.org/",
       "dataset": [
         {
