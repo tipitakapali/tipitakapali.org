@@ -4,6 +4,7 @@ next_tipitakapali.org/
 *.db.bak
 *.db
 *.zip
+!pali-script-converter.zip
 public/api/
 
 
