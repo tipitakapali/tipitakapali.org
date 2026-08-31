@@ -11,13 +11,14 @@ import Footer from '../components/Footer';
 import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
 import DictionaryModal from '../components/DictionaryModal';
+import NotFound from './not-found';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openSearchModal, activeTab, activeBookCode, setIsSidebarOpen, setIsHeaderVisible } = useTabs();
+  const { openBook, openSearchModal, activeTab, activeBookCode, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
@@ -41,6 +42,12 @@ export function MainAppContent({ params: rawParams }) {
       const ogEl = document.querySelector('meta[property="og:description"]');
       if (ogEl) ogEl.setAttribute('content', content);
     };
+
+    if (isNotFound) {
+      document.title = 'Lost in Saṃsāra (404) | Tipiṭaka Pāḷi';
+      setMetaDesc('The page you seek has wandered — like all conditioned things, it is anicca, impermanent.');
+      return;
+    }
 
     if (!activeTab) {
       if (typeof window !== 'undefined') {
@@ -85,6 +92,7 @@ export function MainAppContent({ params: rawParams }) {
     document.title = docTitle;
     setMetaDesc(`Complete ${subject} with rich typography, multi-script support, and full-text search.`);
   }, [
+    isNotFound,
     activeTab,
     activeTab?.bookCode,
     activeTab?.title,
@@ -229,6 +237,10 @@ export function MainAppContent({ params: rawParams }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isZenMode, handleExitZen]);
+
+  if (isNotFound) {
+    return <NotFound />;
+  }
 
   return (
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">

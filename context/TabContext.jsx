@@ -110,6 +110,7 @@ export function TabProvider({ children }) {
   const [targetScrollIntent, setTargetScrollIntent] = useState(null);
   const [treeSelectedNode, setTreeSelectedNode] = useState(null);
   const [activeEditionPages, setActiveEditionPages] = useState({});
+  const [isNotFound, setIsNotFound] = useState(false);
 
   const [bookmarks, setBookmarks] = useState([]);
   const [recentHistory, setRecentHistory] = useState([]);
@@ -122,7 +123,6 @@ export function TabProvider({ children }) {
   // bookCode -> URL script prefix (e.g. 'si') for tabs opened via script-prefixed URLs,
   // so updateUrlParams keeps the prefix in the address bar (deep-links stay script-specific)
   const tabScriptPrefixRef = useRef({});
-  const isInitializedRef = useRef(false);
 
   openTabsRef.current = openTabs;
   activeBookCodeRef.current = activeBookCode;
@@ -206,7 +206,7 @@ export function TabProvider({ children }) {
 
   // Save Recent History to localStorage
   const addToHistory = useCallback((item) => {
-    if (!item?.bookCode) return;
+    if (!item?.bookCode || !item?.bookTitle) return;
     setRecentHistory((prev) => {
       const filtered = prev.filter((h) => h.bookCode !== item.bookCode);
       const newEntry = {
@@ -413,6 +413,7 @@ export function TabProvider({ children }) {
   const openBook = useCallback(
     async (bookCode, options = {}) => {
       if (!bookCode) return;
+      setIsNotFound(false);
       let cleanCode = bookCode.replace('.xml', '');
 
       // Optional script prefix (e.g. si.abh03m10.mul -> abh03m10.mul): apply the script
@@ -713,7 +714,22 @@ export function TabProvider({ children }) {
           });
           return;
         } catch (err) {
-          alert(`Error opening book: ${err.message}`);
+          console.warn(`[openBook] Failed to open TOC for '${cleanCode}':`, err?.message || err);
+          // Remove optimistic tab from state & localStorage
+          const cleanedTabs = openTabsRef.current.filter((t) => t.bookCode !== cleanCode);
+          const nextActive = cleanedTabs.length > 0 ? cleanedTabs[cleanedTabs.length - 1].bookCode : null;
+          setOpenTabs(cleanedTabs);
+          setActiveBookCode(nextActive);
+          persistTabs(cleanedTabs, nextActive);
+          // Clean from recent history if ever present
+          setRecentHistory((prev) => {
+            const filtered = prev.filter((h) => h.bookCode !== cleanCode);
+            try {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
+            } catch (e) {}
+            return filtered;
+          });
+          setIsNotFound(true);
           return;
         } finally {
           setLoadingBook(false);
@@ -870,7 +886,22 @@ export function TabProvider({ children }) {
           chapterTitle: newTab.chapters?.[targetChapIdx]?.title || '',
         });
       } catch (err) {
-        alert(`Error opening book: ${err.message}`);
+        console.warn(`[openBook] Failed to open book '${cleanCode}':`, err?.message || err);
+        // Remove optimistic tab from state & localStorage
+        const cleanedTabs = openTabsRef.current.filter((t) => t.bookCode !== cleanCode);
+        const nextActive = cleanedTabs.length > 0 ? cleanedTabs[cleanedTabs.length - 1].bookCode : null;
+        setOpenTabs(cleanedTabs);
+        setActiveBookCode(nextActive);
+        persistTabs(cleanedTabs, nextActive);
+        // Clean from recent history if ever present
+        setRecentHistory((prev) => {
+          const filtered = prev.filter((h) => h.bookCode !== cleanCode);
+          try {
+            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
+          } catch (e) {}
+          return filtered;
+        });
+        setIsNotFound(true);
       } finally {
         setLoadingBook(false);
       }
@@ -1225,143 +1256,6 @@ export function TabProvider({ children }) {
     });
   }, []);
 
-  // Automatic Session Resumption on page load / revisit
-  // Hash-aware (#para1091 / #pindex-*) — co-exists with MainAppContent's hash handler
-  // If URL has hash para, it takes priority and must NOT be treated as TOC request
-  useEffect(() => {
-    if (typeof window === 'undefined' || isInitializedRef.current) return;
-
-    const url = new URL(window.location);
-    const pathname = url.pathname;
-    let urlBook = url.searchParams.get('book') || url.searchParams.get('book_code');
-    let urlChapter = url.searchParams.get('chapter') || url.searchParams.get('c');
-    let urlQuery = url.searchParams.get('q') || url.searchParams.get('search');
-    let urlPara = url.searchParams.get('para') || url.searchParams.get('p');
-    let urlHashPara = null;
-    let urlHashPindex = null;
-    const rawHash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
-    if (rawHash) {
-      const numMatch = rawHash.match(/^(?:para-?|p)?(\d+)$/i);
-      if (numMatch) urlHashPara = numMatch[1];
-      else if (rawHash.startsWith('pindex-')) {
-        const pidx = parseInt(rawHash.replace('pindex-', ''), 10);
-        if (!isNaN(pidx)) urlHashPindex = pidx;
-      }
-    }
-    // Hash fragment takes priority over ?para=
-    if (urlHashPara) urlPara = urlHashPara;
-    const hashPindex = urlHashPindex;
-
-    if (!urlBook && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
-      const raw = pathname.replace(/^\/(?:book|chapter)\//, '');
-      const parts = raw.split('/');
-      if (parts[0]) urlBook = decodeURIComponent(parts[0]);
-      if (parts[1] && !urlChapter) urlChapter = decodeURIComponent(parts[1]);
-    }
-
-    if (urlBook) {
-      const chapSuffixMatch = urlBook.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
-      if (chapSuffixMatch) {
-        urlBook = chapSuffixMatch[1];
-        if (!urlChapter) {
-          urlChapter = parseInt(chapSuffixMatch[2], 10) + 1;
-        }
-      }
-    }
-
-    if (urlBook) {
-      // Delegate URL-driven opens (including #para1091 hash) to MainAppContent (app/page.js:116)
-      // to avoid duplicate openBook race that caused TOC flash and hash loss.
-      // MainAppContent handles hash + ?q= + path parsing; TabContext resumes only when no URL book.
-      return;
-    }
-
-    // Resume from localStorage
-    try {
-      const savedTabsRaw = localStorage.getItem(STORAGE_KEYS.TABS);
-      const savedActive = localStorage.getItem(STORAGE_KEYS.ACTIVE);
-      const savedHistoryRaw = localStorage.getItem(STORAGE_KEYS.HISTORY);
-
-      if (savedTabsRaw) {
-        const parsedTabs = JSON.parse(savedTabsRaw);
-        if (Array.isArray(parsedTabs) && parsedTabs.length > 0) {
-          const activeToOpen = savedActive || parsedTabs[0].bookCode;
-          const activeItem = parsedTabs.find((p) => p.bookCode === activeToOpen) || parsedTabs[0];
-
-          let resumeParaNum = activeItem.lastParaNum;
-          let resumeChapIdx = activeItem.currentChapterIdx;
-          const isActiveToc = activeItem.isTocView || activeItem.viewMode === 'toc' || resumeChapIdx === null;
-          if (isActiveToc) {
-            resumeChapIdx = undefined;
-            resumeParaNum = undefined;
-          } else if (resumeChapIdx === undefined || resumeChapIdx === null) {
-            resumeChapIdx = 0;
-          }
-
-          if (!resumeParaNum && savedHistoryRaw && !isActiveToc) {
-            try {
-              const parsedHist = JSON.parse(savedHistoryRaw);
-              const histItem = parsedHist.find((h) => h.bookCode === activeItem.bookCode);
-              if (histItem?.paraNum) {
-                resumeParaNum = histItem.paraNum;
-                if (histItem.chapterIdx !== undefined) resumeChapIdx = histItem.chapterIdx;
-              }
-            } catch (_) {}
-          }
-
-          // Open active book first to exact paragraph / chapter (or TOC if no chapter)
-          openBook(activeItem.bookCode, {
-            targetChapterIdx: resumeChapIdx,
-            targetParaNum: resumeParaNum || undefined,
-            isResume: true,
-          });
-
-          // Load rest in background
-          parsedTabs.forEach((item) => {
-            if (item.bookCode !== activeItem.bookCode) {
-              const isBgToc = item.isTocView || item.viewMode === 'toc' || item.currentChapterIdx === null;
-              const bgFetch = isBgToc ? fetchBookTocOnly(item.bookCode) : fetchBook(item.bookCode, { chapter: item.currentChapterIdx ?? 0, buffer: 0 });
-              bgFetch
-                .then((bData) => {
-                  setOpenTabs((prev) => {
-                    if (prev.some((t) => t.bookCode === bData.code)) return prev;
-                    const isToc = isBgToc;
-                    return [
-                      ...prev,
-                      {
-                        bookCode: bData.code,
-                        title: bData.title,
-                        nikaya: bData.nikaya || bData.category || '',
-                        category: bData.category || '',
-                        chapter_count: bData.chapter_count,
-                        chapters: bData.chapters || [],
-                        toc: bData.toc || [],
-                        mat: bData.mat || null,
-                        para_to_chapter: bData.para_to_chapter || {},
-                        para_to_index: bData.para_to_index || {},
-                        page_to_chapter: bData.page_to_chapter || {},
-                        page_to_para: bData.page_to_para || {},
-                        loadedChapters: isToc ? {} : { ...bData.chapters_data },
-                        loadingChapters: {},
-                        currentChapterIdx: isToc ? null : (item.currentChapterIdx ?? 0),
-                        lastParaNum: item.lastParaNum,
-                        viewMode: isToc ? 'toc' : 'reader',
-                        isTocView: isToc,
-                      },
-                    ];
-                  });
-                })
-                .catch(() => {});
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to restore session tabs:', e);
-    }
-  }, [openBook]);
-
-
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 
   // Auto-fetch MAT if missing on activeTab
@@ -1513,6 +1407,8 @@ export function TabProvider({ children }) {
         setIsSidebarOpen,
         isHeaderVisible,
         setIsHeaderVisible,
+        isNotFound,
+        setIsNotFound,
         updateUrlParams,
       }}
     >

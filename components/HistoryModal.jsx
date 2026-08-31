@@ -68,10 +68,10 @@ export default function HistoryModal({ isOpen, onClose }) {
             ) : <div className="w-[75px]" />}
           </div>
 
-          {/* Center: Recent Tabs Title */}
+          {/* Center: Recent Books Title */}
           <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-[var(--accent)] justify-center flex-1 text-center truncate">
             <History size={16} className="shrink-0" />
-            <span>Recent Tabs</span>
+            <span>Recent Books</span>
             <span className="text-[11px] font-normal text-[var(--text-muted)]">
               ({recentHistory.length})
             </span>
