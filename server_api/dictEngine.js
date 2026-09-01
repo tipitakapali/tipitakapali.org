@@ -4,12 +4,29 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-// Locate dictionary database directory (strictly server_api/db)
-const DB_DIR = path.resolve(__dirname, 'db');
-if (!fs.existsSync(DB_DIR)) {
-  console.warn('[DictEngine] Warning: Dictionary database directory not found at:', DB_DIR);
-} else {
-  console.log(`[DictEngine] Dictionary databases directory: ${DB_DIR}`);
+function getDbCandidates(filename) {
+  const candidates = [];
+  if (process.env.USER_DATA_PATH) {
+    candidates.push(path.join(process.env.USER_DATA_PATH, 'db', filename));
+    candidates.push(path.join(process.env.USER_DATA_PATH, 'db_tpo', filename));
+    candidates.push(path.join(process.env.USER_DATA_PATH, filename));
+  }
+  if (process.env.DB_DIR) {
+    candidates.push(path.join(process.env.DB_DIR, filename));
+  }
+  if (process.env.PROCESS_RESOURCES_PATH) {
+    candidates.push(path.join(process.env.PROCESS_RESOURCES_PATH, 'db', filename));
+    candidates.push(path.join(process.env.PROCESS_RESOURCES_PATH, filename));
+  }
+  candidates.push(path.join(__dirname, 'db', filename));
+  candidates.push(path.join(__dirname, filename));
+  return candidates;
+}
+
+function resolveDbPath(filename) {
+  const candidates = getDbCandidates(filename);
+  const found = candidates.find((p) => fs.existsSync(p));
+  return found ? path.resolve(found) : null;
 }
 
 // Database references
@@ -46,12 +63,10 @@ function getTableCharsFromDb(db) {
 }
 
 function initDictDatabases() {
-  if (!DB_DIR) return false;
-
   try {
     for (const [key, filename] of Object.entries(DB_FILES)) {
-      const fullPath = path.join(DB_DIR, filename);
-      if (fs.existsSync(fullPath)) {
+      const fullPath = resolveDbPath(filename);
+      if (fullPath) {
         const db = new Database(fullPath, { readonly: true });
         db.exec(`
           PRAGMA synchronous = NORMAL;
@@ -60,17 +75,17 @@ function initDictDatabases() {
         `);
         dbs[key] = db;
         tableChars[key] = getTableCharsFromDb(db);
-        console.log(`[DictEngine] Connected ${key} (${tableChars[key].length} partition tables)`);
+        console.log(`[DictEngine] Connected ${key} (${tableChars[key].length} partition tables) from: ${fullPath}`);
       } else {
-        console.warn(`[DictEngine] Database file missing: ${fullPath}`);
+        console.warn(`[DictEngine] Database file missing for ${key}: ${filename}`);
       }
     }
 
     // Load goldendict helper if available
-    const goldenPath = path.join(DB_DIR, 'dpd_goldendict.js');
-    if (fs.existsSync(goldenPath)) {
+    const goldenPath = resolveDbPath('dpd_goldendict.js');
+    if (goldenPath) {
       goldendict = require(goldenPath);
-      console.log(`[DictEngine] Loaded DPD goldendict processor (${Object.keys(goldendict.family_root_json || {}).length} root families)`);
+      console.log(`[DictEngine] Loaded DPD goldendict processor (${Object.keys(goldendict.family_root_json || {}).length} root families) from: ${goldenPath}`);
     }
 
     return true;

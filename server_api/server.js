@@ -9,18 +9,39 @@ const compress = require('@fastify/compress');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
+// Default to 127.0.0.1 for desktop security; override with HOST when needed.
 const PORT = parseInt(process.env.PORT || '8400', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || '127.0.0.1';
+
+function getDbCandidates(filename) {
+  const candidates = [];
+  if (process.env.USER_DATA_PATH) {
+    candidates.push(path.join(process.env.USER_DATA_PATH, 'db', filename));
+    candidates.push(path.join(process.env.USER_DATA_PATH, 'db_tpo', filename));
+    candidates.push(path.join(process.env.USER_DATA_PATH, filename));
+  }
+  if (process.env.DB_DIR) {
+    candidates.push(path.join(process.env.DB_DIR, filename));
+  }
+  if (process.env.PROCESS_RESOURCES_PATH) {
+    candidates.push(path.join(process.env.PROCESS_RESOURCES_PATH, 'db', filename));
+    candidates.push(path.join(process.env.PROCESS_RESOURCES_PATH, filename));
+  }
+  candidates.push(path.join(__dirname, 'db', filename));
+  candidates.push(path.join(__dirname, filename));
+  return candidates;
+}
+
+function resolveDbPath(filename) {
+  const candidates = getDbCandidates(filename);
+  const found = candidates.find((p) => fs.existsSync(p));
+  return found ? path.resolve(found) : null;
+}
 
 // Locate tipitaka.db database
-const DB_CANDIDATES = [
-  path.join(__dirname, 'db', 'tipitaka.db'),
-  path.join(__dirname, 'tipitaka.db'),
-];
-
-let DB_PATH = DB_CANDIDATES.find((p) => fs.existsSync(p));
+let DB_PATH = resolveDbPath('tipitaka.db');
 if (!DB_PATH) {
-  console.error('ERROR: tipitaka.db not found in candidates:', DB_CANDIDATES);
+  console.error('ERROR: tipitaka.db not found in candidates:', getDbCandidates('tipitaka.db'));
   process.exit(1);
 }
 console.log(`[Database] Using SQLite database at: ${DB_PATH}`);
@@ -36,14 +57,7 @@ db.exec(`
 `);
 
 // Locate and initialize separate fts_tipitaka.db database for full-text search
-const FTS_DB_CANDIDATES = [
-  path.join(__dirname, 'db', 'fts_tipitaka.db'),
-  path.join(__dirname, 'fts_tipitaka.db'),
-  path.join(__dirname, 'db', 'tipitaka.db'),
-  path.join(__dirname, 'tipitaka.db'),
-];
-
-let FTS_DB_PATH = FTS_DB_CANDIDATES.find((p) => fs.existsSync(p));
+let FTS_DB_PATH = resolveDbPath('fts_tipitaka.db') || DB_PATH;
 let dbFts = null;
 if (FTS_DB_PATH) {
   try {
@@ -212,10 +226,16 @@ async function main() {
     methods: ['GET', 'HEAD', 'OPTIONS'],
   });
 
-  await fastify.register(compress, {
-    global: true,
-    threshold: 512,
-  });
+  if (compress) {
+    try {
+      await fastify.register(compress, {
+        global: true,
+        threshold: 512,
+      });
+    } catch (err) {
+      console.warn('[Fastify] Warning: @fastify/compress registration skipped:', err.message);
+    }
+  }
 
   fastify.get('/', async (req, reply) => {
     return {
