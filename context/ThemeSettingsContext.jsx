@@ -181,6 +181,34 @@ export function ThemeSettingsProvider({ children }) {
     document.body.classList.toggle('zen-mode', isZenMode);
   }, [settings, isZenMode, isMounted]);
 
+  // Prime script fonts to avoid FOIT/layout shift when switching scripts
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fonts && settings.paliScript && settings.paliScript !== 'roman') {
+      const scriptFontMap = {
+        sinhala: '1em "UN-Abhaya"',
+        myanmar: '1em "Pyidaungsu"',
+        devanagari: '1em "Noto Sans Devanagari"',
+        thai: '1em "THSarabunPali"',
+        laos: '1em "Noto Sans Lao"',
+        khmer: '1em "Noto Sans Khmer"',
+        bengali: '1em "Noto Sans Bengali"',
+        gurmukhi: '1em "Noto Sans Gurmukhi"',
+        gujarati: '1em "Noto Sans Gujarati"',
+        telugu: '1em "Noto Sans Telugu"',
+        kannada: '1em "Noto Sans Kannada"',
+        malayalam: '1em "Noto Sans Malayalam"',
+        taitham: '1em "Noto Sans Tai Tham"',
+        brahmi: '1em "Noto Sans Brahmi"',
+        tibetan: '1em "Noto Serif Tibetan"',
+        cyrillic: '1em "Noto Sans"',
+      };
+      const fontDesc = scriptFontMap[settings.paliScript];
+      if (fontDesc) {
+        document.fonts.load(fontDesc).catch(() => {});
+      }
+    }
+  }, [settings.paliScript]);
+
   return (
     <ThemeSettingsContext.Provider
       value={{

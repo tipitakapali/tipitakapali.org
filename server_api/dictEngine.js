@@ -184,7 +184,12 @@ const SYN_CACHE_MAX = 3000;
 const synCache = new Map();
 function getSynonyms(word) {
   if (!dbs.SYN) return [];
-  if (synCache.has(word)) return synCache.get(word);
+  if (synCache.has(word)) {
+    const cached = synCache.get(word);
+    synCache.delete(word);
+    synCache.set(word, cached);
+    return cached;
+  }
   try {
     const fchar = getFChar(word, 'SYN', false);
     const rows = dbs.SYN.prepare(`SELECT word FROM ${fchar} WHERE synonym = ?`).all(word);
@@ -602,7 +607,11 @@ function lookupDPDFast(rawWord, useSplitter = false) {
   const cacheKey = `${word}_${useSplitter ? '1' : '0'}`;
   if (ENABLE_DICT_CACHE) {
     const cached = dpdCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      dpdCache.delete(cacheKey);
+      dpdCache.set(cacheKey, cached);
+      return cached;
+    }
   }
 
   const syns = getSynonyms(word);
@@ -657,7 +666,11 @@ function lookupOthers(rawWord) {
 
   if (ENABLE_DICT_CACHE) {
     const cached = othersCache.get(word);
-    if (cached) return cached;
+    if (cached) {
+      othersCache.delete(word);
+      othersCache.set(word, cached);
+      return cached;
+    }
   }
 
   // Share single SYN lookup across PTS/ABD/PSD (synCache ensures cross-request reuse too)
@@ -716,6 +729,8 @@ function lookupAll(rawWord) {
   if (ENABLE_DICT_CACHE) {
     const cached = dictCache.get(word);
     if (cached) {
+      dictCache.delete(word);
+      dictCache.set(word, cached);
       return cached;
     }
   }
@@ -754,6 +769,16 @@ function lookupAll(rawWord) {
   return result;
 }
 
+function closeDatabases() {
+  for (const [key, dbInstance] of Object.entries(dbs)) {
+    try {
+      if (dbInstance && typeof dbInstance.close === 'function') {
+        dbInstance.close();
+      }
+    } catch (e) {}
+  }
+}
+
 // Initialize on module import
 initDictDatabases();
 
@@ -770,4 +795,5 @@ module.exports = {
   lookupINF,
   lookupSplitter,
   getSynonyms,
+  closeDatabases,
 };

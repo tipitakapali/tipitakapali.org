@@ -66,6 +66,7 @@ export default function SearchModal() {
 
   const inputRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   // Load saved preferences on mount
   useEffect(() => {
@@ -105,6 +106,8 @@ export default function SearchModal() {
       }
 
       if (currentOffset === 0) {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = new AbortController();
         setLoading(true);
       } else {
         setLoadingMore(true);
@@ -119,6 +122,7 @@ export default function SearchModal() {
           sort: currentSort,
           limit: 50,
           offset: currentOffset,
+          signal: abortControllerRef.current?.signal,
         });
 
         const newResults = data.results || [];
@@ -132,11 +136,14 @@ export default function SearchModal() {
         setTotal(data.total || 0);
         updateUrlParams({ q: searchQuery });
       } catch (err) {
+        if (err.name === 'AbortError' || err.message?.includes('aborted')) return;
         setError(err.message);
         if (currentOffset === 0) setResults([]);
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (!abortControllerRef.current?.signal?.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [matFilter, pitakaFilter, distanceFilter, sortOption, updateUrlParams]

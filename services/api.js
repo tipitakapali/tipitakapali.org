@@ -5,7 +5,13 @@ export const ENABLE_CLIENT_CACHE = true;
 const cache = new Map();
 const pendingRequests = new Map();
 
-async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000) {
+async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) {
+  if (signal?.aborted) {
+    const err = new Error('Aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+
   if (!ENABLE_CLIENT_CACHE) {
     return fetcher();
   }
@@ -270,11 +276,18 @@ export async function searchTipitaka(query, options = {}) {
   const cacheKey = `search_${qs}`;
   const base = getApiBase();
 
-  return cachedFetch(cacheKey, async () => {
-    const res = await fetch(`${base}/api/search?${qs}`);
-    if (!res.ok) throw new Error('Search query failed');
-    return res.json();
-  }, 10 * 60 * 1000);
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const res = await fetch(`${base}/api/search?${qs}`, {
+        signal: options.signal,
+      });
+      if (!res.ok) throw new Error('Search query failed');
+      return res.json();
+    },
+    10 * 60 * 1000,
+    options.signal
+  );
 }
 
 import { cleanDictionaryQuery, splitScriptCode } from './transliterate';
@@ -318,11 +331,14 @@ export async function fetchDictionaryLookup(word, dictType = 'all', options = {}
   return cachedFetch(
     cacheKey,
     async () => {
-      const res = await fetch(`${base}/api/dict/lookup?${qs}`);
+      const res = await fetch(`${base}/api/dict/lookup?${qs}`, {
+        signal: options.signal,
+      });
       if (!res.ok) throw new Error(`Dictionary lookup failed for ${cleanWord}`);
       return res.json();
     },
-    24 * 60 * 60 * 1000
+    24 * 60 * 60 * 1000,
+    options.signal
   );
 }
 

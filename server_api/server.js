@@ -325,6 +325,8 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       book = cachedMeta.rawBook;
       chapters = cachedMeta.chapters;
       meta = cachedMeta.meta;
+      bookMetaCache.delete(cleanCode);
+      bookMetaCache.set(cleanCode, cachedMeta);
     } else {
       book = stmtGetBook.get(cleanCode);
       if (!book) {
@@ -346,7 +348,10 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     }
 
     let toc = tocCache.get(cleanCode);
-    if (!toc) {
+    if (toc) {
+      tocCache.delete(cleanCode);
+      tocCache.set(cleanCode, toc);
+    } else {
       toc = stmtGetToc.all(cleanCode);
       if (tocCache.size > 100) {
         const firstKey = tocCache.keys().next().value;
@@ -464,8 +469,15 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     const cleanCode = req.params.code.replace('.xml', '');
     let toc = tocCache.get(cleanCode);
-    if (!toc) {
+    if (toc) {
+      tocCache.delete(cleanCode);
+      tocCache.set(cleanCode, toc);
+    } else {
       toc = stmtGetToc.all(cleanCode);
+      if (tocCache.size > 100) {
+        const firstKey = tocCache.keys().next().value;
+        tocCache.delete(firstKey);
+      }
       tocCache.set(cleanCode, toc);
     }
     return {
@@ -700,6 +712,8 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     const cachedEntry = searchCache.get(cacheKey);
     if (cachedEntry && Date.now() - cachedEntry.timestamp < SEARCH_CACHE_TTL) {
       searchHits++;
+      searchCache.delete(cacheKey);
+      searchCache.set(cacheKey, cachedEntry);
       return cachedEntry.data;
     }
     searchMisses++;
@@ -909,6 +923,24 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
         heap_total_mb: Math.round(memory.heapTotal / (1024 * 1024)),
       },
     };
+  });
+
+  const gracefulShutdown = async () => {
+    try {
+      await fastify.close();
+      if (db && typeof db.close === 'function') db.close();
+      if (dbFts && dbFts !== db && typeof dbFts.close === 'function') dbFts.close();
+      if (dictEngine && typeof dictEngine.closeDatabases === 'function') {
+        dictEngine.closeDatabases();
+      }
+    } catch (e) {}
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
+  process.on('message', (msg) => {
+    if (msg && msg.type === 'shutdown') gracefulShutdown();
   });
 
   try {

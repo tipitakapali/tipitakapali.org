@@ -94,6 +94,7 @@ export function DictionaryProvider({ children }) {
   const [error, setError] = useState(null);
 
   const lookupSeqRef = useRef(0);
+  const lookupAbortControllerRef = useRef(null);
 
   // Cache for loaded inflection tables: { [targetId]: htmlString }
   const [inflectionCache, setInflectionCache] = useState({});
@@ -313,6 +314,9 @@ export function DictionaryProvider({ children }) {
     const cleanWord = (romanWord || sanitizedInput.trim().toLowerCase()).replace(/ṁ/g, 'ṃ');
 
     const currentSeq = ++lookupSeqRef.current;
+    lookupAbortControllerRef.current?.abort();
+    lookupAbortControllerRef.current = new AbortController();
+    const signal = lookupAbortControllerRef.current.signal;
 
     setQueryWord(cleanWord);
     setDisplayWord(rawDisplay);
@@ -331,13 +335,13 @@ export function DictionaryProvider({ children }) {
 
     try {
       // ── Parallel-Progressive: fire DPD + others together, render DPD instantly ──
-      const dpdPromise = fetchDictionaryLookup(cleanWord, 'dpd');
-      const othersPromise = fetchDictionaryLookup(cleanWord, 'others');
+      const dpdPromise = fetchDictionaryLookup(cleanWord, 'dpd', { signal });
+      const othersPromise = fetchDictionaryLookup(cleanWord, 'others', { signal });
       setIsBackgroundLoading(true);
 
       // Phase 1: DPD resolves first → paint immediately (no extra RTT)
       const dpdData = await dpdPromise;
-      if (currentSeq !== lookupSeqRef.current) return;
+      if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
 
       const dpdCount = dpdData?.counts?.dpd || dpdData?.dpd?.length || 0;
 
@@ -385,7 +389,7 @@ export function DictionaryProvider({ children }) {
 
       // ── Phase 2: Secondary dictionaries (already in-flight via parallel Promise) ──
       const othersData = await othersPromise;
-      if (currentSeq !== lookupSeqRef.current) return;
+      if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
 
       const ptsCount = othersData?.counts?.pts || othersData?.pts?.length || 0;
       const abdCount = othersData?.counts?.abd || othersData?.abd?.length || 0;
@@ -431,7 +435,7 @@ export function DictionaryProvider({ children }) {
 
       setIsBackgroundLoading(false);
     } catch (err) {
-      if (currentSeq !== lookupSeqRef.current) return;
+      if (err.name === 'AbortError' || err.message?.includes('aborted') || signal.aborted || currentSeq !== lookupSeqRef.current) return;
       console.warn('Dictionary lookup error:', err);
       setError(err.message || 'Dictionary lookup failed');
       setIsLoading(false);

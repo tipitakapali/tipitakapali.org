@@ -128,6 +128,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" data-theme="classic" data-script="roman" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
       <head>
+        <link
+          rel="preload"
+          href="/fonts/pali/Noto_Sans/static/NotoSans-Regular.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
