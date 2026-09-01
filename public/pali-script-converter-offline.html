@@ -1,242 +1,380 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>Pāḷi Script Converter</title>
-  <meta name="theme-color" content="#f0e6d2">
-  <meta name="twitter:image" content="https://tipitakapali.org/web/icons/tipitakapali.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="web/icons/apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="web/icons/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="web/icons/favicon-16x16.png" />
-  <link rel="manifest" href="https://tipitakapali.org/web/icons/site.webmanifest" />
-  <link rel="mask-icon" href="https://tipitakapali.org/web/icons/safari-pinned-tab.svg" color="#5bbad5" />
-  <meta name="msapplication-TileColor" content="#da532c" />
-  <!-- ends icons 05 Feb 2021 -->
+  <title>Pāḷi Script Converter | Chaṭṭha Saṅgāyana Tipiṭaka</title>
+  <meta name="description" content="Instant multi-script Pāḷi transliteration tool supporting 17 Brahmic scripts and Roman Velthuis input." />
+  <meta name="theme-color" content="#8b2500">
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Pāḷi Script Converter | Chaṭṭha Saṅgāyana Tipiṭaka" />
+  <meta name="twitter:description" content="Instant multi-script Pāḷi transliteration tool supporting 17 Brahmic scripts and Roman Velthuis input." />
+  <meta name="twitter:image" content="https://tipitakapali.org/android-chrome-512x512.png" />
+  <meta property="og:title" content="Pāḷi Script Converter | Chaṭṭha Saṅgāyana Tipiṭaka" />
+  <meta property="og:description" content="Instant multi-script Pāḷi transliteration tool supporting 17 Brahmic scripts and Roman Velthuis input." />
+  <meta property="og:image" content="https://tipitakapali.org/android-chrome-512x512.png" />
+  <meta property="og:url" content="https://tipitakapali.org/pali-script-converter.html" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="https://tipitakapali.org/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="https://tipitakapali.org/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="https://tipitakapali.org/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="https://tipitakapali.org/apple-touch-icon.png" />
+  <link rel="manifest" href="https://tipitakapali.org/site.webmanifest" />
+  <link rel="mask-icon" href="https://tipitakapali.org/safari-pinned-tab.svg" color="#8b2500" />
+  <meta name="msapplication-TileColor" content="#8b2500" />
   <style>
     :root {
-      --safe-area-inset-top: env(safe-area-inset-top, 25px);
+      --safe-area-inset-top: env(safe-area-inset-top, 20px);
       --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
       --safe-area-inset-left: env(safe-area-inset-left, 0px);
       --safe-area-inset-right: env(safe-area-inset-right, 0px);
-      }
+      --accent: #8b2500;
+      --accent-hover: #701e00;
+      --bg-page: #f0eee5;
+      --bg-card: #ffffff;
+      --border-color: #e5e0d3;
+      --text-primary: #2d241e;
+      --text-secondary: #6e6459;
+    }
     
     /* Global Styles */
+    * {
+      box-sizing: border-box;
+    }
+
     html {
       font-size: 16px;
     }
 
     body {
-      padding: calc(var(--safe-area-inset-top) + 20px) calc(var(--safe-area-inset-right) + 10px) calc(var(--safe-area-inset-bottom) + 10px) calc(var(--safe-area-inset-left) + 10px);
-
-      background: #f0e6d2;
-      font-family: 'Noto Sans', sans-serif;
+      padding: calc(var(--safe-area-inset-top) + 15px) calc(var(--safe-area-inset-right) + 15px) calc(var(--safe-area-inset-bottom) + 20px) calc(var(--safe-area-inset-left) + 15px);
+      background: var(--bg-page);
+      font-family: 'Noto Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       line-height: 1.6;
-      color: #333;
+      color: var(--text-primary);
+      margin: 0;
+      min-height: 100vh;
     }
 
     /* Links */
     a {
       text-decoration: none;
-      color: #4a6da7;
-      transition: color 0.3s ease;
+      color: var(--accent);
+      transition: color 0.2s ease;
     }
 
     a:hover {
-      color: #2c4a7c;
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav-bar {
+      max-width: 820px;
+      margin: 0 auto 12px auto;
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
+    }
+
+    .back-button:hover {
+      background: #faf8f5;
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 2px 6px rgba(139, 37, 0, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .nav-logo-icon {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    /* Brand Header */
+    .brand-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .brand-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      box-shadow: 0 4px 12px rgba(139, 37, 0, 0.08);
+      margin-bottom: 10px;
+      padding: 6px;
+      transition: transform 0.2s ease;
+    }
+
+    .brand-logo-wrap:hover {
+      transform: scale(1.04);
+    }
+
+    .brand-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .brand-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0 0 4px 0;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin: 0;
     }
 
     /* Form Styles */
     .uForm {
       margin: 0 auto;
-      max-width: 800px;
-      background: #fff;
-      padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      max-width: 820px;
+      background: var(--bg-card);
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
     }
 
     .help {
-      background: #f0e6d2;
+      background: transparent;
       text-align: center;
-    }
-
-
-    #uType:focus,
-    #convertedArea:focus {
-      outline: none;
-      border-color: #4a6da7;
-    }
-
-    /* Buttons */
-    #clearText,
-    #copyButtonID {
-      display: inline-block;
-      padding: 5px 5px;
-      border: none;
-      border-radius: 5px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-
-    #clearText {
-      background-color: #f44336;
-      color: white;
-    }
-
-    #clearText:hover {
-      background-color: #d32f2f;
-    }
-
-    #copyButtonID {
-      background-color: #4caf50;
-      color: white;
-    }
-
-    #copyButtonID:hover {
-      background-color: #45a049;
-    }
-
-    #copyStatus {
-      color: white;
+      max-width: 820px;
+      margin: 0 auto;
     }
 
     /* Select Styles */
-    #uSelectScript,
+    #uSelectScript {
+      width: 100%;
+      padding: 10px 12px;
+      margin-top: 6px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      background-color: #faf9f6;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+
+    #uSelectScript:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139, 37, 0, 0.12);
+      background-color: #ffffff;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+
     #uType,
     #convertedArea {
       width: 100%;
-      padding: 5px;
-      margin-bottom: 5px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      font-size: 1rem;
-      background-color: #fff;
+      padding: 12px;
+      margin-top: 4px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      font-size: 1.25rem;
+      color: #3d0c02;
+      background-color: #faf9f6;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+      resize: vertical;
+      min-height: 90px;
+      line-height: 1.5;
     }
 
-    #uType,
-    #convertedArea {
-      font-size: 1.5rem;
-      color: rgb(79, 12, 12);
-      font-weight: bolder;
-      transition: border-color 0.3s ease;
+    #uType:focus,
+    #convertedArea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139, 37, 0, 0.12);
+      background-color: #ffffff;
     }
 
-    /* Loader */
-    .dhammaWheelLoader {
+    /* Button Row */
+    .button-row {
       display: flex;
-      justify-content: center;
       align-items: center;
-      margin-bottom: 5px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
-    .wheelLoader {
-      width: 50px;
-      height: 50px;
-      color: #854f1d;
-      background:
-        conic-gradient(from 90deg at 4px 4px, transparent 90deg, currentColor 0) -4px -4px / calc(50% + 2px) calc(50% + 2px),
-        radial-gradient(farthest-side, currentColor 6px, transparent 7px calc(100% - 6px), currentColor calc(100% - 5px)) no-repeat;
-      border-radius: 50%;
-      animation: spin 2s infinite linear;
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
     }
 
-    .wheelLoader::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: inherit;
-      transform: rotate(45deg);
+    #clearText {
+      background-color: #fbeae8;
+      color: #c53030;
+      border: 1px solid #fed7d7;
     }
 
-    @keyframes spin {
-      to {
-        transform: rotate(0.5turn);
-      }
+    #clearText:hover {
+      background-color: #fed7d7;
+      color: #9b2c2c;
     }
 
+    #copyButtonID {
+      background-color: #e6f4ea;
+      color: #137333;
+      border: 1px solid #ceead6;
+    }
+
+    #copyButtonID:hover {
+      background-color: #ceead6;
+      color: #0d652d;
+    }
+
+    #copyStatus {
+      font-weight: normal;
+      margin-left: 2px;
+    }
 
     /* Responsive Design */
     @media (max-width: 768px) {
-      #uForm {
-        padding: 10px;
+      .uForm {
+        padding: 16px;
       }
 
       #uType,
       #convertedArea {
-        font-size: 1rem;
+        font-size: 1.05rem;
+        min-height: 75px;
+      }
+
+      .brand-title {
+        font-size: 1.25rem;
       }
     }
 
     .tCenter {
       margin: 0 auto;
+      border-collapse: collapse;
+      background: var(--bg-card);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
 
+    .tCenter th {
+      background: #faf8f5;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
 
-  #gobackFromSearch {
-        position: absolute;
-        top: 0;
-        left: max(calc(var(--safe-area-inset-left) + 30px), 0);
-        /* Prevents the button from overflowing the 80% body width */
-        max-width: 100%;
-        padding-top: calc(var(--safe-area-inset-top) + 30px);
-        z-index: 1000;
-  }
-
-  .smallButton {
-    cursor: pointer;
-  }
-  
+    .tCenter td {
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      text-align: center;
+    }
   </style>
-      <script>
-      function goBackOnCloudflare() {
-        // note: Cloudlfare redirect /page.html to /page which made window.history.back() does not work
-        window.location.href='https://tipitakapali.org'
+  <script>
+    function goBackOnCloudflare() {
+      if (window.history.length > 1 && document.referrer.includes('tipitakapali.org')) {
+        window.history.back();
+      } else {
+        window.location.href = 'https://tipitakapali.org';
       }
-    </script>
+    }
+  </script>
 </head>
 
-
-
 <body>
-  <div class="dhammaWheelLoader">
-    <div class="wheelLoader"></div>
-  </div>
-  
-
-  <div id="gobackFromSearch" style="position: absolute;">
-    <button class="smallButton" id="goBackButton" onclick="goBackOnCloudflare()">
-      <img width="16" height="16" src="https://tipitakapali.org/web/icons/toplogo.webp" alt="Go back" /> Go Back
+  <div class="top-nav-bar">
+    <button class="back-button" onclick="goBackOnCloudflare()" title="Back to Tipiṭaka">
+      <img width="20" height="20" src="https://tipitakapali.org/tipitakapali_org_logo.svg" alt="Tipiṭaka Logo" class="nav-logo-icon" />
+      <span>Back to Tipiṭaka</span>
     </button>
   </div>
+
+  <div class="brand-header">
+    <a href="https://tipitakapali.org" title="Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi" class="brand-logo-wrap">
+      <img src="https://tipitakapali.org/tipitakapali_org_logo.svg" alt="Tipiṭaka Logo" class="brand-logo" width="52" height="52" />
+    </a>
+    <h1 class="brand-title">Pāḷi Script Converter</h1>
+    <p class="brand-subtitle">Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — tipitakapali.org</p>
+  </div>
+
   <div class="uForm">
-    <form name="mainForm" id="mainForm" method="POST" action="" enctype="multipart/form-data" style="padding: 5px">
-      <b style="font-family: 'Noto Sans', sans-serif !important;">Pāḷi Script Converter</b>
+    <form name="mainForm" id="mainForm" method="POST" action="" onsubmit="return false;">
+      <div id="buildPaliScriptMenu"></div>
 
+      <label for="uType" class="form-label">Input Text (Velthuis or any of 17 Pāḷi Scripts):</label>
+      <textarea rows="3" id="uType" name="uType" placeholder="Type in Velthuis (e.g. dhammacakka, aa -> ā) or paste 17 scripts..."></textarea>
 
-      <p id="buildPaliScriptMenu"></p>
+      <div class="button-row">
+        <button type="button" id="clearText" class="btn-action">✕ Clear Text</button>
+      </div>
 
-      <textarea required rows="2" id="uType" name="uType" placeholder="Accepts 17 mixed scripts input"></textarea>
+      <label for="convertedArea" class="form-label">Converted Output:</label>
+      <textarea rows="3" id="convertedArea" name="convertedArea" placeholder="Converted text will appear here..."></textarea>
 
-      <br><span id="clearText">Clear Text</span><br><br>
-
-      <textarea rows="2" id="convertedArea" name="convertedArea" placeholder="output"></textarea>
-
-      <br><span id="copyButtonID">Copy:
-        <span id="copyStatus"></span><span id="copyIcon">📋</span></span>
-      <br>
+      <div class="button-row">
+        <button type="button" id="copyButtonID" class="btn-action">
+          <span id="copyIcon">📋</span> Copy Output <span id="copyStatus"></span>
+        </button>
+      </div>
     </form>
   </div>
 
   <br>
   <div class="help">
-     <button class="smallButton" onclick="goBackOnCloudflare()">
-      <img width="16" height="16" src="https://tipitakapali.org/web/icons/toplogo.webp" alt="Go back" /> Go Back
-    </button> | 
-    <span><a href="https://tipitakapali.org/pali-script-converter.zip" style="text-decoration:none; color: green;">[Download this tool ~ 12 KB]</a></span>
+    <button class="back-button" onclick="goBackOnCloudflare()" style="margin-right: 8px;">
+      <img width="18" height="18" src="https://tipitakapali.org/tipitakapali_org_logo.svg" alt="Logo" class="nav-logo-icon" /> Back to Tipiṭaka
+    </button>
+    <span style="font-size: 0.85rem;">
+      <a href="https://tipitakapali.org/pali-script-converter.zip" style="font-weight: 600; color: #2e7d32;">⬇ Download Offline Tool (~12 KB)</a>
+    </span>
   </div>
   <div class="help">
     <br>
@@ -380,20 +518,20 @@ function loadFonts(paliScript) {
     @font-face {
     font-family: "${fontFamily}";
     src: local("${fontFamily}"),
-    url("https://tipitakapali.org/web/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Regular.ttf") format("truetype");
+    url("https://tipitakapali.org/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Regular.ttf") format("truetype");
     font-weight: normal;
     font-display: swap;
     }
     @font-face {
     font-family: ${fontFamily};
     src: local("${fontFamily}"),
-    url("https://tipitakapali.org/web/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Bold.ttf") format("truetype");
+    url("https://tipitakapali.org/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Bold.ttf") format("truetype");
     font-weight: bold;
     font-display: swap;
     }
     `
 
-  if ("Brah" == paliScript) {
+  if ("Brah" == paliScript || "brah" == paliScript) {
     //// brah has no bold font
     console.log("I can not find bold font for the brah script")
 
@@ -401,7 +539,7 @@ function loadFonts(paliScript) {
       @font-face {
       font-family: "${fontFamily}";
       src: local("${fontFamily}"),
-      url("https://tipitakapali.org/web/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Regular.ttf") format("truetype");
+      url("https://tipitakapali.org/fonts/pali/${fontFamily.replace(/\s+/g, "_")}/static/${fontFamily.replace(/\s+/g, "")}-Regular.ttf") format("truetype");
       font-weight: normal;
       font-display: swap;
       }
