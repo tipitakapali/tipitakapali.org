@@ -67,10 +67,8 @@ def find_paths():
     web_app_dir = script_dir if (script_dir / 'package.json').exists() else root_dir / 'web_app_next'
     
     db_candidates = [
+        web_app_dir / 'dev_build_vri_db_2026' / 'output' / 'tipitaka.db',
         web_app_dir / 'server_api' / 'db' / 'tipitaka.db',
-        web_app_dir / 'server_api' / 'tipitaka.db',
-        root_dir / 'tipitaka.db',
-        root_dir / 'tipitaka_latin2.db',
     ]
     
     db_path = None
@@ -261,7 +259,13 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             "para_range": meta.get('para_range', {"min": 1, "max": 1, "total": 0}),
             "edition_ranges": meta.get('edition_ranges', {}),
             "book_type": meta.get('book_type', 'Whole'),
-            "mat": book_mat_payload,
+            "mat": meta.get('mat') or book_mat_payload,
+            "sub_books": meta.get('sub_books', None),
+            "sub_book": meta.get('sub_book', None),
+            "chapter_to_sub_book": meta.get('chapter_to_sub_book', None),
+            "sub_books_para_to_chapter": meta.get('sub_books_para_to_chapter', None),
+            "attha_start_chapter": meta.get('attha_start_chapter', None),
+            "tika_start_chapter": meta.get('tika_start_chapter', None),
             "initial_chapter": 0,
             "chapters_data": initial_chapters_data,
             "html": "\n".join(loaded_html_array)
