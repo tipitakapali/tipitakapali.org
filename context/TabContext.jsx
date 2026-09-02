@@ -42,12 +42,15 @@ function resolveNearestChapterAndPara(paraToChapMap, rawParaNum, subBook = null,
   return null;
 }
 
-function getFirstParaOfChapter(paraToChapMap, targetChapIdx) {
-
-  if (!paraToChapMap || targetChapIdx === undefined || targetChapIdx === null) return null;
+function getFirstParaOfChapter(paraToChapMap, targetChapIdx, subBook = null, subBooksParaMap = null) {
+  let mapToUse = paraToChapMap;
+  if (subBook && subBooksParaMap && subBooksParaMap[subBook]) {
+    mapToUse = subBooksParaMap[subBook];
+  }
+  if (!mapToUse || targetChapIdx === undefined || targetChapIdx === null) return null;
   let firstNum = null;
   let minNum = Infinity;
-  for (const [pStr, cIdx] of Object.entries(paraToChapMap)) {
+  for (const [pStr, cIdx] of Object.entries(mapToUse)) {
     if (cIdx === targetChapIdx) {
       const pInt = parseInt(pStr, 10);
       if (!isNaN(pInt) && pInt < minNum) {
@@ -598,7 +601,8 @@ export function TabProvider({ children }) {
         }
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
-          const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx);
+          const targetSub = options.targetSubBook || tab.sub_book;
+          const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx, targetSub, tab.sub_books_para_to_chapter);
           if (firstP) {
             setActiveParaNum(firstP);
           }
@@ -791,10 +795,6 @@ export function TabProvider({ children }) {
             targetChapIdx = resolved.chapterIdx;
             hasTargetChapter = true;
             setActiveParaNum(resolved.paraNum || rawParaNum);
-            if (!bookData.chapters_data?.[targetChapIdx]) {
-              const chapData = await fetchBook(cleanCode, { chapter: targetChapIdx, buffer: 1 });
-              Object.assign(bookData.chapters_data, chapData.chapters_data);
-            }
           }
         }
 
@@ -804,15 +804,27 @@ export function TabProvider({ children }) {
           if (chapFromIdx !== null && chapFromIdx !== undefined) {
             targetChapIdx = chapFromIdx;
             hasTargetChapter = true;
-            if (!bookData.chapters_data?.[targetChapIdx]) {
-              const chapData = await fetchBook(cleanCode, { chapter: targetChapIdx, buffer: 1 });
-              Object.assign(bookData.chapters_data, chapData.chapters_data);
+          }
+        }
+
+        // Critical: Ensure targetChapIdx is loaded into chapters_data (especially in static Cloudflare Pages mode)
+        if (targetChapIdx !== null && targetChapIdx !== undefined && !bookData.chapters_data?.[targetChapIdx]) {
+          try {
+            const chapData = await fetchChapter(cleanCode, targetChapIdx);
+            if (chapData && chapData.html) {
+              bookData.chapters_data = {
+                ...(bookData.chapters_data || {}),
+                [targetChapIdx]: chapData.html,
+              };
             }
+          } catch (e) {
+            console.warn(`[openBook] Failed to fetch initial target chapter ${targetChapIdx}:`, e);
           }
         }
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
-          const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx);
+          const targetSub = options.targetSubBook || bookData.sub_book;
+          const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx, targetSub, bookData.sub_books_para_to_chapter);
           if (firstP) {
             setActiveParaNum(firstP);
           }

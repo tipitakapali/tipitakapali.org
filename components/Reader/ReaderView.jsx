@@ -334,13 +334,36 @@ export default function ReaderView() {
     // Safe DOM element finder by ID or data attributes (prevents selector SyntaxError on IDs with dots e.g. V3.0440)
     const findElement = (id, fallbackSelector = '') => {
       if (!containerRef.current) return null;
-      const scope = (chapterIdx !== undefined && chapterIdx !== null)
-        ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
-        : containerRef.current;
+      const hasSpecificChapter = chapterIdx !== undefined && chapterIdx !== null;
+      const chapterEl = hasSpecificChapter
+        ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+        : null;
 
+      // When a specific chapter is requested, ONLY search within that chapter's container
+      if (hasSpecificChapter) {
+        if (!chapterEl || chapterEl.classList.contains('chapter-placeholder')) {
+          // Chapter is still loading/buffering, retry on next interval tick
+          return null;
+        }
+        if (id) {
+          try {
+            const inScope = chapterEl.querySelector(`[id="${CSS.escape(id)}"]`);
+            if (inScope) return inScope;
+          } catch (_) {}
+        }
+        if (fallbackSelector) {
+          try {
+            const inScopeFallback = chapterEl.querySelector(fallbackSelector);
+            if (inScopeFallback) return inScopeFallback;
+          } catch (_) {}
+        }
+        return null; // NEVER fall back to another chapter when a specific chapter is targeted!
+      }
+
+      // If no specific chapter is specified, search the full container
       if (id) {
         try {
-          const inScope = scope.querySelector(`[id="${CSS.escape(id)}"]`);
+          const inScope = containerRef.current.querySelector(`[id="${CSS.escape(id)}"]`);
           if (inScope) return inScope;
         } catch (_) {}
 
@@ -353,9 +376,8 @@ export default function ReaderView() {
       }
       if (fallbackSelector) {
         try {
-          const inScopeFallback = scope.querySelector(fallbackSelector);
+          const inScopeFallback = containerRef.current.querySelector(fallbackSelector);
           if (inScopeFallback) return inScopeFallback;
-          return containerRef.current.querySelector(fallbackSelector);
         } catch (_) {}
       }
       return null;
@@ -369,12 +391,17 @@ export default function ReaderView() {
         const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
         const targetInt = parseInt(cleanPara, 10);
 
-        // Ensure the chapter containing this paragraph is loaded
-        if (activeTab.para_to_chapter && activeTab.para_to_chapter[cleanPara] !== undefined) {
-          const chapForPara = activeTab.para_to_chapter[cleanPara];
-          if (!activeTab.loadedChapters?.[chapForPara]) {
-            loadChapter(activeTab.bookCode, chapForPara);
-            bufferAdjacentChapters(activeTab.bookCode, chapForPara);
+        // Ensure the target chapter containing this paragraph is loaded
+        const targetChap = (chapterIdx !== undefined && chapterIdx !== null)
+          ? chapterIdx
+          : (activeTab.sub_books_para_to_chapter && activeTab.sub_book
+              ? activeTab.sub_books_para_to_chapter[activeTab.sub_book]?.[cleanPara]
+              : activeTab.para_to_chapter?.[cleanPara]);
+
+        if (targetChap !== undefined && targetChap !== null) {
+          if (!activeTab.loadedChapters?.[targetChap] && !activeTab.loadingChapters?.[targetChap]) {
+            loadChapter(activeTab.bookCode, targetChap);
+            bufferAdjacentChapters(activeTab.bookCode, targetChap);
           }
         }
 
@@ -387,13 +414,18 @@ export default function ReaderView() {
 
         // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
         if (!el && !isNaN(targetInt)) {
-          const rangedParas = containerRef.current.querySelectorAll('[data-para-first]');
-          for (const p of rangedParas) {
-            const first = parseInt(p.getAttribute('data-para-first'), 10);
-            const last = parseInt(p.getAttribute('data-para-last'), 10);
-            if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
-              el = p;
-              break;
+          const scope = (chapterIdx !== undefined && chapterIdx !== null)
+            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+            : containerRef.current;
+          if (scope && !scope.classList.contains('chapter-placeholder')) {
+            const rangedParas = scope.querySelectorAll('[data-para-first]');
+            for (const p of rangedParas) {
+              const first = parseInt(p.getAttribute('data-para-first'), 10);
+              const last = parseInt(p.getAttribute('data-para-last'), 10);
+              if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
+                el = p;
+                break;
+              }
             }
           }
         }
@@ -401,22 +433,24 @@ export default function ReaderView() {
         // Fallback: nearest paragraph <= targetInt
         if (!el && !isNaN(targetInt)) {
           const scope = (chapterIdx !== undefined && chapterIdx !== null)
-            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
+            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
             : containerRef.current;
-          const allParas = scope.querySelectorAll('[data-para]');
-          let bestEl = null;
-          let bestDiff = Infinity;
-          for (const p of allParas) {
-            const pNum = parseInt(p.getAttribute('data-para'), 10);
-            if (!isNaN(pNum) && pNum <= targetInt) {
-              const diff = targetInt - pNum;
-              if (diff < bestDiff) {
-                bestDiff = diff;
-                bestEl = p;
+          if (scope && !scope.classList.contains('chapter-placeholder')) {
+            const allParas = scope.querySelectorAll('[data-para]');
+            let bestEl = null;
+            let bestDiff = Infinity;
+            for (const p of allParas) {
+              const pNum = parseInt(p.getAttribute('data-para'), 10);
+              if (!isNaN(pNum) && pNum <= targetInt) {
+                const diff = targetInt - pNum;
+                if (diff < bestDiff) {
+                  bestDiff = diff;
+                  bestEl = p;
+                }
               }
             }
+            if (bestEl) el = bestEl;
           }
-          if (bestEl) el = bestEl;
         }
 
         if (el) {
@@ -725,33 +759,30 @@ export default function ReaderView() {
                 foundSnippet = text.length > 130 ? text.slice(0, 130) + '...' : text;
               }
 
-              // Detect chapter
-              if (foundParaNum && activeTab.para_to_chapter?.[foundParaNum] !== undefined) {
+              // Detect chapter directly from enclosing chapter DOM block first
+              const chapBlock = p.closest('[data-chapter]');
+              if (chapBlock) {
+                const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
+                if (!isNaN(cIdx)) foundChapterIdx = cIdx;
+              } else if (foundParaNum && activeTab.sub_books_para_to_chapter && activeTab.sub_book) {
+                const subChap = activeTab.sub_books_para_to_chapter[activeTab.sub_book]?.[foundParaNum];
+                if (subChap !== undefined) foundChapterIdx = subChap;
+              } else if (foundParaNum && activeTab.para_to_chapter?.[foundParaNum] !== undefined) {
                 foundChapterIdx = activeTab.para_to_chapter[foundParaNum];
-              } else {
-                const chapBlock = p.closest('[data-chapter]');
-                if (chapBlock) {
-                  const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
-                  if (!isNaN(cIdx)) foundChapterIdx = cIdx;
-                }
               }
               break;
             }
           }
 
           // Also scan chapter blocks directly to handle chapter boundaries & headings
-          if (top < 30) {
-            foundChapterIdx = 0;
-          } else {
-            const chapBlocks = container.querySelectorAll('[data-chapter]');
-            for (const cb of chapBlocks) {
-              const r = cb.getBoundingClientRect();
-              if (r.top <= targetY && r.bottom > targetY) {
-                const cIdx = parseInt(cb.getAttribute('data-chapter'), 10);
-                if (!isNaN(cIdx)) {
-                  foundChapterIdx = cIdx;
-                  break;
-                }
+          const chapBlocks = container.querySelectorAll('[data-chapter]');
+          for (const cb of chapBlocks) {
+            const r = cb.getBoundingClientRect();
+            if (r.top <= targetY && r.bottom > targetY) {
+              const cIdx = parseInt(cb.getAttribute('data-chapter'), 10);
+              if (!isNaN(cIdx)) {
+                foundChapterIdx = cIdx;
+                break;
               }
             }
           }
@@ -815,10 +846,11 @@ export default function ReaderView() {
         setActiveParaNum(pNum);
       }
       const pIdx = pEl.getAttribute('data-pindex');
-      let chapIdx = activeTab.currentChapterIdx || 0;
-      if (pNum && activeTab.para_to_chapter?.[pNum] !== undefined) {
-        chapIdx = activeTab.para_to_chapter[pNum];
-      }
+      const chapterBlock = pEl.closest('[data-chapter]');
+      let chapIdx = chapterBlock
+        ? parseInt(chapterBlock.getAttribute('data-chapter'), 10)
+        : (activeTab.currentChapterIdx || 0);
+      if (isNaN(chapIdx)) chapIdx = activeTab.currentChapterIdx || 0;
       const text = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
       const snip = text.length > 130 ? text.slice(0, 130) + '...' : text;
 
@@ -1114,8 +1146,15 @@ export default function ReaderView() {
       }
     }
 
-    if (currentPara && activeTab.para_to_chapter?.[currentPara] !== undefined) {
-      currentChapIdx = activeTab.para_to_chapter[currentPara];
+    if (typeof document !== 'undefined' && currentPara) {
+      const pEl =
+        containerRef.current?.querySelector(`[data-para="${currentPara}"]`) ||
+        document.querySelector(`[data-para="${currentPara}"]`);
+      const chapBlock = pEl?.closest('[data-chapter]');
+      if (chapBlock) {
+        const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
+        if (!isNaN(cIdx)) currentChapIdx = cIdx;
+      }
     }
 
     const currentChap = activeTab.chapters?.[currentChapIdx];
