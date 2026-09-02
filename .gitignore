@@ -414,3 +414,9 @@ __marimo__/
 server_api/tipitaka.db_before_byPitaka
 *.db
 server_api/tipitaka.db_before_byPitaka
+
+# vri_db_2026 pipeline outputs and upstream repository clone
+vri_db_2026/output/
+vri_db_2026/tipitaka-xml/
+vri_db_2026/_latest_romn/
+vri_db_2026/*.db
