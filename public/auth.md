@@ -1,15 +1,27 @@
 # Auth.md: TipitakaPali.org Agent Authentication & Access Policy
 
+```json
+{
+  "identity_types_supported": ["anonymous"],
+  "anonymous": {
+    "credential_types_supported": ["none"]
+  },
+  "claim_uri": "https://tipitakapali.org/auth.md"
+}
+```
+
 ## Agent Authentication & Access Policy
 
 TipitakaPali.org is an open-access Buddhist Dhamma preservation platform offering complete, unrestricted access to the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon (Sixth Buddhist Council / VRI) and the Digital Pāḷi Dictionary (DPD).
 
-### Authentication Policy
-- **Authentication Method**: Anonymous public access (`anonymous`)
-- **API Keys / Tokens**: Not required
-- **OAuth / OIDC Registration**: Not required
-- **Rate Limits & Costs**: Completely free for AI agents, educational research, monastics, and Dhamma practitioners.
-- **Identity Types Supported**: `["anonymous"]`
+### Registration & Credentials
+- `identity_types_supported`: `["anonymous"]`
+- `anonymous.credential_types_supported`: `["none"]`
+- `claim_uri`: `https://tipitakapali.org/auth.md`
+- **Authentication Requirement**: Anonymous public access (`anonymous`)
+- **API Keys / Tokens**: None required
+- **OAuth / OIDC**: None required (public resource server)
+- **Cost / Quota**: Free universal access for AI agents, educational research, and Dhamma study.
 
 ### Machine Endpoints & Specifications
 - **Canonical API Base**: `https://api.tipitakapali.org`
