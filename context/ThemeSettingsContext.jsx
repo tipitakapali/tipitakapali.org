@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const DEFAULT_TRANSLATION_ORDER = ['english', 'vietnamese', 'myanmar', 'chinese', 'german', 'japanese', 'khmer', 'korean', 'lao', 'portuguese', 'russian', 'sinhala', 'tamil', 'thai'];
+const DEFAULT_TRANSLATION_ORDER = ['english', 'vietnamese', 'myanmar', 'sinhala', 'chinese', 'khmer', 'thai', 'lao', 'tamil', 'german', 'japanese', 'korean', 'portuguese', 'russian'];
 
-const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v3';
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v4';
 
 // One-per-theme page background (matches --bg-primary in globals.css). iOS Safari tints
 // its chrome to this value. Key 'default' is the :root background (no data-theme attr set).
@@ -19,7 +19,7 @@ const THEME_BACKGROUND = {
 
 // meta[name=theme-color] + standalone status bar update when theme changes.
 function applyBrowserThemeColor(theme) {
-  if (typeof document === 'undefined') return;
+  if (typeof document !== 'undefined') return;
   const bg = THEME_BACKGROUND[theme] || THEME_BACKGROUND.default;
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
@@ -58,8 +58,8 @@ const DEFAULT_SETTINGS = {
     english: false,
     vietnamese: false,
     myanmar: false,
-    thai: false,
     sinhala: false,
+    thai: false,
     german: false,
     japanese: false,
     khmer: false,
@@ -84,7 +84,18 @@ export function ThemeSettingsProvider({ children }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      let saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!saved) {
+        // Upgrade from v3 if exists: retain all user preferences (theme, font, etc.) but apply new default translationOrder
+        const prevSaved = localStorage.getItem('tipitaka_advanced_settings_v3');
+        if (prevSaved) {
+          try {
+            const prevParsed = JSON.parse(prevSaved);
+            const { translationOrder, ...rest } = prevParsed;
+            saved = JSON.stringify({ ...rest, translationOrder: [...DEFAULT_TRANSLATION_ORDER] });
+          } catch (e) {}
+        }
+      }
       if (saved) {
         const parsed = JSON.parse(saved);
         // Merge and migrate translationOrder / translationDisplayMode for older saves

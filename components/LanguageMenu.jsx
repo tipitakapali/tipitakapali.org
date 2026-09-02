@@ -10,18 +10,18 @@ const TRANSLATIONS = [
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • -coming soon-' },
   { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -coming soon-' },
   { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -coming soon-' },
-  // Alphabetical by language name
+  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -coming soon-' },
   { id: 'chinese', label: '中文', flag: '🇨🇳', desc: 'Chinese Translation • -coming soon-' },
+  { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'Khmer Translation • -coming soon-' },
+  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -coming soon-' },
+  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'Lao Translation • -coming soon-' },
+  { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'Tamil Translation • -coming soon-' },
+  // Alphabetical by language name
   { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'German Translation • -coming soon-' },
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: 'Japanese Translation • -coming soon-' },
-  { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'Khmer Translation • -coming soon-' },
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-' },
-  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'Lao Translation • -coming soon-' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Portuguese Translation • -coming soon-' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Russian Translation • -coming soon-' },
-  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -coming soon-' },
-  { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'Tamil Translation • -coming soon-' },
-  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -coming soon-' },
 ];
 
 export default function LanguageMenu() {
