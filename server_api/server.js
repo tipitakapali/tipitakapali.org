@@ -435,14 +435,27 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       page_anchors: meta.page_anchors || {},
       para_range: meta.para_range || { min: 1, max: 1, total: 0 },
       edition_ranges: meta.edition_ranges || {},
-      book_type: meta.book_type || 'Whole',
-      mat: meta.mat || precomputedMatMap.get(cleanCode) || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
+      mat: meta.mat
+        ? {
+            ...meta.mat,
+            split_targets: meta.split_targets || meta.mat.split_targets || null,
+            sub_book: meta.sub_book || meta.mat.sub_book || null,
+            sub_books: meta.sub_books || meta.mat.sub_books || null,
+            mula_chapter: meta.mula_chapter !== undefined ? meta.mula_chapter : meta.mat.mula_chapter,
+            mula_chapter_offset: meta.mula_chapter_offset !== undefined ? meta.mula_chapter_offset : meta.mat.mula_chapter_offset,
+            attha_chapter_offset: meta.attha_chapter_offset !== undefined ? meta.attha_chapter_offset : meta.mat.attha_chapter_offset,
+          }
+        : precomputedMatMap.get(cleanCode) || (stmtGetMat ? (stmtGetMat.get(cleanCode) || null) : null),
       sub_books: meta.sub_books || null,
       sub_book: meta.sub_book || null,
       chapter_to_sub_book: meta.chapter_to_sub_book || null,
       sub_books_para_to_chapter: meta.sub_books_para_to_chapter || null,
       attha_start_chapter: meta.attha_start_chapter !== undefined ? meta.attha_start_chapter : null,
       tika_start_chapter: meta.tika_start_chapter !== undefined ? meta.tika_start_chapter : null,
+      split_targets: meta.split_targets || null,
+      mula_chapter: meta.mula_chapter !== undefined ? meta.mula_chapter : null,
+      mula_chapter_offset: meta.mula_chapter_offset !== undefined ? meta.mula_chapter_offset : null,
+      attha_chapter_offset: meta.attha_chapter_offset !== undefined ? meta.attha_chapter_offset : null,
       initial_chapter: reqChap,
       chapters_data: chaptersData,
       html: loadedHtmlArray.join('\n'),
@@ -507,6 +520,26 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
     if (chapSuffixMatch) {
       cleanCode = chapSuffixMatch[1];
+    }
+
+    let bookMeta = bookMetaCache.get(cleanCode)?.meta;
+    if (!bookMeta) {
+      const row = stmtGetBook.get(cleanCode);
+      if (row?.meta_json) {
+        try { bookMeta = JSON.parse(row.meta_json); } catch (e) {}
+      }
+    }
+    if (bookMeta?.mat) {
+      return {
+        book_code: cleanCode,
+        ...bookMeta.mat,
+        split_targets: bookMeta.split_targets || bookMeta.mat.split_targets || null,
+        sub_book: bookMeta.sub_book || bookMeta.mat.sub_book || null,
+        sub_books: bookMeta.sub_books || bookMeta.mat.sub_books || null,
+        mula_chapter: bookMeta.mula_chapter !== undefined ? bookMeta.mula_chapter : bookMeta.mat.mula_chapter,
+        mula_chapter_offset: bookMeta.mula_chapter_offset !== undefined ? bookMeta.mula_chapter_offset : bookMeta.mat.mula_chapter_offset,
+        attha_chapter_offset: bookMeta.attha_chapter_offset !== undefined ? bookMeta.attha_chapter_offset : bookMeta.mat.attha_chapter_offset,
+      };
     }
 
     const cstMat = cstCatalog[cleanCode]?.mat;

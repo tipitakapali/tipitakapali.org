@@ -587,6 +587,10 @@ export function TabProvider({ children }) {
                           sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
                           attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
                           tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
+                          split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                          mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
+                          mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
+                          attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                           loadedChapters: { ...t.loadedChapters, ...bData.chapters_data },
@@ -735,6 +739,10 @@ export function TabProvider({ children }) {
             sub_books_para_to_chapter: bookData.sub_books_para_to_chapter || null,
             attha_start_chapter: bookData.attha_start_chapter !== undefined ? bookData.attha_start_chapter : null,
             tika_start_chapter: bookData.tika_start_chapter !== undefined ? bookData.tika_start_chapter : null,
+            split_targets: bookData.split_targets || null,
+            mula_chapter: bookData.mula_chapter !== undefined ? bookData.mula_chapter : null,
+            mula_chapter_offset: bookData.mula_chapter_offset !== undefined ? bookData.mula_chapter_offset : null,
+            attha_chapter_offset: bookData.attha_chapter_offset !== undefined ? bookData.attha_chapter_offset : null,
             loadedChapters: {},
             loadingChapters: {},
             isLoading: false,
@@ -884,6 +892,10 @@ export function TabProvider({ children }) {
           sub_books_para_to_chapter: bookData.sub_books_para_to_chapter || null,
           attha_start_chapter: bookData.attha_start_chapter !== undefined ? bookData.attha_start_chapter : null,
           tika_start_chapter: bookData.tika_start_chapter !== undefined ? bookData.tika_start_chapter : null,
+          split_targets: bookData.split_targets || bookData.mat?.split_targets || null,
+          mula_chapter: bookData.mula_chapter !== undefined ? bookData.mula_chapter : (bookData.mat?.mula_chapter ?? null),
+          mula_chapter_offset: bookData.mula_chapter_offset !== undefined ? bookData.mula_chapter_offset : (bookData.mat?.mula_chapter_offset ?? null),
+          attha_chapter_offset: bookData.attha_chapter_offset !== undefined ? bookData.attha_chapter_offset : (bookData.mat?.attha_chapter_offset ?? null),
 
           loadedChapters: { ...bookData.chapters_data },
 
@@ -1032,6 +1044,10 @@ export function TabProvider({ children }) {
                           sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
                           attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
                           tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
+                          split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                          mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
+                          mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
+                          attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                         }
@@ -1342,16 +1358,37 @@ export function TabProvider({ children }) {
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 
-  // Auto-fetch MAT if missing on activeTab
+  // Auto-fetch MAT if missing on activeTab or ensure split_targets populated
   useEffect(() => {
-    if (activeTab && !activeTab.mat) {
-      fetchMat(activeTab.bookCode).then((mat) => {
-        if (mat) {
+    if (activeTab) {
+      if (!activeTab.mat || (!activeTab.split_targets && activeTab.mat?.split_targets)) {
+        if (!activeTab.mat) {
+          fetchMat(activeTab.bookCode).then((mat) => {
+            if (mat) {
+              setOpenTabs((prev) =>
+                prev.map((t) => (t.bookCode === activeTab.bookCode ? {
+                  ...t,
+                  mat,
+                  split_targets: mat.split_targets || t.split_targets || null,
+                  mula_chapter: mat.mula_chapter !== undefined ? mat.mula_chapter : t.mula_chapter,
+                  mula_chapter_offset: mat.mula_chapter_offset !== undefined ? mat.mula_chapter_offset : t.mula_chapter_offset,
+                  attha_chapter_offset: mat.attha_chapter_offset !== undefined ? mat.attha_chapter_offset : t.attha_chapter_offset,
+                } : t))
+              );
+            }
+          });
+        } else if (!activeTab.split_targets && activeTab.mat?.split_targets) {
           setOpenTabs((prev) =>
-            prev.map((t) => (t.bookCode === activeTab.bookCode ? { ...t, mat } : t))
+            prev.map((t) => (t.bookCode === activeTab.bookCode ? {
+              ...t,
+              split_targets: t.mat.split_targets,
+              mula_chapter: t.mat.mula_chapter !== undefined ? t.mat.mula_chapter : t.mula_chapter,
+              mula_chapter_offset: t.mat.mula_chapter_offset !== undefined ? t.mat.mula_chapter_offset : t.mula_chapter_offset,
+              attha_chapter_offset: t.mat.attha_chapter_offset !== undefined ? t.mat.attha_chapter_offset : t.attha_chapter_offset,
+            } : t))
           );
         }
-      });
+      }
     }
   }, [activeTab]);
 
@@ -1426,6 +1463,66 @@ export function TabProvider({ children }) {
             ? activeTab.tika_start_chapter
             : (mat?.tika_start_chapter || 0);
           targetChapter = offset + currentChapIdx;
+        }
+      }
+
+      // 3. One-to-Many dynamic routing using split_targets (e.g. s0508, s0513, s0514, vin01)
+      const splitTargets = activeTab.split_targets || mat?.split_targets;
+      if (splitTargets && splitTargets[targetLayer]) {
+        const layerTargets = splitTargets[targetLayer];
+        if (Array.isArray(layerTargets)) {
+          let currentPNum = activeParaNum;
+          if (!currentPNum && typeof document !== 'undefined') {
+            const cEl = document.querySelector('.content-area') || document.querySelector('.reader-container') || document.querySelector('main');
+            if (cEl) {
+              const pEl = cEl.querySelector('[data-para]');
+              if (pEl) currentPNum = pEl.getAttribute('data-para');
+            }
+          }
+          const currentPInt = parseInt(String(currentPNum || '').replace(/^(?:para-?|p)/i, ''), 10);
+
+          for (const rule of layerTargets) {
+            const inChap = rule.chapter_range && currentChapIdx >= rule.chapter_range[0] && currentChapIdx <= rule.chapter_range[1];
+            let inPara = true;
+            if (rule.para_range) {
+              inPara = !isNaN(currentPInt) && currentPInt >= rule.para_range[0] && currentPInt <= rule.para_range[1];
+            }
+            if (inChap && inPara) {
+              targetCode = rule.code || targetCode;
+              targetTitle = rule.title || targetTitle;
+              if (options.chapter !== undefined) {
+                targetChapter = options.chapter;
+              } else if (rule.target_chapter !== undefined) {
+                targetChapter = rule.target_chapter;
+              } else if (rule.target_chapter_offset !== undefined) {
+                targetChapter = Math.max(0, currentChapIdx + rule.target_chapter_offset);
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // 4. Reverse offsets for split volumes
+      if (targetLayer === 'mula' && targetChapter === undefined) {
+        if (activeTab.mula_chapter !== undefined && activeTab.mula_chapter !== null) {
+          targetChapter = activeTab.mula_chapter;
+        } else if (mat?.mula_chapter !== undefined && mat?.mula_chapter !== null) {
+          targetChapter = mat.mula_chapter;
+        } else if (activeTab.mula_chapter_offset !== undefined && activeTab.mula_chapter_offset !== null) {
+          targetChapter = Math.max(0, currentChapIdx + activeTab.mula_chapter_offset);
+        } else if (mat?.mula_chapter_offset !== undefined && mat?.mula_chapter_offset !== null) {
+          targetChapter = Math.max(0, currentChapIdx + mat.mula_chapter_offset);
+        }
+      } else if (targetLayer === 'attha' && targetChapter === undefined) {
+        if (activeTab.attha_chapter !== undefined && activeTab.attha_chapter !== null) {
+          targetChapter = activeTab.attha_chapter;
+        } else if (mat?.attha_chapter !== undefined && mat?.attha_chapter !== null) {
+          targetChapter = mat.attha_chapter;
+        } else if (activeTab.attha_chapter_offset !== undefined && activeTab.attha_chapter_offset !== null) {
+          targetChapter = Math.max(0, currentChapIdx + activeTab.attha_chapter_offset);
+        } else if (mat?.attha_chapter_offset !== undefined && mat?.attha_chapter_offset !== null) {
+          targetChapter = Math.max(0, currentChapIdx + mat.attha_chapter_offset);
         }
       }
 

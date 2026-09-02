@@ -632,6 +632,7 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
         book_type = cst_entry.get('bookType', 'Whole')
         mat = cst_entry.get('mat', None)
 
+        meta_mat = mat_entry if mat_entry else (mat or {})
         meta_obj = {
             'para_to_chapter': para_to_chapter,
             'para_to_index': para_to_index,
@@ -641,7 +642,7 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
             'para_range': para_range,
             'edition_ranges': edition_ranges,
             'book_type': book_type,
-            'mat': mat
+            'mat': meta_mat
         }
         if has_sub_books:
             meta_obj['sub_books'] = sub_books_def
@@ -649,8 +650,18 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
             meta_obj['sub_books_para_to_chapter'] = sub_books_para_to_chapter
         if 'sub_book' in mat_entry:
             meta_obj['sub_book'] = mat_entry['sub_book']
+        if mat_entry.get('attha_start_chapter') is not None:
             meta_obj['attha_start_chapter'] = mat_entry.get('attha_start_chapter')
+        if mat_entry.get('tika_start_chapter') is not None:
             meta_obj['tika_start_chapter'] = mat_entry.get('tika_start_chapter')
+        if 'split_targets' in mat_entry:
+            meta_obj['split_targets'] = mat_entry['split_targets']
+        if 'mula_chapter' in mat_entry:
+            meta_obj['mula_chapter'] = mat_entry['mula_chapter']
+        if 'mula_chapter_offset' in mat_entry:
+            meta_obj['mula_chapter_offset'] = mat_entry['mula_chapter_offset']
+        if 'attha_chapter_offset' in mat_entry:
+            meta_obj['attha_chapter_offset'] = mat_entry['attha_chapter_offset']
 
         cur.execute("""
         INSERT INTO books (code, title, nikaya, category, xml_filename, chapter_count, meta_json)
@@ -926,6 +937,37 @@ def verify_multi_volume_mat(conn):
     m_tag36 = re.search(r'<p[^>]*id=\"para2\"[^>]*>', h36)
     assert m_tag36 and 'data-sub-book="an4"' in m_tag36.group(0)
     assert m_tag36.group(0).count('id="') == 1
+
+    # Suite 7: Patthana 4 & 5 Fix in abh03
+    m10_meta = get_meta('abh03m10.mul')
+    m11_meta = get_meta('abh03m11.mul')
+    assert m10_meta['sub_book'] == 'patthana' and m10_meta['attha_start_chapter'] == 50
+    assert m11_meta['sub_book'] == 'patthana' and m11_meta['attha_start_chapter'] == 50
+
+    # Suite 8: Apadana (s0510)
+    att_510 = get_meta('s0510a.att')
+    assert 'apadana1' in att_510['sub_books'] and 'apadana2' in att_510['sub_books']
+    assert att_510['sub_books_para_to_chapter']['apadana1']['1'] == 2
+    assert att_510['sub_books_para_to_chapter']['apadana2']['1'] == 37
+    m2_510 = get_meta('s0510m2.mul')
+    assert m2_510['sub_book'] == 'apadana2' and m2_510['attha_start_chapter'] == 37
+
+    # Suite 9: Theragatha (s0508)
+    m_508 = get_meta('s0508m.mul')
+    assert 'split_targets' in m_508 and 'attha' in m_508['split_targets']
+    assert m_508['split_targets']['attha'][0]['code'] == 's0508a1.att'
+    assert m_508['split_targets']['attha'][1]['code'] == 's0508a2.att'
+
+    # Suite 10: Jataka 1 & 2 (s0513, s0514)
+    m_513 = get_meta('s0513m.mul')
+    assert len(m_513['split_targets']['attha']) == 4
+    m_514 = get_meta('s0514m.mul')
+    assert len(m_514['split_targets']['attha']) == 3
+
+    # Suite 11: Parajika (vin01)
+    m_vin01 = get_meta('vin01m.mul')
+    assert m_vin01['attha_start_chapter'] == 1
+    assert len(m_vin01['split_targets']['tika']) == 2
 
     log_step("  ✓ Multi-Volume MAT Navigation: 100% assertions PASSED across all collections.")
 

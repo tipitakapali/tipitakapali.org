@@ -38,9 +38,9 @@ export default function MatJumpModal({ isOpen, onClose }) {
     ? baseCode.slice(0, -1)
     : baseCode;
 
-  let activeSubKey = activeTab?.chapter_to_sub_book?.[activeTab?.currentChapterIdx || 0];
+  const cIdx = activeTab?.currentChapterIdx || 0;
+  let activeSubKey = activeTab?.chapter_to_sub_book?.[cIdx];
   if (!activeSubKey && activeTab?.sub_books) {
-    const cIdx = activeTab?.currentChapterIdx || 0;
     for (const [k, v] of Object.entries(activeTab.sub_books)) {
       const cr = v.chapter_range || v.tika_chapter_range;
       if (cr && cIdx >= cr[0] && cIdx <= cr[1]) {
@@ -51,8 +51,35 @@ export default function MatJumpModal({ isOpen, onClose }) {
   }
   const currentSubInfo = activeSubKey && activeTab?.sub_books ? activeTab.sub_books[activeSubKey] : null;
 
-  const resolvedMulaCode = currentSubInfo?.mula_code || mat?.mula_code || (isCurrentMula ? currentCode : null);
-  const resolvedMulaTitle = currentSubInfo?.mula_title || mat?.mula_title || (isCurrentMula ? activeTab?.title : 'Mūlapāḷi');
+  // Split targets resolution (e.g. s0508, s0513, s0514, vin01)
+  const currentP = parseInt(String(activeParaNum || '').replace(/^(?:para-?|p)/i, ''), 10);
+  const splitTargets = activeTab?.split_targets || mat?.split_targets;
+
+  const resolveSplitTarget = (layer) => {
+    if (!splitTargets?.[layer] || !Array.isArray(splitTargets[layer])) return null;
+    for (const rule of splitTargets[layer]) {
+      const inChap = rule.chapter_range && cIdx >= rule.chapter_range[0] && cIdx <= rule.chapter_range[1];
+      let inPara = true;
+      if (rule.para_range) {
+        inPara = !isNaN(currentP) && currentP >= rule.para_range[0] && currentP <= rule.para_range[1];
+      }
+      if (inChap && inPara) return rule;
+    }
+    return null;
+  };
+
+  const splitMula = resolveSplitTarget('mula');
+  const splitAttha = resolveSplitTarget('attha');
+  const splitTika = resolveSplitTarget('tika');
+
+  const resolvedMulaCode = splitMula?.code || currentSubInfo?.mula_code || mat?.mula_code || (isCurrentMula ? currentCode : null);
+  const resolvedMulaTitle = splitMula?.title || currentSubInfo?.mula_title || mat?.mula_title || (isCurrentMula ? activeTab?.title : 'Mūlapāḷi');
+
+  const resolvedAtthaCode = splitAttha?.code || currentSubInfo?.attha_code || mat?.attha_code || (isCurrentAttha ? currentCode : null);
+  const resolvedAtthaTitle = splitAttha?.title || currentSubInfo?.attha_title || mat?.attha_title || (isCurrentAttha ? activeTab?.title : 'Aṭṭhakathā');
+
+  const resolvedTikaCode = splitTika?.code || currentSubInfo?.tika_code || mat?.tika_code || (isCurrentTika ? currentCode : null);
+  const resolvedTikaTitle = splitTika?.title || currentSubInfo?.tika_title || mat?.tika_title || (isCurrentTika ? activeTab.title : 'Ṭīkā');
 
   const connectedBooks = [
     {
@@ -69,20 +96,20 @@ export default function MatJumpModal({ isOpen, onClose }) {
       layer: 'attha',
       label: 'Aṭṭhakathā',
       desc: 'Commentary (Aṭṭhakathā)',
-      code: currentSubInfo?.attha_code || mat?.attha_code || (isCurrentAttha ? currentCode : null),
-      title: currentSubInfo?.attha_title || mat?.attha_title || (isCurrentAttha ? activeTab?.title : 'Aṭṭhakathā'),
-      isCurrent: isCurrentAttha || currentCode === (currentSubInfo?.attha_code || mat?.attha_code),
-      available: Boolean(currentSubInfo?.attha_code || mat?.attha_code),
+      code: resolvedAtthaCode,
+      title: resolvedAtthaTitle,
+      isCurrent: isCurrentAttha || currentCode === resolvedAtthaCode,
+      available: Boolean(resolvedAtthaCode),
       badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',
     },
     {
       layer: 'tika',
       label: 'Ṭīkā',
       desc: 'Sub-commentary (Ṭīkā / Anuṭīkā)',
-      code: currentSubInfo?.tika_code || mat?.tika_code || (isCurrentTika ? currentCode : null),
-      title: currentSubInfo?.tika_title || mat?.tika_title || (isCurrentTika ? activeTab.title : 'Ṭīkā'),
-      isCurrent: isCurrentTika || currentCode === (currentSubInfo?.tika_code || mat?.tika_code),
-      available: Boolean(currentSubInfo?.tika_code || mat?.tika_code),
+      code: resolvedTikaCode,
+      title: resolvedTikaTitle,
+      isCurrent: isCurrentTika || currentCode === resolvedTikaCode,
+      available: Boolean(resolvedTikaCode),
       badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
     },
   ];
@@ -92,9 +119,19 @@ export default function MatJumpModal({ isOpen, onClose }) {
   const jumpTargets = connectedBooks.filter((item) => !item.isCurrent);
 
   const handleJump = (item) => {
+    let targetChapter = undefined;
+    const splitRule = resolveSplitTarget(item.layer);
+    if (splitRule) {
+      if (splitRule.target_chapter !== undefined) {
+        targetChapter = splitRule.target_chapter;
+      } else if (splitRule.target_chapter_offset !== undefined) {
+        targetChapter = Math.max(0, cIdx + splitRule.target_chapter_offset);
+      }
+    }
     jumpToMat(item.layer, {
       title: item.title,
       code: item.code,
+      chapter: targetChapter,
       subBook: activeTab?.sub_book || activeSubKey || undefined,
     });
     onClose();

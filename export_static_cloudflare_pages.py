@@ -266,6 +266,10 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             "sub_books_para_to_chapter": meta.get('sub_books_para_to_chapter', None),
             "attha_start_chapter": meta.get('attha_start_chapter', None),
             "tika_start_chapter": meta.get('tika_start_chapter', None),
+            "split_targets": meta.get('split_targets', None),
+            "mula_chapter": meta.get('mula_chapter', None),
+            "mula_chapter_offset": meta.get('mula_chapter_offset', None),
+            "attha_chapter_offset": meta.get('attha_chapter_offset', None),
             "initial_chapter": 0,
             "chapters_data": initial_chapters_data,
             "html": "\n".join(loaded_html_array)
