@@ -181,6 +181,7 @@ User-agent: DuckDuckBot
 User-agent: Baiduspider
 User-agent: YandexBot
 User-agent: Sogou
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /
 Allow: /_next/
 Allow: /api/
@@ -203,6 +204,7 @@ User-agent: CCBot
 User-agent: Diffbot
 User-agent: FacebookBot
 User-agent: cohere-ai
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /
 Allow: /llms.txt
 Allow: /llms-full.txt
@@ -218,10 +220,12 @@ Allow: /chapter/
 User-agent: GPTBot
 User-agent: ClaudeBot
 User-agent: PerplexityBot
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /api/dict/
 
 # 3. Default for all other user agents
 User-agent: *
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /
 Allow: /_next/
 Allow: /api/
@@ -231,6 +235,7 @@ Disallow: /api/search*
 
 # 4. Sitemaps and AI Entry Points (Root Index, Main, and 16 Scripts)
 {sitemaps_block}
+Agentmap: {site_url}/.well-known/ai-catalog.json
 Host: {site_url.replace('https://', '').replace('http://', '')}
 # AI Tool Docs
 # Canonical Dict API: {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd

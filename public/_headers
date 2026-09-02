@@ -1,0 +1,30 @@
+# Global Security & CORS Policies
+/*
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+  Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Link: </.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </llms.txt>; rel="describedby"; type="text/plain"
+
+# Long-term Immutable Caching for Next.js Static JS/CSS Assets & Fonts (1 Year)
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+/icons/*
+  Cache-Control: public, max-age=2592000, immutable
+
+# Static API JSON Data (1 Day Edge Cache + 7 Days Stale-While-Revalidate)
+/api/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+
+/*.json
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+

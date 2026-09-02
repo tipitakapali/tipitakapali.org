@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "pali-dict-lookup",
+      "type": "skill-md",
+      "description": "Query the Digital P\u0101\u1e37i Dictionary (DPD) and canonical lexicons for word definitions, grammar, roots, and declensions.",
+      "url": "/.well-known/agent-skills/pali-dict-lookup/SKILL.md",
+      "digest": "sha256:dd03eff89bdf31f76e6337b92654e57fa2ee32dc9ede0cb4925702aee63f6d77"
+    },
+    {
+      "name": "canon-reader",
+      "type": "skill-md",
+      "description": "Read and retrieve texts from the 217 canonical books and 2,695 chapters of the Cha\u1e6d\u1e6dha Sa\u1e45g\u0101yana Tipi\u1e6daka P\u0101\u1e37i Canon.",
+      "url": "/.well-known/agent-skills/canon-reader/SKILL.md",
+      "digest": "sha256:c267d8df35898fd4b839de2e545d4a6ddb6d51d16da5ab982214e713396763dd"
+    },
+    {
+      "name": "script-transliteration",
+      "type": "skill-md",
+      "description": "Transliterate and read P\u0101\u1e37i text across Roman (IAST/Velthuis) and 16 Asian Brahmic writing scripts.",
+      "url": "/.well-known/agent-skills/script-transliteration/SKILL.md",
+      "digest": "sha256:3b67528dd1a7b2a8effa8a7ecba29e74ed249e014eaa458e067d7d346c84844d"
+    }
+  ]
+}

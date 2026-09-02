@@ -3,6 +3,7 @@ import './pali-fonts.css';
 import { ThemeSettingsProvider } from '../context/ThemeSettingsContext';
 import { TabProvider } from '../context/TabContext';
 import { DictionaryProvider } from '../context/DictionaryContext';
+import WebMcpRegistration from '../components/WebMcpRegistration';
 
 export const metadata = {
   metadataBase: new URL('https://tipitakapali.org'),
@@ -140,8 +141,15 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
         />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        {/* Agent & Machine Discovery Links */}
+        <link rel="api-catalog" href="/.well-known/api-catalog" />
+        <link rel="ai-catalog" href="/.well-known/ai-catalog.json" />
+        <link rel="service-desc" type="application/openapi+json" href="/openapi.json" />
+        <link rel="describedby" type="text/plain" href="/llms.txt" />
+        <link rel="agent-card" type="application/json" href="/.well-known/agent-card.json" />
       </head>
       <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
+        <WebMcpRegistration />
         <ThemeSettingsProvider>
           <TabProvider>
             <DictionaryProvider>

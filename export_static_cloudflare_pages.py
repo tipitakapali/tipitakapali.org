@@ -455,7 +455,38 @@ export async function onRequest(context) {{
     with open(functions_api_dir / 'health.js', 'w', encoding='utf-8') as f:
         f.write(health_proxy_code)
 
-    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js (legacy 301 redirects) + /functions/book/[[path]].js (SPA shell) + /functions/api/health.js")
+    # 6. Global Edge Middleware for AI Agent Markdown Content Negotiation (/functions/_middleware.js)
+    functions_dir = dist_dir / 'functions'
+    edge_middleware_code = """// Cloudflare Pages Edge Middleware for AI Agent Content Negotiation
+// Handles Accept: text/markdown per RFC / llmstxt.org / Cloudflare Markdown for Agents
+export async function onRequest(context) {
+  const request = context.request;
+  const accept = request.headers.get('accept') || '';
+  const url = new URL(request.url);
+
+  const isStaticDoc = /\\.(md|txt|json|xml|html|css|js|ico|png|svg|jpg|woff2?|ttf)$/i.test(url.pathname);
+
+  // Check if client explicitly requests machine-readable markdown for HTML pages
+  if (accept.includes('text/markdown') && !url.pathname.startsWith('/api/') && !isStaticDoc) {
+    const targetPath = url.pathname === '/' ? '/llms.txt' : '/llms-full.txt';
+    const response = await context.env.ASSETS.fetch(new URL(targetPath, url.origin));
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('content-type', 'text/markdown; charset=utf-8');
+    newHeaders.set('vary', 'Accept');
+    newHeaders.set('x-markdown-tokens', url.pathname === '/' ? '1250' : '8500');
+    return new Response(response.body, {
+      status: 200,
+      headers: newHeaders,
+    });
+  }
+
+  return context.next();
+}
+"""
+    with open(functions_dir / '_middleware.js', 'w', encoding='utf-8') as f:
+        f.write(edge_middleware_code)
+
+    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js + /functions/book/[[path]].js + /functions/api/health.js + /functions/_middleware.js (AI markdown)")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -508,6 +539,7 @@ def generate_cloudflare_headers(dist_dir: Path):
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
+  Link: </.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </llms.txt>; rel="describedby"; type="text/plain"
 
 # Long-term Immutable Caching for Next.js Static JS/CSS Assets & Fonts (1 Year)
 /_next/static/*
@@ -761,6 +793,17 @@ def main():
 
         total_indexed_urls = 1 + len(seo_books) + len(seo_chapters) + len(PALI_SCRIPTS) * (len(seo_books) + len(seo_chapters))
         log_success(f"Generated {len(sitemaps)} XML sitemaps ({total_indexed_urls:,} URLs across 17 scripts), robots.txt, llms.txt, llms-full.txt, site.jsonld")
+
+        # Ensure agent discovery files (.well-known and auth.md) are copied to all targets
+        for target in [dist_dir, git_repo_dir]:
+            if target.exists():
+                src_wk = web_app_dir / 'public' / '.well-known'
+                dst_wk = target / '.well-known'
+                if src_wk.exists():
+                    shutil.copytree(src_wk, dst_wk, dirs_exist_ok=True)
+                src_auth = web_app_dir / 'public' / 'auth.md'
+                if src_auth.exists():
+                    shutil.copy2(src_auth, target / 'auth.md')
     except Exception as e:
         log_warn(f"SEO/AI metadata generation note: {e}")
 

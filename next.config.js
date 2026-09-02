@@ -19,6 +19,19 @@ const nextConfig = {
       }
     : {
         output: 'standalone',
+        async headers() {
+          return [
+            {
+              source: '/:path*',
+              headers: [
+                {
+                  key: 'Link',
+                  value: '</.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </llms.txt>; rel="describedby"; type="text/plain"',
+                },
+              ],
+            },
+          ];
+        },
         async rewrites() {
           const backendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8400';
           return [

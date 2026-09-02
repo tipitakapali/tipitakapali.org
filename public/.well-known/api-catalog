@@ -1,0 +1,34 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://tipitakapali.org/api",
+      "service-desc": [
+        {
+          "href": "https://tipitakapali.org/openapi.json",
+          "type": "application/openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://tipitakapali.org/llms.txt",
+          "type": "text/markdown"
+        }
+      ]
+    },
+    {
+      "anchor": "https://api.tipitakapali.org/api/dict",
+      "service-desc": [
+        {
+          "href": "https://tipitakapali.org/openapi.json",
+          "type": "application/openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://tipitakapali.org/llms.txt",
+          "type": "text/markdown"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "TipitakaPali.org",
+    "identifier": "did:web:tipitakapali.org"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:tipitakapali.org:mcp:server",
+      "displayName": "Tipitaka Pali MCP Server",
+      "type": "application/mcp-server-card+json",
+      "url": "https://tipitakapali.org/.well-known/mcp/server-card.json",
+      "representativeQueries": [
+        "lookup pali word in Digital Pali Dictionary",
+        "get declension inflection table for buddha in pali",
+        "read dhammapada verse 1 in pali canon",
+        "search tipitaka pali canon for anatta"
+      ]
+    },
+    {
+      "identifier": "urn:air:tipitakapali.org:agent:canon",
+      "displayName": "Tipitaka Pali Canon Agent",
+      "type": "application/agent-card+json",
+      "url": "https://tipitakapali.org/.well-known/agent-card.json",
+      "representativeQueries": [
+        "find suttas discussing anatta in majjhima nikaya",
+        "search pali canon for metta passages",
+        "compare vinaya monastic rules in pali canon"
+      ]
+    },
+    {
+      "identifier": "urn:air:tipitakapali.org:skills:index",
+      "displayName": "Tipitaka Pali Agent Skills Index",
+      "type": "application/json",
+      "url": "https://tipitakapali.org/.well-known/agent-skills/index.json",
+      "representativeQueries": [
+        "convert pali roman script to sinhala or devanagari",
+        "lookup word grammar in dpd dictionary",
+        "read canonical sutta in 16 scripts"
+      ]
+    },
+    {
+      "identifier": "urn:air:tipitakapali.org:api:openapi",
+      "displayName": "Tipitaka Pali Canonical OpenAPI Specification",
+      "type": "application/openapi+json",
+      "url": "https://tipitakapali.org/openapi.json",
+      "representativeQueries": [
+        "access tipitaka rest api endpoints",
+        "fetch tree navigation json",
+        "query canonical dictionary json api"
+      ]
+    }
+  ]
+}

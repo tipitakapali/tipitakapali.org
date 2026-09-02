@@ -80,6 +80,7 @@ Sitemap: https://tipitakapali.org/sitemap-mala.xml
 Sitemap: https://tipitakapali.org/sitemap-brah.xml
 Sitemap: https://tipitakapali.org/sitemap-tibt.xml
 Sitemap: https://tipitakapali.org/sitemap-cyrl.xml
+Agentmap: https://tipitakapali.org/.well-known/ai-catalog.json
 Host: tipitakapali.org
 # AI Tool Docs
 # Canonical Dict API: https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd

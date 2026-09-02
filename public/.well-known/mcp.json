@@ -1,0 +1,82 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/server-card/v1.json",
+  "serverInfo": {
+    "name": "tipitakapali-mcp-server",
+    "title": "Tipitaka Pali Canon & DPD MCP Server",
+    "version": "1.0.0",
+    "description": "MCP server exposing Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon books, chapters, full-text search, and Digital Pāḷi Dictionary (DPD) lookups."
+  },
+  "transport": {
+    "type": "http",
+    "endpoint": "https://api.tipitakapali.org/mcp"
+  },
+  "capabilities": {
+    "tools": [
+      {
+        "name": "pali_dict_lookup",
+        "description": "Look up Pali words in the Digital Pāḷi Dictionary (DPD) and classical lexicons",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "word": {
+              "type": "string",
+              "description": "Pāḷi word in Roman script (IAST or Velthuis, e.g. metta or mettā)"
+            },
+            "dict": {
+              "type": "string",
+              "enum": ["all", "dpd", "others"],
+              "default": "dpd",
+              "description": "Dictionary to query (dpd for primary Digital Pali Dictionary, others for PTS/Burmese/Sinhala)"
+            }
+          },
+          "required": ["word"]
+        }
+      },
+      {
+        "name": "pali_canon_search",
+        "description": "Search the entire 520,000+ paragraph Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search phrase or term in Pali (e.g. anicca, dukkha, anatta)"
+            },
+            "pitaka": {
+              "type": "string",
+              "enum": ["all", "vin", "sut", "abh", "ann"],
+              "default": "all",
+              "description": "Piṭaka filter (vin=Vinaya, sut=Sutta, abh=Abhidhamma, ann=Añña)"
+            }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "get_canonical_text",
+        "description": "Retrieve Pali canon book chapter content by book code and chapter number",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "book_code": {
+              "type": "string",
+              "description": "Canonical book code (e.g. s0101m.mul, s0502m.mul)"
+            },
+            "chapter_index": {
+              "type": "integer",
+              "description": "1-based chapter index"
+            }
+          },
+          "required": ["book_code", "chapter_index"]
+        }
+      }
+    ],
+    "resources": [
+      {
+        "uri": "pali://canon/tree",
+        "name": "Tipitaka Navigation Hierarchy",
+        "mimeType": "application/json"
+      }
+    ]
+  }
+}

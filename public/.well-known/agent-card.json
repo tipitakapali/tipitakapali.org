@@ -1,0 +1,35 @@
+{
+  "$schema": "https://a2a-protocol.org/schemas/agent-card/v1.json",
+  "name": "TipitakaPali Agent",
+  "version": "1.0.0",
+  "description": "Autonomous agent for querying the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon, Digital Pāḷi Dictionary (DPD), grammatical analyses, and cross-edition references.",
+  "url": "https://tipitakapali.org",
+  "supportedInterfaces": [
+    {
+      "transport": "http",
+      "url": "https://api.tipitakapali.org/api",
+      "protocol": "rest"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "dict-lookup",
+      "name": "Pāḷi Dictionary Lookup",
+      "description": "Comprehensive lookup across the Digital Pāḷi Dictionary (DPD), PTS, and classical Burmese & Sinhala lexicons."
+    },
+    {
+      "id": "canon-reading",
+      "name": "Pāḷi Canon Reader",
+      "description": "Direct access to 217 canonical books and 2,695 chapters across Roman and 16 Brahmic scripts."
+    },
+    {
+      "id": "canon-search",
+      "name": "Full-Text Canon Search",
+      "description": "FTS5 search across all 520,000+ paragraphs of the Sixth Buddhist Council Pāḷi Canon."
+    }
+  ]
+}
