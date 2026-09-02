@@ -15,20 +15,20 @@ export const AVAILABLE_DICTIONARIES = [
     desc: 'Over 90,000+ entries with complete grammar, roots, case inflections and compounds.',
   },
   {
-    id: 'pts',
-    label: "Pāḷi Text Society's PED (2015)",
-    shortLabel: 'PTS',
-    badge: 'Classic',
-    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    desc: 'Authoritative Rhys Davids & Stede English definitions (corrected 2015 reprint).',
-  },
-  {
     id: 'abd',
     label: 'Tipiṭaka Pāḷi-Myanmar Dictionary',
     shortLabel: 'အဘိဓာန်',
     badge: 'Classic',
     badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     desc: 'Tipiṭaka Pāḷi-Myanmar Dictionary',
+  },
+  {
+    id: 'pts',
+    label: "Pāḷi Text Society's PED (2015)",
+    shortLabel: 'PTS',
+    badge: 'Classic',
+    badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    desc: 'Authoritative Rhys Davids & Stede English definitions (corrected 2015 reprint).',
   },
   {
     id: 'psd',
@@ -44,7 +44,7 @@ export const AVAILABLE_DICTIONARIES = [
     shortLabel: 'Sanskrit',
     badge: 'Comparative',
     badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-    desc: 'Comparative Sanskrit roots and definitions (Apte Practical & Monier-Williams).',
+    desc: 'Comparative Sanskrit roots and definitions (Apte Practical, Monier-Williams, & Edgerton).',
   },
   {
     id: 'splitter',
@@ -62,12 +62,12 @@ const STORAGE_KEYS = {
   CLICK_LOOKUP: 'tipitaka_dict_click_lookup',
   CLICK_MODE: 'tipitaka_dict_click_mode',
   LAST_TAB: 'tipitaka_dict_last_tab',
-  DICT_ORDER: 'tipitaka_dict_order',
+  DICT_ORDER: 'tipitaka_dict_order_v2',
   DICT_ENABLED: 'tipitaka_dict_enabled',
 };
 
-const DEFAULT_DICT_ORDER = ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
-const DEFAULT_DICT_ENABLED = { dpd: true, pts: true, abd: true, psd: true, sans: true, splitter: true };
+export const DEFAULT_DICT_ORDER = ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'];
+export const DEFAULT_DICT_ENABLED = { dpd: true, abd: true, pts: true, psd: true, sans: true, splitter: true };
 
 const DictionaryContext = createContext(null);
 
@@ -155,7 +155,7 @@ export function DictionaryProvider({ children }) {
         setClickLookupModeState(savedClickMode);
       }
       const savedTab = localStorage.getItem(STORAGE_KEYS.LAST_TAB);
-      if (savedTab && ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'].includes(savedTab)) {
+      if (savedTab && ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'].includes(savedTab)) {
         setActiveDictTab(savedTab);
       }
       const savedOrder = localStorage.getItem(STORAGE_KEYS.DICT_ORDER);

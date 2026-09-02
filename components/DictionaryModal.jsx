@@ -21,7 +21,7 @@ import {
   Languages,
   RotateCcw,
 } from 'lucide-react';
-import { useDictionary } from '../context/DictionaryContext';
+import { useDictionary, DEFAULT_DICT_ORDER, DEFAULT_DICT_ENABLED } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { typeVelthuis, convertAnyToRoman, convertPaliScript, cleanDictionaryQuery } from '../services/transliterate';
 import { fetchDictionaryInflection } from '../services/api';
@@ -275,14 +275,14 @@ export default function DictionaryModal() {
   const DICT_TABS = useMemo(() => {
     const rawTabs = [
       { id: 'dpd', label: 'DPD', desc: 'Digital Pāḷi Dictionary', count: lookupData?.counts?.dpd || 0 },
-      { id: 'pts', label: 'PTS', desc: 'Pali Text Society PED', count: lookupData?.counts?.pts || 0 },
-      { id: 'abd', label: 'အဘိဓာန်', desc: 'Abhidhānappadīpikā (MM)', count: lookupData?.counts?.abd || 0 },
-      { id: 'psd', label: 'පාලි-සිංහල', desc: 'Pāli-Sinhala Dictionary', count: lookupData?.counts?.psd || 0 },
-      { id: 'sans', label: 'Sanskrit', desc: 'Apte / Monier-Williams', count: lookupData?.counts?.sans || 0 },
+      { id: 'abd', label: 'အဘိဓာန်', desc: 'Tipiṭaka Pāḷi-Myanmar Dictionary', count: lookupData?.counts?.abd || 0 },
+	    { id: 'pts', label: 'PTS', desc: 'Pāḷi Text Society PED', count: lookupData?.counts?.pts || 0 },
+      { id: 'psd', label: 'සිංහල', desc: 'Pāḷi-Sinhala Dictionary', count: lookupData?.counts?.psd || 0 },
+      { id: 'sans', label: 'Sanskrit', desc: 'Apte / Monier-Williams / Edgerton', count: lookupData?.counts?.sans || 0 },
       { id: 'splitter', label: 'Splitter', desc: 'Compound Deconstructor', count: lookupData?.counts?.splitter || 0 },
     ];
-    const order = dictOrder || ['dpd', 'pts', 'abd', 'psd', 'sans', 'splitter'];
-    const enabled = dictEnabled || { dpd: true, pts: true, abd: true, psd: true, sans: true, splitter: true };
+    const order = dictOrder || DEFAULT_DICT_ORDER;
+    const enabled = dictEnabled || DEFAULT_DICT_ENABLED;
 
     const tabMap = new Map(rawTabs.map((t) => [t.id, t]));
     const result = [];
