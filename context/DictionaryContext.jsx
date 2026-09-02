@@ -24,11 +24,11 @@ export const AVAILABLE_DICTIONARIES = [
   },
   {
     id: 'abd',
-    label: 'Abhidhānappadīpikā (Pāḷi-Pāḷi)',
+    label: 'Tipiṭaka Pāḷi-Myanmar Dictionary',
     shortLabel: 'အဘိဓာန်',
-    badge: 'Ancient',
+    badge: 'Classic',
     badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    desc: 'Ancient canonical Pāḷi-Pāḷi lexicon, synonyms and roots (Myanmar CST).',
+    desc: 'Tipiṭaka Pāḷi-Myanmar Dictionary',
   },
   {
     id: 'psd',

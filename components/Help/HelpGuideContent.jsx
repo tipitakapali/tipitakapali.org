@@ -366,7 +366,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold">Comparative</span>
             </div>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Abhidhānappadīpikā (Pāḷi-Pāḷi), Pāḷi-Sinhala, and Cologne Sanskrit lexicons (Monier-Williams, V.S. Apte, Edgerton Buddhist Hybrid Sanskrit).
+              Tipiṭaka Pāḷi-Myanmar Dictionary (Pāḷi-Myanmar), Pāḷi-Sinhala, and Cologne Sanskrit lexicons (Monier-Williams, V.S. Apte, Edgerton Buddhist Hybrid Sanskrit).
             </p>
           </div>
         </div>
