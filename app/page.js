@@ -15,12 +15,13 @@ import NotFound from './not-found';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
-
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openSearchModal, activeTab, activeBookCode, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
+  const { openBook, openSearchModal, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
+
+  const isEkaActive = isZenMode || (!isSidebarOpen && !isHeaderVisible);
 
 
 
@@ -228,7 +229,7 @@ export function MainAppContent({ params: rawParams }) {
 
   // Keyboard shortcut to exit Eka mode
   useEffect(() => {
-    if (!isZenMode) return;
+    if (!isEkaActive) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         handleExitZen();
@@ -236,7 +237,7 @@ export function MainAppContent({ params: rawParams }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isZenMode, handleExitZen]);
+  }, [isEkaActive, handleExitZen]);
 
   if (isNotFound) {
     return <NotFound />;
@@ -252,7 +253,7 @@ export function MainAppContent({ params: rawParams }) {
           <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
             <ReaderView />
             {/* Floating Exit Eka Mode Button - Aligned near the text reading column */}
-            {isZenMode && (
+            {isEkaActive && (
               <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4 sm:px-6 z-40">
                 <div
                   className="w-full flex justify-end pointer-events-none"

@@ -118,6 +118,7 @@ export function TabProvider({ children }) {
   const openTabsRef = useRef([]);
   const activeBookCodeRef = useRef(null);
   const activeParaNumRef = useRef(null);
+  const isSidebarOpenRef = useRef(isSidebarOpen);
 
   const tabScrollMemoryRef = useRef({});
   // bookCode -> URL script prefix (e.g. 'si') for tabs opened via script-prefixed URLs,
@@ -127,6 +128,7 @@ export function TabProvider({ children }) {
   openTabsRef.current = openTabs;
   activeBookCodeRef.current = activeBookCode;
   activeParaNumRef.current = activeParaNum;
+  isSidebarOpenRef.current = isSidebarOpen;
 
   // Load saved bookmarks, history, and scroll positions from localStorage & handle mobile layout
   useEffect(() => {
@@ -1266,12 +1268,19 @@ export function TabProvider({ children }) {
   }, []);
 
   const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen((prev) => {
-      const next = !prev;
-      setIsHeaderVisible(next);
-      return next;
-    });
-  }, []);
+    const next = !isSidebarOpenRef.current;
+    isSidebarOpenRef.current = next;
+    setIsSidebarOpen(next);
+    setIsHeaderVisible(next);
+    setIsZenMode(!next);
+    if (typeof document !== 'undefined') {
+      if (!next) {
+        document.body.classList.add('zen-mode');
+      } else {
+        document.body.classList.remove('zen-mode');
+      }
+    }
+  }, [setIsZenMode]);
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 
