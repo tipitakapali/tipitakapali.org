@@ -16,11 +16,22 @@ const STORAGE_KEYS = {
 };
 
 function resolveNearestChapterAndPara(paraToChapMap, rawParaNum, subBook = null, subBooksParaMap = null) {
-  const mapToUse = (subBook && subBooksParaMap?.[subBook]) ? subBooksParaMap[subBook] : paraToChapMap;
+  let mapToUse = null;
+  let isSubSpecific = false;
+  if (subBook && subBooksParaMap && subBooksParaMap[subBook]) {
+    mapToUse = subBooksParaMap[subBook];
+    isSubSpecific = true;
+  } else if (!subBook) {
+    mapToUse = paraToChapMap;
+  } else {
+    // A specific subBook was requested, but subBooksParaMap[subBook] is not available.
+    // Do NOT fall back to flat paraToChapMap to avoid clobbering with another sub-book!
+    return null;
+  }
   if (!mapToUse || !rawParaNum) return null;
   const cleanPara = String(rawParaNum).replace(/^(?:para-?|p)/i, '').trim();
   if (mapToUse[cleanPara] !== undefined) {
-    return { chapterIdx: mapToUse[cleanPara], paraNum: cleanPara };
+    return { chapterIdx: mapToUse[cleanPara], paraNum: cleanPara, isSubSpecific };
   }
   const targetInt = parseInt(cleanPara, 10);
   if (isNaN(targetInt)) return null;
@@ -37,15 +48,19 @@ function resolveNearestChapterAndPara(paraToChapMap, rawParaNum, subBook = null,
     }
   }
   if (bestChap !== null) {
-    return { chapterIdx: bestChap, paraNum: bestNum !== null ? String(bestNum) : cleanPara };
+    return { chapterIdx: bestChap, paraNum: bestNum !== null ? String(bestNum) : cleanPara, isSubSpecific };
   }
   return null;
 }
 
 function getFirstParaOfChapter(paraToChapMap, targetChapIdx, subBook = null, subBooksParaMap = null) {
-  let mapToUse = paraToChapMap;
+  let mapToUse = null;
   if (subBook && subBooksParaMap && subBooksParaMap[subBook]) {
     mapToUse = subBooksParaMap[subBook];
+  } else if (!subBook) {
+    mapToUse = paraToChapMap;
+  } else {
+    return null;
   }
   if (!mapToUse || targetChapIdx === undefined || targetChapIdx === null) return null;
   let firstNum = null;
@@ -543,7 +558,7 @@ export function TabProvider({ children }) {
           return;
         }
 
-        // Ensure tab has full metadata (para_to_chapter, page_to_chapter, etc.)
+        // Ensure tab has full metadata (para_to_chapter, page_to_chapter, sub_books, etc.)
         if (
           !tab.para_to_chapter ||
           Object.keys(tab.para_to_chapter).length === 0 ||
@@ -566,6 +581,12 @@ export function TabProvider({ children }) {
                           para_range: bData.para_range || t.para_range,
                           edition_ranges: bData.edition_ranges || t.edition_ranges,
                           book_type: bData.book_type || t.book_type || 'Whole',
+                          sub_books: bData.sub_books || t.sub_books || null,
+                          sub_book: bData.sub_book || t.sub_book || null,
+                          chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                          sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
+                          attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
+                          tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                           loadedChapters: { ...t.loadedChapters, ...bData.chapters_data },
@@ -579,13 +600,15 @@ export function TabProvider({ children }) {
             .catch(() => {});
         }
 
+        const targetSub = options.targetSubBook || tab.sub_book || tab.chapter_to_sub_book?.[targetChapIdx ?? tab.currentChapterIdx ?? 0];
         if (rawParaNum && tab.para_to_chapter) {
-          const targetSub = options.targetSubBook || tab.sub_book;
           const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
-          if (resolved && (!hasTargetChapter || options.targetSubBook)) {
-            targetChapIdx = resolved.chapterIdx;
-            hasTargetChapter = true;
-            setActiveParaNum(resolved.paraNum || rawParaNum);
+          if (resolved) {
+            if (!hasTargetChapter || resolved.isSubSpecific) {
+              targetChapIdx = resolved.chapterIdx;
+              hasTargetChapter = true;
+              setActiveParaNum(resolved.paraNum || rawParaNum);
+            }
           }
         }
 
@@ -601,7 +624,6 @@ export function TabProvider({ children }) {
         }
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
-          const targetSub = options.targetSubBook || tab.sub_book;
           const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx, targetSub, tab.sub_books_para_to_chapter);
           if (firstP) {
             setActiveParaNum(firstP);
@@ -626,6 +648,7 @@ export function TabProvider({ children }) {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
@@ -706,6 +729,12 @@ export function TabProvider({ children }) {
             para_range: bookData.para_range || null,
             edition_ranges: bookData.edition_ranges || null,
             book_type: bookData.book_type || 'Whole',
+            sub_books: bookData.sub_books || null,
+            sub_book: bookData.sub_book || null,
+            chapter_to_sub_book: bookData.chapter_to_sub_book || null,
+            sub_books_para_to_chapter: bookData.sub_books_para_to_chapter || null,
+            attha_start_chapter: bookData.attha_start_chapter !== undefined ? bookData.attha_start_chapter : null,
+            tika_start_chapter: bookData.tika_start_chapter !== undefined ? bookData.tika_start_chapter : null,
             loadedChapters: {},
             loadingChapters: {},
             isLoading: false,
@@ -773,6 +802,7 @@ export function TabProvider({ children }) {
         currentChapterIdx: targetChapIdx,
         viewMode: 'reader',
         isTocView: false,
+        sub_book: options.targetSubBook || null,
       };
       const nextTabsOptimistic = [...openTabsRef.current, optimisticTab];
       setOpenTabs(nextTabsOptimistic);
@@ -788,13 +818,15 @@ export function TabProvider({ children }) {
           buffer: 1,
         });
 
+        const targetSub = options.targetSubBook || bookData.sub_book || bookData.chapter_to_sub_book?.[targetChapIdx ?? 0];
         if (rawParaNum && bookData.para_to_chapter) {
-          const targetSub = options.targetSubBook || bookData.sub_book;
           const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
-          if (resolved && (!hasTargetChapter || options.targetSubBook)) {
-            targetChapIdx = resolved.chapterIdx;
-            hasTargetChapter = true;
-            setActiveParaNum(resolved.paraNum || rawParaNum);
+          if (resolved) {
+            if (!hasTargetChapter || resolved.isSubSpecific) {
+              targetChapIdx = resolved.chapterIdx;
+              hasTargetChapter = true;
+              setActiveParaNum(resolved.paraNum || rawParaNum);
+            }
           }
         }
 
@@ -823,7 +855,6 @@ export function TabProvider({ children }) {
         }
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
-          const targetSub = options.targetSubBook || bookData.sub_book;
           const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx, targetSub, bookData.sub_books_para_to_chapter);
           if (firstP) {
             setActiveParaNum(firstP);
@@ -887,6 +918,7 @@ export function TabProvider({ children }) {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
@@ -994,6 +1026,12 @@ export function TabProvider({ children }) {
                           para_range: bData.para_range || t.para_range,
                           edition_ranges: bData.edition_ranges || t.edition_ranges,
                           book_type: bData.book_type || t.book_type || 'Whole',
+                          sub_books: bData.sub_books || t.sub_books || null,
+                          sub_book: bData.sub_book || t.sub_book || null,
+                          chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                          sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
+                          attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
+                          tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
                           toc: bData.toc?.length ? bData.toc : t.toc,
                           mat: bData.mat || t.mat,
                         }
@@ -1373,10 +1411,12 @@ export function TabProvider({ children }) {
             }
           }
         }
-      } else if (activeTab.sub_book) {
+      } else if (activeTab.sub_book || options.subBook) {
         // 2. Single-volume forward jump: activeTab belongs to a multi-volume commentary (e.g. s0402m2.mul)
-        targetSubBook = activeTab.sub_book;
-        if (targetLayer === 'attha') {
+        targetSubBook = options.subBook || activeTab.sub_book;
+        if (options.chapter !== undefined) {
+          targetChapter = options.chapter;
+        } else if (targetLayer === 'attha') {
           const offset = activeTab.attha_start_chapter !== undefined && activeTab.attha_start_chapter !== null
             ? activeTab.attha_start_chapter
             : (mat?.attha_start_chapter || 0);

@@ -95,6 +95,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
     jumpToMat(item.layer, {
       title: item.title,
       code: item.code,
+      subBook: activeTab?.sub_book || activeSubKey || undefined,
     });
     onClose();
   };

@@ -256,6 +256,7 @@ export default function ReaderView() {
 
   const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
   const { settings, setIsZenMode } = useThemeSettings();
+  const pulseAnimation = Boolean(settings?.pulseAnimation);
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -317,7 +318,7 @@ export default function ReaderView() {
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
 
-    const { chapterIdx, paraIndex, paraNum, page, pageSystem } = targetScrollIntent;
+    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook } = targetScrollIntent;
 
     if (chapterIdx !== undefined && chapterIdx !== null) {
       if (!activeTab.loadedChapters?.[chapterIdx]) {
@@ -347,14 +348,22 @@ export default function ReaderView() {
         }
         if (id) {
           try {
+            if (subBook) {
+              const inScopeSub = chapterEl.querySelector(`[data-sub-book="${CSS.escape(subBook)}"][id="${CSS.escape(id)}"]`);
+              if (inScopeSub) return inScopeSub;
+            }
             const inScope = chapterEl.querySelector(`[id="${CSS.escape(id)}"]`);
-            if (inScope) return inScope;
+            if (inScope && (!subBook || inScope.getAttribute('data-sub-book') === subBook)) return inScope;
           } catch (_) {}
         }
         if (fallbackSelector) {
           try {
+            if (subBook && !fallbackSelector.includes('data-sub-book')) {
+              const inScopeSub = chapterEl.querySelector(`[data-sub-book="${CSS.escape(subBook)}"]${fallbackSelector}`);
+              if (inScopeSub) return inScopeSub;
+            }
             const inScopeFallback = chapterEl.querySelector(fallbackSelector);
-            if (inScopeFallback) return inScopeFallback;
+            if (inScopeFallback && (!subBook || inScopeFallback.getAttribute('data-sub-book') === subBook)) return inScopeFallback;
           } catch (_) {}
         }
         return null; // NEVER fall back to another chapter when a specific chapter is targeted!
@@ -363,21 +372,27 @@ export default function ReaderView() {
       // If no specific chapter is specified, search the full container
       if (id) {
         try {
+          if (subBook) {
+            const inScopeSub = containerRef.current.querySelector(`[data-sub-book="${CSS.escape(subBook)}"][id="${CSS.escape(id)}"]`);
+            if (inScopeSub) return inScopeSub;
+          }
           const inScope = containerRef.current.querySelector(`[id="${CSS.escape(id)}"]`);
-          if (inScope) return inScope;
+          if (inScope && (!subBook || inScope.getAttribute('data-sub-book') === subBook)) return inScope;
         } catch (_) {}
 
-        const byId = document.getElementById(id);
-        if (byId && containerRef.current.contains(byId)) return byId;
-        try {
-          const escaped = containerRef.current.querySelector(`[id="${CSS.escape(id)}"]`);
-          if (escaped) return escaped;
-        } catch (_) {}
+        if (!subBook) {
+          const byId = document.getElementById(id);
+          if (byId && containerRef.current.contains(byId)) return byId;
+        }
       }
       if (fallbackSelector) {
         try {
+          if (subBook && !fallbackSelector.includes('data-sub-book')) {
+            const inScopeSub = containerRef.current.querySelector(`[data-sub-book="${CSS.escape(subBook)}"]${fallbackSelector}`);
+            if (inScopeSub) return inScopeSub;
+          }
           const inScopeFallback = containerRef.current.querySelector(fallbackSelector);
-          if (inScopeFallback) return inScopeFallback;
+          if (inScopeFallback && (!subBook || inScopeFallback.getAttribute('data-sub-book') === subBook)) return inScopeFallback;
         } catch (_) {}
       }
       return null;
@@ -392,10 +407,11 @@ export default function ReaderView() {
         const targetInt = parseInt(cleanPara, 10);
 
         // Ensure the target chapter containing this paragraph is loaded
+        const activeSub = subBook || activeTab.sub_book || activeTab.chapter_to_sub_book?.[chapterIdx ?? activeTab.currentChapterIdx ?? 0];
         const targetChap = (chapterIdx !== undefined && chapterIdx !== null)
           ? chapterIdx
-          : (activeTab.sub_books_para_to_chapter && activeTab.sub_book
-              ? activeTab.sub_books_para_to_chapter[activeTab.sub_book]?.[cleanPara]
+          : (activeTab.sub_books_para_to_chapter && activeSub
+              ? activeTab.sub_books_para_to_chapter[activeSub]?.[cleanPara]
               : activeTab.para_to_chapter?.[cleanPara]);
 
         if (targetChap !== undefined && targetChap !== null) {
@@ -405,12 +421,21 @@ export default function ReaderView() {
           }
         }
 
-        let el =
-          findElement(`para${cleanPara}`) ||
-          findElement(`para-${cleanPara}`) ||
-          findElement(cleanPara) ||
-          findElement(null, `p[data-para="${cleanPara}"]`) ||
-          findElement(null, `[data-para="${cleanPara}"]`);
+        let el = null;
+        if (activeSub) {
+          el =
+            findElement(`para${cleanPara}`, `[data-sub-book="${activeSub}"][data-para="${cleanPara}"]`) ||
+            findElement(`para-${cleanPara}`, `[data-sub-book="${activeSub}"][data-para="${cleanPara}"]`) ||
+            findElement(cleanPara, `[data-sub-book="${activeSub}"][data-para="${cleanPara}"]`);
+        }
+        if (!el) {
+          el =
+            findElement(`para${cleanPara}`) ||
+            findElement(`para-${cleanPara}`) ||
+            findElement(cleanPara) ||
+            findElement(null, `p[data-para="${cleanPara}"]`) ||
+            findElement(null, `[data-para="${cleanPara}"]`);
+        }
 
         // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
         if (!el && !isNaN(targetInt)) {
@@ -420,6 +445,9 @@ export default function ReaderView() {
           if (scope && !scope.classList.contains('chapter-placeholder')) {
             const rangedParas = scope.querySelectorAll('[data-para-first]');
             for (const p of rangedParas) {
+              if (activeSub && p.getAttribute('data-sub-book') && p.getAttribute('data-sub-book') !== activeSub) {
+                continue;
+              }
               const first = parseInt(p.getAttribute('data-para-first'), 10);
               const last = parseInt(p.getAttribute('data-para-last'), 10);
               if (!isNaN(first) && !isNaN(last) && targetInt >= first && targetInt <= last) {
@@ -440,6 +468,9 @@ export default function ReaderView() {
             let bestEl = null;
             let bestDiff = Infinity;
             for (const p of allParas) {
+              if (activeSub && p.getAttribute('data-sub-book') && p.getAttribute('data-sub-book') !== activeSub) {
+                continue;
+              }
               const pNum = parseInt(p.getAttribute('data-para'), 10);
               if (!isNaN(pNum) && pNum <= targetInt) {
                 const diff = targetInt - pNum;
@@ -648,7 +679,7 @@ export default function ReaderView() {
   }, [
     targetScrollIntent,
     activeTab,
-    settings.pulseAnimation,
+    pulseAnimation,
     loadChapter,
     bufferAdjacentChapters,
     saveTabScroll,
