@@ -1,0 +1,29 @@
+{
+  "issuer": "https://tipitakapali.org",
+  "authorization_endpoint": "https://tipitakapali.org/auth/authorize",
+  "token_endpoint": "https://tipitakapali.org/auth/token",
+  "registration_endpoint": "https://tipitakapali.org/auth.md",
+  "response_types_supported": [
+    "token"
+  ],
+  "grant_types_supported": [
+    "client_credentials",
+    "anonymous"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none"
+  ],
+  "agent_auth": {
+    "skill": "https://tipitakapali.org/auth.md",
+    "register_uri": "https://tipitakapali.org/auth.md",
+    "identity_types_supported": [
+      "anonymous"
+    ],
+    "anonymous": {
+      "credential_types_supported": [
+        "none"
+      ]
+    },
+    "claim_uri": "https://tipitakapali.org/auth.md"
+  }
+}

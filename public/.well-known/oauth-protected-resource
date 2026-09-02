@@ -1,0 +1,14 @@
+{
+  "resource": "https://tipitakapali.org",
+  "authorization_servers": [
+    "https://tipitakapali.org"
+  ],
+  "scopes_supported": [
+    "read:canon",
+    "read:dictionary"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ],
+  "resource_documentation": "https://tipitakapali.org/auth.md"
+}
