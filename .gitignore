@@ -1,3 +1,16 @@
+
+
+server_api/tipitaka.db_before_byPitaka
+*.db
+server_api/tipitaka.db_before_byPitaka
+
+# dev_build_vri_db_2026 pipeline outputs and upstream repository clone
+dev_build_vri_db_2026/output/
+dev_build_vri_db_2026/tipitaka-xml/
+dev_build_vri_db_2026/_latest_romn/
+dev_build_vri_db_2026/*.db
+
+
 cloudflare_pages_dist/
 next_tipitakapali.org/
 *.db-*
@@ -410,13 +423,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-server_api/tipitaka.db_before_byPitaka
-*.db
-server_api/tipitaka.db_before_byPitaka
-
-# vri_db_2026 pipeline outputs and upstream repository clone
-vri_db_2026/output/
-vri_db_2026/tipitaka-xml/
-vri_db_2026/_latest_romn/
-vri_db_2026/*.db

@@ -334,7 +334,16 @@ export default function ReaderView() {
     // Safe DOM element finder by ID or data attributes (prevents selector SyntaxError on IDs with dots e.g. V3.0440)
     const findElement = (id, fallbackSelector = '') => {
       if (!containerRef.current) return null;
+      const scope = (chapterIdx !== undefined && chapterIdx !== null)
+        ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
+        : containerRef.current;
+
       if (id) {
+        try {
+          const inScope = scope.querySelector(`[id="${CSS.escape(id)}"]`);
+          if (inScope) return inScope;
+        } catch (_) {}
+
         const byId = document.getElementById(id);
         if (byId && containerRef.current.contains(byId)) return byId;
         try {
@@ -344,6 +353,8 @@ export default function ReaderView() {
       }
       if (fallbackSelector) {
         try {
+          const inScopeFallback = scope.querySelector(fallbackSelector);
+          if (inScopeFallback) return inScopeFallback;
           return containerRef.current.querySelector(fallbackSelector);
         } catch (_) {}
       }

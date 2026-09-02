@@ -1,0 +1,7 @@
+# vri_db_2026 local gitignore
+output/
+tipitaka-xml/
+_latest_romn/
+*.db
+*.tmp
+__pycache__/

@@ -38,15 +38,31 @@ export default function MatJumpModal({ isOpen, onClose }) {
     ? baseCode.slice(0, -1)
     : baseCode;
 
+  let activeSubKey = activeTab?.chapter_to_sub_book?.[activeTab?.currentChapterIdx || 0];
+  if (!activeSubKey && activeTab?.sub_books) {
+    const cIdx = activeTab?.currentChapterIdx || 0;
+    for (const [k, v] of Object.entries(activeTab.sub_books)) {
+      const cr = v.chapter_range || v.tika_chapter_range;
+      if (cr && cIdx >= cr[0] && cIdx <= cr[1]) {
+        activeSubKey = k;
+        break;
+      }
+    }
+  }
+  const currentSubInfo = activeSubKey && activeTab?.sub_books ? activeTab.sub_books[activeSubKey] : null;
+
+  const resolvedMulaCode = currentSubInfo?.mula_code || mat?.mula_code || (isCurrentMula ? currentCode : null);
+  const resolvedMulaTitle = currentSubInfo?.mula_title || mat?.mula_title || (isCurrentMula ? activeTab?.title : 'Mūlapāḷi');
+
   const connectedBooks = [
     {
       layer: 'mula',
       label: 'Mūla',
       desc: 'Pāḷi Canon (Root Text)',
-      code: mat?.mula_code || (isCurrentMula ? currentCode : null),
-      title: mat?.mula_title || (isCurrentMula ? activeTab.title : 'Mūlapāḷi'),
-      isCurrent: isCurrentMula || currentCode === mat?.mula_code,
-      available: Boolean(mat?.mula_code),
+      code: resolvedMulaCode,
+      title: resolvedMulaTitle,
+      isCurrent: isCurrentMula || currentCode === resolvedMulaCode,
+      available: Boolean(resolvedMulaCode),
       badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
     },
     {
@@ -54,7 +70,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
       label: 'Aṭṭhakathā',
       desc: 'Commentary (Aṭṭhakathā)',
       code: mat?.attha_code || (isCurrentAttha ? currentCode : null),
-      title: mat?.attha_title || (isCurrentAttha ? activeTab.title : 'Aṭṭhakathā'),
+      title: mat?.attha_title || (isCurrentAttha ? activeTab?.title : 'Aṭṭhakathā'),
       isCurrent: isCurrentAttha || currentCode === mat?.attha_code,
       available: Boolean(mat?.attha_code),
       badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',

@@ -15,19 +15,19 @@ const STORAGE_KEYS = {
   HISTORY: 'tipitaka_recent_history_v2',
 };
 
-function resolveNearestChapterAndPara(paraToChapMap, rawParaNum) {
-
-  if (!paraToChapMap || !rawParaNum) return null;
+function resolveNearestChapterAndPara(paraToChapMap, rawParaNum, subBook = null, subBooksParaMap = null) {
+  const mapToUse = (subBook && subBooksParaMap?.[subBook]) ? subBooksParaMap[subBook] : paraToChapMap;
+  if (!mapToUse || !rawParaNum) return null;
   const cleanPara = String(rawParaNum).replace(/^(?:para-?|p)/i, '').trim();
-  if (paraToChapMap[cleanPara] !== undefined) {
-    return { chapterIdx: paraToChapMap[cleanPara], paraNum: cleanPara };
+  if (mapToUse[cleanPara] !== undefined) {
+    return { chapterIdx: mapToUse[cleanPara], paraNum: cleanPara };
   }
   const targetInt = parseInt(cleanPara, 10);
   if (isNaN(targetInt)) return null;
 
   let bestNum = null;
   let bestChap = null;
-  for (const [pStr, cIdx] of Object.entries(paraToChapMap)) {
+  for (const [pStr, cIdx] of Object.entries(mapToUse)) {
     const pInt = parseInt(pStr, 10);
     if (!isNaN(pInt) && pInt <= targetInt) {
       if (bestNum === null || pInt > bestNum) {
@@ -577,8 +577,9 @@ export function TabProvider({ children }) {
         }
 
         if (rawParaNum && tab.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum);
-          if (resolved) {
+          const targetSub = options.targetSubBook || tab.sub_book;
+          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
+          if (resolved && (!hasTargetChapter || options.targetSubBook)) {
             targetChapIdx = resolved.chapterIdx;
             hasTargetChapter = true;
             setActiveParaNum(resolved.paraNum || rawParaNum);
@@ -784,8 +785,9 @@ export function TabProvider({ children }) {
         });
 
         if (rawParaNum && bookData.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum);
-          if (resolved) {
+          const targetSub = options.targetSubBook || bookData.sub_book;
+          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
+          if (resolved && (!hasTargetChapter || options.targetSubBook)) {
             targetChapIdx = resolved.chapterIdx;
             hasTargetChapter = true;
             setActiveParaNum(resolved.paraNum || rawParaNum);
@@ -833,6 +835,12 @@ export function TabProvider({ children }) {
           para_range: bookData.para_range || null,
           edition_ranges: bookData.edition_ranges || null,
           book_type: bookData.book_type || 'Whole',
+          sub_books: bookData.sub_books || null,
+          sub_book: bookData.sub_book || null,
+          chapter_to_sub_book: bookData.chapter_to_sub_book || null,
+          sub_books_para_to_chapter: bookData.sub_books_para_to_chapter || null,
+          attha_start_chapter: bookData.attha_start_chapter !== undefined ? bookData.attha_start_chapter : null,
+          tika_start_chapter: bookData.tika_start_chapter !== undefined ? bookData.tika_start_chapter : null,
 
           loadedChapters: { ...bookData.chapters_data },
 
@@ -1310,6 +1318,64 @@ export function TabProvider({ children }) {
 
       let targetCode = options.code || null;
       let targetTitle = options.title || null;
+      let targetChapter = options.chapter !== undefined ? options.chapter : undefined;
+      let targetSubBook = options.subBook || null;
+
+      const currentChapIdx = activeTab.currentChapterIdx || 0;
+
+      // 1. Multi-volume reverse jump: activeTab has sub_books (e.g. s0402a.att, s0402t.tik, etc.)
+      if (activeTab.sub_books) {
+        let subKey = activeTab.chapter_to_sub_book?.[currentChapIdx];
+        if (!subKey) {
+          for (const [k, v] of Object.entries(activeTab.sub_books)) {
+            const cr = v.chapter_range || v.tika_chapter_range;
+            if (cr && currentChapIdx >= cr[0] && currentChapIdx <= cr[1]) {
+              subKey = k;
+              break;
+            }
+          }
+        }
+        if (subKey && activeTab.sub_books[subKey]) {
+          const subInfo = activeTab.sub_books[subKey];
+          targetSubBook = subKey;
+          if (targetLayer === 'mula') {
+            targetCode = subInfo.mula_code || targetCode;
+            targetTitle = subInfo.mula_title || targetTitle;
+            const startC = subInfo.chapter_range ? subInfo.chapter_range[0] : 0;
+            targetChapter = Math.max(0, currentChapIdx - startC);
+          } else if (targetLayer === 'tika') {
+            targetCode = mat?.tika_code || subInfo.tika_code || targetCode;
+            targetTitle = mat?.tika_title || subInfo.tika_title || targetTitle;
+            if (subInfo.tika_chapter_range) {
+              const startC = subInfo.chapter_range ? subInfo.chapter_range[0] : 0;
+              targetChapter = subInfo.tika_chapter_range[0] + (currentChapIdx - startC);
+            } else if (subInfo.tika_chapter !== undefined) {
+              targetChapter = subInfo.tika_chapter;
+            }
+          } else if (targetLayer === 'attha') {
+            targetCode = mat?.attha_code || subInfo.attha_code || targetCode;
+            targetTitle = mat?.attha_title || subInfo.attha_title || targetTitle;
+            if (subInfo.chapter_range && subInfo.tika_chapter_range) {
+              const startT = subInfo.tika_chapter_range[0];
+              targetChapter = subInfo.chapter_range[0] + (currentChapIdx - startT);
+            }
+          }
+        }
+      } else if (activeTab.sub_book) {
+        // 2. Single-volume forward jump: activeTab belongs to a multi-volume commentary (e.g. s0402m2.mul)
+        targetSubBook = activeTab.sub_book;
+        if (targetLayer === 'attha') {
+          const offset = activeTab.attha_start_chapter !== undefined && activeTab.attha_start_chapter !== null
+            ? activeTab.attha_start_chapter
+            : (mat?.attha_start_chapter || 0);
+          targetChapter = offset + currentChapIdx;
+        } else if (targetLayer === 'tika') {
+          const offset = activeTab.tika_start_chapter !== undefined && activeTab.tika_start_chapter !== null
+            ? activeTab.tika_start_chapter
+            : (mat?.tika_start_chapter || 0);
+          targetChapter = offset + currentChapIdx;
+        }
+      }
 
       if (!targetCode && mat) {
         if (targetLayer === 'mula') {
@@ -1353,6 +1419,8 @@ export function TabProvider({ children }) {
       openBook(targetCode, {
         title: targetTitle || undefined,
         targetParaNum: currentPara || undefined,
+        targetChapterIdx: targetChapter !== undefined ? targetChapter : undefined,
+        targetSubBook: targetSubBook || undefined,
       });
     },
     [activeTab, activeParaNum, openBook]
