@@ -640,24 +640,32 @@ export default function ReaderView() {
           }
 
           // Detect first paragraph in the chapter
-          let nextEl = target.nextElementSibling;
-          while (nextEl) {
-            if (nextEl.hasAttribute && nextEl.hasAttribute('data-para')) {
-              const pNum = nextEl.getAttribute('data-para');
-              if (pNum) {
-                setActiveParaNum(pNum);
-                break;
-              }
+          const inP = target.querySelector ? target.querySelector('[data-para]') : null;
+          if (inP) {
+            const pNum = inP.getAttribute('data-para');
+            if (pNum) {
+              setActiveParaNum(pNum);
             }
-            const innerP = nextEl.querySelector ? nextEl.querySelector('[data-para]') : null;
-            if (innerP) {
-              const pNum = innerP.getAttribute('data-para');
-              if (pNum) {
-                setActiveParaNum(pNum);
-                break;
+          } else {
+            let nextEl = target.nextElementSibling;
+            while (nextEl) {
+              if (nextEl.hasAttribute && nextEl.hasAttribute('data-para')) {
+                const pNum = nextEl.getAttribute('data-para');
+                if (pNum) {
+                  setActiveParaNum(pNum);
+                  break;
+                }
               }
+              const innerP = nextEl.querySelector ? nextEl.querySelector('[data-para]') : null;
+              if (innerP) {
+                const pNum = innerP.getAttribute('data-para');
+                if (pNum) {
+                  setActiveParaNum(pNum);
+                  break;
+                }
+              }
+              nextEl = nextEl.nextElementSibling;
             }
-            nextEl = nextEl.nextElementSibling;
           }
 
           saveTabScroll(activeTab.bookCode, offset);

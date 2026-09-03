@@ -273,9 +273,32 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
 
   return cachedFetch(cacheKey, async () => {
     try {
-      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_jump${qs ? '?' + qs : ''}`, { cache: 'no-store' });
+      const base = getApiBase();
+      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/mat_jump${qs ? '?' + qs : ''}`, { cache: 'no-store' });
       if (res.ok) return await res.json();
     } catch (e) {}
+
+    // Fallback for static/offline distribution: inspect static mat_chapter_map
+    if (chapter !== null && chapter !== undefined) {
+      try {
+        const cRes = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_chapter_map.json`);
+        if (cRes.ok) {
+          const data = await cRes.json();
+          const match = (data.chapters || []).find(r => r.source_chapter === parseInt(chapter, 10));
+          if (match) {
+            return {
+              source_book: cleanCode,
+              source_chapter: parseInt(chapter, 10),
+              source_para: para,
+              mula: match.mula_book ? { book: match.mula_book, chapter: match.mula_chapter, para: null, title: match.mula_title } : null,
+              attha: match.attha_book ? { book: match.attha_book, chapter: match.attha_chapter, para: null, title: match.attha_title } : null,
+              tika: match.tika_book ? { book: match.tika_book, chapter: match.tika_chapter, para: null, title: match.tika_title } : null,
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
     return null;
   }, 1000);
 }
