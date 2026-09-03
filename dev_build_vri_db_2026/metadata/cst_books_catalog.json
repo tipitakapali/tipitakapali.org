@@ -241,10 +241,16 @@
       "mula_code": "s0402m1.mul",
       "mula_title": "Dukanipātapāḷi",
       "attha_code": "s0402a.att",
-      "attha_title": "Duka-Tika-Catukkanipāta-Aṭṭhakathā",
+      "attha_title": "Dukanipāta-Aṭṭhakathā",
       "tika_code": "s0402t.tik",
-      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā"
-    }
+      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
+      "sub_book": "an2",
+      "attha_start_chapter": 0,
+      "tika_start_chapter": 0
+    },
+    "sub_book": "an2",
+    "attha_start_chapter": 0,
+    "tika_start_chapter": 0
   },
   "s0402m2.mul": {
     "index": 13,
@@ -260,10 +266,16 @@
       "mula_code": "s0402m2.mul",
       "mula_title": "Tikanipātapāḷi",
       "attha_code": "s0402a.att",
-      "attha_title": "Duka-Tika-Catukkanipāta-Aṭṭhakathā",
+      "attha_title": "Dukanipāta-Aṭṭhakathā",
       "tika_code": "s0402t.tik",
-      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā"
-    }
+      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
+      "sub_book": "an3",
+      "attha_start_chapter": 19,
+      "tika_start_chapter": 19
+    },
+    "sub_book": "an3",
+    "attha_start_chapter": 19,
+    "tika_start_chapter": 18
   },
   "s0402m3.mul": {
     "index": 14,
@@ -279,10 +291,16 @@
       "mula_code": "s0402m3.mul",
       "mula_title": "Catukkanipātapāḷi",
       "attha_code": "s0402a.att",
-      "attha_title": "Duka-Tika-Catukkanipāta-Aṭṭhakathā",
+      "attha_title": "Dukanipāta-Aṭṭhakathā",
       "tika_code": "s0402t.tik",
-      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā"
-    }
+      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
+      "sub_book": "an4",
+      "attha_start_chapter": 36,
+      "tika_start_chapter": 36
+    },
+    "sub_book": "an4",
+    "attha_start_chapter": 36,
+    "tika_start_chapter": 34
   },
   "s0403m1.mul": {
     "index": 15,
@@ -298,10 +316,16 @@
       "mula_code": "s0403m1.mul",
       "mula_title": "Pañcakanipātapāḷi",
       "attha_code": "s0403a.att",
-      "attha_title": "Pañcaka-Chakka-Sattakanipāta-Aṭṭhakathā",
+      "attha_title": "Pañcakanipāta-Aṭṭhakathā",
       "tika_code": "s0403t.tik",
-      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā"
-    }
+      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
+      "sub_book": "an5",
+      "attha_start_chapter": 0,
+      "tika_start_chapter": 0
+    },
+    "sub_book": "an5",
+    "attha_start_chapter": 0,
+    "tika_start_chapter": 0
   },
   "s0403m2.mul": {
     "index": 16,
@@ -317,10 +341,16 @@
       "mula_code": "s0403m2.mul",
       "mula_title": "Chakkanipātapāḷi",
       "attha_code": "s0403a.att",
-      "attha_title": "Pañcaka-Chakka-Sattakanipāta-Aṭṭhakathā",
+      "attha_title": "Pañcakanipāta-Aṭṭhakathā",
       "tika_code": "s0403t.tik",
-      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā"
-    }
+      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
+      "sub_book": "an6",
+      "attha_start_chapter": 26,
+      "tika_start_chapter": 26
+    },
+    "sub_book": "an6",
+    "attha_start_chapter": 26,
+    "tika_start_chapter": 23
   },
   "s0403m3.mul": {
     "index": 17,
@@ -336,10 +366,16 @@
       "mula_code": "s0403m3.mul",
       "mula_title": "Sattakanipātapāḷi",
       "attha_code": "s0403a.att",
-      "attha_title": "Pañcaka-Chakka-Sattakanipāta-Aṭṭhakathā",
+      "attha_title": "Pañcakanipāta-Aṭṭhakathā",
       "tika_code": "s0403t.tik",
-      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā"
-    }
+      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
+      "sub_book": "an7",
+      "attha_start_chapter": 39,
+      "tika_start_chapter": 39
+    },
+    "sub_book": "an7",
+    "attha_start_chapter": 39,
+    "tika_start_chapter": 33
   },
   "s0404m1.mul": {
     "index": 18,
@@ -355,10 +391,16 @@
       "mula_code": "s0404m1.mul",
       "mula_title": "Aṭṭhakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhakanipāta-Aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
-    }
+      "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
+      "sub_book": "an8",
+      "attha_start_chapter": 0,
+      "tika_start_chapter": 0
+    },
+    "sub_book": "an8",
+    "attha_start_chapter": 0,
+    "tika_start_chapter": 0
   },
   "s0404m2.mul": {
     "index": 19,
@@ -374,10 +416,16 @@
       "mula_code": "s0404m2.mul",
       "mula_title": "Navakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhakanipāta-Aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
-    }
+      "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
+      "sub_book": "an9",
+      "attha_start_chapter": 10,
+      "tika_start_chapter": 10
+    },
+    "sub_book": "an9",
+    "attha_start_chapter": 10,
+    "tika_start_chapter": 8
   },
   "s0404m3.mul": {
     "index": 20,
@@ -393,10 +441,16 @@
       "mula_code": "s0404m3.mul",
       "mula_title": "Dasakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhakanipāta-Aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
-    }
+      "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
+      "sub_book": "an10",
+      "attha_start_chapter": 15,
+      "tika_start_chapter": 15
+    },
+    "sub_book": "an10",
+    "attha_start_chapter": 15,
+    "tika_start_chapter": 13
   },
   "s0404m4.mul": {
     "index": 21,
@@ -412,10 +466,16 @@
       "mula_code": "s0404m4.mul",
       "mula_title": "Ekādasakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhakanipāta-Aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
-    }
+      "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
+      "sub_book": "an11",
+      "attha_start_chapter": 31,
+      "tika_start_chapter": 31
+    },
+    "sub_book": "an11",
+    "attha_start_chapter": 31,
+    "tika_start_chapter": 26
   },
   "s0501m.mul": {
     "index": 22,
@@ -431,7 +491,7 @@
       "mula_code": "s0501m.mul",
       "mula_title": "Khuddakapāṭhapāḷi",
       "attha_code": "s0501a.att",
-      "attha_title": "Khuddakapāṭha-Aṭṭhakathā",
+      "attha_title": "Khuddakapāṭha-Aṭṭhakathā (Paramatthajotikā 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -469,7 +529,7 @@
       "mula_code": "s0503m.mul",
       "mula_title": "Udānapāḷi",
       "attha_code": "s0503a.att",
-      "attha_title": "Udāna-Aṭṭhakathā",
+      "attha_title": "Udāna-Aṭṭhakathā (Paramatthadīpanī 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -488,7 +548,7 @@
       "mula_code": "s0504m.mul",
       "mula_title": "Itivuttakapāḷi",
       "attha_code": "s0504a.att",
-      "attha_title": "Itivuttaka-Aṭṭhakathā",
+      "attha_title": "Itivuttaka-Aṭṭhakathā (Paramatthadīpanī 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -507,7 +567,7 @@
       "mula_code": "s0505m.mul",
       "mula_title": "Suttanipātapāḷi",
       "attha_code": "s0505a.att",
-      "attha_title": "Suttanipāta-Aṭṭhakathā",
+      "attha_title": "Suttanipāta-Aṭṭhakathā (Paramatthajotikā 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -526,7 +586,7 @@
       "mula_code": "s0506m.mul",
       "mula_title": "Vimānavatthupāḷi",
       "attha_code": "s0506a.att",
-      "attha_title": "Vimānavatthu-Aṭṭhakathā",
+      "attha_title": "Vimānavatthu-Aṭṭhakathā (Paramatthadīpanī 3)",
       "tika_code": null,
       "tika_title": null
     }
@@ -545,7 +605,7 @@
       "mula_code": "s0507m.mul",
       "mula_title": "Petavatthupāḷi",
       "attha_code": "s0507a.att",
-      "attha_title": "Petavatthu-Aṭṭhakathā",
+      "attha_title": "Petavatthu-Aṭṭhakathā (Paramatthadīpanī 4)",
       "tika_code": null,
       "tika_title": null
     }
@@ -564,9 +624,69 @@
       "mula_code": "s0508m.mul",
       "mula_title": "Theragāthāpāḷi",
       "attha_code": "s0508a1.att",
-      "attha_title": "Theragāthā-Aṭṭhakathā-1",
+      "attha_title": "Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5)",
       "tika_code": null,
-      "tika_title": null
+      "tika_title": null,
+      "split_targets": {
+        "attha": [
+          {
+            "code": "s0508a1.att",
+            "title": "Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5)",
+            "chapter_range": [
+              0,
+              2
+            ],
+            "para_range": [
+              1,
+              266
+            ],
+            "target_chapter_offset": 1
+          },
+          {
+            "code": "s0508a2.att",
+            "title": "Theragāthā-Aṭṭhakathā-2 (Paramatthadīpanī 5)",
+            "chapter_range": [
+              3,
+              20
+            ],
+            "para_range": [
+              267,
+              1288
+            ],
+            "target_chapter_offset": -3
+          }
+        ]
+      }
+    },
+    "split_targets": {
+      "attha": [
+        {
+          "code": "s0508a1.att",
+          "title": "Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5)",
+          "chapter_range": [
+            0,
+            2
+          ],
+          "para_range": [
+            1,
+            266
+          ],
+          "target_chapter_offset": 1
+        },
+        {
+          "code": "s0508a2.att",
+          "title": "Theragāthā-Aṭṭhakathā-2 (Paramatthadīpanī 5)",
+          "chapter_range": [
+            3,
+            20
+          ],
+          "para_range": [
+            267,
+            1288
+          ],
+          "target_chapter_offset": -3
+        }
+      ]
     }
   },
   "s0509m.mul": {
@@ -583,7 +703,7 @@
       "mula_code": "s0509m.mul",
       "mula_title": "Therīgāthāpāḷi",
       "attha_code": "s0509a.att",
-      "attha_title": "Therīgāthā-Aṭṭhakathā",
+      "attha_title": "Therīgāthā-Aṭṭhakathā (Paramatthadīpanī 6)",
       "tika_code": null,
       "tika_title": null
     }
@@ -602,10 +722,14 @@
       "mula_code": "s0510m1.mul",
       "mula_title": "Apadānapāḷi-1",
       "attha_code": "s0510a.att",
-      "attha_title": "Apadāna-Aṭṭhakathā",
+      "attha_title": "Apadāna-Aṭṭhakathā (Visuddhajanavilāsinī)",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "sub_book": "apadana1",
+      "attha_start_chapter": 0
+    },
+    "sub_book": "apadana1",
+    "attha_start_chapter": 0
   },
   "s0510m2.mul": {
     "index": 32,
@@ -621,10 +745,14 @@
       "mula_code": "s0510m2.mul",
       "mula_title": "Apadānapāḷi-2",
       "attha_code": "s0510a.att",
-      "attha_title": "Apadāna-Aṭṭhakathā",
+      "attha_title": "Apadāna-Aṭṭhakathā (Visuddhajanavilāsinī)",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "sub_book": "apadana2",
+      "attha_start_chapter": 37
+    },
+    "sub_book": "apadana2",
+    "attha_start_chapter": 37
   },
   "s0511m.mul": {
     "index": 33,
@@ -640,7 +768,7 @@
       "mula_code": "s0511m.mul",
       "mula_title": "Buddhavaṃsapāḷi",
       "attha_code": "s0511a.att",
-      "attha_title": "Buddhavaṃsa-Aṭṭhakathā",
+      "attha_title": "Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī)",
       "tika_code": null,
       "tika_title": null
     }
@@ -659,7 +787,7 @@
       "mula_code": "s0512m.mul",
       "mula_title": "Cariyāpiṭakapāḷi",
       "attha_code": "s0512a.att",
-      "attha_title": "Cariyāpiṭaka-Aṭṭhakathā",
+      "attha_title": "Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7)",
       "tika_code": null,
       "tika_title": null
     }
@@ -680,7 +808,87 @@
       "attha_code": "s0513a1.att",
       "attha_title": "Jātaka-Aṭṭhakathā-1",
       "tika_code": null,
-      "tika_title": null
+      "tika_title": null,
+      "split_targets": {
+        "attha": [
+          {
+            "code": "s0513a1.att",
+            "title": "Jātaka-Aṭṭhakathā-1",
+            "chapter_range": [
+              0,
+              0
+            ],
+            "target_chapter_offset": 1
+          },
+          {
+            "code": "s0513a2.att",
+            "title": "Jātaka-Aṭṭhakathā-2",
+            "chapter_range": [
+              1,
+              2
+            ],
+            "target_chapter_offset": -1
+          },
+          {
+            "code": "s0513a3.att",
+            "title": "Jātaka-Aṭṭhakathā-3",
+            "chapter_range": [
+              3,
+              8
+            ],
+            "target_chapter_offset": -3
+          },
+          {
+            "code": "s0513a4.att",
+            "title": "Jātaka-Aṭṭhakathā-4",
+            "chapter_range": [
+              9,
+              15
+            ],
+            "target_chapter_offset": -9
+          }
+        ]
+      }
+    },
+    "split_targets": {
+      "attha": [
+        {
+          "code": "s0513a1.att",
+          "title": "Jātaka-Aṭṭhakathā-1",
+          "chapter_range": [
+            0,
+            0
+          ],
+          "target_chapter_offset": 1
+        },
+        {
+          "code": "s0513a2.att",
+          "title": "Jātaka-Aṭṭhakathā-2",
+          "chapter_range": [
+            1,
+            2
+          ],
+          "target_chapter_offset": -1
+        },
+        {
+          "code": "s0513a3.att",
+          "title": "Jātaka-Aṭṭhakathā-3",
+          "chapter_range": [
+            3,
+            8
+          ],
+          "target_chapter_offset": -3
+        },
+        {
+          "code": "s0513a4.att",
+          "title": "Jātaka-Aṭṭhakathā-4",
+          "chapter_range": [
+            9,
+            15
+          ],
+          "target_chapter_offset": -9
+        }
+      ]
     }
   },
   "s0514m.mul": {
@@ -699,7 +907,85 @@
       "attha_code": "s0514a1.att",
       "attha_title": "Jātaka-Aṭṭhakathā-5",
       "tika_code": null,
-      "tika_title": null
+      "tika_title": null,
+      "split_targets": {
+        "attha": [
+          {
+            "code": "s0514a1.att",
+            "title": "Jātaka-Aṭṭhakathā-5",
+            "chapter_range": [
+              0,
+              4
+            ],
+            "target_chapter_offset": 0
+          },
+          {
+            "code": "s0514a2.att",
+            "title": "Jātaka-Aṭṭhakathā-6",
+            "chapter_range": [
+              5,
+              5
+            ],
+            "para_range": [
+              1,
+              783
+            ],
+            "target_chapter": 0
+          },
+          {
+            "code": "s0514a3.att",
+            "title": "Jātaka-Aṭṭhakathā-7",
+            "chapter_range": [
+              5,
+              5
+            ],
+            "para_range": [
+              784,
+              99999
+            ],
+            "target_chapter": 0
+          }
+        ]
+      }
+    },
+    "split_targets": {
+      "attha": [
+        {
+          "code": "s0514a1.att",
+          "title": "Jātaka-Aṭṭhakathā-5",
+          "chapter_range": [
+            0,
+            4
+          ],
+          "target_chapter_offset": 0
+        },
+        {
+          "code": "s0514a2.att",
+          "title": "Jātaka-Aṭṭhakathā-6",
+          "chapter_range": [
+            5,
+            5
+          ],
+          "para_range": [
+            1,
+            783
+          ],
+          "target_chapter": 0
+        },
+        {
+          "code": "s0514a3.att",
+          "title": "Jātaka-Aṭṭhakathā-7",
+          "chapter_range": [
+            5,
+            5
+          ],
+          "para_range": [
+            784,
+            99999
+          ],
+          "target_chapter": 0
+        }
+      ]
     }
   },
   "s0515m.mul": {
@@ -716,7 +1002,7 @@
       "mula_code": "s0515m.mul",
       "mula_title": "Mahāniddesapāḷi",
       "attha_code": "s0515a.att",
-      "attha_title": "Mahāniddesa-Aṭṭhakathā",
+      "attha_title": "Mahāniddesa-Aṭṭhakathā (Saddhammappajotikā 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -735,7 +1021,7 @@
       "mula_code": "s0516m.mul",
       "mula_title": "Cūḷaniddesapāḷi",
       "attha_code": "s0516a.att",
-      "attha_title": "Cūḷaniddesa-Aṭṭhakathā",
+      "attha_title": "Cūḷaniddesa-Aṭṭhakathā (Saddhammappajotikā 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -754,7 +1040,7 @@
       "mula_code": "s0517m.mul",
       "mula_title": "Paṭisambhidāmaggapāḷi",
       "attha_code": "s0517a.att",
-      "attha_title": "Paṭisambhidāmagga-Aṭṭhakathā",
+      "attha_title": "Paṭisambhidāmagga-Aṭṭhakathā (Saddhammappakāsinī)",
       "tika_code": null,
       "tika_title": null
     }
@@ -774,8 +1060,8 @@
       "mula_title": "Nettippakaraṇapāḷi",
       "attha_code": "s0519a.att",
       "attha_title": "Nettippakaraṇa-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "s0519t.tik",
+      "tika_title": "Nettippakaraṇa-Ṭīkā"
     }
   },
   "s0518m.nrf": {
@@ -789,8 +1075,8 @@
     "shortNavPath": "Su. Pi./Khu. Ni./Milindapañhapāḷi",
     "chapterListTypes": "book,chapter",
     "mat": {
-      "mula_code": "s0518m.nrf",
-      "mula_title": "Milindapañhapāḷi",
+      "mula_code": null,
+      "mula_title": null,
       "attha_code": null,
       "attha_title": null,
       "tika_code": null,
@@ -808,8 +1094,8 @@
     "shortNavPath": "Su. Pi./Khu. Ni./Peṭakopadesapāḷi",
     "chapterListTypes": "book,chapter",
     "mat": {
-      "mula_code": "s0520m.nrf",
-      "mula_title": "Peṭakopadesapāḷi",
+      "mula_code": null,
+      "mula_title": null,
       "attha_code": null,
       "attha_title": null,
       "tika_code": null,
@@ -832,8 +1118,70 @@
       "attha_code": "vin01a.att",
       "attha_title": "Pārājikakaṇḍa-Aṭṭhakathā",
       "tika_code": "vin01t1.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-1"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-1",
+      "split_targets": {
+        "tika": [
+          {
+            "code": "vin01t1.tik",
+            "title": "Sāratthadīpanī-Ṭīkā-1",
+            "chapter_range": [
+              0,
+              0
+            ],
+            "para_range": [
+              1,
+              23
+            ],
+            "target_chapter_offset": 1
+          },
+          {
+            "code": "vin01t2.tik",
+            "title": "Sāratthadīpanī-Ṭīkā-2",
+            "chapter_range": [
+              1,
+              4
+            ],
+            "para_range": [
+              24,
+              662
+            ],
+            "target_chapter_offset": -1
+          }
+        ]
+      },
+      "attha_start_chapter": 1
+    },
+    "split_targets": {
+      "tika": [
+        {
+          "code": "vin01t1.tik",
+          "title": "Sāratthadīpanī-Ṭīkā-1",
+          "chapter_range": [
+            0,
+            0
+          ],
+          "para_range": [
+            1,
+            23
+          ],
+          "target_chapter_offset": 1
+        },
+        {
+          "code": "vin01t2.tik",
+          "title": "Sāratthadīpanī-Ṭīkā-2",
+          "chapter_range": [
+            1,
+            4
+          ],
+          "para_range": [
+            24,
+            662
+          ],
+          "target_chapter_offset": -1
+        }
+      ]
+    },
+    "attha_start_chapter": 1
   },
   "vin02m1.mul": {
     "index": 44,
@@ -851,8 +1199,12 @@
       "attha_code": "vin02a1.att",
       "attha_title": "Pācittiya-Aṭṭhakathā",
       "tika_code": "vin02t.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-3"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-3",
+      "sub_book": "pacittiya",
+      "tika_start_chapter": 0
+    },
+    "sub_book": "pacittiya",
+    "tika_start_chapter": 0
   },
   "vin02m2.mul": {
     "index": 45,
@@ -870,8 +1222,12 @@
       "attha_code": "vin02a2.att",
       "attha_title": "Mahāvagga-Aṭṭhakathā",
       "tika_code": "vin02t.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-3"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-3",
+      "sub_book": "mahavagga",
+      "tika_start_chapter": 8
+    },
+    "sub_book": "mahavagga",
+    "tika_start_chapter": 8
   },
   "vin02m3.mul": {
     "index": 46,
@@ -889,8 +1245,12 @@
       "attha_code": "vin02a3.att",
       "attha_title": "Cūḷavagga-Aṭṭhakathā",
       "tika_code": "vin02t.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-3"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-3",
+      "sub_book": "culavagga",
+      "tika_start_chapter": 19
+    },
+    "sub_book": "culavagga",
+    "tika_start_chapter": 19
   },
   "vin02m4.mul": {
     "index": 47,
@@ -908,8 +1268,12 @@
       "attha_code": "vin02a4.att",
       "attha_title": "Parivāra-Aṭṭhakathā",
       "tika_code": "vin02t.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-3"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-3",
+      "sub_book": "parivara",
+      "tika_start_chapter": 32
+    },
+    "sub_book": "parivara",
+    "tika_start_chapter": 32
   },
   "abh01m.mul": {
     "index": 48,
@@ -926,8 +1290,8 @@
       "mula_title": "Dhammasaṅgaṇīpāḷi",
       "attha_code": "abh01a.att",
       "attha_title": "Dhammasaṅgaṇi-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "abh01t.tik",
+      "tika_title": "Dhammasaṅgaṇī-Mūlaṭīkā"
     }
   },
   "abh02m.mul": {
@@ -965,8 +1329,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "dhatukatha",
+      "attha_start_chapter": 0,
+      "tika_start_chapter": 0
+    },
+    "sub_book": "dhatukatha",
+    "attha_start_chapter": 0,
+    "tika_start_chapter": 0
   },
   "abh03m2.mul": {
     "index": 51,
@@ -984,8 +1354,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "puggalapannatti",
+      "attha_start_chapter": 3,
+      "tika_start_chapter": 1
+    },
+    "sub_book": "puggalapannatti",
+    "attha_start_chapter": 3,
+    "tika_start_chapter": 1
   },
   "abh03m3.mul": {
     "index": 52,
@@ -1002,9 +1378,15 @@
       "mula_title": "Kathāvatthupāḷi",
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
-    }
+      "tika_code": "abh03t.tik",
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "kathavatthu",
+      "attha_start_chapter": 6,
+      "tika_start_chapter": 2
+    },
+    "sub_book": "kathavatthu",
+    "attha_start_chapter": 6,
+    "tika_start_chapter": 2
   },
   "abh03m4.mul": {
     "index": 53,
@@ -1022,8 +1404,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "yamaka",
+      "attha_start_chapter": 39,
+      "tika_start_chapter": 3
+    },
+    "sub_book": "yamaka",
+    "attha_start_chapter": 39,
+    "tika_start_chapter": 3
   },
   "abh03m5.mul": {
     "index": 54,
@@ -1041,8 +1429,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "yamaka",
+      "attha_start_chapter": 39,
+      "tika_start_chapter": 3
+    },
+    "sub_book": "yamaka",
+    "attha_start_chapter": 39,
+    "tika_start_chapter": 3
   },
   "abh03m6.mul": {
     "index": 55,
@@ -1060,8 +1454,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "yamaka",
+      "attha_start_chapter": 39,
+      "tika_start_chapter": 3
+    },
+    "sub_book": "yamaka",
+    "attha_start_chapter": 39,
+    "tika_start_chapter": 3
   },
   "abh03m7.mul": {
     "index": 56,
@@ -1078,9 +1478,15 @@
       "mula_title": "Paṭṭhānapāḷi-1",
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
-    }
+      "tika_code": "abh03t.tik",
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "patthana",
+      "attha_start_chapter": 50,
+      "tika_start_chapter": 4
+    },
+    "sub_book": "patthana",
+    "attha_start_chapter": 50,
+    "tika_start_chapter": 4
   },
   "abh03m8.mul": {
     "index": 57,
@@ -1098,8 +1504,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "patthana",
+      "attha_start_chapter": 50,
+      "tika_start_chapter": 4
+    },
+    "sub_book": "patthana",
+    "attha_start_chapter": 50,
+    "tika_start_chapter": 4
   },
   "abh03m9.mul": {
     "index": 58,
@@ -1117,8 +1529,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "patthana",
+      "attha_start_chapter": 50,
+      "tika_start_chapter": 4
+    },
+    "sub_book": "patthana",
+    "attha_start_chapter": 50,
+    "tika_start_chapter": 4
   },
   "abh03m10.mul": {
     "index": 59,
@@ -1135,9 +1553,15 @@
       "mula_title": "Paṭṭhānapāḷi-4",
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
-    }
+      "tika_code": "abh03t.tik",
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "patthana",
+      "attha_start_chapter": 50,
+      "tika_start_chapter": 4
+    },
+    "sub_book": "patthana",
+    "attha_start_chapter": 50,
+    "tika_start_chapter": 4
   },
   "abh03m11.mul": {
     "index": 60,
@@ -1155,8 +1579,14 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
-    }
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_book": "patthana",
+      "attha_start_chapter": 50,
+      "tika_start_chapter": 4
+    },
+    "sub_book": "patthana",
+    "attha_start_chapter": 50,
+    "tika_start_chapter": 4
   },
   "s0101a.att": {
     "index": 61,
@@ -1400,9 +1830,61 @@
       "mula_code": "s0402m1.mul",
       "mula_title": "Dukanipātapāḷi",
       "attha_code": "s0402a.att",
-      "attha_title": "Duka-Tika-Catukkanipāta-Aṭṭhakathā",
+      "attha_title": "Duka-tika-catukkanipāta-aṭṭhakathā",
       "tika_code": "s0402t.tik",
-      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā"
+      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
+      "sub_books": {
+        "an2": {
+          "mula_code": "s0402m1.mul",
+          "mula_title": "Dukanipātapāḷi",
+          "chapter_range": [
+            0,
+            18
+          ]
+        },
+        "an3": {
+          "mula_code": "s0402m2.mul",
+          "mula_title": "Tikanipātapāḷi",
+          "chapter_range": [
+            19,
+            35
+          ]
+        },
+        "an4": {
+          "mula_code": "s0402m3.mul",
+          "mula_title": "Catukkanipātapāḷi",
+          "chapter_range": [
+            36,
+            63
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an2": {
+        "mula_code": "s0402m1.mul",
+        "mula_title": "Dukanipātapāḷi",
+        "chapter_range": [
+          0,
+          18
+        ]
+      },
+      "an3": {
+        "mula_code": "s0402m2.mul",
+        "mula_title": "Tikanipātapāḷi",
+        "chapter_range": [
+          19,
+          35
+        ]
+      },
+      "an4": {
+        "mula_code": "s0402m3.mul",
+        "mula_title": "Catukkanipātapāḷi",
+        "chapter_range": [
+          36,
+          63
+        ]
+      }
     }
   },
   "s0403a.att": {
@@ -1419,9 +1901,61 @@
       "mula_code": "s0403m1.mul",
       "mula_title": "Pañcakanipātapāḷi",
       "attha_code": "s0403a.att",
-      "attha_title": "Pañcaka-Chakka-Sattakanipāta-Aṭṭhakathā",
+      "attha_title": "Pañcaka-chakka-sattakanipāta-aṭṭhakathā",
       "tika_code": "s0403t.tik",
-      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā"
+      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
+      "sub_books": {
+        "an5": {
+          "mula_code": "s0403m1.mul",
+          "mula_title": "Pañcakanipātapāḷi",
+          "chapter_range": [
+            0,
+            25
+          ]
+        },
+        "an6": {
+          "mula_code": "s0403m2.mul",
+          "mula_title": "Chakkanipātapāḷi",
+          "chapter_range": [
+            26,
+            38
+          ]
+        },
+        "an7": {
+          "mula_code": "s0403m3.mul",
+          "mula_title": "Sattakanipātapāḷi",
+          "chapter_range": [
+            39,
+            46
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an5": {
+        "mula_code": "s0403m1.mul",
+        "mula_title": "Pañcakanipātapāḷi",
+        "chapter_range": [
+          0,
+          25
+        ]
+      },
+      "an6": {
+        "mula_code": "s0403m2.mul",
+        "mula_title": "Chakkanipātapāḷi",
+        "chapter_range": [
+          26,
+          38
+        ]
+      },
+      "an7": {
+        "mula_code": "s0403m3.mul",
+        "mula_title": "Sattakanipātapāḷi",
+        "chapter_range": [
+          39,
+          46
+        ]
+      }
     }
   },
   "s0404a.att": {
@@ -1438,9 +1972,77 @@
       "mula_code": "s0404m1.mul",
       "mula_title": "Aṭṭhakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhaka-navaka-dasaka-ekādasakanipāta-aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
+      "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
+      "sub_books": {
+        "an8": {
+          "mula_code": "s0404m1.mul",
+          "mula_title": "Aṭṭhakanipātapāḷi",
+          "chapter_range": [
+            0,
+            9
+          ]
+        },
+        "an9": {
+          "mula_code": "s0404m2.mul",
+          "mula_title": "Navakanipātapāḷi",
+          "chapter_range": [
+            10,
+            14
+          ]
+        },
+        "an10": {
+          "mula_code": "s0404m3.mul",
+          "mula_title": "Dasakanipātapāḷi",
+          "chapter_range": [
+            15,
+            30
+          ]
+        },
+        "an11": {
+          "mula_code": "s0404m4.mul",
+          "mula_title": "Ekādasakanipātapāḷi",
+          "chapter_range": [
+            31,
+            32
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an8": {
+        "mula_code": "s0404m1.mul",
+        "mula_title": "Aṭṭhakanipātapāḷi",
+        "chapter_range": [
+          0,
+          9
+        ]
+      },
+      "an9": {
+        "mula_code": "s0404m2.mul",
+        "mula_title": "Navakanipātapāḷi",
+        "chapter_range": [
+          10,
+          14
+        ]
+      },
+      "an10": {
+        "mula_code": "s0404m3.mul",
+        "mula_title": "Dasakanipātapāḷi",
+        "chapter_range": [
+          15,
+          30
+        ]
+      },
+      "an11": {
+        "mula_code": "s0404m4.mul",
+        "mula_title": "Ekādasakanipātapāḷi",
+        "chapter_range": [
+          31,
+          32
+        ]
+      }
     }
   },
   "s0501a.att": {
@@ -1457,7 +2059,7 @@
       "mula_code": "s0501m.mul",
       "mula_title": "Khuddakapāṭhapāḷi",
       "attha_code": "s0501a.att",
-      "attha_title": "Khuddakapāṭha-Aṭṭhakathā",
+      "attha_title": "Khuddakapāṭha-Aṭṭhakathā (Paramatthajotikā 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1495,7 +2097,7 @@
       "mula_code": "s0503m.mul",
       "mula_title": "Udānapāḷi",
       "attha_code": "s0503a.att",
-      "attha_title": "Udāna-Aṭṭhakathā",
+      "attha_title": "Udāna-Aṭṭhakathā (Paramatthadīpanī 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1514,7 +2116,7 @@
       "mula_code": "s0504m.mul",
       "mula_title": "Itivuttakapāḷi",
       "attha_code": "s0504a.att",
-      "attha_title": "Itivuttaka-Aṭṭhakathā",
+      "attha_title": "Itivuttaka-Aṭṭhakathā (Paramatthadīpanī 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1533,7 +2135,7 @@
       "mula_code": "s0505m.mul",
       "mula_title": "Suttanipātapāḷi",
       "attha_code": "s0505a.att",
-      "attha_title": "Suttanipāta-Aṭṭhakathā",
+      "attha_title": "Suttanipāta-Aṭṭhakathā (Paramatthajotikā 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1552,7 +2154,7 @@
       "mula_code": "s0506m.mul",
       "mula_title": "Vimānavatthupāḷi",
       "attha_code": "s0506a.att",
-      "attha_title": "Vimānavatthu-Aṭṭhakathā",
+      "attha_title": "Vimānavatthu-Aṭṭhakathā (Paramatthadīpanī 3)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1571,7 +2173,7 @@
       "mula_code": "s0507m.mul",
       "mula_title": "Petavatthupāḷi",
       "attha_code": "s0507a.att",
-      "attha_title": "Petavatthu-Aṭṭhakathā",
+      "attha_title": "Petavatthu-Aṭṭhakathā (Paramatthadīpanī 4)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1590,10 +2192,12 @@
       "mula_code": "s0508m.mul",
       "mula_title": "Theragāthāpāḷi",
       "attha_code": "s0508a1.att",
-      "attha_title": "Theragāthā-Aṭṭhakathā-1",
+      "attha_title": "Theragāthā-Aṭṭhakathā-1 (Paramatthadīpanī 5)",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": -1
+    },
+    "mula_chapter_offset": -1
   },
   "s0508a2.att": {
     "index": 84,
@@ -1609,10 +2213,12 @@
       "mula_code": "s0508m.mul",
       "mula_title": "Theragāthāpāḷi",
       "attha_code": "s0508a2.att",
-      "attha_title": "Theragāthā-Aṭṭhakathā-2",
+      "attha_title": "Theragāthā-Aṭṭhakathā-2 (Paramatthadīpanī 5)",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": 3
+    },
+    "mula_chapter_offset": 3
   },
   "s0509a.att": {
     "index": 85,
@@ -1628,7 +2234,7 @@
       "mula_code": "s0509m.mul",
       "mula_title": "Therīgāthāpāḷi",
       "attha_code": "s0509a.att",
-      "attha_title": "Therīgāthā-Aṭṭhakathā",
+      "attha_title": "Therīgāthā-Aṭṭhakathā (Paramatthadīpanī 6)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1647,9 +2253,45 @@
       "mula_code": "s0510m1.mul",
       "mula_title": "Apadānapāḷi-1",
       "attha_code": "s0510a.att",
-      "attha_title": "Apadāna-Aṭṭhakathā",
+      "attha_title": "Apadāna-Aṭṭhakathā (Visuddhajanavilāsinī)",
       "tika_code": null,
-      "tika_title": null
+      "tika_title": null,
+      "sub_books": {
+        "apadana1": {
+          "mula_code": "s0510m1.mul",
+          "mula_title": "Apadānapāḷi-1",
+          "chapter_range": [
+            0,
+            36
+          ]
+        },
+        "apadana2": {
+          "mula_code": "s0510m2.mul",
+          "mula_title": "Apadānapāḷi-2",
+          "chapter_range": [
+            37,
+            42
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "apadana1": {
+        "mula_code": "s0510m1.mul",
+        "mula_title": "Apadānapāḷi-1",
+        "chapter_range": [
+          0,
+          36
+        ]
+      },
+      "apadana2": {
+        "mula_code": "s0510m2.mul",
+        "mula_title": "Apadānapāḷi-2",
+        "chapter_range": [
+          37,
+          42
+        ]
+      }
     }
   },
   "s0511a.att": {
@@ -1666,7 +2308,7 @@
       "mula_code": "s0511m.mul",
       "mula_title": "Buddhavaṃsapāḷi",
       "attha_code": "s0511a.att",
-      "attha_title": "Buddhavaṃsa-Aṭṭhakathā",
+      "attha_title": "Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1685,7 +2327,7 @@
       "mula_code": "s0512m.mul",
       "mula_title": "Cariyāpiṭakapāḷi",
       "attha_code": "s0512a.att",
-      "attha_title": "Cariyāpiṭaka-Aṭṭhakathā",
+      "attha_title": "Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1706,8 +2348,10 @@
       "attha_code": "s0513a1.att",
       "attha_title": "Jātaka-Aṭṭhakathā-1",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": -1
+    },
+    "mula_chapter_offset": -1
   },
   "s0513a2.att": {
     "index": 90,
@@ -1725,8 +2369,10 @@
       "attha_code": "s0513a2.att",
       "attha_title": "Jātaka-Aṭṭhakathā-2",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": 1
+    },
+    "mula_chapter_offset": 1
   },
   "s0513a3.att": {
     "index": 91,
@@ -1744,8 +2390,10 @@
       "attha_code": "s0513a3.att",
       "attha_title": "Jātaka-Aṭṭhakathā-3",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": 3
+    },
+    "mula_chapter_offset": 3
   },
   "s0513a4.att": {
     "index": 92,
@@ -1763,8 +2411,10 @@
       "attha_code": "s0513a4.att",
       "attha_title": "Jātaka-Aṭṭhakathā-4",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": 9
+    },
+    "mula_chapter_offset": 9
   },
   "s0514a1.att": {
     "index": 93,
@@ -1782,8 +2432,10 @@
       "attha_code": "s0514a1.att",
       "attha_title": "Jātaka-Aṭṭhakathā-5",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter_offset": 0
+    },
+    "mula_chapter_offset": 0
   },
   "s0514a2.att": {
     "index": 94,
@@ -1801,8 +2453,10 @@
       "attha_code": "s0514a2.att",
       "attha_title": "Jātaka-Aṭṭhakathā-6",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter": 5
+    },
+    "mula_chapter": 5
   },
   "s0514a3.att": {
     "index": 95,
@@ -1820,8 +2474,10 @@
       "attha_code": "s0514a3.att",
       "attha_title": "Jātaka-Aṭṭhakathā-7",
       "tika_code": null,
-      "tika_title": null
-    }
+      "tika_title": null,
+      "mula_chapter": 5
+    },
+    "mula_chapter": 5
   },
   "s0515a.att": {
     "index": 96,
@@ -1837,7 +2493,7 @@
       "mula_code": "s0515m.mul",
       "mula_title": "Mahāniddesapāḷi",
       "attha_code": "s0515a.att",
-      "attha_title": "Mahāniddesa-Aṭṭhakathā",
+      "attha_title": "Mahāniddesa-Aṭṭhakathā (Saddhammappajotikā 1)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1856,7 +2512,7 @@
       "mula_code": "s0516m.mul",
       "mula_title": "Cūḷaniddesapāḷi",
       "attha_code": "s0516a.att",
-      "attha_title": "Cūḷaniddesa-Aṭṭhakathā",
+      "attha_title": "Cūḷaniddesa-Aṭṭhakathā (Saddhammappajotikā 2)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1875,7 +2531,7 @@
       "mula_code": "s0517m.mul",
       "mula_title": "Paṭisambhidāmaggapāḷi",
       "attha_code": "s0517a.att",
-      "attha_title": "Paṭisambhidāmagga-Aṭṭhakathā",
+      "attha_title": "Paṭisambhidāmagga-Aṭṭhakathā (Saddhammappakāsinī)",
       "tika_code": null,
       "tika_title": null
     }
@@ -1895,8 +2551,8 @@
       "mula_title": "Nettippakaraṇapāḷi",
       "attha_code": "s0519a.att",
       "attha_title": "Nettippakaraṇa-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "s0519t.tik",
+      "tika_title": "Nettippakaraṇa-Ṭīkā"
     }
   },
   "vin01a.att": {
@@ -1915,7 +2571,123 @@
       "attha_code": "vin01a.att",
       "attha_title": "Pārājikakaṇḍa-Aṭṭhakathā",
       "tika_code": "vin01t1.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-1"
+      "tika_title": "Sāratthadīpanī-Ṭīkā-1",
+      "split_targets": {
+        "mula": [
+          {
+            "code": "vin01m.mul",
+            "title": "Pārājikapāḷi",
+            "chapter_range": [
+              0,
+              1
+            ],
+            "para_range": [
+              1,
+              23
+            ],
+            "target_chapter": 0
+          },
+          {
+            "code": "vin01m.mul",
+            "title": "Pārājikapāḷi",
+            "chapter_range": [
+              2,
+              5
+            ],
+            "para_range": [
+              24,
+              662
+            ],
+            "target_chapter_offset": -1
+          }
+        ],
+        "tika": [
+          {
+            "code": "vin01t1.tik",
+            "title": "Sāratthadīpanī-Ṭīkā-1",
+            "chapter_range": [
+              0,
+              1
+            ],
+            "para_range": [
+              1,
+              23
+            ],
+            "target_chapter_offset": 0
+          },
+          {
+            "code": "vin01t2.tik",
+            "title": "Sāratthadīpanī-Ṭīkā-2",
+            "chapter_range": [
+              2,
+              5
+            ],
+            "para_range": [
+              24,
+              662
+            ],
+            "target_chapter_offset": -2
+          }
+        ]
+      }
+    },
+    "split_targets": {
+      "mula": [
+        {
+          "code": "vin01m.mul",
+          "title": "Pārājikapāḷi",
+          "chapter_range": [
+            0,
+            1
+          ],
+          "para_range": [
+            1,
+            23
+          ],
+          "target_chapter": 0
+        },
+        {
+          "code": "vin01m.mul",
+          "title": "Pārājikapāḷi",
+          "chapter_range": [
+            2,
+            5
+          ],
+          "para_range": [
+            24,
+            662
+          ],
+          "target_chapter_offset": -1
+        }
+      ],
+      "tika": [
+        {
+          "code": "vin01t1.tik",
+          "title": "Sāratthadīpanī-Ṭīkā-1",
+          "chapter_range": [
+            0,
+            1
+          ],
+          "para_range": [
+            1,
+            23
+          ],
+          "target_chapter_offset": 0
+        },
+        {
+          "code": "vin01t2.tik",
+          "title": "Sāratthadīpanī-Ṭīkā-2",
+          "chapter_range": [
+            2,
+            5
+          ],
+          "para_range": [
+            24,
+            662
+          ],
+          "target_chapter_offset": -2
+        }
+      ]
     }
   },
   "vin02a1.att": {
@@ -2009,8 +2781,8 @@
       "mula_title": "Dhammasaṅgaṇīpāḷi",
       "attha_code": "abh01a.att",
       "attha_title": "Dhammasaṅgaṇi-Aṭṭhakathā",
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "abh01t.tik",
+      "tika_title": "Dhammasaṅgaṇī-Mūlaṭīkā"
     }
   },
   "abh02a.att": {
@@ -2048,7 +2820,101 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_books": {
+        "dhatukatha": {
+          "mula_code": "abh03m1.mul",
+          "mula_title": "Dhātukathāpāḷi",
+          "chapter_range": [
+            0,
+            2
+          ],
+          "tika_chapter": 0
+        },
+        "puggalapannatti": {
+          "mula_code": "abh03m2.mul",
+          "mula_title": "Puggalapaññattipāḷi",
+          "chapter_range": [
+            3,
+            5
+          ],
+          "tika_chapter": 1
+        },
+        "kathavatthu": {
+          "mula_code": "abh03m3.mul",
+          "mula_title": "Kathāvatthupāḷi",
+          "chapter_range": [
+            6,
+            38
+          ],
+          "tika_chapter": 2
+        },
+        "yamaka": {
+          "mula_code": "abh03m4.mul",
+          "mula_title": "Yamakapāḷi-1",
+          "chapter_range": [
+            39,
+            49
+          ],
+          "tika_chapter": 3
+        },
+        "patthana": {
+          "mula_code": "abh03m7.mul",
+          "mula_title": "Paṭṭhānapāḷi-1",
+          "chapter_range": [
+            50,
+            65
+          ],
+          "tika_chapter": 4
+        }
+      }
+    },
+    "sub_books": {
+      "dhatukatha": {
+        "mula_code": "abh03m1.mul",
+        "mula_title": "Dhātukathāpāḷi",
+        "chapter_range": [
+          0,
+          2
+        ],
+        "tika_chapter": 0
+      },
+      "puggalapannatti": {
+        "mula_code": "abh03m2.mul",
+        "mula_title": "Puggalapaññattipāḷi",
+        "chapter_range": [
+          3,
+          5
+        ],
+        "tika_chapter": 1
+      },
+      "kathavatthu": {
+        "mula_code": "abh03m3.mul",
+        "mula_title": "Kathāvatthupāḷi",
+        "chapter_range": [
+          6,
+          38
+        ],
+        "tika_chapter": 2
+      },
+      "yamaka": {
+        "mula_code": "abh03m4.mul",
+        "mula_title": "Yamakapāḷi-1",
+        "chapter_range": [
+          39,
+          49
+        ],
+        "tika_chapter": 3
+      },
+      "patthana": {
+        "mula_code": "abh03m7.mul",
+        "mula_title": "Paṭṭhānapāḷi-1",
+        "chapter_range": [
+          50,
+          65
+        ],
+        "tika_chapter": 4
+      }
     }
   },
   "s0101t.tik": {
@@ -2119,12 +2985,12 @@
     "shortNavPath": "Su. Pi./Dī. Ni./Sīlakkhandhavagga-Abhinavaṭīkā-1",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "s0104t.nrf",
-      "tika_title": "Sīlakkhandhavagga-Abhinavaṭīkā-1"
+      "mula_code": "s0101m.mul",
+      "mula_title": "Sīlakkhandhavaggapāḷi",
+      "attha_code": "s0101a.att",
+      "attha_title": "Sīlakkhandhavagga-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "s0105t.nrf": {
@@ -2138,12 +3004,12 @@
     "shortNavPath": "Su. Pi./Dī. Ni./Sīlakkhandhavagga-Abhinavaṭīkā-2",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "s0105t.nrf",
-      "tika_title": "Sīlakkhandhavagga-Abhinavaṭīkā-2"
+      "mula_code": "s0101m.mul",
+      "mula_title": "Sīlakkhandhavaggapāḷi",
+      "attha_code": "s0101a.att",
+      "attha_title": "Sīlakkhandhavagga-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "s0201t.tik": {
@@ -2331,9 +3197,61 @@
       "mula_code": "s0402m1.mul",
       "mula_title": "Dukanipātapāḷi",
       "attha_code": "s0402a.att",
-      "attha_title": "Duka-Tika-Catukkanipāta-Aṭṭhakathā",
+      "attha_title": "Dukanipāta-Aṭṭhakathā",
       "tika_code": "s0402t.tik",
-      "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā"
+      "tika_title": "Duka-tika-catukkanipāta-ṭīkā",
+      "sub_books": {
+        "an2": {
+          "mula_code": "s0402m1.mul",
+          "mula_title": "Dukanipātapāḷi",
+          "chapter_range": [
+            0,
+            18
+          ]
+        },
+        "an3": {
+          "mula_code": "s0402m2.mul",
+          "mula_title": "Tikanipātapāḷi",
+          "chapter_range": [
+            19,
+            35
+          ]
+        },
+        "an4": {
+          "mula_code": "s0402m3.mul",
+          "mula_title": "Catukkanipātapāḷi",
+          "chapter_range": [
+            36,
+            63
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an2": {
+        "mula_code": "s0402m1.mul",
+        "mula_title": "Dukanipātapāḷi",
+        "chapter_range": [
+          0,
+          17
+        ]
+      },
+      "an3": {
+        "mula_code": "s0402m2.mul",
+        "mula_title": "Tikanipātapāḷi",
+        "chapter_range": [
+          18,
+          33
+        ]
+      },
+      "an4": {
+        "mula_code": "s0402m3.mul",
+        "mula_title": "Catukkanipātapāḷi",
+        "chapter_range": [
+          34,
+          58
+        ]
+      }
     }
   },
   "s0403t.tik": {
@@ -2350,9 +3268,61 @@
       "mula_code": "s0403m1.mul",
       "mula_title": "Pañcakanipātapāḷi",
       "attha_code": "s0403a.att",
-      "attha_title": "Pañcaka-Chakka-Sattakanipāta-Aṭṭhakathā",
+      "attha_title": "Pañcakanipāta-Aṭṭhakathā",
       "tika_code": "s0403t.tik",
-      "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā"
+      "tika_title": "Pañcaka-chakka-sattakanipāta-ṭīkā",
+      "sub_books": {
+        "an5": {
+          "mula_code": "s0403m1.mul",
+          "mula_title": "Pañcakanipātapāḷi",
+          "chapter_range": [
+            0,
+            25
+          ]
+        },
+        "an6": {
+          "mula_code": "s0403m2.mul",
+          "mula_title": "Chakkanipātapāḷi",
+          "chapter_range": [
+            26,
+            38
+          ]
+        },
+        "an7": {
+          "mula_code": "s0403m3.mul",
+          "mula_title": "Sattakanipātapāḷi",
+          "chapter_range": [
+            39,
+            46
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an5": {
+        "mula_code": "s0403m1.mul",
+        "mula_title": "Pañcakanipātapāḷi",
+        "chapter_range": [
+          0,
+          22
+        ]
+      },
+      "an6": {
+        "mula_code": "s0403m2.mul",
+        "mula_title": "Chakkanipātapāḷi",
+        "chapter_range": [
+          23,
+          32
+        ]
+      },
+      "an7": {
+        "mula_code": "s0403m3.mul",
+        "mula_title": "Sattakanipātapāḷi",
+        "chapter_range": [
+          33,
+          40
+        ]
+      }
     }
   },
   "s0404t.tik": {
@@ -2369,9 +3339,77 @@
       "mula_code": "s0404m1.mul",
       "mula_title": "Aṭṭhakanipātapāḷi",
       "attha_code": "s0404a.att",
-      "attha_title": "Aṭṭhakādinipāta-Aṭṭhakathā",
+      "attha_title": "Aṭṭhakanipāta-Aṭṭhakathā",
       "tika_code": "s0404t.tik",
-      "tika_title": "Aṭṭhakādinipāta-Ṭīkā"
+      "tika_title": "Aṭṭhaka-navaka-dasaka-ekādasakanipāta-ṭīkā",
+      "sub_books": {
+        "an8": {
+          "mula_code": "s0404m1.mul",
+          "mula_title": "Aṭṭhakanipātapāḷi",
+          "chapter_range": [
+            0,
+            9
+          ]
+        },
+        "an9": {
+          "mula_code": "s0404m2.mul",
+          "mula_title": "Navakanipātapāḷi",
+          "chapter_range": [
+            10,
+            14
+          ]
+        },
+        "an10": {
+          "mula_code": "s0404m3.mul",
+          "mula_title": "Dasakanipātapāḷi",
+          "chapter_range": [
+            15,
+            30
+          ]
+        },
+        "an11": {
+          "mula_code": "s0404m4.mul",
+          "mula_title": "Ekādasakanipātapāḷi",
+          "chapter_range": [
+            31,
+            32
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "an8": {
+        "mula_code": "s0404m1.mul",
+        "mula_title": "Aṭṭhakanipātapāḷi",
+        "chapter_range": [
+          0,
+          7
+        ]
+      },
+      "an9": {
+        "mula_code": "s0404m2.mul",
+        "mula_title": "Navakanipātapāḷi",
+        "chapter_range": [
+          8,
+          12
+        ]
+      },
+      "an10": {
+        "mula_code": "s0404m3.mul",
+        "mula_title": "Dasakanipātapāḷi",
+        "chapter_range": [
+          13,
+          25
+        ]
+      },
+      "an11": {
+        "mula_code": "s0404m4.mul",
+        "mula_title": "Ekādasakanipātapāḷi",
+        "chapter_range": [
+          26,
+          27
+        ]
+      }
     }
   },
   "s0519t.tik": {
@@ -2385,10 +3423,10 @@
     "shortNavPath": "Su. Pi./Khu. Ni./Nettippakaraṇa-Ṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
+      "mula_code": "s0519m.mul",
+      "mula_title": "Nettippakaraṇapāḷi",
+      "attha_code": "s0519a.att",
+      "attha_title": "Nettippakaraṇa-Aṭṭhakathā",
       "tika_code": "s0519t.tik",
       "tika_title": "Nettippakaraṇa-Ṭīkā"
     }
@@ -2404,12 +3442,12 @@
     "shortNavPath": "Su. Pi./Khu. Ni./Nettivibhāvinī",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "s0501t.nrf",
-      "tika_title": "Nettivibhāvinī"
+      "mula_code": "s0519m.mul",
+      "mula_title": "Nettippakaraṇapāḷi",
+      "attha_code": "s0519a.att",
+      "attha_title": "Nettippakaraṇa-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin01t1.tik": {
@@ -2428,8 +3466,12 @@
       "attha_code": "vin01a.att",
       "attha_title": "Pārājikakaṇḍa-Aṭṭhakathā",
       "tika_code": "vin01t1.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-1"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-1",
+      "mula_chapter": 0,
+      "attha_chapter_offset": 0
+    },
+    "mula_chapter": 0,
+    "attha_chapter_offset": 0
   },
   "vin01t2.tik": {
     "index": 128,
@@ -2447,8 +3489,12 @@
       "attha_code": "vin01a.att",
       "attha_title": "Pārājikakaṇḍa-Aṭṭhakathā",
       "tika_code": "vin01t2.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-2"
-    }
+      "tika_title": "Sāratthadīpanī-Ṭīkā-2",
+      "mula_chapter_offset": 1,
+      "attha_chapter_offset": 2
+    },
+    "mula_chapter_offset": 1,
+    "attha_chapter_offset": 2
   },
   "vin02t.tik": {
     "index": 129,
@@ -2463,10 +3509,86 @@
     "mat": {
       "mula_code": "vin02m1.mul",
       "mula_title": "Pācittiyapāḷi",
-      "attha_code": "vin02a1.att",
-      "attha_title": "Pācittiya-Aṭṭhakathā",
+      "attha_code": "vin02a4.att",
+      "attha_title": "Parivāra-Aṭṭhakathā",
       "tika_code": "vin02t.tik",
-      "tika_title": "Sāratthadīpanī-Ṭīkā-3"
+      "tika_title": "Sāratthadīpanī-Ṭīkā-3",
+      "sub_books": {
+        "pacittiya": {
+          "mula_code": "vin02m1.mul",
+          "mula_title": "Pācittiyapāḷi",
+          "attha_code": "vin02a1.att",
+          "tika_chapter_range": [
+            0,
+            7
+          ]
+        },
+        "mahavagga": {
+          "mula_code": "vin02m2.mul",
+          "mula_title": "Mahāvaggapāḷi",
+          "attha_code": "vin02a2.att",
+          "tika_chapter_range": [
+            8,
+            18
+          ]
+        },
+        "culavagga": {
+          "mula_code": "vin02m3.mul",
+          "mula_title": "Cūḷavaggapāḷi",
+          "attha_code": "vin02a3.att",
+          "tika_chapter_range": [
+            19,
+            31
+          ]
+        },
+        "parivara": {
+          "mula_code": "vin02m4.mul",
+          "mula_title": "Parivārapāḷi",
+          "attha_code": "vin02a4.att",
+          "tika_chapter_range": [
+            32,
+            47
+          ]
+        }
+      }
+    },
+    "sub_books": {
+      "pacittiya": {
+        "mula_code": "vin02m1.mul",
+        "mula_title": "Pācittiyapāḷi",
+        "attha_code": "vin02a1.att",
+        "tika_chapter_range": [
+          0,
+          7
+        ]
+      },
+      "mahavagga": {
+        "mula_code": "vin02m2.mul",
+        "mula_title": "Mahāvaggapāḷi",
+        "attha_code": "vin02a2.att",
+        "tika_chapter_range": [
+          8,
+          18
+        ]
+      },
+      "culavagga": {
+        "mula_code": "vin02m3.mul",
+        "mula_title": "Cūḷavaggapāḷi",
+        "attha_code": "vin02a3.att",
+        "tika_chapter_range": [
+          19,
+          31
+        ]
+      },
+      "parivara": {
+        "mula_code": "vin02m4.mul",
+        "mula_title": "Parivārapāḷi",
+        "attha_code": "vin02a4.att",
+        "tika_chapter_range": [
+          32,
+          47
+        ]
+      }
     }
   },
   "vin04t.nrf": {
@@ -2480,12 +3602,12 @@
     "shortNavPath": "Vi. Pi./Dvemātikāpāḷi",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
+      "mula_code": "vin04t.nrf",
+      "mula_title": "Dvemātikāpāḷi - Kaṅkhāvitaraṇī-Aṭṭhakathā",
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "vin04t.nrf",
-      "tika_title": "Dvemātikāpāḷi"
+      "tika_code": "vin09t.nrf",
+      "tika_title": "Kaṅkhāvitaraṇīpurāṇa-Ṭīkā"
     }
   },
   "vin05t.nrf": {
@@ -2503,8 +3625,8 @@
       "mula_title": null,
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "vin05t.nrf",
-      "tika_title": "Vinayasaṅgaha-Aṭṭhakathā"
+      "tika_code": "vin06t.nrf",
+      "tika_title": "Vajirabuddhi-Ṭīkā"
     }
   },
   "vin06t.nrf": {
@@ -2520,10 +3642,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "vin06t.nrf",
-      "tika_title": "Vajirabuddhi-Ṭīkā"
+      "attha_code": "vin05t.nrf",
+      "attha_title": "Vinayasaṅgaha-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin07t.nrf": {
@@ -2537,12 +3659,12 @@
     "shortNavPath": "Vi. Pi./Vimativinodanī-Ṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "vin07t.nrf",
-      "tika_title": "Vimativinodanī-Ṭīkā"
+      "mula_code": "vin01m.mul",
+      "mula_title": "Pārājikapāḷi",
+      "attha_code": "vin01a.att",
+      "attha_title": "Pārājikakaṇḍa-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin08t.nrf": {
@@ -2560,8 +3682,8 @@
       "mula_title": null,
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "vin08t.nrf",
-      "tika_title": "Vinayālaṅkāra-Ṭīkā"
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin09t.nrf": {
@@ -2575,12 +3697,12 @@
     "shortNavPath": "Vi. Pi./Kaṅkhāvitaraṇīpurāṇa-Ṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "vin09t.nrf",
-      "tika_title": "Kaṅkhāvitaraṇīpurāṇa-Ṭīkā"
+      "mula_code": "vin04t.nrf",
+      "mula_title": "Dvemātikāpāḷi - Kaṅkhāvitaraṇī-Aṭṭhakathā",
+      "attha_code": "vin04t.nrf",
+      "attha_title": "Dvemātikāpāḷi - Kaṅkhāvitaraṇī-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin10t.nrf": {
@@ -2598,8 +3720,8 @@
       "mula_title": null,
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "vin10t.nrf",
-      "tika_title": "Vinayavinicchaya-Uttaravinicchaya"
+      "tika_code": "vin11t.nrf",
+      "tika_title": "Vinayavinicchaya-Ṭīkā"
     }
   },
   "vin11t.nrf": {
@@ -2615,10 +3737,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "vin11t.nrf",
-      "tika_title": "Vinayavinicchaya-Ṭīkā"
+      "attha_code": "vin10t.nrf",
+      "attha_title": "Vinayavinicchaya-Uttaravinicchaya",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin12t.nrf": {
@@ -2636,8 +3758,8 @@
       "mula_title": null,
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "vin12t.nrf",
-      "tika_title": "Pācityādiyojanāpāḷi"
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "vin13t.nrf": {
@@ -2653,10 +3775,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "vin13t.nrf",
-      "tika_title": "Khuddasikkhā-Mūlasikkhā"
+      "attha_code": "vin13t.nrf",
+      "attha_title": "Khuddasikkhā-Mūlasikkhā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh01t.tik": {
@@ -2670,10 +3792,10 @@
     "shortNavPath": "Abhi. Pi./Dhammasaṅgaṇī-Mūlaṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
+      "mula_code": "abh01m.mul",
+      "mula_title": "Dhammasaṅgaṇīpāḷi",
+      "attha_code": "abh01a.att",
+      "attha_title": "Dhammasaṅgaṇi-Aṭṭhakathā",
       "tika_code": "abh01t.tik",
       "tika_title": "Dhammasaṅgaṇī-Mūlaṭīkā"
     }
@@ -2713,7 +3835,101 @@
       "attha_code": "abh03a.att",
       "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
       "tika_code": "abh03t.tik",
-      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā"
+      "tika_title": "Pañcapakaraṇa-Mūlaṭīkā",
+      "sub_books": {
+        "dhatukatha": {
+          "mula_code": "abh03m1.mul",
+          "mula_title": "Dhātukathāpāḷi",
+          "chapter_range": [
+            0,
+            2
+          ],
+          "tika_chapter": 0
+        },
+        "puggalapannatti": {
+          "mula_code": "abh03m2.mul",
+          "mula_title": "Puggalapaññattipāḷi",
+          "chapter_range": [
+            3,
+            5
+          ],
+          "tika_chapter": 1
+        },
+        "kathavatthu": {
+          "mula_code": "abh03m3.mul",
+          "mula_title": "Kathāvatthupāḷi",
+          "chapter_range": [
+            6,
+            38
+          ],
+          "tika_chapter": 2
+        },
+        "yamaka": {
+          "mula_code": "abh03m4.mul",
+          "mula_title": "Yamakapāḷi-1",
+          "chapter_range": [
+            39,
+            49
+          ],
+          "tika_chapter": 3
+        },
+        "patthana": {
+          "mula_code": "abh03m7.mul",
+          "mula_title": "Paṭṭhānapāḷi-1",
+          "chapter_range": [
+            50,
+            65
+          ],
+          "tika_chapter": 4
+        }
+      }
+    },
+    "sub_books": {
+      "dhatukatha": {
+        "mula_code": "abh03m1.mul",
+        "mula_title": "Dhātukathāpāḷi",
+        "chapter_range": [
+          0,
+          0
+        ],
+        "tika_chapter": 0
+      },
+      "puggalapannatti": {
+        "mula_code": "abh03m2.mul",
+        "mula_title": "Puggalapaññattipāḷi",
+        "chapter_range": [
+          1,
+          1
+        ],
+        "tika_chapter": 1
+      },
+      "kathavatthu": {
+        "mula_code": "abh03m3.mul",
+        "mula_title": "Kathāvatthupāḷi",
+        "chapter_range": [
+          2,
+          2
+        ],
+        "tika_chapter": 2
+      },
+      "yamaka": {
+        "mula_code": "abh03m4.mul",
+        "mula_title": "Yamakapāḷi-1",
+        "chapter_range": [
+          3,
+          3
+        ],
+        "tika_chapter": 3
+      },
+      "patthana": {
+        "mula_code": "abh03m7.mul",
+        "mula_title": "Paṭṭhānapāḷi-1",
+        "chapter_range": [
+          4,
+          4
+        ],
+        "tika_chapter": 4
+      }
     }
   },
   "abh04t.nrf": {
@@ -2727,12 +3943,12 @@
     "shortNavPath": "Abhi. Pi./Dhammasaṅgaṇī-Anuṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "abh04t.nrf",
-      "tika_title": "Dhammasaṅgaṇī-Anuṭīkā"
+      "mula_code": "abh01m.mul",
+      "mula_title": "Dhammasaṅgaṇīpāḷi",
+      "attha_code": "abh01a.att",
+      "attha_title": "Dhammasaṅgaṇi-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh05t.nrf": {
@@ -2746,12 +3962,12 @@
     "shortNavPath": "Abhi. Pi./Pañcapakaraṇa-Anuṭīkā",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "abh05t.nrf",
-      "tika_title": "Pañcapakaraṇa-Anuṭīkā"
+      "mula_code": "abh03m7.mul",
+      "mula_title": "Paṭṭhānapāḷi-1",
+      "attha_code": "abh03a.att",
+      "attha_title": "Pañcapakaraṇa-Aṭṭhakathā",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh06t.nrf": {
@@ -2769,8 +3985,8 @@
       "mula_title": null,
       "attha_code": null,
       "attha_title": null,
-      "tika_code": "abh06t.nrf",
-      "tika_title": "Abhidhammāvatāro-Nāmarūpaparicchedo"
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh07t.nrf": {
@@ -2786,10 +4002,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "abh07t.nrf",
-      "tika_title": "Abhidhammatthasaṅgaho"
+      "attha_code": "abh07t.nrf",
+      "attha_title": "Abhidhammatthasaṅgaho",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh08t.nrf": {
@@ -2805,10 +4021,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "abh08t.nrf",
-      "tika_title": "Abhidhammāvatāra-Purāṇaṭīkā"
+      "attha_code": "abh06t.nrf",
+      "attha_title": "Abhidhammāvatāro-Nāmarūpaparicchedo",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "abh09t.nrf": {
@@ -2824,10 +4040,10 @@
     "mat": {
       "mula_code": null,
       "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
-      "tika_code": "abh09t.nrf",
-      "tika_title": "Abhidhammamātikāpāḷi"
+      "attha_code": "abh09t.nrf",
+      "attha_title": "Abhidhammamātikāpāḷi",
+      "tika_code": null,
+      "tika_title": null
     }
   },
   "e0101n.mul": {
@@ -2841,12 +4057,12 @@
     "shortNavPath": "",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
+      "mula_code": "e0101n.mul",
+      "mula_title": "Visuddhimagga-1",
       "attha_code": null,
       "attha_title": null,
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "e0103n.att",
+      "tika_title": "Visuddhimagga-Mahāṭīkā-1"
     }
   },
   "e0102n.mul": {
@@ -2860,12 +4076,12 @@
     "shortNavPath": "",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
+      "mula_code": "e0102n.mul",
+      "mula_title": "Visuddhimagga-2",
       "attha_code": null,
       "attha_title": null,
-      "tika_code": null,
-      "tika_title": null
+      "tika_code": "e0104n.att",
+      "tika_title": "Visuddhimagga-Mahāṭīkā-2"
     }
   },
   "e0103n.att": {
@@ -2879,10 +4095,10 @@
     "shortNavPath": "",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
+      "mula_code": "e0101n.mul",
+      "mula_title": "Visuddhimagga-1",
+      "attha_code": "e0103n.att",
+      "attha_title": "Visuddhimagga-Mahāṭīkā-1",
       "tika_code": null,
       "tika_title": null
     }
@@ -2898,10 +4114,10 @@
     "shortNavPath": "",
     "chapterListTypes": "",
     "mat": {
-      "mula_code": null,
-      "mula_title": null,
-      "attha_code": null,
-      "attha_title": null,
+      "mula_code": "e0102n.mul",
+      "mula_title": "Visuddhimagga-2",
+      "attha_code": "e0104n.att",
+      "attha_title": "Visuddhimagga-Mahāṭīkā-2",
       "tika_code": null,
       "tika_title": null
     }

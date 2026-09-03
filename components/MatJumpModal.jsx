@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, BookOpen, Layers, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
+import { fetchMatJump } from '../services/api';
 
 
 export default function MatJumpModal({ isOpen, onClose }) {
   const { activeTab, activeParaNum, jumpToMat } = useTabs();
   const { settings } = useThemeSettings();
+
+  const [apiMatData, setApiMatData] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -21,11 +24,9 @@ export default function MatJumpModal({ isOpen, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !activeTab) return null;
-
-  const mat = activeTab.mat;
-  const currentCategory = (activeTab.category || '').toLowerCase();
-  const currentCode = activeTab.bookCode || '';
+  const mat = activeTab?.mat;
+  const currentCategory = (activeTab?.category || '').toLowerCase();
+  const currentCode = activeTab?.bookCode || '';
 
   const isCurrentMula = currentCategory.includes('mūla') || currentCode.endsWith('.mul');
   const isCurrentAttha = currentCategory.includes('aṭṭhakathā') || currentCode.endsWith('.att');
@@ -38,8 +39,13 @@ export default function MatJumpModal({ isOpen, onClose }) {
     ? baseCode.slice(0, -1)
     : baseCode;
 
-  const cIdx = activeTab?.currentChapterIdx || 0;
-  let activeSubKey = activeTab?.chapter_to_sub_book?.[cIdx];
+  let cIdx = activeTab?.currentChapterIdx !== undefined && activeTab?.currentChapterIdx !== null ? activeTab.currentChapterIdx : 0;
+  if (typeof window !== 'undefined') {
+    const m = window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i);
+    if (m) cIdx = Math.max(0, parseInt(m[1], 10) - 1);
+  }
+
+  let activeSubKey = activeTab?.chapter_to_sub_book?.[cIdx] || activeTab?.chapter_to_sub_book?.[String(cIdx)];
   if (!activeSubKey && activeTab?.sub_books) {
     for (const [k, v] of Object.entries(activeTab.sub_books)) {
       const cr = v.chapter_range || v.tika_chapter_range;
@@ -49,19 +55,69 @@ export default function MatJumpModal({ isOpen, onClose }) {
       }
     }
   }
+
+  let activePNum = activeParaNum;
+  if (!activePNum && typeof window !== 'undefined' && window.location.hash) {
+    const hashMatch = window.location.hash.match(/^(?:#para-?|#p)?(\d+(?:-\d+)?)/i);
+    if (hashMatch) activePNum = hashMatch[1];
+  }
+
+  const cleanPStr = String(activePNum || '').replace(/^(?:para-?|p)/i, '').trim();
+  const currentP = parseInt(cleanPStr, 10);
+  let validCurrentP = currentP;
+
+  if (!isNaN(currentP) && cleanPStr) {
+    let pChap = undefined;
+    if (activeSubKey && activeTab?.sub_books_para_to_chapter?.[activeSubKey]) {
+      pChap = activeTab.sub_books_para_to_chapter[activeSubKey][cleanPStr];
+    } else if (activeTab?.para_to_chapter) {
+      pChap = activeTab.para_to_chapter[cleanPStr];
+    }
+
+    if (pChap !== undefined && pChap !== cIdx) {
+      const hasExplicitHash = typeof window !== 'undefined' && window.location.hash && window.location.hash.includes(cleanPStr);
+      if (hasExplicitHash && !activeSubKey) {
+        cIdx = pChap;
+      } else if (pChap === undefined) {
+        validCurrentP = NaN;
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen || !currentCode) return;
+    let isMounted = true;
+    fetchMatJump(currentCode, cleanPStr, cIdx).then((data) => {
+      if (isMounted && data) {
+        setApiMatData(data);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, currentCode, cleanPStr, cIdx]);
+
+  if (!isOpen || !activeTab) return null;
   const currentSubInfo = activeSubKey && activeTab?.sub_books ? activeTab.sub_books[activeSubKey] : null;
 
+  // 1. High-Priority Precomputed Canon Mapping (from tipitaka.db or Tab Metadata)
+  const precomputedParaMat = (!isNaN(validCurrentP) && cleanPStr)
+    ? (activeSubKey && activeTab?.sub_books_para_to_mat?.[activeSubKey]?.[cleanPStr]) || activeTab?.para_to_mat?.[cleanPStr]
+    : null;
+  const precomputedChapMat = activeTab?.chapter_to_mat?.[cIdx] || activeTab?.chapter_to_mat?.[String(cIdx)];
+  const precomputedMat = apiMatData || precomputedParaMat || precomputedChapMat;
+
   // Split targets resolution (e.g. s0508, s0513, s0514, vin01)
-  const currentP = parseInt(String(activeParaNum || '').replace(/^(?:para-?|p)/i, ''), 10);
   const splitTargets = activeTab?.split_targets || mat?.split_targets;
 
   const resolveSplitTarget = (layer) => {
     if (!splitTargets?.[layer] || !Array.isArray(splitTargets[layer])) return null;
+
     for (const rule of splitTargets[layer]) {
       const inChap = rule.chapter_range && cIdx >= rule.chapter_range[0] && cIdx <= rule.chapter_range[1];
       let inPara = true;
       if (rule.para_range) {
-        inPara = !isNaN(currentP) && currentP >= rule.para_range[0] && currentP <= rule.para_range[1];
+        inPara = !isNaN(validCurrentP) && validCurrentP >= rule.para_range[0] && validCurrentP <= rule.para_range[1];
       }
       if (inChap && inPara) return rule;
     }
@@ -72,14 +128,14 @@ export default function MatJumpModal({ isOpen, onClose }) {
   const splitAttha = resolveSplitTarget('attha');
   const splitTika = resolveSplitTarget('tika');
 
-  const resolvedMulaCode = splitMula?.code || currentSubInfo?.mula_code || mat?.mula_code || (isCurrentMula ? currentCode : null);
-  const resolvedMulaTitle = splitMula?.title || currentSubInfo?.mula_title || mat?.mula_title || (isCurrentMula ? activeTab?.title : 'Mūlapāḷi');
+  const resolvedMulaCode = precomputedMat?.mula?.book || splitMula?.code || currentSubInfo?.mula_code || mat?.mula_code || (isCurrentMula ? currentCode : null);
+  const resolvedMulaTitle = precomputedMat?.mula?.title || splitMula?.title || currentSubInfo?.mula_title || mat?.mula_title || (isCurrentMula ? activeTab?.title : 'Mūlapāḷi');
 
-  const resolvedAtthaCode = splitAttha?.code || currentSubInfo?.attha_code || mat?.attha_code || (isCurrentAttha ? currentCode : null);
-  const resolvedAtthaTitle = splitAttha?.title || currentSubInfo?.attha_title || mat?.attha_title || (isCurrentAttha ? activeTab?.title : 'Aṭṭhakathā');
+  const resolvedAtthaCode = precomputedMat?.attha?.book || splitAttha?.code || currentSubInfo?.attha_code || mat?.attha_code || (isCurrentAttha ? currentCode : null);
+  const resolvedAtthaTitle = precomputedMat?.attha?.title || splitAttha?.title || currentSubInfo?.attha_title || mat?.attha_title || (isCurrentAttha ? activeTab?.title : 'Aṭṭhakathā');
 
-  const resolvedTikaCode = splitTika?.code || currentSubInfo?.tika_code || mat?.tika_code || (isCurrentTika ? currentCode : null);
-  const resolvedTikaTitle = splitTika?.title || currentSubInfo?.tika_title || mat?.tika_title || (isCurrentTika ? activeTab.title : 'Ṭīkā');
+  const resolvedTikaCode = precomputedMat?.tika?.book || splitTika?.code || currentSubInfo?.tika_code || mat?.tika_code || (isCurrentTika ? currentCode : null);
+  const resolvedTikaTitle = precomputedMat?.tika?.title || splitTika?.title || currentSubInfo?.tika_title || mat?.tika_title || (isCurrentTika ? activeTab?.title : 'Ṭīkā');
 
   const connectedBooks = [
     {
@@ -120,18 +176,32 @@ export default function MatJumpModal({ isOpen, onClose }) {
 
   const handleJump = (item) => {
     let targetChapter = undefined;
-    const splitRule = resolveSplitTarget(item.layer);
-    if (splitRule) {
-      if (splitRule.target_chapter !== undefined) {
-        targetChapter = splitRule.target_chapter;
-      } else if (splitRule.target_chapter_offset !== undefined) {
-        targetChapter = Math.max(0, cIdx + splitRule.target_chapter_offset);
+    let targetPara = undefined;
+
+    const preTarget = precomputedMat?.[item.layer];
+    if (preTarget) {
+      targetChapter = preTarget.chapter;
+      targetPara = preTarget.para;
+    } else {
+      const splitRule = resolveSplitTarget(item.layer);
+      if (splitRule) {
+        if (splitRule.target_chapter !== undefined) {
+          targetChapter = splitRule.target_chapter;
+        } else if (splitRule.target_chapter_offset !== undefined) {
+          targetChapter = Math.max(0, cIdx + splitRule.target_chapter_offset);
+        }
       }
     }
+
+    const finalTargetCode = preTarget?.book || item.code;
+    const finalTargetTitle = preTarget?.title || item.title;
+
     jumpToMat(item.layer, {
-      title: item.title,
-      code: item.code,
+      title: finalTargetTitle,
+      code: finalTargetCode,
       chapter: targetChapter,
+      targetChapterIdx: targetChapter,
+      targetParaNum: targetPara,
       subBook: activeTab?.sub_book || activeSubKey || undefined,
     });
     onClose();
@@ -244,7 +314,17 @@ export default function MatJumpModal({ isOpen, onClose }) {
                       className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
                     >
                       <span>Jump</span>
-                      {activeParaNum && <span className="font-mono font-normal opacity-80 text-[10px]">p.{activeParaNum}</span>}
+                      {(() => {
+                        const pTarget = precomputedMat?.[item.layer];
+                        const displayP = pTarget ? pTarget.para : (precomputedMat ? null : activeParaNum);
+                        if (displayP) {
+                          return <span className="font-mono font-normal opacity-80 text-[10px]">p.{displayP}</span>;
+                        }
+                        if (activeParaNum || cleanPStr) {
+                          return <span className="font-sans text-[10px] opacity-75">(Chapter)</span>;
+                        }
+                        return null;
+                      })()}
                       <ArrowUpRight size={12} />
                     </button>
                   ) : (

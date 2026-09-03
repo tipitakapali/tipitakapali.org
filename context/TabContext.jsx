@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { fetchBook, fetchChapter, fetchMat, lookupBookInfo, fetchBookTocOnly } from '../services/api';
+import { fetchBook, fetchChapter, fetchMat, fetchMatJump, lookupBookInfo, fetchBookTocOnly } from '../services/api';
 import { splitScriptCode } from '../services/transliterate';
 import { useThemeSettings } from './ThemeSettingsContext';
 
@@ -563,7 +563,11 @@ export function TabProvider({ children }) {
           !tab.para_to_chapter ||
           Object.keys(tab.para_to_chapter).length === 0 ||
           !tab.page_to_chapter ||
-          Object.keys(tab.page_to_chapter).length === 0
+          Object.keys(tab.page_to_chapter).length === 0 ||
+          (!tab.split_targets && tab.mat?.split_targets) ||
+          !tab.chapter_to_mat ||
+          !tab.para_to_mat ||
+          !tab.mat
         ) {
           fetchBook(cleanCode, { chapter: targetChapIdx })
             .then((bData) => {
@@ -588,6 +592,8 @@ export function TabProvider({ children }) {
                           attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
                           tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
                           split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                          chapter_to_mat: bData.chapter_to_mat || t.chapter_to_mat || null,
+                          para_to_mat: bData.para_to_mat || t.para_to_mat || null,
                           mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
                           mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
                           attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
@@ -1408,10 +1414,66 @@ export function TabProvider({ children }) {
       let targetChapter = options.chapter !== undefined ? options.chapter : undefined;
       let targetSubBook = options.subBook || null;
 
-      const currentChapIdx = activeTab.currentChapterIdx || 0;
+      let currentChapIdx = activeTab.currentChapterIdx !== undefined && activeTab.currentChapterIdx !== null ? activeTab.currentChapterIdx : 0;
+      if (typeof window !== 'undefined') {
+        const m = window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i);
+        if (m) currentChapIdx = Math.max(0, parseInt(m[1], 10) - 1);
+      }
+
+      let currentPNum = options.targetParaNum || activeParaNum;
+      if (!currentPNum && typeof window !== 'undefined' && window.location.hash) {
+        const hashMatch = window.location.hash.match(/^(?:#para-?|#p)?(\d+(?:-\d+)?)/i);
+        if (hashMatch) currentPNum = hashMatch[1];
+      }
+      if (!currentPNum && typeof document !== 'undefined') {
+        const cEl = document.querySelector('.content-area') || document.querySelector('.reader-container') || document.querySelector('main');
+        if (cEl) {
+          const pEl = cEl.querySelector('[data-para]');
+          if (pEl) currentPNum = pEl.getAttribute('data-para');
+        }
+      }
+      const cleanP = String(currentPNum || '').replace(/^(?:para-?|p)/i, '').trim();
+
+      let activeSubKey = activeTab?.sub_book || activeTab?.chapter_to_sub_book?.[currentChapIdx];
+      if (!activeSubKey && activeTab?.sub_books) {
+        for (const [k, v] of Object.entries(activeTab.sub_books)) {
+          const cr = v.chapter_range || v.tika_chapter_range;
+          if (cr && currentChapIdx >= cr[0] && currentChapIdx <= cr[1]) {
+            activeSubKey = k;
+            break;
+          }
+        }
+      }
+
+      // 0. High-Priority Precomputed Canonical Mapping (Authoritative Database Ground Truth)
+      let precomputedTarget = (cleanP && activeSubKey && activeTab.sub_books_para_to_mat?.[activeSubKey]?.[cleanP]?.[targetLayer])
+        || (cleanP && activeTab.para_to_mat?.[cleanP]?.[targetLayer])
+        || activeTab.chapter_to_mat?.[currentChapIdx]?.[targetLayer]
+        || activeTab.chapter_to_mat?.[String(currentChapIdx)]?.[targetLayer];
+
+      if (!precomputedTarget && typeof window !== 'undefined') {
+        try {
+          const jumpData = await fetchMatJump(activeTab.bookCode, cleanP, currentChapIdx);
+          if (jumpData?.[targetLayer]?.book) {
+            precomputedTarget = jumpData[targetLayer];
+          }
+        } catch (_) {}
+      }
+
+      if (options.code && (options.targetChapterIdx !== undefined || options.chapter !== undefined)) {
+        targetCode = options.code;
+        targetTitle = options.title || targetTitle;
+        targetChapter = options.targetChapterIdx !== undefined ? options.targetChapterIdx : options.chapter;
+        if (options.targetParaNum) currentPNum = options.targetParaNum;
+      } else if (precomputedTarget?.book) {
+        targetCode = precomputedTarget.book;
+        targetTitle = precomputedTarget.title || options.title || targetTitle;
+        targetChapter = precomputedTarget.chapter;
+        if (precomputedTarget.para) currentPNum = precomputedTarget.para;
+      }
 
       // 1. Multi-volume reverse jump: activeTab has sub_books (e.g. s0402a.att, s0402t.tik, etc.)
-      if (activeTab.sub_books) {
+      if (!targetCode && activeTab.sub_books) {
         let subKey = activeTab.chapter_to_sub_book?.[currentChapIdx];
         if (!subKey) {
           for (const [k, v] of Object.entries(activeTab.sub_books)) {
@@ -1472,6 +1534,10 @@ export function TabProvider({ children }) {
         const layerTargets = splitTargets[targetLayer];
         if (Array.isArray(layerTargets)) {
           let currentPNum = activeParaNum;
+          if (!currentPNum && typeof window !== 'undefined' && window.location.hash) {
+            const hashMatch = window.location.hash.match(/^(?:#para-?|#p)?(\d+(?:-\d+)?)/i);
+            if (hashMatch) currentPNum = hashMatch[1];
+          }
           if (!currentPNum && typeof document !== 'undefined') {
             const cEl = document.querySelector('.content-area') || document.querySelector('.reader-container') || document.querySelector('main');
             if (cEl) {
@@ -1479,25 +1545,63 @@ export function TabProvider({ children }) {
               if (pEl) currentPNum = pEl.getAttribute('data-para');
             }
           }
-          const currentPInt = parseInt(String(currentPNum || '').replace(/^(?:para-?|p)/i, ''), 10);
+          const cleanP = String(currentPNum || '').replace(/^(?:para-?|p)/i, '').trim();
+          let currentPInt = parseInt(cleanP, 10);
 
+          let effectiveChapIdx = currentChapIdx;
+          let subKeyForChap = activeTab?.chapter_to_sub_book?.[currentChapIdx] || activeTab?.chapter_to_sub_book?.[String(currentChapIdx)];
+          if (!subKeyForChap && activeTab?.sub_books) {
+            for (const [k, v] of Object.entries(activeTab.sub_books)) {
+              const cr = v.chapter_range || v.tika_chapter_range;
+              if (cr && currentChapIdx >= cr[0] && currentChapIdx <= cr[1]) {
+                subKeyForChap = k;
+                break;
+              }
+            }
+          }
+
+          if (cleanP) {
+            let pChap = undefined;
+            if (subKeyForChap && activeTab.sub_books_para_to_chapter?.[subKeyForChap]) {
+              pChap = activeTab.sub_books_para_to_chapter[subKeyForChap][cleanP];
+            } else if (activeTab.para_to_chapter) {
+              pChap = activeTab.para_to_chapter[cleanP];
+            }
+
+            if (pChap !== undefined && pChap === currentChapIdx) {
+              effectiveChapIdx = currentChapIdx;
+            } else if (pChap !== undefined && pChap !== currentChapIdx) {
+              const hasExplicitHash = typeof window !== 'undefined' && window.location.hash && window.location.hash.includes(cleanP);
+              if (hasExplicitHash && !subKeyForChap) {
+                effectiveChapIdx = pChap;
+              } else if (pChap === undefined) {
+                currentPInt = NaN;
+              }
+            }
+          }
+
+          let matchedRule = null;
           for (const rule of layerTargets) {
-            const inChap = rule.chapter_range && currentChapIdx >= rule.chapter_range[0] && currentChapIdx <= rule.chapter_range[1];
+            const inChap = rule.chapter_range && effectiveChapIdx >= rule.chapter_range[0] && effectiveChapIdx <= rule.chapter_range[1];
             let inPara = true;
             if (rule.para_range) {
               inPara = !isNaN(currentPInt) && currentPInt >= rule.para_range[0] && currentPInt <= rule.para_range[1];
             }
             if (inChap && inPara) {
-              targetCode = rule.code || targetCode;
-              targetTitle = rule.title || targetTitle;
-              if (options.chapter !== undefined) {
-                targetChapter = options.chapter;
-              } else if (rule.target_chapter !== undefined) {
-                targetChapter = rule.target_chapter;
-              } else if (rule.target_chapter_offset !== undefined) {
-                targetChapter = Math.max(0, currentChapIdx + rule.target_chapter_offset);
-              }
+              matchedRule = rule;
               break;
+            }
+          }
+
+          if (matchedRule) {
+            targetCode = options.code || matchedRule.code || targetCode;
+            targetTitle = options.title || matchedRule.title || targetTitle;
+            if (options.chapter !== undefined) {
+              targetChapter = options.chapter;
+            } else if (matchedRule.target_chapter !== undefined) {
+              targetChapter = matchedRule.target_chapter;
+            } else if (matchedRule.target_chapter_offset !== undefined) {
+              targetChapter = Math.max(0, effectiveChapIdx + matchedRule.target_chapter_offset);
             }
           }
         }
@@ -1554,7 +1658,7 @@ export function TabProvider({ children }) {
       if (!targetCode || targetCode === activeTab.bookCode) return;
 
       // Extract current active paragraph number from state or DOM
-      let currentPara = activeParaNum;
+      let currentPara = currentPNum || activeParaNum;
       if (!currentPara && typeof document !== 'undefined') {
         const container = document.querySelector('.reader-container') || document.querySelector('main');
         if (container) {

@@ -255,7 +255,7 @@
         "mula_title": "Dhātukathāpāḷi",
         "chapter_range": [
           0,
-          2
+          0
         ],
         "tika_chapter": 0
       },
@@ -263,8 +263,8 @@
         "mula_code": "abh03m2.mul",
         "mula_title": "Puggalapaññattipāḷi",
         "chapter_range": [
-          3,
-          5
+          1,
+          1
         ],
         "tika_chapter": 1
       },
@@ -272,8 +272,8 @@
         "mula_code": "abh03m3.mul",
         "mula_title": "Kathāvatthupāḷi",
         "chapter_range": [
-          6,
-          38
+          2,
+          2
         ],
         "tika_chapter": 2
       },
@@ -281,8 +281,8 @@
         "mula_code": "abh03m4.mul",
         "mula_title": "Yamakapāḷi-1",
         "chapter_range": [
-          39,
-          49
+          3,
+          3
         ],
         "tika_chapter": 3
       },
@@ -290,8 +290,8 @@
         "mula_code": "abh03m7.mul",
         "mula_title": "Paṭṭhānapāḷi-1",
         "chapter_range": [
-          50,
-          65
+          4,
+          4
         ],
         "tika_chapter": 4
       }
@@ -1362,7 +1362,7 @@
     "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
     "sub_book": "an3",
     "attha_start_chapter": 19,
-    "tika_start_chapter": 19
+    "tika_start_chapter": 18
   },
   "s0402m3.mul": {
     "category": "mūla",
@@ -1374,7 +1374,7 @@
     "tika_title": "Duka-Tika-Catukkanipāta-Ṭīkā",
     "sub_book": "an4",
     "attha_start_chapter": 36,
-    "tika_start_chapter": 36
+    "tika_start_chapter": 34
   },
   "s0402t.tik": {
     "category": "ṭīkā",
@@ -1390,23 +1390,23 @@
         "mula_title": "Dukanipātapāḷi",
         "chapter_range": [
           0,
-          18
+          17
         ]
       },
       "an3": {
         "mula_code": "s0402m2.mul",
         "mula_title": "Tikanipātapāḷi",
         "chapter_range": [
-          19,
-          35
+          18,
+          33
         ]
       },
       "an4": {
         "mula_code": "s0402m3.mul",
         "mula_title": "Catukkanipātapāḷi",
         "chapter_range": [
-          36,
-          63
+          34,
+          58
         ]
       }
     }
@@ -1468,7 +1468,7 @@
     "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
     "sub_book": "an6",
     "attha_start_chapter": 26,
-    "tika_start_chapter": 26
+    "tika_start_chapter": 23
   },
   "s0403m3.mul": {
     "category": "mūla",
@@ -1480,7 +1480,7 @@
     "tika_title": "Pañcaka-Chakka-Sattakanipāta-Ṭīkā",
     "sub_book": "an7",
     "attha_start_chapter": 39,
-    "tika_start_chapter": 39
+    "tika_start_chapter": 33
   },
   "s0403t.tik": {
     "category": "ṭīkā",
@@ -1496,23 +1496,23 @@
         "mula_title": "Pañcakanipātapāḷi",
         "chapter_range": [
           0,
-          25
+          22
         ]
       },
       "an6": {
         "mula_code": "s0403m2.mul",
         "mula_title": "Chakkanipātapāḷi",
         "chapter_range": [
-          26,
-          38
+          23,
+          32
         ]
       },
       "an7": {
         "mula_code": "s0403m3.mul",
         "mula_title": "Sattakanipātapāḷi",
         "chapter_range": [
-          39,
-          46
+          33,
+          40
         ]
       }
     }
@@ -1582,7 +1582,7 @@
     "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
     "sub_book": "an9",
     "attha_start_chapter": 10,
-    "tika_start_chapter": 10
+    "tika_start_chapter": 8
   },
   "s0404m3.mul": {
     "category": "mūla",
@@ -1594,7 +1594,7 @@
     "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
     "sub_book": "an10",
     "attha_start_chapter": 15,
-    "tika_start_chapter": 15
+    "tika_start_chapter": 13
   },
   "s0404m4.mul": {
     "category": "mūla",
@@ -1606,7 +1606,7 @@
     "tika_title": "Aṭṭhakādinipāta-Ṭīkā",
     "sub_book": "an11",
     "attha_start_chapter": 31,
-    "tika_start_chapter": 31
+    "tika_start_chapter": 26
   },
   "s0404t.tik": {
     "category": "ṭīkā",
@@ -1622,31 +1622,31 @@
         "mula_title": "Aṭṭhakanipātapāḷi",
         "chapter_range": [
           0,
-          9
+          7
         ]
       },
       "an9": {
         "mula_code": "s0404m2.mul",
         "mula_title": "Navakanipātapāḷi",
         "chapter_range": [
-          10,
-          14
+          8,
+          12
         ]
       },
       "an10": {
         "mula_code": "s0404m3.mul",
         "mula_title": "Dasakanipātapāḷi",
         "chapter_range": [
-          15,
-          30
+          13,
+          25
         ]
       },
       "an11": {
         "mula_code": "s0404m4.mul",
         "mula_title": "Ekādasakanipātapāḷi",
         "chapter_range": [
-          31,
-          32
+          26,
+          27
         ]
       }
     }

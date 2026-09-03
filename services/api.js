@@ -261,6 +261,25 @@ export async function fetchMat(bookCode) {
   }, 24 * 60 * 60 * 1000);
 }
 
+export async function fetchMatJump(bookCode, para = null, chapter = null) {
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+  const p = para ? `para=${encodeURIComponent(String(para).replace(/^(?:para-?|p)/i, '').trim())}` : '';
+  const c = (chapter !== undefined && chapter !== null) ? `chapter=${encodeURIComponent(chapter)}` : '';
+  const qs = [p, c].filter(Boolean).join('&');
+  const cacheKey = `mat_jump_${cleanCode}_${para || '0'}_${chapter !== undefined && chapter !== null ? chapter : '0'}`;
+
+  return cachedFetch(cacheKey, async () => {
+    try {
+      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_jump${qs ? '?' + qs : ''}`, { cache: 'no-store' });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+    return null;
+  }, 1000);
+}
+
 export async function searchTipitaka(query, options = {}) {
   const params = new URLSearchParams();
   params.set('q', query);

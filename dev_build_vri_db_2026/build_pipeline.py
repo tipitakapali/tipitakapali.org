@@ -228,6 +228,356 @@ def compare_latest_with_old_romn():
         log_step("No textual body differences found.")
 
 
+def precompute_canonical_mat_mappings(cur, conn, book_mat_catalog):
+    """
+    Precompute exact, database-wide paragraph-level and chapter-level MAT mappings
+    for all 217 books in the Tipitaka canon. Populates mat_para_map and mat_chapter_map,
+    and enriches books.meta_json with chapter_to_mat and para_to_mat.
+    """
+    log_step("Precomputing canon-wide MAT chapter and paragraph mappings...")
+    t0 = time.time()
+
+    cur.execute("SELECT id, code, category, title, meta_json FROM books ORDER BY id")
+    books = {}
+    for r in cur.fetchall():
+        meta = json.loads(r[4]) if r[4] else {}
+        books[r[1]] = {
+            'id': r[0],
+            'code': r[1],
+            'category': r[2],
+            'title': r[3],
+            'meta': meta,
+            'para_to_chapter': meta.get('para_to_chapter', {}),
+            'chapter_to_sub_book': meta.get('chapter_to_sub_book', {}),
+            'sub_books_para_to_chapter': meta.get('sub_books_para_to_chapter', {}),
+            'sub_books': meta.get('sub_books', {}),
+            'sub_book': meta.get('sub_book'),
+            'split_targets': meta.get('split_targets'),
+            'mat': meta.get('mat', {}) or book_mat_catalog.get(r[1], {})
+        }
+
+    chapters_by_book = {}
+    cur.execute("SELECT book_code, chapter_index, title FROM chapters ORDER BY book_code, chapter_index")
+    for r in cur.fetchall():
+        bcode = r[0]
+        if bcode not in chapters_by_book:
+            chapters_by_book[bcode] = []
+        chapters_by_book[bcode].append({'index': r[1], 'title': r[2]})
+
+    def resolve_target(src_code, target_layer, src_chap_idx, src_para_num=None):
+        src_b = books.get(src_code)
+        if not src_b:
+            return None
+
+        clean_p = str(src_para_num).replace('para', '').replace('p', '').strip() if src_para_num else None
+        p_int = int(clean_p) if clean_p and clean_p.isdigit() else None
+
+        mat = src_b['mat']
+        split_targets = src_b['split_targets'] or mat.get('split_targets')
+
+        target_code = None
+        target_chap = None
+
+        # Case 1: Split targets (e.g. vin01m.mul -> vin01t1/t2, s0508m -> s0508a1/a2, s0513m -> s0513a1..a4)
+        if split_targets and target_layer in split_targets:
+            rules = split_targets[target_layer]
+            for rule in rules:
+                in_chap = rule.get('chapter_range') and (rule['chapter_range'][0] <= src_chap_idx <= rule['chapter_range'][1])
+                in_para = True
+                if rule.get('para_range') and p_int is not None:
+                    in_para = (rule['para_range'][0] <= p_int <= rule['para_range'][1])
+                if in_chap and in_para:
+                    target_code = rule.get('code')
+                    if rule.get('target_chapter') is not None:
+                        target_chap = rule['target_chapter']
+                    elif rule.get('target_chapter_offset') is not None:
+                        target_chap = max(0, src_chap_idx + rule['target_chapter_offset'])
+                    break
+
+        sub_key = None
+
+        # Case 2: Multi-volume parent book with sub_books (e.g. vin02t.tik, s0402a.att, s0402t.tik, s0403a.att, s0403t.tik, s0404a.att, s0404t.tik, s0510a.att, abh03a.att, abh03t.tik)
+        if not target_code and src_b.get('sub_books'):
+            if src_b.get('chapter_to_sub_book'):
+                sub_key = src_b['chapter_to_sub_book'].get(str(src_chap_idx)) or src_b['chapter_to_sub_book'].get(src_chap_idx)
+
+            if not sub_key:
+                for k, sinfo in src_b['sub_books'].items():
+                    cr = sinfo.get('tika_chapter_range') or sinfo.get('chapter_range')
+                    if cr and cr[0] <= src_chap_idx <= cr[1]:
+                        sub_key = k
+                        break
+
+            if sub_key and sub_key in src_b['sub_books']:
+                sinfo = src_b['sub_books'][sub_key]
+                if target_layer == 'mula':
+                    target_code = sinfo.get('mula_code')
+                    if sinfo.get('chapter_range'):
+                        target_chap = max(0, src_chap_idx - sinfo['chapter_range'][0])
+                    elif sinfo.get('tika_chapter_range'):
+                        start_t = sinfo['tika_chapter_range'][0]
+                        if start_t in [8, 19, 32]:
+                            target_chap = max(0, src_chap_idx - (start_t + 1))
+                        else:
+                            target_chap = max(0, src_chap_idx - start_t)
+                elif target_layer == 'attha':
+                    target_code = sinfo.get('attha_code')
+                    if sinfo.get('chapter_range'):
+                        target_chap = max(0, src_chap_idx - sinfo['chapter_range'][0])
+                    elif sinfo.get('tika_chapter_range'):
+                        start_t = sinfo['tika_chapter_range'][0]
+                        if start_t in [8, 19, 32]:
+                            target_chap = max(0, src_chap_idx - (start_t + 1))
+                        else:
+                            target_chap = max(0, src_chap_idx - start_t)
+                elif target_layer == 'tika':
+                    target_code = sinfo.get('tika_code')
+                    if sinfo.get('tika_chapter') is not None:
+                        target_chap = sinfo['tika_chapter']
+                    elif sinfo.get('tika_chapter_range') and sinfo.get('chapter_range'):
+                        start_c = sinfo['chapter_range'][0]
+                        start_t = sinfo['tika_chapter_range'][0]
+                        target_chap = start_t + (src_chap_idx - start_c)
+
+        # Case 3: Sub-book single volume forward jump (e.g. s0402m2.mul -> s0402a.att an3, vin02m2.mul -> vin02t.tik, s0510m2.mul -> s0510a.att apadana2)
+        if not target_code and src_b.get('sub_book'):
+            src_sub = src_b['sub_book']
+            if target_layer == 'mula':
+                target_code = mat.get('mula_code')
+                offset = src_b['meta'].get('mula_start_chapter', mat.get('mula_start_chapter', 0))
+                if target_chap is None:
+                    target_chap = offset + src_chap_idx
+            elif target_layer == 'attha':
+                target_code = mat.get('attha_code')
+                offset = src_b['meta'].get('attha_start_chapter', mat.get('attha_start_chapter', 0))
+                if target_chap is None:
+                    target_chap = offset + src_chap_idx
+            elif target_layer == 'tika':
+                target_code = mat.get('tika_code')
+                offset = src_b['meta'].get('tika_start_chapter', mat.get('tika_start_chapter', 0))
+                if target_chap is None:
+                    target_chap = offset + src_chap_idx
+
+        # Case 3: Reverse offset from split/multi book (e.g. s0508a2.att -> s0508m.mul, s0510a.att -> s0510m2.mul)
+        if not target_code:
+            if target_layer == 'mula':
+                target_code = mat.get('mula_code')
+                if src_b['meta'].get('mula_chapter') is not None:
+                    target_chap = src_b['meta']['mula_chapter']
+                elif src_b['meta'].get('mula_chapter_offset') is not None:
+                    target_chap = max(0, src_chap_idx + src_b['meta']['mula_chapter_offset'])
+            elif target_layer == 'attha':
+                target_code = mat.get('attha_code')
+                if src_b['meta'].get('attha_chapter') is not None:
+                    target_chap = src_b['meta']['attha_chapter']
+                elif src_b['meta'].get('attha_chapter_offset') is not None:
+                    target_chap = max(0, src_chap_idx + src_b['meta']['attha_chapter_offset'])
+                elif src_b['meta'].get('attha_start_chapter') is not None:
+                    target_chap = max(0, src_chap_idx + src_b['meta']['attha_start_chapter'])
+                elif mat.get('attha_start_chapter') is not None:
+                    target_chap = max(0, src_chap_idx + mat['attha_start_chapter'])
+            elif target_layer == 'tika':
+                target_code = mat.get('tika_code')
+                if src_b['meta'].get('tika_chapter') is not None:
+                    target_chap = src_b['meta']['tika_chapter']
+                elif src_b['meta'].get('tika_chapter_offset') is not None:
+                    target_chap = max(0, src_chap_idx + src_b['meta']['tika_chapter_offset'])
+                elif src_b['meta'].get('tika_start_chapter') is not None:
+                    target_chap = max(0, src_chap_idx + src_b['meta']['tika_start_chapter'])
+                elif mat.get('tika_start_chapter') is not None:
+                    target_chap = max(0, src_chap_idx + mat['tika_start_chapter'])
+
+        # Fallback to standard mat codes
+        if not target_code and mat:
+            target_code = mat.get(f'{target_layer}_code')
+
+        if not target_code or target_code == src_code:
+            return None
+
+        target_b = books.get(target_code)
+        if not target_b:
+            return None
+
+        target_title = target_b['title']
+        target_para = clean_p
+
+        # Refine target chapter using paragraph alignment if available
+        src_p2c = src_b.get('sub_books_para_to_chapter', {}).get(sub_key, {}) if sub_key else src_b.get('para_to_chapter', {})
+        if not src_p2c:
+            src_p2c = src_b.get('para_to_chapter', {})
+        paras_in_chap = [int(p) for p, c in src_p2c.items() if c == src_chap_idx and p.isdigit() and int(p) > 0]
+        paras_in_chap.sort()
+
+        target_sub_hint = sub_key or target_b.get('sub_book') or src_b.get('sub_book')
+        target_p2c = target_b.get('sub_books_para_to_chapter', {}).get(target_sub_hint, {}) if target_sub_hint else target_b.get('para_to_chapter', {})
+        if not target_p2c:
+            target_p2c = target_b.get('para_to_chapter', {})
+
+        para_matched_chap = None
+        for p in paras_in_chap:
+            str_p = str(p)
+            if str_p in target_p2c:
+                para_matched_chap = target_p2c[str_p]
+                break
+        if para_matched_chap is not None:
+            target_chap = para_matched_chap
+
+        # Find target chapter and exact/nearest paragraph in target book
+        if clean_p and target_b['para_to_chapter']:
+            target_sub = target_b['sub_book'] or (target_b['chapter_to_sub_book'].get(str(target_chap)) if target_chap is not None else None)
+            if not target_sub and src_b.get('sub_book'):
+                target_sub = src_b['sub_book']
+            if not target_sub and sub_key:
+                target_sub = sub_key
+
+            # Priority A: Check sub_books_para_to_chapter
+            if target_sub and target_b['sub_books_para_to_chapter'].get(target_sub):
+                sub_p2c = target_b['sub_books_para_to_chapter'][target_sub]
+                if clean_p in sub_p2c:
+                    target_chap = sub_p2c[clean_p]
+                    target_para = clean_p
+                else:
+                    target_para = None
+            # Priority B: Check target book's standard para_to_chapter
+            elif clean_p in target_b['para_to_chapter']:
+                target_chap = target_b['para_to_chapter'][clean_p]
+                target_para = clean_p
+            else:
+                target_para = None
+
+        if target_chap is None:
+            target_chap = 0
+
+        return {
+            'book': target_code,
+            'chapter': target_chap,
+            'para': target_para,
+            'title': target_title
+        }
+
+    cur.execute("DELETE FROM mat_para_map")
+    cur.execute("DELETE FROM mat_chapter_map")
+
+    para_rows = []
+    chapter_rows = []
+
+    for bcode, b in books.items():
+        chaps = chapters_by_book.get(bcode, [{'index': 0, 'title': b['title']}])
+        p2c = b['para_to_chapter']
+
+        chapter_to_mat = {}
+        para_to_mat = {}
+
+        # 1. Compute chapter mappings
+        for ch in chaps:
+            c_idx = ch['index']
+            c_mat = {}
+            for layer in ['mula', 'attha', 'tika']:
+                t = resolve_target(bcode, layer, c_idx)
+                if t:
+                    c_mat[layer] = t
+
+            if c_mat:
+                chapter_to_mat[str(c_idx)] = c_mat
+                chapter_rows.append((
+                    bcode,
+                    c_idx,
+                    c_mat.get('mula', {}).get('book'),
+                    c_mat.get('mula', {}).get('chapter'),
+                    c_mat.get('mula', {}).get('title'),
+                    c_mat.get('attha', {}).get('book'),
+                    c_mat.get('attha', {}).get('chapter'),
+                    c_mat.get('attha', {}).get('title'),
+                    c_mat.get('tika', {}).get('book'),
+                    c_mat.get('tika', {}).get('chapter'),
+                    c_mat.get('tika', {}).get('title'),
+                ))
+
+        # 2. Compute paragraph mappings (including all sub-book occurrences)
+        para_entries = []
+        seen_para_chap = set()
+
+        sub_p2c = b.get('sub_books_para_to_chapter', {})
+        chapter_to_sub = b.get('chapter_to_sub_book', {})
+        if sub_p2c:
+            for s_key, s_pmap in sub_p2c.items():
+                for p_str, c_idx in s_pmap.items():
+                    key = (c_idx, str(p_str))
+                    if key not in seen_para_chap:
+                        seen_para_chap.add(key)
+                        para_entries.append((c_idx, str(p_str), s_key))
+
+        for p_str, c_idx in p2c.items():
+            key = (c_idx, str(p_str))
+            if key not in seen_para_chap:
+                seen_para_chap.add(key)
+                s_key = chapter_to_sub.get(str(c_idx)) or chapter_to_sub.get(c_idx) or b.get('sub_book')
+                para_entries.append((c_idx, str(p_str), s_key))
+
+        sub_books_para_to_mat = {}
+        for c_idx, p_str, s_key in para_entries:
+            p_mat = {}
+            for layer in ['mula', 'attha', 'tika']:
+                t = resolve_target(bcode, layer, c_idx, p_str)
+                if t:
+                    p_mat[layer] = t
+
+            if p_mat:
+                if str(p_str) not in para_to_mat:
+                    para_to_mat[str(p_str)] = p_mat
+                if s_key:
+                    if s_key not in sub_books_para_to_mat:
+                        sub_books_para_to_mat[s_key] = {}
+                    sub_books_para_to_mat[s_key][str(p_str)] = p_mat
+
+                para_rows.append((
+                    bcode,
+                    c_idx,
+                    str(p_str),
+                    s_key,
+                    p_mat.get('mula', {}).get('book'),
+                    p_mat.get('mula', {}).get('chapter'),
+                    p_mat.get('mula', {}).get('para'),
+                    p_mat.get('mula', {}).get('title'),
+                    p_mat.get('attha', {}).get('book'),
+                    p_mat.get('attha', {}).get('chapter'),
+                    p_mat.get('attha', {}).get('para'),
+                    p_mat.get('attha', {}).get('title'),
+                    p_mat.get('tika', {}).get('book'),
+                    p_mat.get('tika', {}).get('chapter'),
+                    p_mat.get('tika', {}).get('para'),
+                    p_mat.get('tika', {}).get('title'),
+                ))
+
+        b['meta']['chapter_to_mat'] = chapter_to_mat
+        b['meta']['para_to_mat'] = para_to_mat
+        if sub_books_para_to_mat:
+            b['meta']['sub_books_para_to_mat'] = sub_books_para_to_mat
+        new_meta_json = json.dumps(b['meta'], ensure_ascii=False)
+        cur.execute("UPDATE books SET meta_json = ? WHERE code = ?", (new_meta_json, bcode))
+
+    cur.executemany("""
+    INSERT INTO mat_chapter_map (
+        source_book, source_chapter,
+        mula_book, mula_chapter, mula_title,
+        attha_book, attha_chapter, attha_title,
+        tika_book, tika_chapter, tika_title
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, chapter_rows)
+
+    cur.executemany("""
+    INSERT INTO mat_para_map (
+        source_book, source_chapter, source_para, sub_book,
+        mula_book, mula_chapter, mula_para, mula_title,
+        attha_book, attha_chapter, attha_para, attha_title,
+        tika_book, tika_chapter, tika_para, tika_title
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, para_rows)
+
+    elapsed = time.time() - t0
+    log_step(f"  ✓ Precomputed {len(chapter_rows)} chapter and {len(para_rows)} paragraph MAT mappings in {elapsed:.2f}s.")
+
+
 # ===========================================================================
 # Step 3: Build tipitaka.db from _latest_romn
 # ===========================================================================
@@ -302,6 +652,45 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
         attha_title TEXT,
         tika_code TEXT,
         tika_title TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE mat_para_map (
+        source_book TEXT NOT NULL,
+        source_chapter INTEGER NOT NULL,
+        source_para TEXT NOT NULL,
+        sub_book TEXT,
+        mula_book TEXT,
+        mula_chapter INTEGER,
+        mula_para TEXT,
+        mula_title TEXT,
+        attha_book TEXT,
+        attha_chapter INTEGER,
+        attha_para TEXT,
+        attha_title TEXT,
+        tika_book TEXT,
+        tika_chapter INTEGER,
+        tika_para TEXT,
+        tika_title TEXT,
+        PRIMARY KEY (source_book, source_chapter, source_para)
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE mat_chapter_map (
+        source_book TEXT NOT NULL,
+        source_chapter INTEGER NOT NULL,
+        mula_book TEXT,
+        mula_chapter INTEGER,
+        mula_title TEXT,
+        attha_book TEXT,
+        attha_chapter INTEGER,
+        attha_title TEXT,
+        tika_book TEXT,
+        tika_chapter INTEGER,
+        tika_title TEXT,
+        PRIMARY KEY (source_book, source_chapter)
     );
     """)
 
@@ -705,6 +1094,9 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """, (book_code, cat, mat.get('mula_code'), mat.get('mula_title'), mat.get('attha_code'), mat.get('attha_title'), mat.get('tika_code'), mat.get('tika_title')))
 
+    # Precompute Canon-wide MAT mappings (Chapter and Paragraph Level)
+    precompute_canonical_mat_mappings(cur, conn, book_mat_catalog)
+
     # Create Performance Indexes
     log_step("Creating database indexes...")
     cur.execute("CREATE INDEX idx_books_code ON books(code);")
@@ -712,6 +1104,9 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
     cur.execute("CREATE INDEX idx_chapters_book_idx ON chapters(book_code, chapter_index);")
     cur.execute("CREATE INDEX idx_chapters_chunk ON chapters(chunk_name);")
     cur.execute("CREATE INDEX idx_book_mat_code ON book_mat(book_code);")
+    cur.execute("CREATE INDEX idx_mat_para_lookup ON mat_para_map(source_book, source_chapter, source_para);")
+    cur.execute("CREATE INDEX idx_mat_para_src ON mat_para_map(source_book, source_para);")
+    cur.execute("CREATE INDEX idx_mat_chap_src ON mat_chapter_map(source_book, source_chapter);")
     cur.execute("CREATE INDEX idx_book_toc_code ON book_toc(book_code, item_index);")
     cur.execute("CREATE INDEX idx_tree_parent ON tree_nodes(parent_id);")
 
@@ -969,7 +1364,82 @@ def verify_multi_volume_mat(conn):
     assert m_vin01['attha_start_chapter'] == 1
     assert len(m_vin01['split_targets']['tika']) == 2
 
-    log_step("  ✓ Multi-Volume MAT Navigation: 100% assertions PASSED across all collections.")
+    # Suite 12: Precomputed Canonical MAT Tables Verification
+    cur = conn.cursor()
+    cur.execute("SELECT count(*) FROM mat_para_map;")
+    total_mat_paras = cur.fetchone()[0]
+    cur.execute("SELECT count(*) FROM mat_chapter_map;")
+    total_mat_chaps = cur.fetchone()[0]
+
+    assert total_mat_paras >= 70000, f"Expected >= 70000 mat_para_map rows, found {total_mat_paras}"
+    assert total_mat_chaps >= 2000, f"Expected >= 2000 mat_chapter_map rows, found {total_mat_chaps}"
+
+    # Verify vin01m.mul para 443 -> vin01t2.tik ch 2 para 443
+    cur.execute("SELECT tika_book, tika_chapter, tika_para FROM mat_para_map WHERE source_book = 'vin01m.mul' AND source_para = '443'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin01t2.tik' and r[1] == 2 and r[2] == '443', f"vin01m.mul para 443 mapping failed: {r}"
+
+    # Verify vin01m.mul para 1 -> vin01t1.tik ch 1 para 1
+    cur.execute("SELECT tika_book, tika_chapter, tika_para FROM mat_para_map WHERE source_book = 'vin01m.mul' AND source_para = '1'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin01t1.tik' and r[1] == 1 and r[2] == '1', f"vin01m.mul para 1 mapping failed: {r}"
+
+    # Verify s0402m2.mul para 2 -> s0402a.att ch 19 para 2
+    cur.execute("SELECT attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0402m2.mul' AND source_para = '2'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402a.att' and r[1] == 19 and r[2] == '2', f"s0402m2.mul para 2 mapping failed: {r}"
+
+    # Verify s0508m.mul para 443 -> s0508a2.att ch 2 para 443
+    cur.execute("SELECT attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0508m.mul' AND source_para = '443'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0508a2.att' and r[1] == 2 and r[2] == '443', f"s0508m.mul para 443 mapping failed: {r}"
+
+    # Verify vin02m2.mul para 184 -> vin02t.tik ch 11 para 184, vin02a2.att ch 2 para 184
+    cur.execute("SELECT tika_book, tika_chapter, tika_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 'vin02m2.mul' AND source_para = '184'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin02t.tik' and r[1] == 11 and r[2] == '184' and r[3] == 'vin02a2.att' and r[4] == 2 and r[5] == '184', f"vin02m2.mul para 184 mapping failed: {r}"
+
+    # Verify reverse jump: vin02t.tik ch 11 para 184 -> vin02m2.mul ch 2 para 184, vin02a2.att ch 2 para 184
+    cur.execute("SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 'vin02t.tik' AND source_chapter = 11 AND source_para = '184'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin02m2.mul' and r[1] == 2 and r[2] == '184' and r[3] == 'vin02a2.att' and r[4] == 2 and r[5] == '184', f"vin02t.tik para 184 mapping failed: {r}"
+
+    # Verify chapter-scoped disambiguation: vin02t.tik ch 13 (Mahavagga) para 243 -> vin02m2.mul ch 4 para 243
+    cur.execute("SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 'vin02t.tik' AND source_chapter = 13 AND source_para = '243'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin02m2.mul' and r[1] == 4 and r[2] == '243' and r[3] == 'vin02a2.att' and r[4] == 4 and r[5] == '243', f"vin02t.tik ch 13 para 243 mapping failed: {r}"
+
+    # Verify chapter-scoped disambiguation: vin02t.tik ch 0 (Pacittiya) para 243 -> vin02m1.mul ch 0 para 243
+    cur.execute("SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 'vin02t.tik' AND source_chapter = 0 AND source_para = '243'")
+    r = cur.fetchone()
+    assert r and r[0] == 'vin02m1.mul' and r[1] == 0 and r[2] == '243' and r[3] == 'vin02a1.att' and r[4] == 0 and r[5] == '243', f"vin02t.tik ch 0 para 243 mapping failed: {r}"
+
+    # Verify Anguttara Nikaya Tikanipata para 9 (Khatasuttam): has Atthakatha ch 19 para 9, Tika ch 18 (Balavagga)
+    cur.execute("SELECT attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para FROM mat_para_map WHERE source_book = 's0402m2.mul' AND source_chapter = 0 AND source_para = '9'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402a.att' and r[1] == 19 and r[2] == '9' and r[3] == 's0402t.tik' and r[4] == 18, f"s0402m2.mul para 9 mapping failed: {r}"
+
+    # Verify Anguttara Nikaya Tikanipata para 2 (Lakkhanasuttam): has Tika ch 18 para 2
+    cur.execute("SELECT tika_book, tika_chapter, tika_para FROM mat_para_map WHERE source_book = 's0402m2.mul' AND source_chapter = 0 AND source_para = '2'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402t.tik' and r[1] == 18 and r[2] == '2', f"s0402m2.mul para 2 mapping failed: {r}"
+
+    # Verify Catukkanipata s0402m3.mul para 1 -> s0402t.tik ch 34 para 1
+    cur.execute("SELECT tika_book, tika_chapter, tika_para FROM mat_para_map WHERE source_book = 's0402m3.mul' AND source_chapter = 0 AND source_para = '1'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402t.tik' and r[1] == 34 and r[2] == '1', f"s0402m3.mul para 1 mapping failed: {r}"
+
+    # Verify s0402t.tik ch 32 (Acelakavagga, URL /33) reverse jumps to Mula ch 15 (URL /16) and Attha ch 34 (URL /35)
+    cur.execute("SELECT mula_book, mula_chapter, attha_book, attha_chapter FROM mat_chapter_map WHERE source_book = 's0402t.tik' AND source_chapter = 32")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402m2.mul' and r[1] == 15 and r[2] == 's0402a.att' and r[3] == 34, f"s0402t.tik ch 32 chapter mapping failed: {r}"
+
+    # Verify s0402t.tik ch 32 para 157 reverse jumps to Mula ch 15 para 157 and Attha ch 34 para 157
+    cur.execute("SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0402t.tik' AND source_chapter = 32 AND source_para = '157'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0402m2.mul' and r[1] == 15 and r[2] == '157' and r[3] == 's0402a.att' and r[4] == 34 and r[5] == '157', f"s0402t.tik ch 32 para 157 mapping failed: {r}"
+
+    log_step(f"  ✓ Multi-Volume MAT Navigation: 100% assertions PASSED across all collections ({total_mat_chaps} chapters, {total_mat_paras} paras verified).")
 
 
 def verify_databases():
@@ -1000,6 +1470,12 @@ def verify_databases():
     cur.execute("SELECT count(*) FROM book_mat;")
     mat_count = cur.fetchone()[0]
 
+    cur.execute("SELECT count(*) FROM mat_para_map;")
+    mat_para_count = cur.fetchone()[0]
+
+    cur.execute("SELECT count(*) FROM mat_chapter_map;")
+    mat_chap_count = cur.fetchone()[0]
+
     cur.execute("SELECT count(*) FROM site_metadata WHERE key = 'tree_json';")
     tree_meta_count = cur.fetchone()[0]
 
@@ -1017,10 +1493,12 @@ def verify_databases():
     assert toc_count >= 35000, f"Expected >= 35000 book_toc items, found {toc_count}"
     assert nodes_count >= 2500, f"Expected >= 2500 tree nodes, found {nodes_count}"
     assert mat_count == 217, f"Expected 217 book_mat rows, found {mat_count}"
+    assert mat_para_count >= 70000, f"Expected >= 70000 mat_para_map entries, found {mat_para_count}"
+    assert mat_chap_count >= 2000, f"Expected >= 2000 mat_chapter_map entries, found {mat_chap_count}"
     assert tree_meta_count == 1, "site_metadata must contain 'tree_json'"
     assert meta_json_count == 217, f"All books must contain valid meta_json"
 
-    log_step(f"tipitaka.db PASSED: {b_count} books, {c_count} chapters (100% with HTML), {toc_count:,} TOC entries, {mat_count} MAT relations.")
+    log_step(f"tipitaka.db PASSED: {b_count} books, {c_count} chapters (100% with HTML), {toc_count:,} TOC entries, {mat_count} MAT relations, {mat_para_count:,} para links.")
 
     if os.path.exists(FTS_DB):
         fconn = sqlite3.connect(FTS_DB)

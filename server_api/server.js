@@ -85,9 +85,17 @@ const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para
 
 let stmtGetMat = null;
 let stmtGetAllMat = null;
+let stmtGetMatParaChap = null;
+let stmtGetMatPara = null;
+let stmtGetMatParaSub = null;
+let stmtGetMatChapter = null;
 try {
   stmtGetMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat WHERE book_code = ?');
   stmtGetAllMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat');
+  stmtGetMatParaChap = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND source_chapter = ? AND source_para = ?');
+  stmtGetMatParaSub = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND sub_book = ? AND source_para = ?');
+  stmtGetMatPara = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND source_para = ?');
+  stmtGetMatChapter = db.prepare('SELECT mula_book, mula_chapter, mula_title, attha_book, attha_chapter, attha_title, tika_book, tika_chapter, tika_title FROM mat_chapter_map WHERE source_book = ? AND source_chapter = ?');
 } catch (e) {
   console.warn('[MAT] book_mat table prepared statement error:', e.message);
 }
@@ -386,6 +394,9 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
         sub_books_para_to_chapter: meta.sub_books_para_to_chapter || null,
         attha_start_chapter: meta.attha_start_chapter !== undefined ? meta.attha_start_chapter : null,
         tika_start_chapter: meta.tika_start_chapter !== undefined ? meta.tika_start_chapter : null,
+        chapter_to_mat: meta.chapter_to_mat || null,
+        para_to_mat: meta.para_to_mat || null,
+        sub_books_para_to_mat: meta.sub_books_para_to_mat || null,
         initial_chapter: null,
         chapters_data: {},
         html: '',
@@ -452,6 +463,9 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       sub_books_para_to_chapter: meta.sub_books_para_to_chapter || null,
       attha_start_chapter: meta.attha_start_chapter !== undefined ? meta.attha_start_chapter : null,
       tika_start_chapter: meta.tika_start_chapter !== undefined ? meta.tika_start_chapter : null,
+      chapter_to_mat: meta.chapter_to_mat || null,
+      para_to_mat: meta.para_to_mat || null,
+      sub_books_para_to_mat: meta.sub_books_para_to_mat || null,
       split_targets: meta.split_targets || null,
       mula_chapter: meta.mula_chapter !== undefined ? meta.mula_chapter : null,
       mula_chapter_offset: meta.mula_chapter_offset !== undefined ? meta.mula_chapter_offset : null,
@@ -561,6 +575,75 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
 
     reply.code(404);
     return { error: `No MAT relationship found for '${cleanCode}'` };
+  });
+
+  // Precomputed Canon-wide MAT Jump Resolver
+  fastify.get('/api/book/:code/mat_jump', async (req, reply) => {
+    applyCacheHeader(reply, 'no-cache, no-store, must-revalidate');
+    let cleanCode = req.params.code.replace('.xml', '');
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) {
+      cleanCode = chapSuffixMatch[1];
+    }
+
+    const pStr = req.query.para ? String(req.query.para).replace(/^(?:para-?|p)/i, '').trim() : null;
+    let baseP = pStr;
+    if (baseP && baseP.includes('-')) {
+      baseP = baseP.split('-')[0].trim();
+    }
+    const cIdx = req.query.chapter !== undefined && req.query.chapter !== null ? parseInt(req.query.chapter, 10) : null;
+
+    const catEntry = cstCatalog[cleanCode] || {};
+    let subKey = catEntry.sub_book || null;
+    if (!subKey && catEntry.chapter_to_sub_book && cIdx !== null) {
+      subKey = catEntry.chapter_to_sub_book[cIdx] || catEntry.chapter_to_sub_book[String(cIdx)];
+    }
+    if (!subKey && catEntry.sub_books && cIdx !== null) {
+      for (const [k, v] of Object.entries(catEntry.sub_books)) {
+        const cr = v.chapter_range || v.tika_chapter_range;
+        if (cr && cIdx >= cr[0] && cIdx <= cr[1]) {
+          subKey = k;
+          break;
+        }
+      }
+    }
+
+    let paraRow = null;
+    if (pStr && cIdx !== null && !isNaN(cIdx) && stmtGetMatParaChap) {
+      paraRow = stmtGetMatParaChap.get(cleanCode, cIdx, pStr) || (baseP !== pStr ? stmtGetMatParaChap.get(cleanCode, cIdx, baseP) : null);
+    }
+    if (!paraRow && pStr && subKey && stmtGetMatParaSub) {
+      paraRow = stmtGetMatParaSub.get(cleanCode, subKey, pStr) || (baseP !== pStr ? stmtGetMatParaSub.get(cleanCode, subKey, baseP) : null);
+    }
+    if (!paraRow && pStr && !subKey && stmtGetMatPara) {
+      paraRow = stmtGetMatPara.get(cleanCode, pStr) || (baseP !== pStr ? stmtGetMatPara.get(cleanCode, baseP) : null);
+    }
+    let chapRow = null;
+    if (cIdx !== null && !isNaN(cIdx) && stmtGetMatChapter) {
+      chapRow = stmtGetMatChapter.get(cleanCode, cIdx);
+    }
+
+    const formatLayer = (prefix, pRow, cRow) => {
+      const book = pRow?.[`${prefix}_book`] || cRow?.[`${prefix}_book`];
+      if (!book) return null;
+      return {
+        book,
+        chapter: pRow?.[`${prefix}_chapter`] !== undefined && pRow?.[`${prefix}_chapter`] !== null
+          ? pRow[`${prefix}_chapter`]
+          : (cRow?.[`${prefix}_chapter`] ?? 0),
+        para: pRow?.[`${prefix}_para`] || null,
+        title: pRow?.[`${prefix}_title`] || cRow?.[`${prefix}_title`] || null,
+      };
+    };
+
+    return {
+      source_book: cleanCode,
+      source_chapter: cIdx,
+      source_para: pStr,
+      mula: formatLayer('mula', paraRow, chapRow),
+      attha: formatLayer('attha', paraRow, chapRow),
+      tika: formatLayer('tika', paraRow, chapRow),
+    };
   });
 
   // Get full MAT matrix for all books (RAM-Resident)
