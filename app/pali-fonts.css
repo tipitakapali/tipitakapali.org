@@ -435,8 +435,22 @@ html[data-script]:not([data-script="roman"]) .search-summary-bar,
 html[data-script]:not([data-script="roman"]) .search-summary-bar span,
 html[data-script]:not([data-script="roman"]) .mat-pali-title,
 html[data-script]:not([data-script="roman"]) .toc-pali-title,
+html[data-script]:not([data-script="roman"]) .pali-script-text,
+html[data-script]:not([data-script="roman"]) .history-modal,
+html[data-script]:not([data-script="roman"]) .history-item,
+html[data-script]:not([data-script="roman"]) .history-title,
+html[data-script]:not([data-script="roman"]) .history-pali-title,
+html[data-script]:not([data-script="roman"]) .history-pali-chapter,
+html[data-script]:not([data-script="roman"]) .history-pali-nikaya,
+html[data-script]:not([data-script="roman"]) .history-snippet,
+html[data-script]:not([data-script="roman"]) .bookmark-modal,
+html[data-script]:not([data-script="roman"]) .bookmark-item,
+html[data-script]:not([data-script="roman"]) .bookmark-title,
+html[data-script]:not([data-script="roman"]) .bookmark-pali-title,
+html[data-script]:not([data-script="roman"]) .bookmark-pali-chapter,
+html[data-script]:not([data-script="roman"]) .bookmark-snippet,
 html[data-script]:not([data-script="roman"]) input[type="text"].pali-input {
-  font-family: var(--font-reader);
+  font-family: var(--font-reader) !important;
 }
 
 /* Meditation loader — Pali title & quote must match reader font + Thai bigger */

@@ -278,18 +278,66 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
       if (res.ok) return await res.json();
     } catch (e) {}
 
-    // Fallback for static/offline distribution: inspect static mat_chapter_map
+    // Fallback for static/offline distribution: inspect static mat_para_map then mat_chapter_map
     if (chapter !== null && chapter !== undefined) {
+      const chapInt = parseInt(chapter, 10);
+      if (para) {
+        try {
+          const pRes = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_para_map.json`);
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            const cleanPStr = String(para).replace(/^(?:para-?|p)/i, '').trim();
+            let pMatch = (pData.paras || []).find(r => r.source_chapter === chapInt && String(r.source_para) === cleanPStr);
+            let matchQuality = 'exact';
+            if (!pMatch) {
+              const targetP = parseInt(cleanPStr, 10);
+              if (!isNaN(targetP) && targetP > 0) {
+                const chapParas = (pData.paras || []).filter(r => r.source_chapter === chapInt);
+                let closest = null;
+                let minDiff = Infinity;
+                for (const r of chapParas) {
+                  const pNum = parseInt(r.source_para, 10);
+                  if (!isNaN(pNum)) {
+                    const diff = Math.abs(pNum - targetP);
+                    if (diff < minDiff) {
+                      minDiff = diff;
+                      closest = r;
+                    }
+                  }
+                }
+                if (closest) {
+                  pMatch = closest;
+                  matchQuality = 'closest';
+                }
+              }
+            }
+            if (pMatch) {
+              return {
+                source_book: cleanCode,
+                source_chapter: chapInt,
+                source_para: cleanPStr,
+                match_quality: matchQuality,
+                matched_source_para: pMatch.source_para,
+                mula: pMatch.mula_book ? { book: pMatch.mula_book, chapter: pMatch.mula_chapter, para: pMatch.mula_para, title: pMatch.mula_title } : null,
+                attha: pMatch.attha_book ? { book: pMatch.attha_book, chapter: pMatch.attha_chapter, para: pMatch.attha_para, title: pMatch.attha_title } : null,
+                tika: pMatch.tika_book ? { book: pMatch.tika_book, chapter: pMatch.tika_chapter, para: pMatch.tika_para, title: pMatch.tika_title } : null,
+              };
+            }
+          }
+        } catch (_) {}
+      }
+
       try {
         const cRes = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_chapter_map.json`);
         if (cRes.ok) {
           const data = await cRes.json();
-          const match = (data.chapters || []).find(r => r.source_chapter === parseInt(chapter, 10));
+          const match = (data.chapters || []).find(r => r.source_chapter === chapInt);
           if (match) {
             return {
               source_book: cleanCode,
-              source_chapter: parseInt(chapter, 10),
+              source_chapter: chapInt,
               source_para: para,
+              match_quality: 'chapter',
               mula: match.mula_book ? { book: match.mula_book, chapter: match.mula_chapter, para: null, title: match.mula_title } : null,
               attha: match.attha_book ? { book: match.attha_book, chapter: match.attha_chapter, para: null, title: match.attha_title } : null,
               tika: match.tika_book ? { book: match.tika_book, chapter: match.tika_chapter, para: null, title: match.tika_title } : null,

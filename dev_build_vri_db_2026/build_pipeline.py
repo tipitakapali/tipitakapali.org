@@ -401,6 +401,48 @@ def precompute_canonical_mat_mappings(cur, conn, book_mat_catalog):
         target_title = target_b['title']
         target_para = clean_p
 
+        # Special handling for books where every chapter has its own 1..N paragraph numbering (e.g. s0511 Buddhavaṃsa, s0512 Cariyāpiṭaka)
+        is_chap_paras_book = src_b['meta'].get('chapter_has_own_paras') or target_b['meta'].get('chapter_has_own_paras') or src_code in ['s0511m.mul', 's0511a.att', 's0512m.mul', 's0512a.att']
+        if is_chap_paras_book:
+            if src_code == 's0511m.mul' and target_layer == 'attha':
+                max_chap = max(0, len(chapters_by_book.get(target_code, [])) - 1)
+                target_chap = min(src_chap_idx + 1, max_chap)
+                return {
+                    'book': target_code,
+                    'chapter': target_chap,
+                    'para': clean_p,
+                    'title': target_title
+                }
+            elif src_code == 's0511a.att' and target_layer == 'mula':
+                if src_chap_idx == 0:
+                    return None
+                target_chap = src_chap_idx - 1
+                return {
+                    'book': target_code,
+                    'chapter': target_chap,
+                    'para': clean_p,
+                    'title': target_title
+                }
+            elif src_code == 's0512m.mul' and target_layer == 'attha':
+                max_chap = max(0, len(chapters_by_book.get(target_code, [])) - 1)
+                target_chap = min(src_chap_idx + 1, max_chap)
+                return {
+                    'book': target_code,
+                    'chapter': target_chap,
+                    'para': clean_p,
+                    'title': target_title
+                }
+            elif src_code == 's0512a.att' and target_layer == 'mula':
+                if src_chap_idx == 0:
+                    return None
+                target_chap = src_chap_idx - 1
+                return {
+                    'book': target_code,
+                    'chapter': target_chap,
+                    'para': clean_p,
+                    'title': target_title
+                }
+
         # Refine target chapter using paragraph alignment if available
         src_p2c = src_b.get('sub_books_para_to_chapter', {}).get(sub_key, {}) if sub_key else src_b.get('para_to_chapter', {})
         if not src_p2c:
@@ -499,6 +541,18 @@ def precompute_canonical_mat_mappings(cur, conn, book_mat_catalog):
 
         sub_p2c = b.get('sub_books_para_to_chapter', {})
         chapter_to_sub = b.get('chapter_to_sub_book', {})
+        chap_to_ps = b.get('meta', {}).get('chapter_to_paras', {})
+
+        if chap_to_ps:
+            for c_idx_str, p_list in chap_to_ps.items():
+                c_idx = int(c_idx_str)
+                s_key = chapter_to_sub.get(str(c_idx)) or chapter_to_sub.get(c_idx) or b.get('sub_book')
+                for p_str in p_list:
+                    key = (c_idx, str(p_str))
+                    if key not in seen_para_chap:
+                        seen_para_chap.add(key)
+                        para_entries.append((c_idx, str(p_str), s_key))
+
         if sub_p2c:
             for s_key, s_pmap in sub_p2c.items():
                 for p_str, c_idx in s_pmap.items():
@@ -854,6 +908,9 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
 
         para_to_chapter = {}
         para_to_index = {}
+        chapter_to_paras = {c['chapter_index']: set() for c in chaps}
+        if 0 not in chapter_to_paras:
+            chapter_to_paras[0] = set()
         page_to_chapter = {'V': {}, 'P': {}, 'T': {}, 'M': {}, 'O': {}}
         page_to_para = {'V': {}, 'P': {}, 'T': {}, 'M': {}, 'O': {}}
         page_anchors = {'V': {}, 'P': {}, 'T': {}, 'M': {}, 'O': {}}
@@ -936,12 +993,15 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
             inner = re.sub(r'<note>([\s\S]*?)</note>', r'<span class="note" title="Footnote">[\1]</span>', inner)
 
             current_sub_key = chapter_to_sub_book.get(current_chap_idx) if has_sub_books else mat_entry.get('sub_book')
-
-            attr_parts = [f'data-pindex="{para_counter}"']
+            guid = f"{book_code}:c{current_chap_idx}:n{n_attr or '0'}:p{para_counter}"
+            attr_parts = [f'data-pindex="{para_counter}"', f'data-guid="{guid}"']
             if current_sub_key:
                 attr_parts.append(f'data-sub-book="{current_sub_key}"')
 
             if n_attr:
+                if current_chap_idx not in chapter_to_paras:
+                    chapter_to_paras[current_chap_idx] = set()
+                chapter_to_paras[current_chap_idx].add(n_attr)
                 attr_parts.append(f'id="para{n_attr}"')
                 attr_parts.append(f'data-para="{n_attr}"')
                 span = try_parse_paragraph_span(n_attr)
@@ -950,6 +1010,7 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
                     attr_parts.append(f'data-para-last="{span[1]}"')
                     for p_num in range(span[0], span[1] + 1):
                         str_num = str(p_num)
+                        chapter_to_paras[current_chap_idx].add(str_num)
                         if str_num not in para_to_chapter:
                             para_to_chapter[str_num] = current_chap_idx
                             para_to_index[str_num] = para_counter
@@ -1024,6 +1085,7 @@ def build_tipitaka_database(output_path: str = TIPITAKA_DB):
         meta_mat = mat_entry if mat_entry else (mat or {})
         meta_obj = {
             'para_to_chapter': para_to_chapter,
+            'chapter_to_paras': {str(c): sorted(list(ps), key=lambda x: (int(x.split('-')[0]) if x.split('-')[0].isdigit() else 999999, x)) for c, ps in chapter_to_paras.items() if ps},
             'para_to_index': para_to_index,
             'page_to_chapter': page_to_chapter,
             'page_to_para': page_to_para,
@@ -1326,12 +1388,12 @@ def verify_multi_volume_mat(conn):
     _, h19 = get_chap('s0402a.att', 19)
     m_tag19 = re.search(r'<p[^>]*id=\"para2\"[^>]*>', h19)
     assert m_tag19 and 'data-sub-book="an3"' in m_tag19.group(0)
-    assert m_tag19.group(0).count('id="') == 1
+    assert m_tag19.group(0).count(' id="') == 1
 
     _, h36 = get_chap('s0402a.att', 36)
     m_tag36 = re.search(r'<p[^>]*id=\"para2\"[^>]*>', h36)
     assert m_tag36 and 'data-sub-book="an4"' in m_tag36.group(0)
-    assert m_tag36.group(0).count('id="') == 1
+    assert m_tag36.group(0).count(' id="') == 1
 
     # Suite 7: Patthana 4 & 5 Fix in abh03
     m10_meta = get_meta('abh03m10.mul')
@@ -1438,6 +1500,27 @@ def verify_multi_volume_mat(conn):
     cur.execute("SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0402t.tik' AND source_chapter = 32 AND source_para = '157'")
     r = cur.fetchone()
     assert r and r[0] == 's0402m2.mul' and r[1] == 15 and r[2] == '157' and r[3] == 's0402a.att' and r[4] == 34 and r[5] == '157', f"s0402t.tik ch 32 para 157 mapping failed: {r}"
+
+    # Suite 13: Buddhavaṃsa (s0511) & Cariyāpiṭaka (s0512) Chapter-Scoped MAT Verification
+    # Verify s0511m.mul ch 2 (Dīpaṅkarabuddhavaṃso) para 1 -> s0511a.att ch 3 para 1
+    cur.execute("SELECT attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0511m.mul' AND source_chapter = 2 AND source_para = '1'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0511a.att' and r[1] == 3 and r[2] == '1', f"s0511m.mul ch 2 para 1 mapping failed: {r}"
+
+    # Verify reverse jump: s0511a.att ch 3 para 1 -> s0511m.mul ch 2 para 1
+    cur.execute("SELECT mula_book, mula_chapter, mula_para FROM mat_para_map WHERE source_book = 's0511a.att' AND source_chapter = 3 AND source_para = '1'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0511m.mul' and r[1] == 2 and r[2] == '1', f"s0511a.att ch 3 para 1 mapping failed: {r}"
+
+    # Verify s0511m.mul ch 26 (Gotamabuddhavaṃso) para 5 -> s0511a.att ch 27 para 5
+    cur.execute("SELECT attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0511m.mul' AND source_chapter = 26 AND source_para = '5'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0511a.att' and r[1] == 27 and r[2] == '5', f"s0511m.mul ch 26 para 5 mapping failed: {r}"
+
+    # Verify s0512m.mul ch 1 para 1 -> s0512a.att ch 2 para 1
+    cur.execute("SELECT attha_book, attha_chapter, attha_para FROM mat_para_map WHERE source_book = 's0512m.mul' AND source_chapter = 1 AND source_para = '1'")
+    r = cur.fetchone()
+    assert r and r[0] == 's0512a.att' and r[1] == 2 and r[2] == '1', f"s0512m.mul ch 1 para 1 mapping failed: {r}"
 
     log_step(f"  ✓ Multi-Volume MAT Navigation: 100% assertions PASSED across all collections ({total_mat_chaps} chapters, {total_mat_paras} paras verified).")
 

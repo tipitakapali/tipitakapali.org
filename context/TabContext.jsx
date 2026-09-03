@@ -611,15 +611,19 @@ export function TabProvider({ children }) {
         }
 
         const targetSub = options.targetSubBook || tab.sub_book || tab.chapter_to_sub_book?.[targetChapIdx ?? tab.currentChapterIdx ?? 0];
+        let effectivePara = rawParaNum;
         if (rawParaNum && tab.para_to_chapter) {
           const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
           if (resolved) {
             if (!hasTargetChapter || resolved.isSubSpecific) {
               targetChapIdx = resolved.chapterIdx;
               hasTargetChapter = true;
-              setActiveParaNum(resolved.paraNum || rawParaNum);
             }
+            effectivePara = resolved.paraNum || rawParaNum;
           }
+        }
+        if (effectivePara) {
+          setActiveParaNum(effectivePara);
         }
 
         // Fallback: resolve chapter via para_index for headings/subheads where para_num is empty
@@ -637,12 +641,19 @@ export function TabProvider({ children }) {
           const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx, targetSub, tab.sub_books_para_to_chapter);
           if (firstP) {
             setActiveParaNum(firstP);
+            effectivePara = firstP;
           }
         }
 
         if (hasTargetChapter) {
           const nextTabs = currentTabs.map((t) =>
-            t.bookCode === cleanCode ? { ...t, currentChapterIdx: targetChapIdx, viewMode: 'reader', isTocView: false } : t
+            t.bookCode === cleanCode ? {
+              ...t,
+              currentChapterIdx: targetChapIdx,
+              lastParaNum: effectivePara || t.lastParaNum,
+              viewMode: 'reader',
+              isTocView: false
+            } : t
           );
           setOpenTabs(nextTabs);
           persistTabs(nextTabs, cleanCode);
@@ -833,15 +844,19 @@ export function TabProvider({ children }) {
         });
 
         const targetSub = options.targetSubBook || bookData.sub_book || bookData.chapter_to_sub_book?.[targetChapIdx ?? 0];
+        let effectivePara = rawParaNum;
         if (rawParaNum && bookData.para_to_chapter) {
           const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
           if (resolved) {
             if (!hasTargetChapter || resolved.isSubSpecific) {
               targetChapIdx = resolved.chapterIdx;
               hasTargetChapter = true;
-              setActiveParaNum(resolved.paraNum || rawParaNum);
             }
+            effectivePara = resolved.paraNum || rawParaNum;
           }
+        }
+        if (effectivePara) {
+          setActiveParaNum(effectivePara);
         }
 
         // Fallback: resolve chapter via para_index for headings where para_num is empty (e.g. Paṭhamakoṭigāmasuttaṃ)
@@ -908,6 +923,7 @@ export function TabProvider({ children }) {
           loadingChapters: {},
           isLoading: false,
           currentChapterIdx: targetChapIdx,
+          lastParaNum: effectivePara || undefined,
           viewMode: 'reader',
           isTocView: false,
         };
@@ -1572,7 +1588,8 @@ export function TabProvider({ children }) {
               effectiveChapIdx = currentChapIdx;
             } else if (pChap !== undefined && pChap !== currentChapIdx) {
               const hasExplicitHash = typeof window !== 'undefined' && window.location.hash && window.location.hash.includes(cleanP);
-              if (hasExplicitHash && !subKeyForChap) {
+              const hasExplicitPathChapter = typeof window !== 'undefined' && Boolean(window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i));
+              if (hasExplicitHash && !subKeyForChap && !hasExplicitPathChapter) {
                 effectiveChapIdx = pChap;
               } else if (pChap === undefined) {
                 currentPInt = NaN;

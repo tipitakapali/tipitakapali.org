@@ -89,15 +89,23 @@ let stmtGetMatParaChap = null;
 let stmtGetMatPara = null;
 let stmtGetMatParaSub = null;
 let stmtGetMatChapter = null;
+let stmtGetCanonPara = null;
+let stmtGetClosestCanonPara = null;
+let stmtGetClosestMatParaChap = null;
+let stmtGetCanonByGuid = null;
 try {
   stmtGetMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat WHERE book_code = ?');
   stmtGetAllMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat');
-  stmtGetMatParaChap = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND source_chapter = ? AND source_para = ?');
-  stmtGetMatParaSub = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND sub_book = ? AND source_para = ?');
-  stmtGetMatPara = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title FROM mat_para_map WHERE source_book = ? AND source_para = ?');
+  stmtGetMatParaChap = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND source_chapter = ? AND source_para = ?');
+  stmtGetClosestMatParaChap = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND source_chapter = ? AND CAST(source_para AS INTEGER) > 0 ORDER BY ABS(CAST(source_para AS INTEGER) - ?) ASC LIMIT 1');
+  stmtGetMatParaSub = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND sub_book = ? AND source_para = ?');
+  stmtGetMatPara = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND source_para = ?');
   stmtGetMatChapter = db.prepare('SELECT mula_book, mula_chapter, mula_title, attha_book, attha_chapter, attha_title, tika_book, tika_chapter, tika_title FROM mat_chapter_map WHERE source_book = ? AND source_chapter = ?');
+  stmtGetCanonPara = db.prepare('SELECT guid, book_code, chapter_index, para_num, mula_guid, mula_book, mula_chapter, mula_para, attha_guid, attha_book, attha_chapter, attha_para, tika_guid, tika_book, tika_chapter, tika_para, match_quality FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND (para_num = ? OR (para_first <= ? AND para_last >= ?)) LIMIT 1');
+  stmtGetClosestCanonPara = db.prepare('SELECT guid, book_code, chapter_index, para_num, mula_guid, mula_book, mula_chapter, mula_para, attha_guid, attha_book, attha_chapter, attha_para, tika_guid, tika_book, tika_chapter, tika_para, match_quality FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_first IS NOT NULL ORDER BY ABS(para_first - ?) ASC LIMIT 1');
+  stmtGetCanonByGuid = db.prepare('SELECT * FROM canon_paragraphs WHERE guid = ? LIMIT 1');
 } catch (e) {
-  console.warn('[MAT] book_mat table prepared statement error:', e.message);
+  console.warn('[MAT] book_mat/canon_paragraphs table prepared statement error:', e.message);
 }
 
 // Velthuis input normalization for Pāḷi searches
@@ -608,6 +616,54 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       }
     }
 
+    let matchQuality = 'exact';
+    let matchedSourcePara = pStr;
+
+    // First Priority: Query Canon-wide Ground-Truth GUID Paragraph Map
+    if (pStr && cIdx !== null && !isNaN(cIdx) && stmtGetCanonPara) {
+      const pNum = parseInt(baseP, 10);
+      const queryNum = isNaN(pNum) ? -1 : pNum;
+      let canonRow = stmtGetCanonPara.get(cleanCode, cIdx, pStr, queryNum, queryNum);
+      if (!canonRow && queryNum > 0 && stmtGetClosestCanonPara) {
+        canonRow = stmtGetClosestCanonPara.get(cleanCode, cIdx, queryNum);
+        if (canonRow) {
+          matchQuality = 'closest';
+          matchedSourcePara = canonRow.para_num;
+        }
+      }
+      if (canonRow) {
+        return {
+          source_book: cleanCode,
+          source_chapter: cIdx,
+          source_para: pStr,
+          source_guid: canonRow.guid,
+          match_quality: matchQuality !== 'exact' ? matchQuality : canonRow.match_quality,
+          matched_source_para: matchedSourcePara,
+          mula: canonRow.mula_book ? {
+            book: canonRow.mula_book,
+            chapter: canonRow.mula_chapter,
+            para: canonRow.mula_para,
+            guid: canonRow.mula_guid,
+            title: cstCatalog[canonRow.mula_book]?.title || null,
+          } : null,
+          attha: canonRow.attha_book ? {
+            book: canonRow.attha_book,
+            chapter: canonRow.attha_chapter,
+            para: canonRow.attha_para,
+            guid: canonRow.attha_guid,
+            title: cstCatalog[canonRow.attha_book]?.title || null,
+          } : null,
+          tika: canonRow.tika_book ? {
+            book: canonRow.tika_book,
+            chapter: canonRow.tika_chapter,
+            para: canonRow.tika_para,
+            guid: canonRow.tika_guid,
+            title: cstCatalog[canonRow.tika_book]?.title || null,
+          } : null,
+        };
+      }
+    }
+
     let paraRow = null;
     if (pStr && cIdx !== null && !isNaN(cIdx) && stmtGetMatParaChap) {
       paraRow = stmtGetMatParaChap.get(cleanCode, cIdx, pStr) || (baseP !== pStr ? stmtGetMatParaChap.get(cleanCode, cIdx, baseP) : null);
@@ -618,9 +674,22 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (!paraRow && pStr && !subKey && stmtGetMatPara) {
       paraRow = stmtGetMatPara.get(cleanCode, pStr) || (baseP !== pStr ? stmtGetMatPara.get(cleanCode, baseP) : null);
     }
+    if (!paraRow && pStr && cIdx !== null && !isNaN(cIdx) && stmtGetClosestMatParaChap) {
+      const pNum = parseInt(baseP, 10);
+      if (!isNaN(pNum) && pNum > 0) {
+        paraRow = stmtGetClosestMatParaChap.get(cleanCode, cIdx, pNum);
+        if (paraRow) {
+          matchQuality = 'closest';
+          matchedSourcePara = paraRow.source_para;
+        }
+      }
+    }
     let chapRow = null;
     if (cIdx !== null && !isNaN(cIdx) && stmtGetMatChapter) {
       chapRow = stmtGetMatChapter.get(cleanCode, cIdx);
+    }
+    if (!paraRow && chapRow) {
+      matchQuality = 'chapter';
     }
 
     const formatLayer = (prefix, pRow, cRow) => {
@@ -640,10 +709,47 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       source_book: cleanCode,
       source_chapter: cIdx,
       source_para: pStr,
+      match_quality: matchQuality,
+      matched_source_para: matchedSourcePara,
       mula: formatLayer('mula', paraRow, chapRow),
       attha: formatLayer('attha', paraRow, chapRow),
       tika: formatLayer('tika', paraRow, chapRow),
     };
+  });
+
+  // Get single paragraph by canonical GUID (ideal for LLMs & translations)
+  fastify.get('/api/paragraph/:guid', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, s-maxage=604800');
+    const guid = req.params.guid;
+    if (!stmtGetCanonByGuid) {
+      reply.code(500);
+      return { error: 'Database not initialized' };
+    }
+    const row = stmtGetCanonByGuid.get(guid);
+    if (!row) {
+      reply.code(404);
+      return { error: `Paragraph not found: ${guid}` };
+    }
+    return row;
+  });
+
+  // Batch query paragraphs for LLM translation chunks
+  fastify.get('/api/paragraphs', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=3600');
+    const book = req.query.book;
+    const chapter = req.query.chapter !== undefined ? parseInt(req.query.chapter, 10) : null;
+    const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
+    const offset = parseInt(req.query.offset || '0', 10);
+
+    let rows;
+    if (book && chapter !== null) {
+      rows = db.prepare('SELECT global_id, guid, book_code, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? ORDER BY para_index LIMIT ? OFFSET ?').all(book, chapter, limit, offset);
+    } else if (book) {
+      rows = db.prepare('SELECT global_id, guid, book_code, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid FROM canon_paragraphs WHERE book_code = ? ORDER BY para_index LIMIT ? OFFSET ?').all(book, limit, offset);
+    } else {
+      rows = db.prepare('SELECT global_id, guid, book_code, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid FROM canon_paragraphs ORDER BY global_id LIMIT ? OFFSET ?').all(limit, offset);
+    }
+    return { count: rows.length, paragraphs: rows };
   });
 
   // Get full MAT matrix for all books (RAM-Resident)

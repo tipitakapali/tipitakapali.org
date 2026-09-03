@@ -26,6 +26,7 @@ export default function Footer() {
   const {
     activeTab,
     activeParaNum,
+    setActiveParaNum,
     bookmarks,
     isGoToOpen,
     openGoToModal,
@@ -70,7 +71,36 @@ export default function Footer() {
 
           {/* MAT Button */}
           <button
-            onClick={() => setIsMatModalOpen(true)}
+            onClick={() => {
+              if (typeof document !== 'undefined') {
+                const container = document.querySelector('main.content-area') || document.querySelector('.content-area') || document.querySelector('main');
+                if (container) {
+                  const containerRect = container.getBoundingClientRect();
+                  const targetY = containerRect.top + 100;
+                  const paras = container.querySelectorAll('[data-para]');
+                  let currentVisible = null;
+                  for (const p of paras) {
+                    const r = p.getBoundingClientRect();
+                    if (r.top <= targetY && r.bottom > containerRect.top) {
+                      currentVisible = p.getAttribute('data-para');
+                    }
+                  }
+                  if (!currentVisible) {
+                    for (const p of paras) {
+                      const r = p.getBoundingClientRect();
+                      if (r.bottom >= containerRect.top) {
+                        currentVisible = p.getAttribute('data-para');
+                        break;
+                      }
+                    }
+                  }
+                  if (currentVisible) {
+                    setActiveParaNum(currentVisible);
+                  }
+                }
+              }
+              setIsMatModalOpen(true);
+            }}
             disabled={!activeTab}
             className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Jump to Connected Mūla, Aṭṭhakathā, Ṭīkā"

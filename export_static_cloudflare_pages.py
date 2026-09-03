@@ -78,6 +78,9 @@ def find_paths():
             break
 
     catalog_path = web_app_dir / 'server_api' / 'cst_books_catalog.json'
+    book_mat_path = web_app_dir / 'server_api' / 'book_mat.json'
+    if not book_mat_path.exists():
+        book_mat_path = web_app_dir / 'dev_build_vri_db_2026' / 'metadata' / 'book_mat.json'
     tree_json_path = web_app_dir / 'server_api' / 'tree.json'
     dist_dir = web_app_dir / 'cloudflare_pages_dist'
     git_repo_dir = web_app_dir / 'next_tipitakapali.org'
@@ -87,6 +90,7 @@ def find_paths():
         'web_app_dir': web_app_dir,
         'db_path': db_path,
         'catalog_path': catalog_path,
+        'book_mat_path': book_mat_path,
         'tree_json_path': tree_json_path,
         'dist_dir': dist_dir,
         'git_repo_dir': git_repo_dir,
@@ -120,7 +124,7 @@ def write_json_multiformat(base_dir: Path, relative_path_no_ext: str, data):
     with open(dir_index_file, 'w', encoding='utf-8') as f:
         f.write(json_str)
 
-def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_path: Path, tree_json_path: Path):
+def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_path: Path, tree_json_path: Path, book_mat_path: Path = None):
     """Export navigation, books, chapters, TOCs, and MAT cross-references into static JSON."""
     log_info(f"Connecting to SQLite database: {db_path}")
     conn = sqlite3.connect(str(db_path))
@@ -135,6 +139,15 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             log_info(f"Loaded {len(cst_catalog)} entries from CST catalog: {catalog_path.name}")
         except Exception as e:
             log_warn(f"Could not parse catalog {catalog_path}: {e}")
+
+    book_mat_catalog = {}
+    if book_mat_path and book_mat_path.exists():
+        try:
+            with open(book_mat_path, 'r', encoding='utf-8') as f:
+                book_mat_catalog = json.load(f)
+            log_info(f"Loaded {len(book_mat_catalog)} entries from book_mat.json")
+        except Exception as e:
+            log_warn(f"Could not parse book_mat.json {book_mat_path}: {e}")
 
     # 1. Export Navigation Tree
     log_info("Exporting navigation tree (/api/tree)...")
@@ -243,7 +256,12 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             (clean_code,)
         )
         mat_row = cur.fetchone()
-        book_mat_payload = dict(mat_row) if mat_row else cst_catalog.get(clean_code, {}).get('mat', None)
+        mat_entry = book_mat_catalog.get(clean_code, {})
+        book_mat_payload = dict(mat_row) if mat_row else dict(mat_entry) if mat_entry else cst_catalog.get(clean_code, {}).get('mat', None)
+        if book_mat_payload and mat_entry:
+            for k in ['chapter_has_own_paras', 'attha_start_chapter', 'tika_start_chapter', 'mula_chapter_offset', 'attha_chapter_offset', 'tika_chapter_offset', 'sub_books', 'sub_book', 'split_targets']:
+                if k in mat_entry and k not in book_mat_payload:
+                    book_mat_payload[k] = mat_entry[k]
         if book_mat_payload:
             write_json_multiformat(target_api_dir, f"book/{clean_code}/mat", book_mat_payload)
 
@@ -283,6 +301,23 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
         except Exception as e:
             pass
 
+        # Export book-specific canon paragraphs with GUIDs (/api/book/{code}/paragraphs)
+        try:
+            cur.execute(
+                "SELECT guid, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid, match_quality "
+                "FROM canon_paragraphs WHERE book_code = ? ORDER BY para_index",
+                (clean_code,)
+            )
+            canon_p_rows = [dict(r) for r in cur.fetchall()]
+            if canon_p_rows:
+                write_json_multiformat(target_api_dir, f"book/{clean_code}/paragraphs", {
+                    "book_code": clean_code,
+                    "total": len(canon_p_rows),
+                    "paragraphs": canon_p_rows
+                })
+        except Exception as e:
+            pass
+
         # Build initial chapters buffer (chapters 0 and 1)
         initial_chapters_data = {}
         for c_idx in [0, 1]:
@@ -318,12 +353,14 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             "sub_book": meta.get('sub_book') or cat_entry.get('sub_book', None),
             "chapter_to_sub_book": meta.get('chapter_to_sub_book') or cat_entry.get('chapter_to_sub_book', None),
             "sub_books_para_to_chapter": meta.get('sub_books_para_to_chapter') or cat_entry.get('sub_books_para_to_chapter', None),
-            "attha_start_chapter": meta.get('attha_start_chapter', None),
-            "tika_start_chapter": meta.get('tika_start_chapter', None),
+            "chapter_to_paras": meta.get('chapter_to_paras', None),
+            "chapter_has_own_paras": meta.get('chapter_has_own_paras', None) or (book_mat_payload.get('chapter_has_own_paras') if book_mat_payload else False),
+            "attha_start_chapter": meta.get('attha_start_chapter', None) or (book_mat_payload.get('attha_start_chapter') if book_mat_payload else None),
+            "tika_start_chapter": meta.get('tika_start_chapter', None) or (book_mat_payload.get('tika_start_chapter') if book_mat_payload else None),
             "split_targets": meta.get('split_targets') or cat_entry.get('split_targets', None),
             "mula_chapter": meta.get('mula_chapter', None),
-            "mula_chapter_offset": meta.get('mula_chapter_offset', None),
-            "attha_chapter_offset": meta.get('attha_chapter_offset', None),
+            "mula_chapter_offset": meta.get('mula_chapter_offset', None) or (book_mat_payload.get('mula_chapter_offset') if book_mat_payload else None),
+            "attha_chapter_offset": meta.get('attha_chapter_offset', None) or (book_mat_payload.get('attha_chapter_offset') if book_mat_payload else None),
             "initial_chapter": 0,
             "chapters_data": initial_chapters_data,
             "html": "\n".join(loaded_html_array)
@@ -532,25 +569,116 @@ export async function onRequest(context) {{
       const res = await fetch(targetUrl, {{
         headers: {{ 'User-Agent': 'Cloudflare-Edge-MAT-Proxy/2.0' }}
       }});
-      const headers = new Headers(res.headers);
-      headers.set('Access-Control-Allow-Origin', '*');
-      headers.set('Cache-Control', 'no-store');
-      return new Response(res.body, {{
-        status: res.status,
-        headers: headers,
-      }});
-    }} catch (err) {{
-      return new Response(JSON.stringify({{
-        error: 'VPS unreachable',
-        detail: err.message,
-      }}), {{
-        status: 502,
-        headers: {{
-          'Content-Type': 'application/json; charset=utf-8',
-          'Access-Control-Allow-Origin': '*',
-        }},
-      }});
-    }}
+      if (res.ok) {{
+        const headers = new Headers(res.headers);
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Cache-Control', 'no-store');
+        return new Response(res.body, {{
+          status: res.status,
+          headers: headers,
+        }});
+      }}
+    }} catch (err) {{}}
+
+    // Fallback: Resolve MAT jump using precomputed static JSON assets on Cloudflare Edge!
+    try {{
+      const parts = url.pathname.split('/');
+      const bookIdx = parts.indexOf('book');
+      const bookCode = bookIdx !== -1 && parts.length > bookIdx + 1 ? parts[bookIdx + 1] : '';
+      const params = url.searchParams;
+      const para = params.get('para');
+      const chapter = params.get('chapter');
+      const chapInt = chapter !== null && chapter !== undefined ? parseInt(chapter, 10) : null;
+
+      if (bookCode && para && chapInt !== null) {{
+        const pUrl = new URL(`/api/book/${{encodeURIComponent(bookCode)}}/mat_para_map.json`, url.origin);
+        const pRes = await context.env.ASSETS.fetch(pUrl);
+        if (pRes.ok) {{
+          const pData = await pRes.json();
+          const cleanPStr = String(para).replace(/^(?:para-?|p)/i, '').trim();
+          let match = (pData.paras || []).find(r => r.source_chapter === chapInt && String(r.source_para) === cleanPStr);
+          let matchQuality = 'exact';
+          if (!match) {{
+            const targetP = parseInt(cleanPStr, 10);
+            if (!isNaN(targetP) && targetP > 0) {{
+              const chapParas = (pData.paras || []).filter(r => r.source_chapter === chapInt);
+              let closest = null;
+              let minDiff = Infinity;
+              for (const r of chapParas) {{
+                const pNum = parseInt(r.source_para, 10);
+                if (!isNaN(pNum)) {{
+                  const diff = Math.abs(pNum - targetP);
+                  if (diff < minDiff) {{
+                    minDiff = diff;
+                    closest = r;
+                  }}
+                }}
+              }}
+              if (closest) {{
+                match = closest;
+                matchQuality = 'closest';
+              }}
+            }}
+          }}
+          if (match) {{
+            return new Response(JSON.stringify({{
+              source_book: bookCode,
+              source_chapter: chapInt,
+              source_para: cleanPStr,
+              match_quality: matchQuality,
+              matched_source_para: match.source_para,
+              mula: match.mula_book ? {{ book: match.mula_book, chapter: match.mula_chapter, para: match.mula_para, title: match.mula_title }} : null,
+              attha: match.attha_book ? {{ book: match.attha_book, chapter: match.attha_chapter, para: match.attha_para, title: match.attha_title }} : null,
+              tika: match.tika_book ? {{ book: match.tika_book, chapter: match.tika_chapter, para: match.tika_para, title: match.tika_title }} : null,
+            }}), {{
+              status: 200,
+              headers: {{
+                'Content-Type': 'application/json; charset=utf-8',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=3600',
+              }},
+            }});
+          }}
+        }}
+      }}
+
+      if (bookCode && chapInt !== null) {{
+        const cUrl = new URL(`/api/book/${{encodeURIComponent(bookCode)}}/mat_chapter_map.json`, url.origin);
+        const cRes = await context.env.ASSETS.fetch(cUrl);
+        if (cRes.ok) {{
+          const cData = await cRes.json();
+          const match = (cData.chapters || []).find(r => r.source_chapter === chapInt);
+          if (match) {{
+            return new Response(JSON.stringify({{
+              source_book: bookCode,
+              source_chapter: chapInt,
+              source_para: para,
+              match_quality: 'chapter',
+              mula: match.mula_book ? {{ book: match.mula_book, chapter: match.mula_chapter, para: null, title: match.mula_title }} : null,
+              attha: match.attha_book ? {{ book: match.attha_book, chapter: match.attha_chapter, para: null, title: match.attha_title }} : null,
+              tika: match.tika_book ? {{ book: match.tika_book, chapter: match.tika_chapter, para: null, title: match.tika_title }} : null,
+            }}), {{
+              status: 200,
+              headers: {{
+                'Content-Type': 'application/json; charset=utf-8',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'public, max-age=3600',
+              }},
+            }});
+          }}
+        }}
+      }}
+    }} catch (edgeErr) {{}}
+
+    return new Response(JSON.stringify({{
+      error: 'MAT mapping unavailable',
+    }}), {{
+      status: 404,
+      headers: {{
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      }},
+    }});
   }}
 
   // Default: pass through to static JSON assets
@@ -559,6 +687,46 @@ export async function onRequest(context) {{
 """
     with open(functions_api_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
         f.write(mat_jump_proxy_code)
+
+    # 5c. Paragraph API Proxy Functions (/functions/api/paragraph/[[path]].js and /functions/api/paragraphs.js)
+    functions_api_para_dir = functions_api_dir / 'paragraph'
+    functions_api_para_dir.mkdir(parents=True, exist_ok=True)
+    para_proxy_code = f"""// Cloudflare Pages Edge Function - Single Paragraph Lookup by GUID
+export async function onRequest(context) {{
+  const url = new URL(context.request.url);
+  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
+  const cleanBase = vpsBase.replace(/\\/+$/, '');
+  const targetUrl = cleanBase + url.pathname + url.search;
+
+  try {{
+    const res = await fetch(targetUrl, {{
+      headers: {{ 'User-Agent': 'Cloudflare-Edge-Paragraph-Proxy/2.0' }}
+    }});
+    const headers = new Headers(res.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
+    return new Response(res.body, {{
+      status: res.status,
+      headers: headers,
+    }});
+  }} catch (err) {{
+    return new Response(JSON.stringify({{
+      error: 'VPS unreachable',
+      detail: err.message,
+    }}), {{
+      status: 502,
+      headers: {{
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      }},
+    }});
+  }}
+}}
+"""
+    with open(functions_api_para_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(para_proxy_code)
+
+    with open(functions_api_dir / 'paragraphs.js', 'w', encoding='utf-8') as f:
+        f.write(para_proxy_code)
 
     # 6. Global Edge Middleware for AI Agent Markdown Content Negotiation (/functions/_middleware.js)
     functions_dir = dist_dir / 'functions'
@@ -591,7 +759,7 @@ export async function onRequest(context) {
     with open(functions_dir / '_middleware.js', 'w', encoding='utf-8') as f:
         f.write(edge_middleware_code)
 
-    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js + /functions/book/[[path]].js + /functions/api/book/[[path]].js + /functions/api/health.js + /functions/_middleware.js (AI markdown)")
+    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js + /functions/book/[[path]].js + /functions/api/book/[[path]].js + /functions/api/paragraph/[[path]].js + /functions/api/paragraphs.js + /functions/api/health.js + /functions/_middleware.js (AI markdown)")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -612,6 +780,7 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code/mat_chapter_map        /api/book/:code/mat_chapter_map.json       200
 /api/book/:code/mat_para_map           /api/book/:code/mat_para_map.json          200
+/api/book/:code/paragraphs             /api/book/:code/paragraphs.json            200
 /api/book/:code                        /api/book/:code.json                       200
 
 # 2. Client-side SPA Fallbacks — /book/* and /chapter/* are handled primarily by Cloudflare
@@ -846,7 +1015,8 @@ def main():
             target_api_dir=target_api_dir,
             db_path=db_path,
             catalog_path=paths['catalog_path'],
-            tree_json_path=paths['tree_json_path']
+            tree_json_path=paths['tree_json_path'],
+            book_mat_path=paths.get('book_mat_path')
         )
 
         # Sync static API data to public/api for offline local dev

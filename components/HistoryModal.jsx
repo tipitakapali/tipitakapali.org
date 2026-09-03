@@ -49,7 +49,8 @@ export default function HistoryModal({ isOpen, onClose }) {
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 animate-fade-in" onClick={onClose}>
       <div
-        className="modal-card bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-in"
+        className="modal-card history-modal bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-scale-in"
+        style={{ fontFamily: settings?.paliScript && settings.paliScript !== 'roman' ? 'var(--font-reader)' : undefined }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -129,13 +130,13 @@ export default function HistoryModal({ isOpen, onClose }) {
               return (
                 <div
                   key={item.id}
-                  className="group p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-start justify-between gap-3 cursor-pointer"
+                  className="history-item group p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-start justify-between gap-3 cursor-pointer"
                   onClick={() => handleJump(item)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)] flex-wrap">
-                      <span className="truncate">{displayBookTitle}</span>
-                      <span className="text-[10.5px] text-[var(--accent)] font-medium shrink-0">
+                    <div className="history-title flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)] flex-wrap">
+                      <span className="truncate history-pali-title pali-script-text">{displayBookTitle}</span>
+                      <span className="text-[10.5px] text-[var(--accent)] font-medium shrink-0 history-pali-chapter pali-script-text">
                         › {displayChapterTitle || `Ch ${(item.chapterIdx || 0) + 1}`}
                       </span>
                       {item.paraNum && (
@@ -145,7 +146,7 @@ export default function HistoryModal({ isOpen, onClose }) {
                       )}
                     </div>
                     {displaySnippet && (
-                      <div className="text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">
+                      <div className="history-snippet pali-script-text text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">
                         {displaySnippet}
                       </div>
                     )}
@@ -154,7 +155,7 @@ export default function HistoryModal({ isOpen, onClose }) {
                         <Clock size={10} />
                         {formatTimeAgo(item.lastReadTime)}
                       </span>
-                      {displayNikaya && <span>• {displayNikaya}</span>}
+                      {displayNikaya && <span className="history-pali-nikaya pali-script-text">• {displayNikaya}</span>}
                     </div>
                   </div>
 

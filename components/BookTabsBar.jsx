@@ -7,7 +7,7 @@ import { useTabs } from '../context/TabContext';
 
 
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { convertPaliScript } from '../services/transliterate';
+import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
 export default function BookTabsBar() {
   const {
@@ -195,7 +195,15 @@ export default function BookTabsBar() {
           const isActive = tab.bookCode === activeBookCode;
           const isDragging = draggedIndex === idx;
           const isOver = dragOverIndex === idx;
-          const displayTitle = convertPaliScript(tab.title, settings?.paliScript);
+          const textType = (() => {
+            const code = (tab.bookCode || '').toLowerCase();
+            const cat = (tab.category || '').toLowerCase();
+            if (code.endsWith('.mul') || code.includes('m.mul') || cat.includes('mūla') || cat.includes('mula')) return 'mula';
+            if (code.endsWith('.att') || code.includes('a.att') || cat.includes('aṭṭha') || cat.includes('attha')) return 'attha';
+            if (code.endsWith('.tik') || code.includes('t.tik') || cat.includes('ṭīkā') || cat.includes('tika')) return 'tika';
+            return 'other';
+          })();
+          const displayTitle = convertPaliScript(capitalizePali(tab.title), settings?.paliScript);
 
           return (
             <div
@@ -221,8 +229,8 @@ export default function BookTabsBar() {
                 }
               }}
             >
-              <Book size={12} className="tab-icon shrink-0 opacity-80" />
-              <span className="tab-title truncate">{displayTitle}</span>
+              <Book size={12} className={`tab-icon tab-icon-${textType} shrink-0 opacity-90`} />
+              <span className={`tab-title truncate`}>{displayTitle}</span>
               <button
                 className="tab-close-btn"
                 title="Close tab (Middle click)"

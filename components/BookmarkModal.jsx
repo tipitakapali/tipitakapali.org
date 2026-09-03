@@ -130,7 +130,10 @@ export default function BookmarkModal({ isOpen, onClose }) {
 
   return (
     <div className="modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 animate-fade-in">
-      <div className="modal-card bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+      <div
+        className="modal-card bookmark-modal bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        style={{ fontFamily: settings?.paliScript && settings.paliScript !== 'roman' ? 'var(--font-reader)' : undefined }}
+      >
         {/* Header */}
         <div className="modal-header px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 font-bold text-sm text-[var(--accent)]">
@@ -225,13 +228,13 @@ export default function BookmarkModal({ isOpen, onClose }) {
               return (
                 <div
                   key={item.id}
-                  className="group p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-start justify-between gap-3 cursor-pointer"
+                  className="bookmark-item group p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)]/50 transition flex items-start justify-between gap-3 cursor-pointer"
                   onClick={() => handleJump(item)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] flex-wrap">
-                      <span className="truncate">{displayBookTitle}</span>
-                      <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                    <div className="bookmark-title flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] flex-wrap">
+                      <span className="truncate bookmark-pali-title pali-script-text">{displayBookTitle}</span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-normal bookmark-pali-chapter pali-script-text">
                         › {displayChapterTitle || `Ch ${item.chapterIdx + 1}`}
                       </span>
                       {item.paraNum && (
@@ -241,7 +244,7 @@ export default function BookmarkModal({ isOpen, onClose }) {
                       )}
                     </div>
                     {displaySnippet && (
-                      <div className="text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">
+                      <div className="bookmark-snippet pali-script-text text-[11.5px] text-[var(--text-secondary)] mt-1 truncate">
                         {displaySnippet}
                       </div>
                     )}

@@ -539,6 +539,58 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   z-index: 10;
 }
 
+/* Book Tabs Bar - Text Type Colors for Book Icon (matches sidebar tree) */
+/* Light theme (default) */
+.book-tab .tab-icon-mula,
+.book-tab.active .tab-icon-mula {
+  color: #6d28d9 !important;
+}
+.book-tab .tab-icon-attha,
+.book-tab.active .tab-icon-attha {
+  color: #c2410c !important;
+}
+.book-tab .tab-icon-tika,
+.book-tab.active .tab-icon-tika {
+  color: #0e7490 !important;
+}
+.book-tab .tab-icon-other,
+.book-tab.active .tab-icon-other {
+  color: var(--accent) !important;
+}
+
+/* Dark theme */
+[data-theme="dark"] .book-tab .tab-icon-mula,
+[data-theme="dark"] .book-tab.active .tab-icon-mula,
+.dark .book-tab .tab-icon-mula,
+.dark .book-tab.active .tab-icon-mula {
+  color: #c4b5fd !important;
+}
+[data-theme="dark"] .book-tab .tab-icon-attha,
+[data-theme="dark"] .book-tab.active .tab-icon-attha,
+.dark .book-tab .tab-icon-attha,
+.dark .book-tab.active .tab-icon-attha {
+  color: #fdba74 !important;
+}
+[data-theme="dark"] .book-tab .tab-icon-tika,
+[data-theme="dark"] .book-tab.active .tab-icon-tika,
+.dark .book-tab .tab-icon-tika,
+.dark .book-tab.active .tab-icon-tika {
+  color: #67e8f9 !important;
+}
+
+/* Sepia theme */
+[data-theme="sepia"] .book-tab .tab-icon-mula,
+[data-theme="sepia"] .book-tab.active .tab-icon-mula {
+  color: #581c87 !important;
+}
+[data-theme="sepia"] .book-tab .tab-icon-attha,
+[data-theme="sepia"] .book-tab.active .tab-icon-attha {
+  color: #7c2d12 !important;
+}
+[data-theme="sepia"] .book-tab .tab-icon-tika,
+[data-theme="sepia"] .book-tab.active .tab-icon-tika {
+  color: #0369a1 !important;
+}
 
 .book-tab .tab-close-btn {
   width: 16px;
@@ -1797,6 +1849,7 @@ main.content-area {
 
 .reader-container strong.bld {
   font-weight: 700;
+  color: var(--accent);
 }
 
 .reader-container strong.paranum {

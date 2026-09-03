@@ -1919,7 +1919,9 @@
     "attha_code": "s0511a.att",
     "attha_title": "Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī)",
     "tika_code": null,
-    "tika_title": null
+    "tika_title": null,
+    "mula_chapter_offset": -1,
+    "chapter_has_own_paras": true
   },
   "s0511m.mul": {
     "category": "mūla",
@@ -1928,7 +1930,9 @@
     "attha_code": "s0511a.att",
     "attha_title": "Buddhavaṃsa-Aṭṭhakathā (Madhuratthappakāsinī)",
     "tika_code": null,
-    "tika_title": null
+    "tika_title": null,
+    "attha_start_chapter": 1,
+    "chapter_has_own_paras": true
   },
   "s0512a.att": {
     "category": "aṭṭhakathā",
@@ -1937,7 +1941,9 @@
     "attha_code": "s0512a.att",
     "attha_title": "Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7)",
     "tika_code": null,
-    "tika_title": null
+    "tika_title": null,
+    "mula_chapter_offset": -1,
+    "chapter_has_own_paras": true
   },
   "s0512m.mul": {
     "category": "mūla",
@@ -1946,7 +1952,9 @@
     "attha_code": "s0512a.att",
     "attha_title": "Cariyāpiṭaka-Aṭṭhakathā (Paramatthadīpanī 7)",
     "tika_code": null,
-    "tika_title": null
+    "tika_title": null,
+    "attha_start_chapter": 1,
+    "chapter_has_own_paras": true
   },
   "s0513a1.att": {
     "category": "aṭṭhakathā",
