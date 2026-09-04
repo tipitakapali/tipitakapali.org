@@ -261,6 +261,47 @@ export async function fetchMat(bookCode) {
   }, 24 * 60 * 60 * 1000);
 }
 
+// Book-level cache for MAT static JSON files (mat_para_map / mat_chapter_map).
+// One file serves every para+chapter of a book, so caching must be keyed by book —
+// not by para (the outer cachedFetch key). Otherwise each new paragraph re-downloads
+// the identical file, and one MAT open with N visible paras fires N identical downloads.
+// The pending map dedupes concurrent opens of the modal for the same book.
+const matStaticMapCache = new Map();
+const matStaticMapPending = new Map();
+const MAT_STATIC_MAP_TTL = 24 * 60 * 60 * 1000;
+
+async function fetchMatStaticMap(cleanCode, mapName) {
+  const key = `${mapName}_${cleanCode}`;
+  if (ENABLE_CLIENT_CACHE) {
+    const cached = matStaticMapCache.get(key);
+    if (cached && Date.now() - cached.timestamp < MAT_STATIC_MAP_TTL) {
+      return cached.data;
+    }
+    if (matStaticMapPending.has(key)) {
+      return matStaticMapPending.get(key);
+    }
+  }
+  const promise = (async () => {
+    try {
+      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/${mapName}.json`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (ENABLE_CLIENT_CACHE) {
+        matStaticMapCache.set(key, { data, timestamp: Date.now() });
+      }
+      return data;
+    } catch (_) {
+      return null;
+    } finally {
+      matStaticMapPending.delete(key);
+    }
+  })();
+  if (ENABLE_CLIENT_CACHE) {
+    matStaticMapPending.set(key, promise);
+  }
+  return promise;
+}
+
 export async function fetchMatJump(bookCode, para = null, chapter = null) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -282,9 +323,8 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
       const chapInt = parseInt(chapter, 10);
       if (para) {
         try {
-          const pRes = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_para_map.json`);
-          if (pRes.ok) {
-            const pData = await pRes.json();
+          const pData = await fetchMatStaticMap(cleanCode, 'mat_para_map');
+          if (pData) {
             const cleanPStr = String(para).replace(/^(?:para-?|p)/i, '').trim();
             let pMatch = (pData.paras || []).find(r => r.source_chapter === chapInt && String(r.source_para) === cleanPStr);
             let matchQuality = 'exact';
@@ -327,9 +367,8 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
       }
 
       try {
-        const cRes = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/mat_chapter_map.json`);
-        if (cRes.ok) {
-          const data = await cRes.json();
+        const data = await fetchMatStaticMap(cleanCode, 'mat_chapter_map');
+        if (data) {
           const match = (data.chapters || []).find(r => r.source_chapter === chapInt);
           if (match) {
             return {

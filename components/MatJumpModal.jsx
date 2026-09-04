@@ -313,12 +313,17 @@ export default function MatJumpModal({ isOpen, onClose }) {
               </h2>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono text-[9px] text-[var(--text-muted)]">
+              Esc
+            </kbd>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Current Context Info */}
@@ -456,13 +461,6 @@ export default function MatJumpModal({ isOpen, onClose }) {
         </div>
 
 
-        {/* Footer info tip */}
-        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] text-[11px] text-[var(--text-muted)] flex items-center justify-between">
-          <span>Target paragraph will be highlighted with a smooth pulse.</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono text-[9px]">
-            Esc
-          </kbd>
-        </div>
       </div>
     </div>
   );
