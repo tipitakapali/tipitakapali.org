@@ -564,4 +564,35 @@ export async function fetchDictionaryInflection(query) {
   );
 }
 
+export async function fetchAvailableTranslations() {
+  const base = getApiBase();
+  return cachedFetch('available_translations', async () => {
+    const res = await fetch(`${base}/api/translations`);
+    if (!res.ok) throw new Error('Failed to load translations list');
+    return res.json();
+  }, 60 * 60 * 1000);
+}
 
+export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = []) {
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+  const langs = Array.isArray(requestedLangs) ? requestedLangs.filter(Boolean).join(',') : (requestedLangs || '');
+  if (!langs) {
+    return { book_code: cleanCode, chapter_index: chapterIndex, languages: [], translations: {} };
+  }
+
+  const cacheKey = `trans_${cleanCode}_ch${chapterIndex}_${langs}`;
+  const base = getApiBase();
+
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}`);
+      if (!res.ok) throw new Error(`Failed to load translations for ${cleanCode} ch ${chapterIndex}`);
+      return res.json();
+    },
+    60 * 60 * 1000
+  );
+}

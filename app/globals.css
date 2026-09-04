@@ -432,6 +432,183 @@ body.no-indent .reader-container .bodytext,
 body.no-indent .reader-container .indent { text-indent: 0 !important; }
 body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-left: 0 !important; }
 
+/* Translation Display Styles */
+.reader-para-row {
+  position: relative;
+  width: 100%;
+}
+
+.reader-trans-stack-row {
+  display: block;
+}
+
+.reader-trans-side-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.75rem;
+  align-items: start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.reader-trans-side-row:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .reader-trans-side-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+.reader-side-empty {
+  border-bottom: none;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0;
+}
+
+.reader-trans-col-empty {
+  min-height: 1px;
+}
+
+.reader-pali-col {
+  min-width: 0;
+}
+
+.reader-pali-col p {
+  margin-bottom: 0 !important;
+}
+
+.reader-trans-col {
+  min-width: 0;
+}
+
+.reader-translation-container {
+  width: 100%;
+}
+
+.reader-stack-container {
+  margin-top: 0.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.reader-side-container {
+  margin-top: 0;
+}
+
+/* Myanmar Nissaya Word Pairs Typography */
+.reader-nissaya-pair {
+  display: inline;
+}
+
+.reader-nissaya-pali {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+}
+
+.reader-nissaya-sep {
+  opacity: 0.55;
+  margin-right: 0.25rem;
+}
+
+.reader-nissaya-meaning {
+  color: var(--text-primary);
+}
+
+.reader-nissaya-divider {
+  display: inline-block;
+  color: var(--text-muted);
+  opacity: 0.45;
+  margin: 0 0.4rem;
+  user-select: none;
+}
+
+.reader-trans-block {
+  border-left: 3px solid var(--accent);
+  background: var(--bg-secondary);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.5rem 0.85rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.reader-trans-block:hover {
+  background: var(--bg-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.reader-trans-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+  user-select: none;
+}
+
+.reader-trans-flag {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.reader-trans-name {
+  line-height: 1;
+}
+
+.reader-trans-content {
+  font-size: calc(var(--font-size-base, 22px) * 0.92);
+  line-height: calc(var(--line-height-base, 1.85) * 0.95);
+  color: var(--text-primary);
+  opacity: 0.92;
+  text-align: var(--reader-text-align, justify);
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+/* Script-specific typography adjustments for translations */
+.reader-trans-block[data-trans-lang="my"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="my_nissaya"] .reader-trans-content {
+  font-family: "Padauk", "Myanmar Text", sans-serif;
+  line-height: 2.1;
+  font-size: calc(var(--font-size-base, 22px) * 0.95);
+}
+
+.reader-trans-block[data-trans-lang="si"] .reader-trans-content {
+  font-family: "Noto Sans Sinhala", sans-serif;
+  line-height: 2.0;
+}
+
+.reader-trans-block[data-trans-lang="th"] .reader-trans-content {
+  font-family: "Noto Sans Thai", sans-serif;
+  line-height: 1.9;
+}
+
+.reader-trans-block[data-trans-lang="km"] .reader-trans-content {
+  font-family: "Noto Sans Khmer", sans-serif;
+  line-height: 2.0;
+}
+
+.reader-trans-block[data-trans-lang="lo"] .reader-trans-content {
+  font-family: "Noto Sans Lao", sans-serif;
+  line-height: 2.0;
+}
+
+.reader-trans-block[data-trans-lang="zh"] .reader-trans-content {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.8;
+}
+
+.reader-trans-block[data-trans-lang="ja"] .reader-trans-content {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  line-height: 1.8;
+}
 
 /* Tabs Bar */
 .book-tabs-bar {

@@ -110,6 +110,10 @@ try {
   console.warn('[MAT] book_mat/canon_paragraphs table prepared statement error:', e.message);
 }
 
+// Initialize translation engine for fast SQLite translation querying
+const { getTranslationEngine } = require('./translationEngine');
+const translationEngine = getTranslationEngine();
+
 // Velthuis input normalization for Pāḷi searches
 function typeVelthuis(uType) {
   if (!uType) return '';
@@ -816,6 +820,74 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
   fastify.get('/api/mat', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
     return precomputedMatList;
+  });
+
+  // ==========================================
+  // Translation API Endpoints
+  // ==========================================
+
+  // List available translation languages and metadata
+  fastify.get('/api/translations', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=3600, stale-while-revalidate=86400');
+    return {
+      available: translationEngine.getAvailableLanguages(),
+    };
+  });
+
+  // Fetch translations for a book & chapter across one or more languages
+  fastify.get('/api/book/:code/translation', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    const rawCode = req.params.code;
+    const chapParam = req.query.chapter !== undefined ? req.query.chapter : (req.query.chapterIndex !== undefined ? req.query.chapterIndex : 0);
+    const langsParam = req.query.lang || req.query.langs || 'en';
+    const isDetailed = req.query.detailed === 'true' || req.query.detailed === '1';
+
+    let requestedLangs = [];
+    if (langsParam === 'all') {
+      requestedLangs = translationEngine.getAvailableLanguages().map((l) => l.code);
+    } else {
+      requestedLangs = langsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    if (isDetailed) {
+      return translationEngine.getChapterTranslationsDetailed(rawCode, chapParam, requestedLangs);
+    }
+    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs);
+  });
+
+  // Chapter-in-path translation convenience alias
+  fastify.get('/api/book/:code/chapter/:chapterIndex/translation', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    const rawCode = req.params.code;
+    const chapParam = req.params.chapterIndex;
+    const langsParam = req.query.lang || req.query.langs || 'en';
+    const isDetailed = req.query.detailed === 'true' || req.query.detailed === '1';
+
+    let requestedLangs = [];
+    if (langsParam === 'all') {
+      requestedLangs = translationEngine.getAvailableLanguages().map((l) => l.code);
+    } else {
+      requestedLangs = langsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    if (isDetailed) {
+      return translationEngine.getChapterTranslationsDetailed(rawCode, chapParam, requestedLangs);
+    }
+    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs);
+  });
+
+  // Lookup translation by canonical GUID across languages
+  fastify.get('/api/translation/guid/:guid', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    const guid = req.params.guid;
+    const langsParam = req.query.lang || req.query.langs || 'all';
+    let requestedLangs = [];
+    if (langsParam === 'all') {
+      requestedLangs = translationEngine.getAvailableLanguages().map((l) => l.code);
+    } else {
+      requestedLangs = langsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return translationEngine.getGuidTranslation(guid, requestedLangs);
   });
 
 // Helper to build FTS5 match query supporting single words, exact phrases, proximity (NEAR), and multi-word AND

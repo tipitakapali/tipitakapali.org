@@ -7,21 +7,22 @@ import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 
 const TRANSLATIONS = [
   // Pinned to top (user's preferred priority)
-  { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • -coming soon-' },
-  { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Vietnamese translation • -coming soon-' },
-  { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'Myanmar Translation • -coming soon-' },
-  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'Sinhala Translation • -coming soon-' },
-  { id: 'chinese', label: '中文', flag: '🇨🇳', desc: 'Chinese Translation • -coming soon-' },
-  { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'Khmer Translation • -coming soon-' },
-  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'Thai Translation • -coming soon-' },
-  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'Lao Translation • -coming soon-' },
-  { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'Tamil Translation • -coming soon-' },
-  // Alphabetical by language name
-  { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'German Translation • -coming soon-' },
-  { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: 'Japanese Translation • -coming soon-' },
+  { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • 1.28M sentences' },
+  { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Bản dịch Tiếng Việt • 1.28M câu' },
+  { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'မြန်မာဘာသာပြန် • 1.28M စာကြောင်း' },
+  { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'සිංහල පරිවර්තනය • 1.21M වාක්‍ය' },
+  { id: 'chinese', label: '中文', flag: '🇨🇳', desc: '中文翻译 • 1.27M 句' },
+  { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ' },
+  { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'ฉบับแปลภาษาไทย • 1.27M ประโยค' },
+  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'ການແປພາສາລາວ • 420K ປະໂຫຍກ' },
+  { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்' },
+  { id: 'hindi', label: 'हिन्दी', flag: '🇮🇳', desc: 'हिन्दी अनुवाद • 410K वाक्य' },
+  { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'Deutsche Übersetzung • 1.28M Sätze' },
+  { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文' },
+  { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases' },
+  { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений' },
+  { id: 'my_nissaya', label: 'မြန်မာ နိဿယ', flag: '🇲🇲', desc: 'Myanmar Nissaya • 570K စာကြောင်း' },
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-' },
-  { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Portuguese Translation • -coming soon-' },
-  { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Russian Translation • -coming soon-' },
 ];
 
 export default function LanguageMenu() {

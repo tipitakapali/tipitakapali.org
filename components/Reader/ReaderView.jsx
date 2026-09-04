@@ -11,18 +11,181 @@ import { useDictionary } from '../../context/DictionaryContext';
 
 import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
+import { fetchChapterTranslations } from '../../services/api';
 
-// Memoized Chapter Block with Pre-Buffering Intersection Observer
+const TRANSLATION_METAS = {
+  en: { label: 'English', flag: '🇬🇧' },
+  vi: { label: 'Tiếng Việt', flag: '🇻🇳' },
+  my: { label: 'မြန်မာ', flag: '🇲🇲' },
+  si: { label: 'සිංහල', flag: '🇱🇰' },
+  zh: { label: '中文', flag: '🇨🇳' },
+  km: { label: 'ភាសាខ្មែរ', flag: '🇰🇭' },
+  th: { label: 'ไทย', flag: '🇹🇭' },
+  lo: { label: 'ລາວ', flag: '🇱🇦' },
+  ta: { label: 'தமிழ்', flag: '🇮🇳' },
+  hi: { label: 'हिन्दी', flag: '🇮🇳' },
+  de: { label: 'Deutsch', flag: '🇩🇪' },
+  ja: { label: '日本語', flag: '🇯🇵' },
+  pt: { label: 'Português', flag: '🇵🇹' },
+  ru: { label: 'Русский', flag: '🇷🇺' },
+  my_nissaya: { label: 'မြန်မာနိဿယ', flag: '🇲🇲' },
+};
+
+export const LANG_KEY_TO_CODE = {
+  english: 'en',
+  vietnamese: 'vi',
+  myanmar: 'my',
+  sinhala: 'si',
+  chinese: 'zh',
+  khmer: 'km',
+  thai: 'th',
+  lao: 'lo',
+  tamil: 'ta',
+  hindi: 'hi',
+  german: 'de',
+  japanese: 'ja',
+  portuguese: 'pt',
+  russian: 'ru',
+  my_nissaya: 'my_nissaya',
+};
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatInlineTags(str) {
+  if (!str) return '';
+  // First escape unsafe HTML
+  let safe = escapeHtml(str);
+
+  // Allow standard safe formatting tags used in Pali translations
+  safe = safe
+    .replace(/&lt;i&gt;/gi, '<i>')
+    .replace(/&lt;\/i&gt;/gi, '</i>')
+    .replace(/&lt;b&gt;/gi, '<b>')
+    .replace(/&lt;\/b&gt;/gi, '</b>')
+    .replace(/&lt;em&gt;/gi, '<em>')
+    .replace(/&lt;\/em&gt;/gi, '</em>')
+    .replace(/&lt;strong&gt;/gi, '<strong>')
+    .replace(/&lt;\/strong&gt;/gi, '</strong>');
+
+  // Convert markdown **bold** and *italic*
+  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  safe = safe.replace(/(^|[^\*])\*([^*]+)\*([^\*]|$)/g, '$1<i>$2</i>$3');
+
+  return safe;
+}
+
+function formatTranslationContent(text, lang) {
+  if (!text) return '';
+
+  // For Myanmar Nissaya (or nissaya content), format word pairs if delimited by " | "
+  if (lang === 'my_nissaya' && text.includes(' | ') && text.includes(': ')) {
+    const pairs = text.split(' | ');
+    const partsHtml = pairs
+      .map((part) => {
+        const trimmed = part.trim();
+        if (!trimmed) return '';
+        const colonIdx = trimmed.indexOf(': ');
+        if (colonIdx > 0) {
+          const pali = trimmed.substring(0, colonIdx).trim();
+          const meaning = trimmed.substring(colonIdx + 2).trim();
+          return `<span class="reader-nissaya-pair"><strong class="reader-nissaya-pali">${escapeHtml(pali)}</strong><span class="reader-nissaya-sep">:</span> <span class="reader-nissaya-meaning">${formatInlineTags(meaning)}</span></span>`;
+        }
+        return `<span class="reader-nissaya-meaning">${formatInlineTags(trimmed)}</span>`;
+      })
+      .filter(Boolean)
+      .join('<span class="reader-nissaya-divider"> | </span>');
+
+    return partsHtml;
+  }
+
+  return formatInlineTags(text);
+}
+
+function injectTranslationsIntoHtml(html, translations, activeLangs, displayMode) {
+  if (!html || !translations || !activeLangs || activeLangs.length === 0) return html;
+
+  let hasAny = false;
+  for (const l of activeLangs) {
+    if (translations[l] && Object.keys(translations[l]).length > 0) {
+      hasAny = true;
+      break;
+    }
+  }
+  if (!hasAny) return html;
+
+  const isSide = displayMode === 'side';
+
+  return html.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullMatch, pTag, pIndex) => {
+    const items = [];
+    for (const lang of activeLangs) {
+      const trans = translations[lang]?.[pIndex];
+      if (trans && trans.trim()) {
+        const meta = TRANSLATION_METAS[lang] || { label: lang.toUpperCase(), flag: '🌐' };
+        items.push({
+          lang,
+          label: meta.label,
+          flag: meta.flag,
+          text: trans.trim(),
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      if (isSide) {
+        // Keep 2-column layout for body paragraphs so Pāli text doesn't jump width
+        const isBodyPara = /\b(bodytext|hangnum|indent|gatha\w*)\b/i.test(pTag);
+        if (isBodyPara) {
+          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" data-pindex="${pIndex}"><div class="reader-pali-col">${pTag}</div><div class="reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
+        }
+      }
+      return fullMatch;
+    }
+
+    const transBlocksHtml = items
+      .map(
+        (item) => `
+      <div class="reader-trans-block" data-trans-lang="${item.lang}">
+        <div class="reader-trans-header">
+          <span class="reader-trans-flag">${item.flag}</span>
+          <span class="reader-trans-name">${item.label}</span>
+        </div>
+        <div class="reader-trans-content">${formatTranslationContent(item.text, item.lang)}</div>
+      </div>`
+      )
+      .join('');
+
+    if (isSide) {
+      return `<div class="reader-para-row reader-trans-side-row" data-pindex="${pIndex}"><div class="reader-pali-col">${pTag}</div><div class="reader-trans-col"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${transBlocksHtml}</div></div></div>`;
+    }
+
+    return `<div class="reader-para-row reader-trans-stack-row" data-pindex="${pIndex}">${pTag}<div class="reader-translation-container reader-stack-container" data-pindex="${pIndex}">${transBlocksHtml}</div></div>`;
+  });
+}
+
+// Memoized Chapter Block with Pre-Buffering Intersection Observer and Translation Support
 const ChapterBlock = memo(function ChapterBlock({
   chapter,
+  bookCode,
   html,
   isLoading,
   onVisible,
   paliScript = 'roman',
   searchHighlight = null,
   highlightSearchTerms = true,
+  activeLangs = [],
+  translationDisplayMode = 'stack',
 }) {
   const sentinelRef = useRef(null);
+  const [translations, setTranslations] = React.useState({});
+  const activeLangsKey = activeLangs.join(',');
 
   useEffect(() => {
     if (html || !sentinelRef.current) return;
@@ -40,6 +203,34 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => observer.disconnect();
   }, [html, chapter.chapter_index, onVisible]);
 
+  useEffect(() => {
+    if (!html || !bookCode || !activeLangsKey) {
+      setTranslations({});
+      return;
+    }
+
+    let isMounted = true;
+    const langsToFetch = activeLangsKey.split(',').filter(Boolean);
+    if (langsToFetch.length === 0) {
+      setTranslations({});
+      return;
+    }
+
+    fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch)
+      .then((data) => {
+        if (isMounted && data?.translations) {
+          setTranslations(data.translations);
+        }
+      })
+      .catch((err) => {
+        console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [html, bookCode, chapter.chapter_index, activeLangsKey]);
+
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
     let processed = html;
@@ -55,8 +246,16 @@ const ChapterBlock = memo(function ChapterBlock({
         searchHighlight.paraNum
       );
     }
+    if (activeLangs.length > 0 && Object.keys(translations).length > 0) {
+      processed = injectTranslationsIntoHtml(
+        processed,
+        translations,
+        activeLangs,
+        translationDisplayMode
+      );
+    }
     return processed;
-  }, [html, paliScript, searchHighlight, highlightSearchTerms]);
+  }, [html, paliScript, searchHighlight, highlightSearchTerms, activeLangs, translations, translationDisplayMode]);
 
   if (displayHtml) {
     return (
@@ -257,6 +456,23 @@ export default function ReaderView() {
   const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
   const { settings, setIsZenMode } = useThemeSettings();
   const pulseAnimation = Boolean(settings?.pulseAnimation);
+
+  const activeLangs = React.useMemo(() => {
+    if (!settings?.translations) return [];
+    const order = settings.translationOrder || [];
+    const langs = [];
+    for (const id of order) {
+      if (settings.translations[id] && LANG_KEY_TO_CODE[id]) {
+        langs.push(LANG_KEY_TO_CODE[id]);
+      }
+    }
+    for (const [id, enabled] of Object.entries(settings.translations)) {
+      if (enabled && LANG_KEY_TO_CODE[id] && !langs.includes(LANG_KEY_TO_CODE[id])) {
+        langs.push(LANG_KEY_TO_CODE[id]);
+      }
+    }
+    return langs;
+  }, [settings?.translations, settings?.translationOrder]);
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -869,15 +1085,24 @@ export default function ReaderView() {
       return;
     }
 
+    // 1.5. Ignore clicks inside translation containers (prevents accidental Pali dict lookup on translations)
+    if (e.target.closest('.reader-translation-container')) {
+      return;
+    }
+
     // 2. Track reading position and active paragraph
     const pEl = e.target.closest('p[data-pindex]');
     if (pEl && activeTab) {
       let pNum = pEl.getAttribute('data-para');
       if (!pNum) {
-        let prev = pEl.previousElementSibling;
+        let row = pEl.closest('.reader-para-row') || pEl;
+        let prev = row.previousElementSibling;
         while (prev) {
-          pNum = prev.getAttribute('data-para');
-          if (pNum) break;
+          const foundP = prev.matches?.('p[data-para]') ? prev : prev.querySelector?.('p[data-para]');
+          if (foundP) {
+            pNum = foundP.getAttribute('data-para');
+            if (pNum) break;
+          }
           prev = prev.previousElementSibling;
         }
       }
@@ -1398,19 +1623,26 @@ export default function ReaderView() {
         >
           <div
             className="reader-container w-full"
-            style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
+            style={{
+              maxWidth: (activeLangs.length > 0 && settings?.translationDisplayMode === 'side')
+                ? '1400px'
+                : 'var(--reader-max-width, 880px)',
+            }}
           >
             {activeTab.chapters && activeTab.chapters.length > 0 ? (
               activeTab.chapters.map((chap) => (
                 <ChapterBlock
-                  key={chap.chapter_index}
+                  key={`${activeTab.bookCode}_${chap.chapter_index}`}
                   chapter={chap}
+                  bookCode={activeTab.bookCode}
                   html={activeTab.loadedChapters?.[chap.chapter_index]}
                   isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
                   onVisible={handleChapterVisible}
                   paliScript={settings?.paliScript}
                   searchHighlight={searchHighlight}
                   highlightSearchTerms={settings?.highlightSearchTerms ?? true}
+                  activeLangs={activeLangs}
+                  translationDisplayMode={settings?.translationDisplayMode || 'stack'}
                 />
               ))
             ) : (
