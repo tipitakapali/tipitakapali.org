@@ -5,7 +5,6 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start:cf": "node server_cf.js",
     "dev": "node --watch server.js",
     "pm2:start": "npx pm2 start ecosystem.config.js",
     "pm2:stop": "npx pm2 stop ecosystem.config.js",

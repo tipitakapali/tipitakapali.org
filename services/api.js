@@ -272,13 +272,12 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
   const cacheKey = `mat_jump_${cleanCode}_${para || '0'}_${chapter !== undefined && chapter !== null ? chapter : '0'}`;
 
   return cachedFetch(cacheKey, async () => {
-    try {
-      const base = getApiBase();
-      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/mat_jump${qs ? '?' + qs : ''}`, { cache: 'no-store' });
-      if (res.ok) return await res.json();
-    } catch (e) {}
-
-    // Fallback for static/offline distribution: inspect static mat_para_map then mat_chapter_map
+    // Static edge JSON first: co-located with the app on the same host, edge-cached
+    // (see public/_headers: 1-day edge cache for /api/*), so no cross-host VPS hop.
+    // Covers every book in the static export (export_static_cloudflare_pages.py).
+    // Dynamic VPS is only a fallback for environments without static files (local dev)
+    // or paragraphs missing from the static maps. Previously the order was reversed,
+    // so every MAT open paid for a failed VPS round-trip (404) before the static hit.
     if (chapter !== null && chapter !== undefined) {
       const chapInt = parseInt(chapter, 10);
       if (para) {
@@ -347,8 +346,15 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
       } catch (_) {}
     }
 
+    // Dynamic VPS fallback (also covers calls without a chapter for the static path above).
+    try {
+      const base = getApiBase();
+      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/mat_jump${qs ? '?' + qs : ''}`, { cache: 'no-store' });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+
     return null;
-  }, 1000);
+  }, 24 * 60 * 60 * 1000);
 }
 
 export async function searchTipitaka(query, options = {}) {

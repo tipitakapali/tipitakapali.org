@@ -267,6 +267,7 @@ async function main() {
         'GET /api/book/:code/toc',
         'GET /api/book/:code/xml',
         'GET /api/book/:code/mat',
+        'GET /api/book/:code/mat_jump?para=..&chapter=..',
         'GET /api/mat',
         'GET /api/search?q=...',
         'GET /api/health',
@@ -585,9 +586,9 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return { error: `No MAT relationship found for '${cleanCode}'` };
   });
 
-  // Precomputed Canon-wide MAT Jump Resolver
+  // Precomputed Canon-wide MAT Jump Resolver (immutable per DB build: cacheable)
   fastify.get('/api/book/:code/mat_jump', async (req, reply) => {
-    applyCacheHeader(reply, 'no-cache, no-store, must-revalidate');
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
     let cleanCode = req.params.code.replace('.xml', '');
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
     if (chapSuffixMatch) {
