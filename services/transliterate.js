@@ -452,12 +452,12 @@ export function cleanDictionaryQuery(rawInput) {
   // Handles Roman, Myanmar, Sinhala, and Devanagari attached particles
   text = text.replace(/([’'”"»›]+)(ti|pi|va|eva|iti|api|nti|တိ|ති|ति)\b/gi, ' $2');
 
-  // 3. Replace all quotation marks (curly, straight, double-single, guillemets, etc.) with spaces
-  text = text.replace(/[‘’“”"''`«»‹›„]/g, ' ');
+  // 3. Replace all quotation marks (curly, straight, double-single, guillemets, CJK quotes, etc.) with spaces
+  text = text.replace(/[‘’“”"''`«»‹›„“”「」『』]/g, ' ');
 
   // 4. Replace punctuation & symbols (commas, periods, semicolons, colons, dashes, brackets, ellipsis, etc.)
-  // Note: Handles standard ASCII and Indic punctuation (၊, ။, etc.)
-  text = text.replace(/[.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။]/g, ' ');
+  // Note: Handles standard ASCII, Indic (၊, ။), and CJK punctuation (，。！？；：（）【】《》、·)
+  text = text.replace(/[.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။，。！？；：（）【】《》、·]/g, ' ');
 
   // 5. Clean leading root symbols e.g. √
   text = text.replace(/^[√\s\d.-]+/, ' ');

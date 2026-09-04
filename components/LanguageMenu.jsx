@@ -25,6 +25,7 @@ export const TRANSLATIONS = [
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • 1.28M sentences', color: '#2563eb' },
   { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Bản dịch Tiếng Việt • 1.28M câu', color: '#dc2626' },
   { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'မြန်မာဘာသာပြန် • 1.28M စာကြောင်း', color: '#059669' },
+  { id: 'my_nissaya', label: 'မြန်မာ နိဿယ', flag: '🇲🇲', desc: 'Myanmar Nissaya • 570K စာကြောင်း', color: '#0d9488' },
   { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'සිංහල පරිවර්තනය • 1.21M වාක්‍ය', color: '#d97706' },
   { id: 'chinese', label: '中文', flag: '🇨🇳', desc: '中文翻译 • 1.27M 句', color: '#e11d48' },
   { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ', color: '#0891b2' },
@@ -36,7 +37,6 @@ export const TRANSLATIONS = [
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#16a34a' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений', color: '#0284c7' },
-  { id: 'my_nissaya', label: 'မြန်မာ နိဿယ', flag: '🇲🇲', desc: 'Myanmar Nissaya • 570K စာကြောင်း', color: '#0d9488' },
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-', color: '#4f46e5' },
 ];
 
@@ -104,21 +104,51 @@ function hslToHex(h, s, l) {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-function generateRandomLanguageColors() {
-  const h = Math.floor(Math.random() * 360);
-  const borderHue = (h + Math.floor(Math.random() * 60) - 30 + 360) % 360;
-  const isDark = Math.random() > 0.5;
+export function getThemeMode(theme) {
+  if (theme === 'oled') return 'oled';
+  if (theme === 'dark') return 'dark';
+  if (theme === 'dusk') return 'dusk';
+  if (theme === 'sepia' || theme === 'warm') return 'warm';
+  return 'light'; // classic, white, default, etc.
+}
 
-  let bg, text;
-  if (!isDark) {
-    bg = hslToHex(h, 30 + Math.floor(Math.random() * 30), 91 + Math.floor(Math.random() * 6));
-    text = hslToHex(h, 25 + Math.floor(Math.random() * 25), 12 + Math.floor(Math.random() * 14));
+export function generateThemeAwareLanguageColors(theme = 'classic', baseHue = null) {
+  const mode = getThemeMode(theme);
+  const h = baseHue !== null ? baseHue : Math.floor(Math.random() * 360);
+  const borderHue = (h + Math.floor(Math.random() * 40) - 20 + 360) % 360;
+
+  let bg, text, border;
+
+  if (mode === 'oled') {
+    bg = hslToHex(h, 20 + Math.floor(Math.random() * 20), 6 + Math.floor(Math.random() * 5));
+    text = hslToHex(h, 15 + Math.floor(Math.random() * 20), 92 + Math.floor(Math.random() * 7));
+    border = hslToHex(borderHue, 80 + Math.floor(Math.random() * 20), 55 + Math.floor(Math.random() * 12));
+  } else if (mode === 'dusk') {
+    // Dusk / Dracula theme with calm dark-slate undertones
+    bg = hslToHex(h, 20 + Math.floor(Math.random() * 20), 16 + Math.floor(Math.random() * 6));
+    text = hslToHex(h, 12 + Math.floor(Math.random() * 15), 93 + Math.floor(Math.random() * 6));
+    border = hslToHex(borderHue, 85 + Math.floor(Math.random() * 15), 60 + Math.floor(Math.random() * 10));
+  } else if (mode === 'dark') {
+    bg = hslToHex(h, 20 + Math.floor(Math.random() * 25), 14 + Math.floor(Math.random() * 8));
+    text = hslToHex(h, 15 + Math.floor(Math.random() * 20), 88 + Math.floor(Math.random() * 10));
+    border = hslToHex(borderHue, 75 + Math.floor(Math.random() * 25), 52 + Math.floor(Math.random() * 12));
+  } else if (mode === 'warm') {
+    // Warm / Sepia theme with soft parchment tints and warm earthy text
+    bg = hslToHex(h, 28 + Math.floor(Math.random() * 22), 91 + Math.floor(Math.random() * 5));
+    text = hslToHex(h, 30 + Math.floor(Math.random() * 20), 14 + Math.floor(Math.random() * 8));
+    border = hslToHex(borderHue, 80 + Math.floor(Math.random() * 20), 40 + Math.floor(Math.random() * 12));
   } else {
-    bg = hslToHex(h, 25 + Math.floor(Math.random() * 20), 12 + Math.floor(Math.random() * 8));
-    text = hslToHex(h, 20 + Math.floor(Math.random() * 20), 88 + Math.floor(Math.random() * 10));
+    // Light / Classic
+    bg = hslToHex(h, 35 + Math.floor(Math.random() * 30), 92 + Math.floor(Math.random() * 5));
+    text = hslToHex(h, 30 + Math.floor(Math.random() * 25), 12 + Math.floor(Math.random() * 12));
+    border = hslToHex(borderHue, 80 + Math.floor(Math.random() * 20), 42 + Math.floor(Math.random() * 10));
   }
-  const border = hslToHex(borderHue, 75 + Math.floor(Math.random() * 25), 45 + Math.floor(Math.random() * 15));
+
   return { bg, text, border };
+}
+
+export function generateRandomLanguageColors(theme = 'classic') {
+  return generateThemeAwareLanguageColors(theme);
 }
 
 export function formatCssColor(val, fallback = '') {
@@ -152,7 +182,6 @@ export default function LanguageMenu() {
   // AI translation disclaimer popup state
   const [disclaimerModalOpen, setDisclaimerModalOpen] = useState(false);
   const [pendingLangId, setPendingLangId] = useState(null);
-  const [dontShowAgain, setDontShowAgain] = useState(true);
 
   // Color customization modal state (Task 3)
   const [colorPickerTarget, setColorPickerTarget] = useState(null);
@@ -206,10 +235,58 @@ export default function LanguageMenu() {
       const knownIds = TRANSLATIONS.map((t) => t.id);
       const filtered = order.filter((id) => knownIds.includes(id));
       for (const id of knownIds) if (!filtered.includes(id)) filtered.push(id);
+
+      // Migrate my_nissaya right under myanmar if it was at the old default position (end of list)
+      const myIdx = filtered.indexOf('myanmar');
+      const nissayaIdx = filtered.indexOf('my_nissaya');
+      if (myIdx !== -1 && nissayaIdx !== -1 && nissayaIdx > myIdx + 1 && nissayaIdx >= filtered.length - 2) {
+        filtered.splice(nissayaIdx, 1);
+        filtered.splice(myIdx + 1, 0, 'my_nissaya');
+      }
+
       return filtered;
     }
     return TRANSLATIONS.map((t) => t.id);
   }, [settings.translationOrder]);
+
+  const enabledLangIds = useMemo(() => {
+    const current = settings.translations || {};
+    return translationOrder.filter((id) =>
+      id === 'pali' ? current.pali !== false : Boolean(current[id])
+    );
+  }, [translationOrder, settings.translations]);
+
+  const handleApplyThemeAwareColors = (mode = 'all') => {
+    const currentColors = { ...(settings.translationColors || {}) };
+    const theme = settings.theme || 'classic';
+    const startHue = Math.floor(Math.random() * 360);
+
+    enabledLangIds.forEach((langId, idx) => {
+      const baseHue = Math.floor((startHue + (idx * 360) / Math.max(1, enabledLangIds.length)) % 360);
+      const randomSet = generateThemeAwareLanguageColors(theme, baseHue);
+
+      const existing = currentColors[langId] || {};
+      if (mode === 'all') {
+        currentColors[langId] = { ...existing, bg: randomSet.bg, text: randomSet.text, border: randomSet.border };
+      } else if (mode === 'bg') {
+        currentColors[langId] = { ...existing, bg: randomSet.bg };
+      } else if (mode === 'text') {
+        currentColors[langId] = { ...existing, text: randomSet.text };
+      } else if (mode === 'border') {
+        currentColors[langId] = { ...existing, border: randomSet.border };
+      }
+    });
+
+    updateSetting('translationColors', currentColors);
+  };
+
+  const handleResetEnabledColors = () => {
+    const currentColors = { ...(settings.translationColors || {}) };
+    enabledLangIds.forEach((langId) => {
+      delete currentColors[langId];
+    });
+    updateSetting('translationColors', currentColors);
+  };
 
   const orderedTranslations = useMemo(() => {
     const map = new Map(TRANSLATIONS.map((t) => [t.id, t]));
@@ -244,25 +321,17 @@ export default function LanguageMenu() {
       return;
     }
 
-    // If enabling a translation (not Pali):
+    // Task 1: Always show the AI notice modal when enabling any translation language (not Pali)
     if (!isPali) {
-      const alreadyAccepted =
-        typeof window !== 'undefined' &&
-        localStorage.getItem('tipitaka_ai_trans_disclaimer_accepted');
-      if (!alreadyAccepted) {
-        setPendingLangId(tId);
-        setDisclaimerModalOpen(true);
-        return;
-      }
+      setPendingLangId(tId);
+      setDisclaimerModalOpen(true);
+      return;
     }
 
     applyToggleTranslation(tId);
   };
 
   const handleConfirmDisclaimer = () => {
-    if (dontShowAgain && typeof window !== 'undefined') {
-      localStorage.setItem('tipitaka_ai_trans_disclaimer_accepted', 'true');
-    }
     if (pendingLangId) {
       applyToggleTranslation(pendingLangId);
       setPendingLangId(null);
@@ -425,10 +494,54 @@ export default function LanguageMenu() {
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     Languages & Display Order
                   </span>
-                  <span className="text-[10px] text-[var(--accent)] font-semibold flex items-center gap-1">
-                    <Sparkles size={11} />
-                    <span>Toggle on/off</span>
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyThemeAwareColors('all')}
+                      className="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/35 hover:bg-[var(--accent)] hover:text-white transition cursor-pointer shadow-2xs"
+                      title="Randomize harmonious background, text, and border colors for all enabled languages matching current theme"
+                      aria-label="Randomize all translation colors"
+                    >
+                      <Sparkles size={11} />
+                      <span>Random Colors</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyThemeAwareColors('bg')}
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      title="Randomize harmonious background colors for enabled languages matching current theme"
+                      aria-label="Randomize background colors"
+                    >
+                      BG
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyThemeAwareColors('text')}
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      title="Randomize readable text colors for enabled languages matching current theme"
+                      aria-label="Randomize text colors"
+                    >
+                      Text
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyThemeAwareColors('border')}
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      title="Randomize distinct left border colors for enabled languages"
+                      aria-label="Randomize border colors"
+                    >
+                      Border
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetEnabledColors}
+                      className="p-1 rounded-md text-[10px] text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-500/10 border border-[var(--border-color)] transition cursor-pointer"
+                      title="Reset colors for all enabled languages to default"
+                      aria-label="Reset translation colors to default"
+                    >
+                      <RotateCcw size={11} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -608,16 +721,6 @@ export default function LanguageMenu() {
                   </li>
                 </ul>
               </div>
-
-              <label className="flex items-center gap-2 pt-1 text-[11.5px] text-[var(--text-muted)] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={dontShowAgain}
-                  onChange={(e) => setDontShowAgain(e.target.checked)}
-                  className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer"
-                />
-                <span>Do not show this notice again</span>
-              </label>
             </div>
 
             {/* Footer */}
@@ -695,9 +798,20 @@ export default function LanguageMenu() {
                           border: {formatCssColor(activeBorder)}
                         </span>
                       </div>
-                      <p className="text-xs leading-relaxed" style={{ color: formatCssColor(activeText) || 'inherit' }}>
+                      <p
+                        className="text-xs leading-relaxed"
+                        style={{
+                          color: formatCssColor(activeText) || 'inherit',
+                          fontFamily:
+                            colorPickerTarget.id === 'vietnamese'
+                              ? '"Be Vietnam Pro", "Noto Serif", "Literata", serif'
+                              : 'inherit',
+                        }}
+                      >
                         {colorPickerTarget.id === 'pali'
                           ? 'Namo tassa bhagavato arahato sammāsambuddhassa. Evaṃ me sutaṃ—ekaṃ samayaṃ bhagavā...'
+                          : colorPickerTarget.id === 'vietnamese'
+                          ? 'Tôi từng nghe như vầy: Một thời Thế Tôn du hành trên đại đạo giữa Rājagaha và Nālandā (ā, ī, ū, ṭ, ḍ, ṇ, ṅ, ñ, ḷ, ṃ)...'
                           : 'Thus have I heard. On one occasion the Blessed One was travelling along the highway between Rājagaha and Nālandā...'}
                       </p>
                     </div>
@@ -906,7 +1020,7 @@ export default function LanguageMenu() {
                 <button
                   type="button"
                   onClick={() => {
-                    const randoms = generateRandomLanguageColors();
+                    const randoms = generateThemeAwareLanguageColors(settings.theme);
                     updateLangColors(colorPickerTarget.id, randoms);
                   }}
                   className="px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] flex items-center gap-1.5 transition cursor-pointer shadow-2xs"

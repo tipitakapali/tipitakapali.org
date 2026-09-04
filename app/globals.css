@@ -1,3 +1,61 @@
+/* Local @font-face for Be Vietnam Pro (self-hosted, no external Google Fonts CDN) */
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-SemiBoldItalic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/pali/Be_Vietnam_Pro/BeVietnamPro-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -470,6 +528,19 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-stack-row {
   display: block;
+  margin-bottom: 1.25rem;
+}
+
+.reader-trans-stack-row:last-child {
+  margin-bottom: 0;
+}
+
+.reader-trans-stack-row > p {
+  margin-bottom: 0.35rem !important;
+}
+
+.reader-trans-stack-row .reader-trans-block:last-child {
+  margin-bottom: 0;
 }
 
 .reader-trans-side-row {
@@ -671,6 +742,32 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
   border-left-color: var(--accent); /* Original Pali Accent */
 }
 
+/* Pali Top Block - when Pali is at top position (Task 2) */
+.reader-trans-block.reader-pali-top-block {
+  border-left: none;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0.25rem;
+}
+
+.reader-trans-block.reader-pali-top-block.has-custom-border {
+  border-left: 3.5px solid var(--accent);
+  padding: 0.5rem 0.85rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.reader-trans-block.reader-pali-top-block.has-custom-bg {
+  padding: 0.5rem 0.85rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
+.reader-trans-block.reader-pali-top-block:not(.has-custom-bg):hover {
+  background: transparent;
+  box-shadow: none;
+}
+
 .reader-trans-block.reader-pali-trans-block p,
 .reader-trans-block[data-trans-lang="pali"] p {
   margin-bottom: 0 !important;
@@ -802,6 +899,17 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 .reader-trans-block[data-trans-lang="ja"] .reader-trans-content {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
   line-height: 1.8;
+}
+
+/* Vietnamese Translation Typography (Task 3) - Flawless rendering for Vietnamese tonemarks & Pali diacritics */
+.reader-trans-block[data-trans-lang="vi"],
+.reader-trans-block[data-trans-lang="vietnamese"],
+.reader-trans-block[data-trans-lang="vi"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="vietnamese"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="vi"] p,
+.reader-trans-block[data-trans-lang="vietnamese"] p {
+  font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.85;
 }
 
 /* Tabs Bar */

@@ -132,7 +132,13 @@ function injectTranslationsIntoHtml(
   if (!html) return html;
 
   const hasTranslations = orderedLayers.some((l) => l.type === 'trans');
-  if (isPaliEnabled && !hasTranslations) {
+  const paliColors = translationColors?.pali || {};
+  const hasCustomPaliColors = Boolean(
+    formatCssColor(paliColors.border) ||
+    formatCssColor(paliColors.bg) ||
+    formatCssColor(paliColors.text)
+  );
+  if (isPaliEnabled && !hasTranslations && !hasCustomPaliColors) {
     return html;
   }
 
@@ -170,21 +176,51 @@ function injectTranslationsIntoHtml(
       if (layer.type === 'pali') {
         if (isPaliEnabled) {
           const isPaliInTopPosition = renderedItems.length === 0 && orderedLayers[0]?.type === 'pali';
-          if (isPaliInTopPosition) {
-            renderedItems.push({
-              type: 'pali',
-              lang: 'pali',
-              html: pTag,
-            });
+          const isPaliTop = isPaliInTopPosition;
+          const currentPaliColors = translationColors?.pali || {};
+          const paliBorder = formatCssColor(currentPaliColors.border);
+          const paliBg = formatCssColor(currentPaliColors.bg);
+          const paliText = formatCssColor(currentPaliColors.text);
+          const hasCustomPali = Boolean(paliBorder || paliBg || paliText);
+
+          if (isPaliTop) {
+            if (hasCustomPali) {
+              const paliBlockStyles = [
+                paliBorder ? `border-left: 3.5px solid ${paliBorder}` : 'border-left: none',
+                paliBg ? `background-color: ${paliBg}` : '',
+                paliText ? `color: ${paliText}` : '',
+                (paliBorder || paliBg) ? 'padding: 0.5rem 0.85rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 0.5rem;' : '',
+              ].filter(Boolean).join('; ');
+
+              const topBlockClasses = [
+                'reader-trans-block',
+                'reader-pali-trans-block',
+                'reader-pali-top-block',
+                paliBorder ? 'has-custom-border' : '',
+                paliBg ? 'has-custom-bg' : '',
+              ].filter(Boolean).join(' ');
+
+              renderedItems.push({
+                type: 'pali',
+                lang: 'pali',
+                html: `
+      <div class="${topBlockClasses}" data-trans-lang="pali"${paliBlockStyles ? ` style="${paliBlockStyles}"` : ''}>
+        ${pTag}
+      </div>`,
+              });
+            } else {
+              renderedItems.push({
+                type: 'pali',
+                lang: 'pali',
+                html: pTag,
+              });
+            }
           } else {
             // Task 2: If Pali text is not in position top, add border-left to it as other translation languages
             // Task 3: Dynamically apply custom colors (background, text color, border-left color)
-            const paliColors = translationColors?.pali || {};
-            const paliBorder = formatCssColor(paliColors.border) || 'var(--accent, #8b2500)';
-            const paliBg = formatCssColor(paliColors.bg);
-            const paliText = formatCssColor(paliColors.text);
+            const borderValue = paliBorder || 'var(--accent, #8b2500)';
             const paliBlockStyles = [
-              `border-left: 3.5px solid ${paliBorder}`,
+              `border-left: 3.5px solid ${borderValue}`,
               paliBg ? `background-color: ${paliBg}` : '',
               paliText ? `color: ${paliText}` : '',
             ].filter(Boolean).join('; ');
@@ -379,7 +415,13 @@ const ChapterBlock = memo(function ChapterBlock({
       );
     }
     const hasActiveTrans = activeLangs.length > 0;
-    if (hasActiveTrans || !isPaliEnabled) {
+    const currentPaliColors = translationColors?.pali || {};
+    const hasCustomPaliColors = Boolean(
+      formatCssColor(currentPaliColors.border) ||
+      formatCssColor(currentPaliColors.bg) ||
+      formatCssColor(currentPaliColors.text)
+    );
+    if (hasActiveTrans || !isPaliEnabled || hasCustomPaliColors) {
       processed = injectTranslationsIntoHtml(
         processed,
         translations,
@@ -527,39 +569,221 @@ function createRangeFromCharOffset(parentEl, targetOffset, length) {
   return null;
 }
 
+// Cached Intl.Segmenter instances by locale for fast word extraction across languages
+const wordSegmenters = new Map();
+function getWordSegmenter(locale) {
+  if (!wordSegmenters.has(locale)) {
+    try {
+      wordSegmenters.set(locale, new Intl.Segmenter(locale, { granularity: 'word' }));
+    } catch (e) {
+      try {
+        wordSegmenters.set(locale, new Intl.Segmenter('en', { granularity: 'word' }));
+      } catch (err) {
+        wordSegmenters.set(locale, null);
+      }
+    }
+  }
+  return wordSegmenters.get(locale);
+}
+
+// Extract word and boundaries at offset inside a text string (supports CJK, Myanmar, Indic, Latin)
+function extractWordAtOffset(text, offset, lang = 'en') {
+  if (!text || offset < 0 || offset > text.length) return null;
+  const safeOffset = Math.min(offset, Math.max(0, text.length - 1));
+
+  const localeMap = {
+    pali: 'pi',
+    pi: 'pi',
+    english: 'en',
+    en: 'en',
+    vietnamese: 'vi',
+    vi: 'vi',
+    myanmar: 'my',
+    my: 'my',
+    my_nissaya: 'my',
+    sinhala: 'si',
+    si: 'si',
+    chinese: 'zh',
+    zh: 'zh',
+    khmer: 'km',
+    km: 'km',
+    thai: 'th',
+    th: 'th',
+    lao: 'lo',
+    lo: 'lo',
+    tamil: 'ta',
+    ta: 'ta',
+    hindi: 'hi',
+    hi: 'hi',
+    german: 'de',
+    de: 'de',
+    japanese: 'ja',
+    ja: 'ja',
+    korean: 'ko',
+    ko: 'ko',
+    portuguese: 'pt',
+    pt: 'pt',
+    russian: 'ru',
+    ru: 'ru',
+  };
+  const locale = localeMap[lang] || 'en';
+
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try {
+      const segmenter = getWordSegmenter(locale);
+      if (segmenter) {
+        const segments = Array.from(segmenter.segment(text));
+        // 1. Direct hit on a word-like segment
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          const segStart = seg.index;
+          const segEnd = seg.index + seg.segment.length;
+          if (seg.isWordLike && safeOffset >= segStart && safeOffset < segEnd) {
+            return { word: seg.segment, start: segStart, end: segEnd };
+          }
+        }
+        // 2. Clicked at the trailing boundary of a word
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          const segStart = seg.index;
+          const segEnd = seg.index + seg.segment.length;
+          if (seg.isWordLike && safeOffset === segEnd) {
+            return { word: seg.segment, start: segStart, end: segEnd };
+          }
+        }
+        // 3. Clicked on immediate adjacent punctuation/quote
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          const segStart = seg.index;
+          const segEnd = seg.index + seg.segment.length;
+          if (!seg.isWordLike && safeOffset >= segStart && safeOffset < segEnd) {
+            if (i > 0 && segments[i - 1].isWordLike && safeOffset === segStart) {
+              return {
+                word: segments[i - 1].segment,
+                start: segments[i - 1].index,
+                end: segments[i - 1].index + segments[i - 1].segment.length,
+              };
+            }
+            if (i < segments.length - 1 && segments[i + 1].isWordLike && safeOffset === segEnd - 1) {
+              return {
+                word: segments[i + 1].segment,
+                start: segments[i + 1].index,
+                end: segments[i + 1].index + segments[i + 1].segment.length,
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Regex fallback when Intl.Segmenter is unavailable or did not match
+  const char = text[safeOffset];
+  if (char && /\p{Script=Han}/u.test(char)) {
+    return { word: char, start: safeOffset, end: safeOffset + 1 };
+  }
+
+  const STOP_CHAR = /[\s.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။，。！？；：（）【】《》、·'‘’’"“”«»‹›„“”「」『』]/;
+
+  let start = safeOffset;
+  let end = safeOffset;
+  if (STOP_CHAR.test(text[safeOffset])) {
+    if (safeOffset > 0 && !STOP_CHAR.test(text[safeOffset - 1])) {
+      start = safeOffset - 1;
+      end = safeOffset;
+    } else if (safeOffset < text.length - 1 && !STOP_CHAR.test(text[safeOffset + 1])) {
+      start = safeOffset + 1;
+      end = safeOffset + 2;
+    } else {
+      return null;
+    }
+  } else {
+    end = safeOffset + 1;
+  }
+
+  while (start > 0 && !STOP_CHAR.test(text[start - 1])) {
+    start--;
+  }
+  while (end < text.length && !STOP_CHAR.test(text[end])) {
+    end++;
+  }
+
+  const word = text.slice(start, end).trim();
+  if (!word) return null;
+  return { word, start, end };
+}
+
 // Helper to find and highlight a stored word inside a book container
 function restoreClickedWordHighlight(bookCode, record, container = document) {
   if (!bookCode || !record || !container) return false;
-  const { pIndex, paraNum, chapIdx, word, charOffset, length } = record;
+  const { pIndex, paraNum, chapIdx, word, rawWord, charOffset, length, transLang } = record;
 
-  // 1. Try finding by data-pindex
-  let pEl = null;
-  if (pIndex) {
-    pEl = container.querySelector(`p[data-pindex="${pIndex}"]`);
-  }
-  if (!pEl && paraNum) {
-    pEl = container.querySelector(`p[data-para="${paraNum}"]`);
-  }
-  if (!pEl && chapIdx !== undefined) {
-    pEl = container.querySelector(`#chap-${chapIdx} p`);
+  let targetEl = null;
+
+  // 1. Scoped language block resolution
+  if (transLang && transLang !== 'pali') {
+    if (pIndex) {
+      targetEl = container.querySelector(
+        `[data-pindex="${pIndex}"] .reader-trans-block[data-trans-lang="${transLang}"], ` +
+        `.reader-trans-block[data-trans-lang="${transLang}"][data-pindex="${pIndex}"]`
+      );
+    }
+    if (!targetEl && paraNum) {
+      targetEl = container.querySelector(
+        `[data-para="${paraNum}"] .reader-trans-block[data-trans-lang="${transLang}"], ` +
+        `.reader-trans-block[data-trans-lang="${transLang}"][data-para="${paraNum}"]`
+      );
+    }
   }
 
-  if (pEl) {
+  // 2. Scoped Pali block resolution
+  if (!targetEl && transLang === 'pali') {
+    if (pIndex) {
+      targetEl = container.querySelector(
+        `[data-pindex="${pIndex}"] .reader-pali-trans-block, ` +
+        `p[data-pindex="${pIndex}"], ` +
+        `[data-pindex="${pIndex}"] p`
+      );
+    }
+    if (!targetEl && paraNum) {
+      targetEl = container.querySelector(
+        `[data-para="${paraNum}"] .reader-pali-trans-block, ` +
+        `p[data-para="${paraNum}"], ` +
+        `[data-para="${paraNum}"] p`
+      );
+    }
+  }
+
+  // 3. Fallback to generic paragraph resolution
+  if (!targetEl) {
+    if (pIndex) {
+      targetEl = container.querySelector(`p[data-pindex="${pIndex}"]`) || container.querySelector(`[data-pindex="${pIndex}"]`);
+    }
+    if (!targetEl && paraNum) {
+      targetEl = container.querySelector(`p[data-para="${paraNum}"]`) || container.querySelector(`[data-para="${paraNum}"]`);
+    }
+    if (!targetEl && chapIdx !== undefined) {
+      targetEl = container.querySelector(`#chap-${chapIdx} p, #chap-${chapIdx} [data-pindex]`);
+    }
+  }
+
+  if (targetEl) {
     // Try exact character offset
     if (charOffset !== undefined && length) {
-      const range = createRangeFromCharOffset(pEl, charOffset, length);
+      const range = createRangeFromCharOffset(targetEl, charOffset, length);
       if (range && range.toString().trim()) {
         highlightRangeInReader(range);
         return true;
       }
     }
 
-    // Fallback: search word inside this paragraph
-    if (word) {
-      const pText = pEl.textContent || '';
-      const idx = pText.indexOf(word);
+    // Fallback: search word inside this block/paragraph
+    const searchWord = rawWord || word;
+    if (searchWord) {
+      const pText = targetEl.textContent || '';
+      const idx = pText.indexOf(searchWord);
       if (idx !== -1) {
-        const range = createRangeFromCharOffset(pEl, idx, word.length);
+        const range = createRangeFromCharOffset(targetEl, idx, searchWord.length);
         if (range) {
           highlightRangeInReader(range);
           return true;
@@ -1293,14 +1517,11 @@ export default function ReaderView() {
       });
     }
 
-    // 2.5. Ignore clicks inside translation blocks (prevents accidental Pali dict lookup on translations)
-    if (e.target.closest('.reader-trans-block')) {
-      return;
-    }
-
     // 3. Single-Click Dictionary Word Lookup
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
-    const mode = clickLookupMode || settings?.dictLookupTrigger || 'single';
+    const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
+      ? settings.dictLookupTrigger
+      : (clickLookupMode || 'single');
 
     if (isLookupActive && mode === 'single') {
       const selection = window.getSelection()?.toString()?.trim();
@@ -1322,54 +1543,55 @@ export default function ReaderView() {
           const node = range.startContainer;
           const offset = range.startOffset;
           const text = node.textContent || '';
-          let start = offset;
-          let end = offset;
-          while (start > 0 && /\S/.test(text[start - 1])) {
-            start--;
-          }
-          while (end < text.length && /\S/.test(text[end])) {
-            end++;
-          }
-          const rawWord = text.slice(start, end);
-          const wordToLookup = cleanDictionaryQuery(rawWord);
-          if (wordToLookup && wordToLookup.length >= 2) {
-            const pEl = node.parentElement?.closest('p[data-pindex], p[data-para]') || e.target.closest('p[data-pindex], p[data-para]');
-            const pIndex = pEl?.getAttribute('data-pindex') || null;
-            const pNum = pEl?.getAttribute('data-para') || null;
-            const chapEl = pEl?.closest('[data-chapter]');
-            const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
-            const charOffset = pEl ? getCharOffsetInElement(pEl, node, start) : start;
-            const length = end - start;
+          const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
+          const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
 
-            const wordRange = document.createRange();
-            wordRange.setStart(node, start);
-            wordRange.setEnd(node, end);
-            highlightRangeInReader(wordRange);
+          const extracted = extractWordAtOffset(text, offset, transLang);
+          if (extracted) {
+            const { word: rawWord, start, end } = extracted;
+            const wordToLookup = cleanDictionaryQuery(rawWord);
+            if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
+              const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
+              const blockEl = transBlock || pEl;
+              const pIndex = pEl?.getAttribute('data-pindex') || null;
+              const pNum = pEl?.getAttribute('data-para') || null;
+              const chapEl = pEl?.closest('[data-chapter]');
+              const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+              const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
+              const length = end - start;
 
-            // Multi-frame clear to suppress mobile OS asynchronous selection handles / pins
-            if (typeof window !== 'undefined') {
-              const clearSel = () => {
-                const sel = window.getSelection();
-                if (sel) sel.removeAllRanges();
-              };
-              clearSel();
-              setTimeout(clearSel, 0);
-              setTimeout(clearSel, 60);
-              setTimeout(clearSel, 160);
+              const wordRange = document.createRange();
+              wordRange.setStart(node, start);
+              wordRange.setEnd(node, end);
+              highlightRangeInReader(wordRange);
+
+              // Multi-frame clear to suppress mobile OS asynchronous selection handles / pins
+              if (typeof window !== 'undefined') {
+                const clearSel = () => {
+                  const sel = window.getSelection();
+                  if (sel) sel.removeAllRanges();
+                };
+                clearSel();
+                setTimeout(clearSel, 0);
+                setTimeout(clearSel, 60);
+                setTimeout(clearSel, 160);
+              }
+
+              if (activeTab?.bookCode) {
+                recordClickedWord(activeTab.bookCode, {
+                  chapIdx,
+                  pIndex,
+                  paraNum: pNum,
+                  word: wordToLookup,
+                  rawWord,
+                  charOffset,
+                  length,
+                  transLang,
+                });
+              }
+
+              openDictionary(wordToLookup);
             }
-
-            if (activeTab?.bookCode) {
-              recordClickedWord(activeTab.bookCode, {
-                chapIdx,
-                pIndex,
-                paraNum: pNum,
-                word: rawWord,
-                charOffset,
-                length,
-              });
-            }
-
-            openDictionary(wordToLookup);
           }
         }
       }
@@ -1378,14 +1600,11 @@ export default function ReaderView() {
 
   const handleReaderDoubleClick = useCallback((e) => {
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
-    const mode = clickLookupMode || settings?.dictLookupTrigger || 'single';
+    const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
+      ? settings.dictLookupTrigger
+      : (clickLookupMode || 'single');
 
     if (!isLookupActive || mode !== 'double') {
-      return;
-    }
-
-    // Ignore double clicks on translation blocks
-    if (e.target.closest('.reader-trans-block')) {
       return;
     }
 
@@ -1396,10 +1615,39 @@ export default function ReaderView() {
     if (selection && selection.length > 0 && selection.length < 50) {
       wordToLookup = cleanDictionaryQuery(selection);
       const sel = window.getSelection();
+      let node = null;
+      let startOffset = 0;
       if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0).cloneRange();
-        highlightRangeInReader(range);
+        const range = sel.getRangeAt(0);
+        node = range.startContainer;
+        startOffset = range.startOffset;
+        const clonedRange = range.cloneRange();
+        highlightRangeInReader(clonedRange);
         sel.removeAllRanges();
+      }
+
+      if (node && activeTab?.bookCode) {
+        const transBlock = node.parentElement?.closest?.('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
+        const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest?.('p[data-pindex]') ? 'pali' : 'pali');
+        const pEl = node.parentElement?.closest?.('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
+        const blockEl = transBlock || pEl;
+        const pIndex = pEl?.getAttribute('data-pindex') || null;
+        const pNum = pEl?.getAttribute('data-para') || null;
+        const chapEl = pEl?.closest('[data-chapter]');
+        const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+        const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, startOffset) : startOffset;
+        const length = selection.length;
+
+        recordClickedWord(activeTab.bookCode, {
+          chapIdx,
+          pIndex,
+          paraNum: pNum,
+          word: wordToLookup,
+          rawWord: selection,
+          charOffset,
+          length,
+          transLang,
+        });
       }
     } else {
       // 2. Extract word at click point
@@ -1419,45 +1667,46 @@ export default function ReaderView() {
         const node = range.startContainer;
         const offset = range.startOffset;
         const text = node.textContent || '';
-        let start = offset;
-        let end = offset;
-        while (start > 0 && /\S/.test(text[start - 1])) {
-          start--;
-        }
-        while (end < text.length && /\S/.test(text[end])) {
-          end++;
-        }
-        const rawWord = text.slice(start, end);
-        wordToLookup = cleanDictionaryQuery(rawWord);
-        if (wordToLookup && wordToLookup.length >= 2) {
-          const pEl = node.parentElement?.closest('p[data-pindex], p[data-para]') || e.target.closest('p[data-pindex], p[data-para]');
-          const pIndex = pEl?.getAttribute('data-pindex') || null;
-          const pNum = pEl?.getAttribute('data-para') || null;
-          const chapEl = pEl?.closest('[data-chapter]');
-          const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
-          const charOffset = pEl ? getCharOffsetInElement(pEl, node, start) : start;
-          const length = end - start;
+        const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
+        const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
 
-          const wordRange = document.createRange();
-          wordRange.setStart(node, start);
-          wordRange.setEnd(node, end);
-          highlightRangeInReader(wordRange);
+        const extracted = extractWordAtOffset(text, offset, transLang);
+        if (extracted) {
+          const { word: rawWord, start, end } = extracted;
+          wordToLookup = cleanDictionaryQuery(rawWord);
+          if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
+            const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
+            const blockEl = transBlock || pEl;
+            const pIndex = pEl?.getAttribute('data-pindex') || null;
+            const pNum = pEl?.getAttribute('data-para') || null;
+            const chapEl = pEl?.closest('[data-chapter]');
+            const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+            const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
+            const length = end - start;
 
-          if (activeTab?.bookCode) {
-            recordClickedWord(activeTab.bookCode, {
-              chapIdx,
-              pIndex,
-              paraNum: pNum,
-              word: rawWord,
-              charOffset,
-              length,
-            });
+            const wordRange = document.createRange();
+            wordRange.setStart(node, start);
+            wordRange.setEnd(node, end);
+            highlightRangeInReader(wordRange);
+
+            if (activeTab?.bookCode) {
+              recordClickedWord(activeTab.bookCode, {
+                chapIdx,
+                pIndex,
+                paraNum: pNum,
+                word: wordToLookup,
+                rawWord,
+                charOffset,
+                length,
+                transLang,
+              });
+            }
           }
         }
       }
     }
 
-    if (wordToLookup && wordToLookup.length >= 2) {
+    if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
       openDictionary(wordToLookup);
     }
   }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, activeTab, recordClickedWord]);

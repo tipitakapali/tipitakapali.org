@@ -7,6 +7,7 @@ const DEFAULT_TRANSLATION_ORDER = [
   'english',
   'vietnamese',
   'myanmar',
+  'my_nissaya',
   'sinhala',
   'chinese',
   'khmer',
@@ -19,7 +20,6 @@ const DEFAULT_TRANSLATION_ORDER = [
   'korean',
   'portuguese',
   'russian',
-  'my_nissaya',
 ];
 
 const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v4';
@@ -136,6 +136,15 @@ export function ThemeSettingsProvider({ children }) {
             }
             // Filter out stale ids not in default list (keep custom order but drop unknowns)
             merged.translationOrder = merged.translationOrder.filter((id) => DEFAULT_TRANSLATION_ORDER.includes(id));
+
+            // If my_nissaya was at the old default position (end of list), move it right under myanmar
+            const myIdx = merged.translationOrder.indexOf('myanmar');
+            const nissayaIdx = merged.translationOrder.indexOf('my_nissaya');
+            if (myIdx !== -1 && nissayaIdx !== -1 && nissayaIdx > myIdx + 1 && nissayaIdx >= merged.translationOrder.length - 2) {
+              merged.translationOrder.splice(nissayaIdx, 1);
+              merged.translationOrder.splice(myIdx + 1, 0, 'my_nissaya');
+            }
+
             if (merged.translationOrder.length === 0) merged.translationOrder = [...DEFAULT_TRANSLATION_ORDER];
           }
           if (!['stack', 'side'].includes(merged.translationDisplayMode)) {
@@ -155,6 +164,9 @@ export function ThemeSettingsProvider({ children }) {
           if (!hasAnyActive) {
             merged.translations.pali = true;
           }
+          try {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+          } catch (e) {}
           return merged;
         });
       }
