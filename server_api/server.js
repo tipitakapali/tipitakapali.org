@@ -622,11 +622,16 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     let matchQuality = 'exact';
     let matchedSourcePara = pStr;
 
-    // First Priority: Query Canon-wide Ground-Truth GUID Paragraph Map
+    // Canon-wide Ground-Truth GUID Paragraph Map lookup (return deferred to the
+    // decision below: a fine canon answer (exact/span/closest-para) wins outright,
+    // but a coarse 'section' pointer must NOT shadow a real para-level mat link —
+    // e.g. s0201m.mul ch0 para 9 has no Attha, and must resolve to closest Attha
+    // para 8, not to the canon section anchor (s0201a.att ch0 para 1).
+    let canonRow = null;
     if (pStr && cIdx !== null && !isNaN(cIdx) && stmtGetCanonPara) {
       const pNum = parseInt(baseP, 10);
       const queryNum = isNaN(pNum) ? -1 : pNum;
-      let canonRow = stmtGetCanonPara.get(cleanCode, cIdx, pStr, queryNum, queryNum);
+      canonRow = stmtGetCanonPara.get(cleanCode, cIdx, pStr, queryNum, queryNum);
       if (!canonRow && queryNum > 0 && stmtGetClosestCanonPara) {
         canonRow = stmtGetClosestCanonPara.get(cleanCode, cIdx, queryNum);
         if (canonRow) {
@@ -634,37 +639,43 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
           matchedSourcePara = canonRow.para_num;
         }
       }
-      if (canonRow) {
-        return {
-          source_book: cleanCode,
-          source_chapter: cIdx,
-          source_para: pStr,
-          source_guid: canonRow.guid,
-          match_quality: matchQuality !== 'exact' ? matchQuality : canonRow.match_quality,
-          matched_source_para: matchedSourcePara,
-          mula: canonRow.mula_book ? {
-            book: canonRow.mula_book,
-            chapter: canonRow.mula_chapter,
-            para: canonRow.mula_para,
-            guid: canonRow.mula_guid,
-            title: cstCatalog[canonRow.mula_book]?.title || null,
-          } : null,
-          attha: canonRow.attha_book ? {
-            book: canonRow.attha_book,
-            chapter: canonRow.attha_chapter,
-            para: canonRow.attha_para,
-            guid: canonRow.attha_guid,
-            title: cstCatalog[canonRow.attha_book]?.title || null,
-          } : null,
-          tika: canonRow.tika_book ? {
-            book: canonRow.tika_book,
-            chapter: canonRow.tika_chapter,
-            para: canonRow.tika_para,
-            guid: canonRow.tika_guid,
-            title: cstCatalog[canonRow.tika_book]?.title || null,
-          } : null,
-        };
-      }
+    }
+    // Snapshot the canon verdict now: the mat lookups below reuse matchQuality /
+    // matchedSourcePara for their own outcomes.
+    const canonFine = !!canonRow && (canonRow.match_quality === 'exact' || canonRow.match_quality === 'span' || matchQuality === 'closest');
+    const canonQualityOut = matchQuality !== 'exact' ? matchQuality : canonRow?.match_quality;
+    const canonMatchedOut = matchedSourcePara;
+    const canonResponse = () => ({
+      source_book: cleanCode,
+      source_chapter: cIdx,
+      source_para: pStr,
+      source_guid: canonRow.guid,
+      match_quality: canonQualityOut,
+      matched_source_para: canonMatchedOut,
+      mula: canonRow.mula_book ? {
+        book: canonRow.mula_book,
+        chapter: canonRow.mula_chapter,
+        para: canonRow.mula_para,
+        guid: canonRow.mula_guid,
+        title: cstCatalog[canonRow.mula_book]?.title || null,
+      } : null,
+      attha: canonRow.attha_book ? {
+        book: canonRow.attha_book,
+        chapter: canonRow.attha_chapter,
+        para: canonRow.attha_para,
+        guid: canonRow.attha_guid,
+        title: cstCatalog[canonRow.attha_book]?.title || null,
+      } : null,
+      tika: canonRow.tika_book ? {
+        book: canonRow.tika_book,
+        chapter: canonRow.tika_chapter,
+        para: canonRow.tika_para,
+        guid: canonRow.tika_guid,
+        title: cstCatalog[canonRow.tika_book]?.title || null,
+      } : null,
+    });
+    if (canonFine) {
+      return canonResponse();
     }
 
     let paraRow = null;
@@ -724,6 +735,14 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
           }
         }
       } catch (e) {}
+    }
+    // A coarse canon section pointer is still more actionable than a bare chapter
+    // fallback — but only when mat offers no real para link at all.
+    const matHasPara = !!paraRow && ['mula', 'attha', 'tika'].some(
+      (l) => paraRow[`${l}_book`] && paraRow[`${l}_para`] !== null && paraRow[`${l}_para`] !== undefined
+    );
+    if (!matHasPara && canonRow) {
+      return canonResponse();
     }
     let chapRow = null;
     if (cIdx !== null && !isNaN(cIdx) && stmtGetMatChapter) {
