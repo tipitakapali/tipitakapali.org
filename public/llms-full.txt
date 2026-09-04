@@ -287,3 +287,4 @@ Users can open any canonical text directly in their preferred script by prefixin
 ### 8. OpenAPI & AI Plugin
 - OpenAPI: `GET https://tipitakapali.org/openapi.json` (for ChatGPT/MCP tool import)
 - AI Plugin: `GET https://tipitakapali.org/.well-known/ai-plugin.json`
+- Human Guide (features, shortcuts, dictionaries, scripts): `https://tipitakapali.org/info`

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>About &amp; User Guide | Tipiṭaka Pāḷi — Chaṭṭha Saṅgāyana Tipiṭaka</title>
+<meta name="description" content="About TipitakaPali.org: the complete Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon with full-text search, multi-dictionary lookup, MAT cross-navigation, 17 scripts, and user guide." />
+<link rel="canonical" href="https://tipitakapali.org/info" />
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root {
+    --bg: #f0eee5;
+    --bg-soft: #f4f4eb;
+    --card: #ffffff;
+    --text: #141413;
+    --muted: #5e5d59;
+    --faint: #9a9996;
+    --accent: #8b2500;
+    --accent-hover: #a82e00;
+    --accent-soft: #fdf0e8;
+    --accent-line: #e8d5c0;
+    --border: #e8e0d0;
+    --code-bg: #ece8de;
+    --max: 860px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18191a;
+      --bg-soft: #242526;
+      --card: #28292a;
+      --text: #e4e6eb;
+      --muted: #b0b3b8;
+      --faint: #777a80;
+      --accent: #e07a3c;
+      --accent-hover: #f08e50;
+      --accent-soft: rgba(224, 122, 60, 0.14);
+      --accent-line: rgba(224, 122, 60, 0.35);
+      --border: #3a3b3c;
+      --code-bg: #1c1d1e;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding-bottom: 4rem;
+  }
+  .pali { font-family: "Gentium Plus", "Times Ext Roman", Georgia, serif; }
+  header.hero {
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.25rem 2rem;
+    text-align: center;
+  }
+  header.hero img.logo {
+    width: 72px; height: 72px; border-radius: 16px;
+    background: #fff; padding: 6px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  header.hero h1 {
+    font-size: 1.7rem; color: var(--accent);
+    margin: 0.8rem 0 0.3rem; letter-spacing: -0.01em;
+  }
+  header.hero p.sub { color: var(--muted); max-width: 640px; margin: 0 auto; }
+  .cta-row { margin-top: 1.1rem; display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 0.55rem 1.3rem; border-radius: 9999px;
+    font-weight: 600; font-size: 0.9rem; text-decoration: none;
+    border: 1px solid var(--accent);
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.ghost { color: var(--accent); background: transparent; }
+  .btn.ghost:hover { background: var(--accent-soft); }
+  nav.toc {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg-soft); border-bottom: 1px solid var(--border);
+    overflow-x: auto; white-space: nowrap; padding: 0.55rem 1rem;
+    text-align: center;
+  }
+  nav.toc a {
+    color: var(--muted); text-decoration: none; font-size: 0.82rem; font-weight: 600;
+    margin: 0 0.7rem;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  main { max-width: var(--max); margin: 0 auto; padding: 0 1.25rem; }
+  section.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.4rem 1.4rem;
+    margin-top: 1.4rem; scroll-margin-top: 70px;
+  }
+  section.card h2 { font-size: 1.15rem; margin-bottom: 0.6rem; color: var(--text); }
+  section.card h2 .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); margin-right: 0.5rem;
+  }
+  section.card p, section.card li { font-size: 0.93rem; color: var(--muted); }
+  section.card p + p { margin-top: 0.6rem; }
+  section.card strong { color: var(--text); }
+  section.card ul { padding-left: 1.2rem; margin-top: 0.5rem; }
+  section.card li { margin-bottom: 0.35rem; }
+  code, kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em; background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 5px; padding: 0 5px;
+  }
+  kbd { font-weight: 700; color: var(--accent); white-space: nowrap; }
+  section.card a { color: var(--accent); }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.7rem; margin-top: 1.4rem;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.9rem 0.6rem; text-align: center;
+  }
+  .stat b { display: block; font-size: 1.35rem; color: var(--accent); }
+  .stat span { font-size: 0.78rem; color: var(--muted); }
+  table.keys { width: 100%; border-collapse: collapse; margin-top: 0.7rem; font-size: 0.88rem; }
+  table.keys td { padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); color: var(--muted); }
+  table.keys td:last-child { text-align: right; }
+  .grid2 { display: grid; grid-template-columns: 1fr; gap: 0.7rem; margin-top: 0.7rem; }
+  @media (min-width: 640px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  .tile { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 0.9rem; }
+  .tile b { display: block; color: var(--text); font-size: 0.9rem; margin-bottom: 0.2rem; }
+  .tile p { font-size: 0.83rem !important; }
+  .badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 700;
+    padding: 1px 8px; border-radius: 9999px; margin-right: 0.3rem;
+    border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent);
+  }
+  .tip {
+    margin-top: 0.8rem; background: var(--accent-soft);
+    border: 1px solid var(--accent-line); border-radius: 10px;
+    padding: 0.7rem 0.9rem; font-size: 0.86rem; color: var(--text);
+  }
+  footer.blessing {
+    max-width: var(--max); margin: 2rem auto 0; padding: 1.4rem 1.25rem 0;
+    text-align: center; border-top: 1px solid var(--border);
+  }
+  footer.blessing .verse { color: var(--accent); font-weight: 700; }
+  footer.blessing .trans { color: var(--faint); font-style: italic; font-size: 0.85rem; margin-top: 0.2rem; }
+  footer.blessing .contact { margin-top: 0.8rem; font-size: 0.85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <img class="logo" src="/tipitakapali_org_logo.svg" alt="TipiṭakaPali.org logo" width="72" height="72" />
+  <h1 class="pali">Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi</h1>
+  <p class="sub">A clean, modern, high-performance study environment for the Pāḷi Canon and its ancient commentaries — free for non-commercial Dhamma study.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="/">Open the Reader</a>
+    <a class="btn ghost" href="/?q=mett%C4%81">Try Search</a>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Page contents">
+  <a href="#overview">Overview</a>
+  <a href="#reading">Reading</a>
+  <a href="#search">Search</a>
+  <a href="#dictionary">Dictionary</a>
+  <a href="#scripts">Scripts</a>
+  <a href="#mat">MAT</a>
+  <a href="#shortcuts">Shortcuts</a>
+  <a href="#editions">Editions</a>
+  <a href="#apps">Apps</a>
+  <a href="#api">API</a>
+  <a href="#credits">Credits</a>
+</nav>
+
+<main>
+  <div class="stats" aria-label="Library statistics">
+    <div class="stat"><b>217</b><span>books</span></div>
+    <div class="stat"><b>2,695+</b><span>chapters</span></div>
+    <div class="stat"><b>520,000+</b><span>paragraphs</span></div>
+    <div class="stat"><b>2,860</b><span>navigation nodes</span></div>
+    <div class="stat"><b>17</b><span>Pāḷi scripts</span></div>
+  </div>
+
+  <section class="card" id="overview">
+    <h2><span class="dot"></span>Overview</h2>
+    <p><strong>TipitakaPali.org</strong> presents the <strong class="pali">Chaṭṭha Saṅgāyana Tipiṭaka (CST)</strong> — the Pāḷi Canon as recited at the Sixth Buddhist Council — together with its <strong class="pali">Aṭṭhakathā</strong> (commentaries), <strong class="pali">Ṭīkā</strong> (sub-commentaries) and extra-canonical treatises, directly synchronized with the official <strong>Vipassana Research Institute (VRI)</strong> TEI XML corpus including all errata corrections.</p>
+    <p>Everything runs from a fast static edge distribution with a high-speed dictionary &amp; search API: paragraph-level navigation, multi-dictionary lookup on any word, live transliteration into 17 scripts, and one-click jumps between root text, commentary and sub-commentary.</p>
+    <div class="tip"><strong>Tip:</strong> every book, chapter and paragraph has a shareable address — e.g. <code>/book/s0101m.mul/1</code>, <code>/book/s0101m.mul/1#para8</code>, <code>/?q=anatta</code>. Copy the URL after navigating and it just works.</div>
+  </section>
+
+  <section class="card" id="reading">
+    <h2><span class="dot"></span>Reading the Texts</h2>
+    <ul>
+      <li><strong>Navigation tree</strong> — browse Vinaya, Sutta, Abhidhamma and Añña collections; press <kbd>Ctrl + B</kbd> to show or hide it, and type in its filter box to find any book instantly.</li>
+      <li><strong>Book tabs</strong> — open several books side by side; each tab remembers its chapter, paragraph and scroll position, even after you close the browser.</li>
+      <li><strong>Table of contents</strong> — the <strong>Toc</strong> button lists every section of the open book for direct chapter and paragraph jumping.</li>
+      <li><strong>Go</strong> — jump straight to a paragraph number (<code>para</code>) or a printed-edition page (<code>M / V / P / T</code>).</li>
+      <li><strong>Bookmarks &amp; history</strong> — bookmark any paragraph and revisit your recent reading; both are stored privately in your own browser.</li>
+      <li><strong>Eka mode</strong> — distraction-free reading; press <kbd>Esc</kbd> or the floating button to exit.</li>
+      <li><strong>Themes &amp; typography</strong> — Classic, Sepia, Dark, OLED and Dusk themes, five accent colors, four reader fonts, adjustable size, line-height, alignment and page-break / paragraph-number / footnote display.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="search">
+    <h2><span class="dot"></span>Full-Text Search (FTS5)</h2>
+    <p>Search <strong>all 217 books and 520,000+ paragraphs</strong> instantly (press <kbd>/</kbd>). A dedicated SQLite FTS5 prefix engine powers it, including scholarly variant readings (<code>syā.</code>, <code>ka.</code>, <code>pī.</code>) and manuscript notes.</p>
+    <div class="grid2">
+      <div class="tile"><b>MAT &amp; Piṭaka filters</b><p>Narrow to Mūla, Aṭṭhakathā, Ṭīkā or Añña; and to Vinaya, Sutta (Dīgha, Majjhima, Saṃyutta, Aṅguttara, Khuddaka), Abhidhamma or Añña.</p></div>
+      <div class="tile"><b>Proximity (NEAR)</b><p>Exact phrase with distance 1 (<code>"evaṃ me sutaṃ"</code>), near-words within 2–10 words, or anywhere-in-paragraph matching; prefix wildcards like <code>buddha*</code> included.</p></div>
+      <div class="tile"><b>Three sort orders</b><p>Canonical Piṭaka order (default), relevance ranking, or BM25 statistical scoring.</p></div>
+      <div class="tile"><b>Shareable queries</b><p><code>/?q=mettā</code> opens the search directly — ideal for bookmarks, study notes and AI assistants.</p></div>
+    </div>
+  </section>
+
+  <section class="card" id="dictionary">
+    <h2><span class="dot"></span>Dictionaries — Click Any Word</h2>
+    <p>Click or tap any Pāḷi word while reading (or press <kbd>d</kbd> on a selection) for grammar, roots, inflections and compound analysis across six sources:</p>
+    <p>
+      <span class="badge">Primary</span> Digital Pāḷi Dictionary (DPD) — 90,000+ entries with declensions, conjugations and root families.<br />
+      <span class="badge">Analysis</span> DPD compound splitter — breaks long <span class="pali">samāsa</span>/sandhi compounds into units.<br />
+      <span class="badge">Classic</span> PTS Pāḷi–English Dictionary (Rhys Davids &amp; Stede, corrected 2015 reprint).<br />
+      <span class="badge">Classic</span> Tipiṭaka Pāḷi–Myanmar Abhidhān.<br />
+      <span class="badge">Sinhala</span> Pāḷi–Sinhala Dictionary.<br />
+      <span class="badge">Comparative</span> Sanskrit lexicons (Monier-Williams, Apte, Edgerton Buddhist Hybrid Sanskrit).
+    </p>
+    <p style="margin-top:0.5rem">Choose a center modal, left/right dock or drawer layout in Settings; reorder or disable dictionaries to taste.</p>
+  </section>
+
+  <section class="card" id="scripts">
+    <h2><span class="dot"></span>17 Scripts &amp; Velthuis Typing</h2>
+    <p>Switch the entire Canon live between <strong>Roman, Devanagari, Sinhala, Myanmar, Thai, Lao, Khmer, Bengali, Gurmukhi, Gujarati, Telugu, Kannada, Malayalam, Tai Tham, Brahmi, Tibetan and Cyrillic</strong> — including script-prefixed links like <code>/book/si.s0102m.mul</code>. No Pāḷi keyboard needed either: the search bar, dictionary and filters convert <strong>Velthuis</strong> input in real time.</p>
+    <table class="keys" aria-label="Velthuis examples">
+      <tr><td><code>aa ii uu</code></td><td class="pali">ā ī ū</td></tr>
+      <tr><td><code>.m</code> / <code>m..</code></td><td class="pali">ṃ</td></tr>
+      <tr><td><code>.t .d .n .l</code></td><td class="pali">ṭ ḍ ṇ ḷ</td></tr>
+      <tr><td><code>~n</code> or <code>,,n</code> · <code>"n</code></td><td class="pali">ñ · ṅ</td></tr>
+      <tr><td><code>nibbaana</code> → <span class="pali">nibbāna</span></td><td><code>buddha.m</code> → <span class="pali">buddhaṃ</span></td></tr>
+    </table>
+  </section>
+
+  <section class="card" id="mat">
+    <h2><span class="dot"></span>MAT Cross-Navigation</h2>
+    <p>While reading any paragraph, the <strong>MAT</strong> button lists the connected <strong class="pali">Mūla</strong> (root canon), <strong class="pali">Aṭṭhakathā</strong> (commentary) and <strong class="pali">Ṭīkā</strong> (sub-commentary) and jumps straight to the corresponding paragraph — exact match when it exists, otherwise the closest available paragraph (clearly labeled), otherwise the corresponding chapter.</p>
+  </section>
+
+  <section class="card" id="shortcuts">
+    <h2><span class="dot"></span>Keyboard Shortcuts</h2>
+    <table class="keys">
+      <tr><td>Full-text search</td><td><kbd>/</kbd></td></tr>
+      <tr><td>Dictionary lookup (on selection)</td><td><kbd>d</kbd></td></tr>
+      <tr><td>Toggle navigation sidebar</td><td><kbd>Ctrl + B</kbd></td></tr>
+      <tr><td>Open help &amp; guide</td><td><kbd>?</kbd> or <kbd>F1</kbd></td></tr>
+      <tr><td>Exit Eka mode / close dialogs</td><td><kbd>Esc</kbd></td></tr>
+    </table>
+  </section>
+
+  <section class="card" id="editions">
+    <h2><span class="dot"></span>Printed-Edition Page Marks</h2>
+    <p>Badges like <code>[M 1.0029]</code> mark exact page boundaries of the historic printed editions, and the <strong>Go</strong> dialog can jump to any of them:</p>
+    <p style="margin-top:0.5rem">
+      <span class="badge">V · VRI</span>
+      <span class="badge">M · Myanmar CSC</span>
+      <span class="badge">P · PTS London</span>
+      <span class="badge">T · Royal Thai</span>
+      <span class="badge">O · Other</span>
+    </p>
+  </section>
+
+  <section class="card" id="apps">
+    <h2><span class="dot"></span>Offline Apps</h2>
+    <p>Take the Canon with you — full offline capability on every platform:</p>
+    <p style="margin-top:0.6rem">
+      <a class="btn ghost" href="https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213">App Store (iOS / macOS)</a>
+      <a class="btn ghost" href="https://play.google.com/store/apps/details?id=org.tipitakapali.android">Google Play (Android)</a>
+      <a class="btn ghost" href="https://github.com/tipitakapali/tipitakapali.org/releases">Desktop (Win / Mac / Linux)</a>
+    </p>
+  </section>
+
+  <section class="card" id="api">
+    <h2><span class="dot"></span>For Developers &amp; AI Agents</h2>
+    <p>Reading data is served as edge-cached static JSON; dictionary and search are live at <code>https://api.tipitakapali.org</code> (CORS open). Machine-readable catalogs: <code>/openapi.json</code>, <code>/llms.txt</code>, <code>/llms-full.txt</code>, <code>/site.jsonld</code>.</p>
+    <ul>
+      <li><code>GET /api/tree</code> — navigation tree</li>
+      <li><code>GET /api/books</code> — 217-book catalog</li>
+      <li><code>GET /api/book/:code</code> — book text, TOC, MAT data</li>
+      <li><code>GET /api/search?q=…</code> — FTS5 search</li>
+      <li><code>GET /api/dict/lookup?w=…</code> — dictionary lookup</li>
+      <li><code>GET /api/dict/inf?w=…</code> — inflection tables</li>
+    </ul>
+  </section>
+
+  <section class="card" id="credits">
+    <h2><span class="dot"></span>Attributions &amp; License</h2>
+    <ul>
+      <li><strong>Pāḷi text</strong> — VRI TEI XML corpus (<a href="https://github.com/VipassanaTech/tipitaka-xml">tipitaka-xml</a>); sub-chapter chunking follows <a href="https://tipitaka.org/romn/">tipitaka.org/romn</a>. Non-commercial Dhamma study with attribution to VRI.</li>
+      <li><strong>Script converter &amp; Pāḷi–Sinhala dictionary</strong> — <a href="https://github.com/Path-Nirvana-Foundation/pali-script-converter">Path Nirvana Foundation</a>.</li>
+      <li><strong>DPD</strong> — <a href="https://digitalpalidictionary.github.io">Digital Pāḷi Dictionary</a> (Ven. Bodhirasa &amp; contributors), CC BY-NC 4.0.</li>
+      <li><strong>PTS PED</strong> — via <a href="https://buddhadust.net">Buddhadust</a>; Pāḷi Text Society, CC BY-NC 3.0.</li>
+      <li><strong>Sanskrit lexicons</strong> — <a href="https://www.sanskrit-lexicon.uni-koeln.de">Cologne University</a> (Monier-Williams, Apte, Edgerton), CC BY-NC-SA 3.0.</li>
+      <li><strong>Pāḷi–Myanmar Abhidhān</strong> — adapted from Ven. Pn Daza's Tipiṭaka App.</li>
+      <li><strong>App license</strong> — <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> for non-commercial Dhamma dāna.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="blessing">
+  <div class="verse pali">Ciraṃ tiṭṭhatu saddhammo, dhamme hontu sagāravā.</div>
+  <div class="trans">“May the True Dhamma endure long, and may all beings revere the Dhamma.”</div>
+  <div class="contact">Feedback: <code>tipitakapali.org@gmail.com</code> · <a href="/">TipitakaPali.org</a></div>
+</footer>
+
+</body>
+</html>

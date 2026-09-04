@@ -7,7 +7,7 @@ and AI crawler/agent files for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi w
 
 Generated Files:
   1. sitemap.xml          - Root XML Sitemap Index referencing all child sitemaps.
-  2. sitemap-main.xml     - Roman / Latin default sitemap (Home, 217 books, 2,695 chapters).
+  2. sitemap-main.xml     - Roman / Latin default sitemap (Home, /info, 217 books, 2,695 chapters).
   3. sitemap-{script}.xml - 16 child sitemaps for all supported Pali scripts (si, hi, thai, etc.).
   4. robots.txt           - Search engine and AI crawler rules with all sitemap endpoints.
   5. llms.txt             - Structured site summary and index adhering to /llms.txt standard for AI agents.
@@ -112,13 +112,19 @@ def generate_single_sitemap_xml(books, chapters, site_url, script_code=None):
     prefix = f"{script_code}." if script_code else ""
     is_main = script_code is None
 
-    # Home page only in main sitemap
+    # Home page + static info/guide page only in main sitemap
     if is_main:
         url_elem = ET.SubElement(urlset, "url")
         ET.SubElement(url_elem, "loc").text = f"{site_url}/"
         ET.SubElement(url_elem, "lastmod").text = now_iso
         ET.SubElement(url_elem, "changefreq").text = "weekly"
         ET.SubElement(url_elem, "priority").text = "1.0"
+
+        url_elem = ET.SubElement(urlset, "url")
+        ET.SubElement(url_elem, "loc").text = f"{site_url}/info"
+        ET.SubElement(url_elem, "lastmod").text = now_iso
+        ET.SubElement(url_elem, "changefreq").text = "monthly"
+        ET.SubElement(url_elem, "priority").text = "0.8"
 
     # All 217 Books
     book_priority = "0.9" if is_main else "0.85"
@@ -269,6 +275,7 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 
 ## Key Reading Links
 - [Home & Canonical Navigation]({site_url}/)
+- [About, User Guide & Help]({site_url}/info)
 - [Full Catalog & AI Documentation]({site_url}/llms-full.txt)
 - [XML Sitemap Index]({site_url}/sitemap.xml)
 - [OpenAPI for AI Tools]({site_url}/openapi.json)
@@ -390,6 +397,7 @@ def generate_llms_full_txt(site_url, books, catalog):
         "### 8. OpenAPI & AI Plugin",
         f"- OpenAPI: `GET {site_url}/openapi.json` (for ChatGPT/MCP tool import)",
         f"- AI Plugin: `GET {site_url}/.well-known/ai-plugin.json`",
+        f"- Human Guide (features, shortcuts, dictionaries, scripts): `{site_url}/info`",
     ])
 
     return "\n".join(lines)
