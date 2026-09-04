@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback, Suspense } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
 import { Minimize2 } from 'lucide-react';
 
 import Header from '../components/Header';
@@ -239,6 +239,16 @@ export function MainAppContent({ params: rawParams }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isEkaActive, handleExitZen]);
 
+  // Red alert + halo on the exit button when Eka mode is entered.
+  // Restores to the normal calm button after 3 seconds.
+  const [ekaAlert, setEkaAlert] = useState(false);
+  useEffect(() => {
+    if (!isEkaActive) return;
+    setEkaAlert(true);
+    const t = setTimeout(() => setEkaAlert(false), 3000);
+    return () => clearTimeout(t);
+  }, [isEkaActive]);
+
   if (isNotFound) {
     return <NotFound />;
   }
@@ -259,16 +269,61 @@ export function MainAppContent({ params: rawParams }) {
                   className="w-full flex justify-end pointer-events-none"
                   style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleExitZen}
-                    className="pointer-events-auto w-9 h-9 rounded-full bg-[var(--bg-card)]/90 hover:bg-[var(--bg-card)] backdrop-blur-md border border-[var(--border-color)] text-[var(--accent)] shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center cursor-pointer select-none group opacity-80 hover:opacity-100 mr-1 sm:mr-0"
-                    title="Exit Eka Mode (Esc)"
-                    aria-label="Exit Eka Mode"
-                  >
-                    <Minimize2 size={16} className="group-hover:rotate-90 transition-transform duration-300" />
-                  </button>
+                  <span className="relative inline-flex pointer-events-none">
+                    {ekaAlert && (
+                      <>
+                        <span aria-hidden="true" className="eka-halo" />
+                        <span aria-hidden="true" className="eka-ping" />
+                        <span aria-hidden="true" className="eka-ping" style={{ animationDelay: '0.5s' }} />
+                        <span aria-hidden="true" className="eka-ping" style={{ animationDelay: '1s' }} />
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleExitZen}
+                      className={`pointer-events-auto w-9 h-9 rounded-full backdrop-blur-md border flex items-center justify-center cursor-pointer select-none group mr-1 sm:mr-0 transition-all ${
+                        ekaAlert
+                          ? 'bg-[var(--accent)] border-[var(--accent)] text-white opacity-100 shadow-[0_0_36px_color-mix(in_srgb,var(--accent)_75%,transparent)] scale-125'
+                          : 'bg-[var(--bg-card)]/90 hover:bg-[var(--accent)] hover:text-white hover:border-[var(--accent)] border-[var(--border-color)] text-[var(--accent)] shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 opacity-80 hover:opacity-100'
+                      }`}
+                      title="Exit Eka Mode (Esc)"
+                      aria-label="Exit Eka Mode"
+                    >
+                      <Minimize2 size={ekaAlert ? 20 : 16} className="group-hover:rotate-90 transition-transform duration-300" />
+                    </button>
+                  </span>
                 </div>
+                <style>{`
+                  .eka-halo {
+                    position: absolute;
+                    inset: -28px;
+                    border-radius: 9999px;
+                    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 34%, transparent) 0%, color-mix(in srgb, var(--accent) 14%, transparent) 55%, transparent 74%);
+                    pointer-events: none;
+                    animation: ekaHalo 1.5s ease-in-out infinite;
+                  }
+                  @keyframes ekaHalo {
+                    0%, 100% { opacity: 0.65; transform: scale(1); }
+                    50% { opacity: 1; transform: scale(1.1); }
+                  }
+                  .eka-ping {
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 9999px;
+                    border: 4px solid color-mix(in srgb, var(--accent) 85%, transparent);
+                    opacity: 0;
+                    pointer-events: none;
+                    animation: ekaPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+                  }
+                  @keyframes ekaPing {
+                    0% { transform: scale(1); opacity: 0.9; }
+                    100% { transform: scale(4.5); opacity: 0; }
+                  }
+                  @media (prefers-reduced-motion: reduce) {
+                    .eka-halo, .eka-ping { animation: none !important; }
+                    .eka-ping { display: none; }
+                  }
+                `}</style>
               </div>
             )}
           </div>
