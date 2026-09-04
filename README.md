@@ -1,4 +1,4 @@
-# Chaṭṭha Saṅgāyana Tipiṭaka — Next.js Edition
+# Chaṭṭha Saṅgāyana Tipiṭaka — TipitakaPali.org Apps
 
 Modern, high-performance, full-featured digital reader for the **Chaṭṭha Saṅgāyana Tipiṭaka (VRI)**, built with **Next.js (App Router)**, **Tailwind CSS**, **Lucide Icons**, and a high-speed **Fastify + SQLite** backend engine.
 
@@ -135,7 +135,66 @@ To export the entire application as an ultra-fast static distribution for Cloudf
 cd web_app_next
 python3 export_static_cloudflare_pages.py
 ```
-This pre-exports all 217 books, 2,695+ chapters, TOCs, and MAT matrices to static JSON in `cloudflare_pages_dist/`, builds Next.js in static mode, and configures Cloudflare Edge Functions for dynamic search and dictionary queries.
+This pre-exports all 217 books, 2,695+ chapters, TOCs, and MAT matrices to static JSON in `cloudflare_pages_dist/`, builds Next.js in static mode, and generates scoped SPA-fallback Functions (`/book/*`, `/chapter/*` only, see below).
+
+> **Note:** dictionary, search, and inflection are **not** proxied through Cloudflare — the browser calls `https://api.tipitakapali.org` directly (`services/api.js:getApiBase`) and MAT maps load from static JSON first (`fetchMatStaticMap`), so no Worker hop and no quota burn.
+
+---
+
+### 4. Cloudflare URL Rewrite Rules (Required Dashboard Setup)
+
+Deep links such as `/book/s0101m.mul/1` (chapter), `/book/si.s0101m.mul` (script prefix), and `/book/si.s0101m.mul/1` (both) have **no pre-rendered file** — only plain `/book/<code>` does (217 SEO pages). These rules serve the SPA shell (`/`) server-side while keeping the browser URL intact, so the client router (`app/page.js` + `splitScriptCode()`) opens the right book/chapter/script.
+
+Why URL Rewrite rules and not `_redirects` or Functions:
+- Cloudflare rejects `/book/* /index.html 200` in `_redirects` as an infinite loop (rules get ignored), and `_redirects` rewrites would shadow the real SEO files anyway.
+- The generated `functions/book` + `functions/chapter` are kept only as an **automatic backup** (scoped via `_routes.json` to `/book/*` + `/chapter/*`, so they fire zero times while the rules below are live). Rules consume **no Workers quota**.
+
+**Setup:** Dashboard → zone `tipitakapali.org` → **Rules → Overview → Create rule → URL Rewrite Rule**. For each rule: **If incoming requests match → Custom filter expression** (Expression Editor), action **Rewrite to → Static `/`**, Query → **Preserve**. Three rules:
+
+```text
+Rule 1 — "SPA shell: chapter paths"
+starts_with(http.request.uri.path, "/chapter/")
+
+Rule 2 — "SPA shell: book chapter deep-links"
+starts_with(http.request.uri.path, "/book/") and
+(ends_with(http.request.uri.path, "0") or
+ ends_with(http.request.uri.path, "1") or
+ ends_with(http.request.uri.path, "2") or
+ ends_with(http.request.uri.path, "3") or
+ ends_with(http.request.uri.path, "4") or
+ ends_with(http.request.uri.path, "5") or
+ ends_with(http.request.uri.path, "6") or
+ ends_with(http.request.uri.path, "7") or
+ ends_with(http.request.uri.path, "8") or
+ ends_with(http.request.uri.path, "9")) and
+not (http.request.uri.path contains "/__next")
+
+Rule 3 — "SPA shell: script-prefixed books"
+(starts_with(http.request.uri.path, "/book/si.") or
+ starts_with(http.request.uri.path, "/book/hi.") or
+ starts_with(http.request.uri.path, "/book/thai.") or
+ starts_with(http.request.uri.path, "/book/laos.") or
+ starts_with(http.request.uri.path, "/book/my.") or
+ starts_with(http.request.uri.path, "/book/km.") or
+ starts_with(http.request.uri.path, "/book/beng.") or
+ starts_with(http.request.uri.path, "/book/gurm.") or
+ starts_with(http.request.uri.path, "/book/tham.") or
+ starts_with(http.request.uri.path, "/book/guja.") or
+ starts_with(http.request.uri.path, "/book/telu.") or
+ starts_with(http.request.uri.path, "/book/kann.") or
+ starts_with(http.request.uri.path, "/book/mala.") or
+ starts_with(http.request.uri.path, "/book/brah.") or
+ starts_with(http.request.uri.path, "/book/tibt.") or
+ starts_with(http.request.uri.path, "/book/cyrl."))
+```
+
+Design notes (do not "simplify" without re-testing):
+- Rule 2 matches on *trailing digit* because the Free plan forbids the `matches` (wildcard) operator (Business+ only). Real files never end in a digit (codes end `.mul`/`.att`/`.tik`/`.nrf`, payloads end `.txt`), so there is no shadowing. The `not … "/__next"` guard protects RSC flight payloads.
+- Rule 3 checks include the `/book/` prefix so a real code can never false-match.
+- Plain `/book/<code>` matches **no** rule → pre-rendered SEO HTML serves directly. Verify via view-source (book title, not the generic shell).
+- Legacy `/chapter/{code}{N}` gets the shell + client-side open (no true 301 — Rules expressions can't do the `N+1` arithmetic; the backup Function does the 301 if rules are ever removed).
+
+**Verify after deploying rules** (see Rules → Trace, plus live checks): `/book/s0101m.mul/1`, `/book/si.s0101m.mul`, `/book/si.s0101m.mul/1`, and `/book/s0101m.mul` (must stay pre-rendered).
 
 ---
 

@@ -1,31 +1,55 @@
 #!/usr/bin/env python3
 """
-deploy_static_cloudflare.py
-===========================
+export_static_cloudflare_pages.py
+=================================
 Generates a complete, high-performance static distribution of the Next.js Tipitaka
 web application for Cloudflare Pages.
 
 Features:
   1. Builds Next.js in static export mode (output: 'export') with Turbopack.
   2. Pre-exports all 217 books, 2,695+ chapters, navigation trees, TOCs, and MAT matrices
-     as multi-format static JSON files so 100% of reading features run on Cloudflare's
-     Global Edge CDN (0ms serverless latency).
-  3. Generates Cloudflare Pages Edge Functions for dynamic backend operations:
-     - Full-Text Search (/api/search)
-     - Dictionary Lookups (/api/dict/lookup, /api/dict/inf, /api/dict/*)
-     - Health status (/api/health)
-     - Legacy dictionary endpoints (/api/dpd, /api/pts, etc.)
-  4. Generates Cloudflare Pages '_redirects' for instant SPA client-side routing.
-  5. Generates Cloudflare Pages '_headers' for global edge caching and CORS.
-  6. Synchronizes to live Git repository for Cloudflare Pages auto-deployment.
-  7. Syncs static API data to 'public/api' for local development.
+      as single-write static JSON files so 100% of reading features run on Cloudflare's
+      Global Edge CDN (0ms serverless latency). No {path}/index.json duplicates;
+      `_redirects` rewrites cover clean URLs and the SPA fetches the .json variant.
+  3. Dynamic backend ops (FTS search, dict lookup/inf) are NOT proxied — the browser
+      calls https://api.tipitakapali.org directly (services/api.js:getApiBase), so
+      no Worker hop and no Functions quota burn.
+  4. Scoped SPA-fallback Functions (functions/book + functions/chapter only, kept as
+      an AUTOMATIC BACKUP): serve the shell for script-prefixed codes, chapter
+      deep-links, and legacy 0-indexed /chapter/{code}{N} 301s. Invocation is scoped
+      via _routes.json to /book/* + /chapter/* — everything else stays pure static.
+  5. Generates Cloudflare Pages '_redirects' (API rewrites only — SPA fallbacks live
+      in URL Rewrite rules + backup Functions, never in _redirects) and '_headers'.
+  6. Prunes the duplicate Next.js chapter/ prerender (canonical SEO lives on /book/*;
+      /chapter/* is served by shell + client-side parser) unless --keep-chapter.
+  7. Skips per-book canon paragraphs JSON unless --with-paragraphs (nothing fetches it).
+  8. Synchronizes to live Git repository for Cloudflare Pages auto-deployment.
+  9. Syncs static API data to 'public/api' for local development.
+
+IMPORTANT — Cloudflare dashboard setup (NOT in version control, see README §4):
+  Deep links (/book/<code>/<N>, /book/<prefix>.<code>[/<N>]) and /chapter/* have no
+  pre-rendered file, so three URL Rewrite rules (Rules → Transform Rules → Rewrite URL,
+  rewrite path to `/`, preserve query) must exist on the tipitakapali.org zone:
+    Rule 1: starts_with(http.request.uri.path, "/chapter/")
+    Rule 2: starts_with(http.request.uri.path, "/book/") AND path ends with a digit
+            0-9 (10x ends_with OR) AND not contains "/__next"  [no `matches`
+            operator — wildcard needs Business+; trailing-digit is Free-safe]
+    Rule 3: starts_with(http.request.uri.path, "/book/<prefix>.") for the 16 script
+            prefixes (si/hi/thai/laos/my/km/beng/gurm/tham/guja/telu/kann/mala/
+            brah/tibt/cyrl) ORed in one rule.
+  Plain /book/<code> matches NO rule → the 217 pre-rendered SEO pages serve directly.
+  The backup Functions in this script fire zero times while the rules are live
+  (rewrites run first; _routes.json wouldn't match the rewritten `/` anyway).
 
 Usage:
-  python3 deploy_static_cloudflare.py                       # Full build & export
-  python3 deploy_static_cloudflare.py --skip-build          # Skip Next.js build (data export only)
-  python3 deploy_static_cloudflare.py --skip-export         # Skip JSON export (Next.js build only)
-  python3 deploy_static_cloudflare.py --vps-url http://...  # Custom VPS backend URL
-  python3 deploy_static_cloudflare.py --git-push            # Auto commit & push to GitHub
+  python3 export_static_cloudflare_pages.py                 # Full build & export
+  python3 export_static_cloudflare_pages.py --skip-build    # Skip Next.js build (data export only)
+  python3 export_static_cloudflare_pages.py --skip-export   # Skip JSON export (Next.js build only)
+  python3 export_static_cloudflare_pages.py --vps-url http://...  # Custom VPS backend URL
+  python3 export_static_cloudflare_pages.py --git-push      # Auto commit & push to GitHub
+  python3 export_static_cloudflare_pages.py --with-paragraphs  # Also export paragraphs JSON
+  python3 export_static_cloudflare_pages.py --keep-chapter     # Keep duplicate chapter/ output
+  python3 export_static_cloudflare_pages.py --no-spa-fallback  # Skip backup SPA Functions
 """
 
 import os
@@ -413,31 +437,85 @@ def build_nextjs_static(web_app_dir: Path):
     elapsed = time.time() - start_time
     log_success(f"Next.js build and static export completed ({elapsed:.2f}s)!")
 
-def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
+def generate_spa_fallback_functions(dist_dir: Path):
     """
-    Zero-Function static deploy: remove any legacy functions/ directory.
+    Minimal scoped Functions: ONLY /book/* and /chapter/* SPA fallback.
 
-    Rationale (verified):
-    - Pure static Pages = unlimited free requests; any functions/ dir makes
-      all routes count toward the Workers 100k/day free quota (Error 1027).
-    - dict/search/inf already fetch DIRECTLY from https://api.tipitakapali.org
-      client-side (services/api.js:getApiBase), so no proxy Worker is needed.
-    - MAT jump already tries static mat_para_map/mat_chapter_map.json first
-      client-side, VPS only as fallback — no edge resolver needed.
-    - /book/* + /chapter/* SPA fallback is covered by _redirects 200 rewrites
-      to /index.html; the client router (app/page.js MainAppContent) already
-      parses /book/, /chapter/, script prefixes, chapter suffixes, and hashes.
-    - Legacy /chapter/{code}{N} 0-indexed suffixes are also parsed client-side
-      (chapSuffixMatch -> N+1), so no 301 Function is required.
-    Use --with-functions only as an opt-in escape hatch (not recommended).
+    Why Functions (not _redirects):
+    - Cloudflare's validator rejects `/book/* /index.html 200` as an infinite
+      loop (deploy log: rules ignored), so _redirects cannot do SPA fallback.
+    - Even if accepted, _redirects 200 rewrites always win over static files,
+      which would shadow the 217 pre-rendered SEO pages. Functions try the
+      real asset first and serve the shell only on 404.
+    Quota containment: _routes.json includes ONLY /book/* and /chapter/*, so
+    /api/*, /_next/*, fonts, and / stay pure static (unlimited). No middleware,
+    no dict/search/health proxies — the browser calls api.tipitakapali.org
+    and static JSON directly (services/api.js:getApiBase + fetchMatStaticMap).
     """
     functions_dir = dist_dir / 'functions'
-    if functions_dir.exists():
-        shutil.rmtree(functions_dir)
-        log_info("Removed legacy Cloudflare Pages Functions (zero-Function unlimited static mode)")
-    else:
-        log_info("No functions/ to generate (zero-Function unlimited static mode)")
-    log_success("Zero-Function mode: no edge functions deployed; all traffic is static (unlimited)")
+    # Remove legacy quota-burning functions (middleware, api proxies)
+    for stale in [
+        functions_dir / '_middleware.js',
+        functions_dir / 'api',
+    ]:
+        if stale.exists():
+            shutil.rmtree(stale) if stale.is_dir() else stale.unlink()
+
+    chapter_redirect_code = r'''// Cloudflare Pages Edge Function - Legacy Chapter URL Redirects
+// The pre-Next.js static site used 0-indexed chapter suffixes, e.g.
+//   /chapter/abh03m10.mul8  ->  301  /book/abh03m10.mul/9
+// Other /chapter/* paths serve the SPA shell (client router takes over).
+// NOTE: fetch "/" and NOT "/index.html" (Cloudflare 308-canonicalizes
+// /index.html -> /, which would bounce the URL to the homepage).
+export async function onRequest(context) {
+  const url = new URL(context.request.url);
+  const match = url.pathname.match(/^\/chapter\/(.+?\.(?:mul|att|tik|nrf))(\d+)\/?$/i);
+  if (match) {
+    const target = url.origin + '/book/' + match[1] + '/' + (parseInt(match[2], 10) + 1);
+    return Response.redirect(target, 301);
+  }
+  const shellUrl = new URL('/', url.origin);
+  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
+}
+'''
+    book_shell_code = r'''// Cloudflare Pages Edge Function - /book/* SPA Shell & Script-Prefix Fallback
+// Pre-rendered SEO pages serve directly when the file exists; otherwise the
+// SPA shell at "/" is served so the client router (window.location.pathname)
+// opens script-prefixed codes (/book/si.s0102m.mul) and chapter deep-links
+// (/book/s0102m.mul/5). Fetch "/" and NOT "/index.html" (308 canonicalization).
+export async function onRequest(context) {
+  const asset = await context.env.ASSETS.fetch(context.request);
+  if (asset.status !== 404) {
+    return asset;
+  }
+  const url = new URL(context.request.url);
+  const shellUrl = new URL('/', url.origin);
+  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
+}
+'''
+    functions_chapter_dir = functions_dir / 'chapter'
+    functions_chapter_dir.mkdir(parents=True, exist_ok=True)
+    with open(functions_chapter_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(chapter_redirect_code)
+
+    functions_book_dir = functions_dir / 'book'
+    functions_book_dir.mkdir(parents=True, exist_ok=True)
+    with open(functions_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(book_shell_code)
+
+    log_success("Generated scoped SPA fallback Functions: /book/* + /chapter/* only")
+
+
+def generate_routes_json(dist_dir: Path):
+    """Scope Function invocation to page navigations; everything else stays static (unlimited)."""
+    routes = {
+        "version": 1,
+        "include": ["/book/*", "/chapter/*"],
+        "exclude": [],
+    }
+    with open(dist_dir / '_routes.json', 'w', encoding='utf-8') as f:
+        json.dump(routes, f, separators=(',', ':'))
+    log_success("Wrote _routes.json (Functions only on /book/*, /chapter/*)")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -461,14 +539,11 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/paragraphs             /api/book/:code/paragraphs.json            200
 /api/book/:code                        /api/book/:code.json                       200
 
-# 2. Client-side SPA Fallbacks (zero-Function mode — no functions/ dir).
-#    /book/* covers script-prefixed codes (/book/si.s0102m.mul) and chapter
-#    deep-links (/book/s0102m.mul/5): real files serve directly, others rewrite
-#    to the SPA shell where MainAppContent parses the pathname client-side.
-#    /chapter/* likewise serves the shell; legacy 0-indexed suffixes
-#    (/chapter/abh03m10.mul8) are parsed client-side (chapSuffixMatch -> N+1).
-/book/*       /index.html                   200
-/chapter/*    /index.html                   200
+# 2. SPA Fallbacks are handled by scoped Functions (functions/book + functions/chapter),
+#    NOT _redirects: Cloudflare rejects `/book/* /index.html 200` as an infinite loop
+#    (deploy log: "ignored"), and _redirects rewrites would shadow real SEO files.
+#    Invocation is scoped via _routes.json to /book/* + /chapter/* only.
+#    Legacy 0-indexed /chapter/{code}{N} gets a 301 in the chapter Function.
 
 # 3. Legacy URLs — handled by 404.html (Lost in Saṃsāra)
 #    No catch-all /* here — Cloudflare automatically serves 404.html with 404 status for any unmatched path.
@@ -658,9 +733,9 @@ def main():
         help="Keep the duplicate Next.js chapter/ prerender output. Pruned by default: /chapter/* falls back to the SPA shell via _redirects and is parsed client-side"
     )
     parser.add_argument(
-        "--with-functions",
+        "--no-spa-fallback",
         action="store_true",
-        help="Opt-in: keep legacy functions/ edge proxies. Not recommended: any functions/ dir makes all routes count toward the Workers 100k/day quota"
+        help="Skip the scoped /book/* + /chapter/* SPA fallback Functions (pure static; deep-links then 404)"
     )
     args = parser.parse_args()
 
@@ -743,15 +818,19 @@ def main():
             shutil.rmtree(pruned_chapter)
             log_info("Pruned duplicate chapter/ prerender output (served via SPA shell + _redirects)")
 
-    # 4. Zero-Function static deploy (unlimited free requests) unless opted in
-    if args.with_functions:
-        log_warn("--with-functions: legacy edge functions retained (counts toward Workers 100k/day quota)")
+    # 4. Scoped SPA fallback Functions + _routes.json (page views only count;
+    # /api/*, /_next/*, fonts, / stay pure static/unlimited; no middleware/proxies)
+    if args.no_spa_fallback:
+        log_warn("--no-spa-fallback: pure static; /book/*/chapter deep-links will 404")
     else:
-        generate_cloudflare_edge_functions(dist_dir, args.vps_url)
+        generate_spa_fallback_functions(dist_dir)
+        generate_routes_json(dist_dir)
 
     # 5. Generate _redirects & _headers
     generate_cloudflare_redirects(dist_dir)
     generate_cloudflare_headers(dist_dir)
+    log_info("Reminder: deep links need the 3 dashboard URL Rewrite rules (README §4); "
+             "backup SPA Functions fire zero times while those rules are live")
 
     # 6. Generate SEO & AI Agent Metadata (sitemaps, robots.txt, llms.txt, llms-full.txt, site.jsonld)
     try:
