@@ -432,6 +432,36 @@ body.no-indent .reader-container .bodytext,
 body.no-indent .reader-container .indent { text-indent: 0 !important; }
 body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-left: 0 !important; }
 
+/* Translation paragraph indents matching Pali paragraph style (Task 1) */
+.reader-container .reader-trans-content.bodytext {
+  text-indent: 2em;
+}
+.reader-container .reader-trans-content.indent {
+  text-indent: 2em;
+  margin-left: 3em;
+}
+.reader-container .reader-trans-content.hangnum {
+  text-indent: -2em;
+  padding-left: 2em;
+}
+.reader-container .reader-trans-content.unindented {
+  text-indent: 0;
+}
+.reader-container .reader-trans-content.centre,
+.reader-container .reader-trans-content.centered {
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+body.no-indent .reader-container .reader-trans-content.bodytext,
+body.no-indent .reader-container .reader-trans-content.indent {
+  text-indent: 0 !important;
+}
+body.no-indent .reader-container .reader-trans-content.hangnum {
+  text-indent: 0 !important;
+  padding-left: 0 !important;
+}
+
 /* Translation Display Styles */
 .reader-para-row {
   position: relative;
@@ -636,8 +666,19 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   border-left-color: #4f46e5; /* Indigo */
 }
 
-.reader-trans-block[data-trans-lang="pali"] {
+.reader-trans-block[data-trans-lang="pali"],
+.reader-trans-block.reader-pali-trans-block {
   border-left-color: var(--accent); /* Original Pali Accent */
+}
+
+.reader-trans-block.reader-pali-trans-block p,
+.reader-trans-block[data-trans-lang="pali"] p {
+  margin-bottom: 0 !important;
+  color: inherit;
+}
+
+.reader-trans-block .reader-trans-content {
+  margin-bottom: 0 !important;
 }
 
 .reader-trans-empty {

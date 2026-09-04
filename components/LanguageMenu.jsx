@@ -13,6 +13,9 @@ import {
   Columns2,
   ExternalLink,
   AlertTriangle,
+  Palette,
+  RotateCcw,
+  Check,
 } from 'lucide-react';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
@@ -37,6 +40,111 @@ export const TRANSLATIONS = [
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-', color: '#4f46e5' },
 ];
 
+const BG_PALETTE = [
+  { name: 'Default', value: '' },
+  { name: 'Pure White', value: '#ffffff' },
+  { name: 'Cream', value: '#fdfdfc' },
+  { name: 'Classic Warm', value: '#f0eee5' },
+  { name: 'Sepia Warm', value: '#fbf0d9' },
+  { name: 'Soft Amber', value: '#fef3c7' },
+  { name: 'Soft Mint', value: '#dcfce7' },
+  { name: 'Soft Cyan', value: '#e0f2fe' },
+  { name: 'Soft Indigo', value: '#e0e7ff' },
+  { name: 'Soft Purple', value: '#f3e8ff' },
+  { name: 'Soft Rose', value: '#fee2e2' },
+  { name: 'Dark Slate', value: '#1e293b' },
+  { name: 'Dark Neutral', value: '#18191a' },
+];
+
+const TEXT_PALETTE = [
+  { name: 'Default', value: '' },
+  { name: 'Near Black', value: '#111827' },
+  { name: 'Slate Dark', value: '#1e293b' },
+  { name: 'Charcoal', value: '#374151' },
+  { name: 'Navy Blue', value: '#1e3a8a' },
+  { name: 'Forest Green', value: '#064e3b' },
+  { name: 'Earth Brown', value: '#78350f' },
+  { name: 'Wine Red', value: '#881337' },
+  { name: 'Deep Purple', value: '#581c87' },
+  { name: 'Pure White', value: '#ffffff' },
+  { name: 'Soft White', value: '#f8fafc' },
+  { name: 'Pale Gold', value: '#fef08a' },
+  { name: 'Pale Mint', value: '#a7f3d0' },
+];
+
+const BORDER_PALETTE = [
+  { name: 'Burgundy', value: '#8b2500' },
+  { name: 'Royal Blue', value: '#2563eb' },
+  { name: 'Crimson Red', value: '#dc2626' },
+  { name: 'Jade Green', value: '#059669' },
+  { name: 'Saffron Amber', value: '#d97706' },
+  { name: 'Rose Crimson', value: '#e11d48' },
+  { name: 'Deep Cyan', value: '#0891b2' },
+  { name: 'Violet', value: '#7c3aed' },
+  { name: 'Vivid Orange', value: '#ea580c' },
+  { name: 'Marigold Gold', value: '#ca8a04' },
+  { name: 'Cherry Pink', value: '#db2777' },
+  { name: 'Dark Teal', value: '#0d9488' },
+  { name: 'Indigo', value: '#4f46e5' },
+  { name: 'Emerald', value: '#16a34a' },
+  { name: 'Sky Blue', value: '#0284c7' },
+  { name: 'Slate', value: '#475569' },
+];
+
+function hslToHex(h, s, l) {
+  l /= 100;
+  const a = (s * Math.min(l, 1 - l)) / 100;
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function generateRandomLanguageColors() {
+  const h = Math.floor(Math.random() * 360);
+  const borderHue = (h + Math.floor(Math.random() * 60) - 30 + 360) % 360;
+  const isDark = Math.random() > 0.5;
+
+  let bg, text;
+  if (!isDark) {
+    bg = hslToHex(h, 30 + Math.floor(Math.random() * 30), 91 + Math.floor(Math.random() * 6));
+    text = hslToHex(h, 25 + Math.floor(Math.random() * 25), 12 + Math.floor(Math.random() * 14));
+  } else {
+    bg = hslToHex(h, 25 + Math.floor(Math.random() * 20), 12 + Math.floor(Math.random() * 8));
+    text = hslToHex(h, 20 + Math.floor(Math.random() * 20), 88 + Math.floor(Math.random() * 10));
+  }
+  const border = hslToHex(borderHue, 75 + Math.floor(Math.random() * 25), 45 + Math.floor(Math.random() * 15));
+  return { bg, text, border };
+}
+
+export function formatCssColor(val, fallback = '') {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  if (!trimmed) return fallback;
+  // If user typed 3, 6, or 8 hex characters without '#', prepend '#'
+  if (/^[0-9a-fA-F]{3}$/.test(trimmed) || /^[0-9a-fA-F]{6}$/.test(trimmed) || /^[0-9a-fA-F]{8}$/.test(trimmed)) {
+    return `#${trimmed}`;
+  }
+  return trimmed;
+}
+
+export function toValidHex(colorStr, fallback = '#8b2500') {
+  if (!colorStr) return fallback;
+  const formatted = formatCssColor(colorStr);
+  if (/^#[0-9a-fA-F]{6}$/.test(formatted)) return formatted.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(formatted)) {
+    const r = formatted[1];
+    const g = formatted[2];
+    const b = formatted[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return fallback;
+}
+
 export default function LanguageMenu() {
   const { settings, updateSetting } = useThemeSettings();
   const [isOpen, setIsOpen] = useState(false);
@@ -46,11 +154,34 @@ export default function LanguageMenu() {
   const [pendingLangId, setPendingLangId] = useState(null);
   const [dontShowAgain, setDontShowAgain] = useState(true);
 
+  // Color customization modal state (Task 3)
+  const [colorPickerTarget, setColorPickerTarget] = useState(null);
+
+  const updateLangColors = (langId, partial) => {
+    const current = settings.translationColors || {};
+    const updated = {
+      ...current,
+      [langId]: {
+        ...(current[langId] || {}),
+        ...partial,
+      },
+    };
+    updateSetting('translationColors', updated);
+  };
+
+  const resetLangColors = (langId) => {
+    const current = { ...(settings.translationColors || {}) };
+    delete current[langId];
+    updateSetting('translationColors', current);
+  };
+
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (disclaimerModalOpen) {
+        if (colorPickerTarget) {
+          setColorPickerTarget(null);
+        } else if (disclaimerModalOpen) {
           setDisclaimerModalOpen(false);
           setPendingLangId(null);
         } else if (isOpen) {
@@ -58,11 +189,11 @@ export default function LanguageMenu() {
         }
       }
     };
-    if (isOpen || disclaimerModalOpen) {
+    if (isOpen || disclaimerModalOpen || colorPickerTarget) {
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, disclaimerModalOpen]);
+  }, [isOpen, disclaimerModalOpen, colorPickerTarget]);
 
   const activeCount = useMemo(() => {
     const current = settings.translations || {};
@@ -309,6 +440,11 @@ export default function LanguageMenu() {
                     const isFirst = idx === 0;
                     const isLast = idx === orderedTranslations.length - 1;
                     const isOnlyActive = isChecked && activeCount <= 1;
+                    const hasCustomColors = Boolean(
+                      settings.translationColors?.[trans.id]?.bg ||
+                      settings.translationColors?.[trans.id]?.text ||
+                      settings.translationColors?.[trans.id]?.border
+                    );
                     return (
                       <div
                         key={trans.id}
@@ -318,11 +454,11 @@ export default function LanguageMenu() {
                             : 'bg-[var(--bg-secondary)]/50 border-[var(--border-color)]/60 opacity-75'
                         }`}
                       >
-                        {/* Language color indicator bar matching Task 5 border */}
+                        {/* Language color indicator bar matching custom or default border */}
                         <span
                           className="w-1 self-stretch rounded-full shrink-0"
-                          style={{ backgroundColor: trans.color }}
-                          title={`Color code: ${trans.label}`}
+                          style={{ backgroundColor: formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color }}
+                          title={`Color: ${trans.label}`}
                         />
 
                         <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
@@ -343,6 +479,20 @@ export default function LanguageMenu() {
                           />
                         </label>
                         <div className="flex items-center gap-1 shrink-0">
+                          {/* Task 3: Color Customization Palette Button */}
+                          <button
+                            type="button"
+                            onClick={() => setColorPickerTarget(trans)}
+                            className={`p-1 rounded-md transition cursor-pointer border ${
+                              hasCustomColors
+                                ? 'text-[var(--accent)] bg-[var(--accent)]/15 border-[var(--accent)]/40 shadow-2xs'
+                                : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-secondary)] border-[var(--border-color)]'
+                            }`}
+                            title={`Color: Customize colors for ${trans.label}`}
+                            aria-label={`Customize colors for ${trans.label}`}
+                          >
+                            <Palette size={13} />
+                          </button>
                           {/* Task 1: Move to Top Button */}
                           <button
                             type="button"
@@ -485,6 +635,302 @@ export default function LanguageMenu() {
                 className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition cursor-pointer"
               >
                 I Understand & Enable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task 3: Color Palette Customization Modal */}
+      {colorPickerTarget && (
+        <div
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in text-[var(--text-primary)]"
+          onClick={() => setColorPickerTarget(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-[var(--accent)]">
+                <Palette size={18} />
+                <span>Colors: {colorPickerTarget.flag} {colorPickerTarget.label}</span>
+              </div>
+              <button
+                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
+                onClick={() => setColorPickerTarget(null)}
+                title="Close (Esc)"
+                aria-label="Close color picker modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain">
+              {/* Live Preview Card */}
+              {(() => {
+                const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
+                const activeBorder = langColors.border || colorPickerTarget.color || '#8b2500';
+                const activeBg = langColors.bg || '';
+                const activeText = langColors.text || '';
+
+                return (
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                      Live Preview
+                    </span>
+                    <div
+                      className="p-3.5 rounded-xl border-l-[4px] transition-all shadow-xs"
+                      style={{
+                        borderLeftColor: formatCssColor(activeBorder),
+                        backgroundColor: formatCssColor(activeBg) || 'var(--bg-secondary)',
+                        color: formatCssColor(activeText) || 'var(--text-primary)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-bold opacity-75 mb-1.5">
+                        <span>{colorPickerTarget.flag} {colorPickerTarget.label}</span>
+                        <span className="text-[10px] font-mono opacity-70">
+                          border: {formatCssColor(activeBorder)}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed" style={{ color: formatCssColor(activeText) || 'inherit' }}>
+                        {colorPickerTarget.id === 'pali'
+                          ? 'Namo tassa bhagavato arahato sammāsambuddhassa. Evaṃ me sutaṃ—ekaṃ samayaṃ bhagavā...'
+                          : 'Thus have I heard. On one occasion the Blessed One was travelling along the highway between Rājagaha and Nālandā...'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 1. Background Color */}
+              {(() => {
+                const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
+                const activeBg = langColors.bg || '';
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 inline-block shrink-0"
+                          style={{ backgroundColor: formatCssColor(activeBg) || '#f0eee5' }}
+                        />
+                        Background Color
+                      </span>
+                      {activeBg && (
+                        <button
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { bg: '' })}
+                          className="text-[10px] text-[var(--accent)] hover:underline cursor-pointer"
+                        >
+                          Clear (Default)
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="color"
+                        value={toValidHex(activeBg, '#f0eee5')}
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { bg: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-[var(--border-color)] bg-transparent p-0.5 shrink-0"
+                        title="Pick background color"
+                      />
+                      <input
+                        type="text"
+                        value={activeBg}
+                        placeholder="Default or #hex (e.g. #fbf0d9)"
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { bg: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {BG_PALETTE.map((swatch) => (
+                        <button
+                          key={swatch.name}
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { bg: swatch.value })}
+                          className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition cursor-pointer ${
+                            activeBg === swatch.value
+                              ? 'ring-2 ring-[var(--accent)] border-white scale-110'
+                              : 'border-black/20 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: swatch.value || 'transparent' }}
+                          title={swatch.name}
+                        >
+                          {!swatch.value && <span className="text-[9px] text-[var(--text-muted)]">∅</span>}
+                          {activeBg === swatch.value && swatch.value && (
+                            <Check size={11} className={swatch.value === '#ffffff' || swatch.value.startsWith('#f') ? 'text-black' : 'text-white'} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 2. Text Color */}
+              {(() => {
+                const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
+                const activeText = langColors.text || '';
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 inline-block shrink-0"
+                          style={{ backgroundColor: formatCssColor(activeText) || '#1e293b' }}
+                        />
+                        Translation Text Color
+                      </span>
+                      {activeText && (
+                        <button
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { text: '' })}
+                          className="text-[10px] text-[var(--accent)] hover:underline cursor-pointer"
+                        >
+                          Clear (Default)
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="color"
+                        value={toValidHex(activeText, '#1e293b')}
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { text: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-[var(--border-color)] bg-transparent p-0.5 shrink-0"
+                        title="Pick text color"
+                      />
+                      <input
+                        type="text"
+                        value={activeText}
+                        placeholder="Default or #hex (e.g. #1e293b)"
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { text: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {TEXT_PALETTE.map((swatch) => (
+                        <button
+                          key={swatch.name}
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { text: swatch.value })}
+                          className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition cursor-pointer ${
+                            activeText === swatch.value
+                              ? 'ring-2 ring-[var(--accent)] border-white scale-110'
+                              : 'border-black/20 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: swatch.value || 'transparent' }}
+                          title={swatch.name}
+                        >
+                          {!swatch.value && <span className="text-[9px] text-[var(--text-muted)]">∅</span>}
+                          {activeText === swatch.value && swatch.value && (
+                            <Check size={11} className={swatch.value === '#ffffff' || swatch.value.startsWith('#f') ? 'text-black' : 'text-white'} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 3. Border-Left Color */}
+              {(() => {
+                const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
+                const activeBorder = langColors.border || colorPickerTarget.color || '#8b2500';
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 inline-block shrink-0"
+                          style={{ backgroundColor: formatCssColor(activeBorder) }}
+                        />
+                        Border-Left Color
+                      </span>
+                      {langColors.border && (
+                        <button
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { border: '' })}
+                          className="text-[10px] text-[var(--accent)] hover:underline cursor-pointer"
+                        >
+                          Clear (Default)
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="color"
+                        value={toValidHex(activeBorder, colorPickerTarget.color || '#8b2500')}
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { border: e.target.value })}
+                        className="w-8 h-8 rounded-lg cursor-pointer border border-[var(--border-color)] bg-transparent p-0.5 shrink-0"
+                        title="Pick border-left color"
+                      />
+                      <input
+                        type="text"
+                        value={activeBorder}
+                        placeholder={`Default or #hex (${colorPickerTarget.color || '#8b2500'})`}
+                        onChange={(e) => updateLangColors(colorPickerTarget.id, { border: e.target.value })}
+                        className="flex-1 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      {BORDER_PALETTE.map((swatch) => (
+                        <button
+                          key={swatch.name}
+                          type="button"
+                          onClick={() => updateLangColors(colorPickerTarget.id, { border: swatch.value })}
+                          className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition cursor-pointer ${
+                            activeBorder === swatch.value
+                              ? 'ring-2 ring-[var(--accent)] border-white scale-110'
+                              : 'border-black/20 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: swatch.value }}
+                          title={swatch.name}
+                        >
+                          {activeBorder === swatch.value && (
+                            <Check size={11} className={swatch.value === '#ffffff' || swatch.value.startsWith('#f') ? 'text-black' : 'text-white'} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const randoms = generateRandomLanguageColors();
+                    updateLangColors(colorPickerTarget.id, randoms);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Generate random colors for background, text, and border"
+                >
+                  <Sparkles size={13} className="text-amber-500" />
+                  <span>Random Color</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => resetLangColors(colorPickerTarget.id)}
+                  className="px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold text-rose-600 hover:bg-rose-500/10 hover:border-rose-300 flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Reset colors for this language to default"
+                >
+                  <RotateCcw size={12} />
+                  <span>Reset</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setColorPickerTarget(null)}
+                className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition cursor-pointer"
+              >
+                Done
               </button>
             </div>
           </div>

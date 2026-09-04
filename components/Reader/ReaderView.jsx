@@ -26,6 +26,7 @@ const TRANSLATION_METAS = {
   hi: { label: 'हिन्दी', flag: '🇮🇳' },
   de: { label: 'Deutsch', flag: '🇩🇪' },
   ja: { label: '日本語', flag: '🇯🇵' },
+  ko: { label: '한국어', flag: '🇰🇷' },
   pt: { label: 'Português', flag: '🇵🇹' },
   ru: { label: 'Русский', flag: '🇷🇺' },
   my_nissaya: { label: 'မြန်မာနိဿယ', flag: '🇲🇲' },
@@ -44,10 +45,21 @@ export const LANG_KEY_TO_CODE = {
   hindi: 'hi',
   german: 'de',
   japanese: 'ja',
+  korean: 'ko',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',
 };
+
+export function formatCssColor(val, fallback = '') {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  if (!trimmed) return fallback;
+  if (/^[0-9a-fA-F]{3}$/.test(trimmed) || /^[0-9a-fA-F]{6}$/.test(trimmed) || /^[0-9a-fA-F]{8}$/.test(trimmed)) {
+    return `#${trimmed}`;
+  }
+  return trimmed;
+}
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -109,7 +121,14 @@ function formatTranslationContent(text, lang) {
   return formatInlineTags(text);
 }
 
-function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPaliEnabled = true, displayMode = 'stack') {
+function injectTranslationsIntoHtml(
+  html,
+  translations,
+  orderedLayers = [],
+  isPaliEnabled = true,
+  displayMode = 'stack',
+  translationColors = {}
+) {
   if (!html) return html;
 
   const hasTranslations = orderedLayers.some((l) => l.type === 'trans');
@@ -133,6 +152,9 @@ function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPa
       /^(nikaya|book|title|subhead|subsubhead|chapter|centre|centered)$/i.test(c)
     );
     const isHeading = Boolean(headingClass);
+    const paraType = pClasses.find((c) =>
+      /^(bodytext|indent|hangnum|unindented|gatha1|gatha2|gatha3|gathalast|centre|centered)$/i.test(c)
+    ) || (isHeading ? '' : 'bodytext');
 
     const rowAttrs = [
       `data-pindex="${pIndex}"`,
@@ -147,11 +169,35 @@ function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPa
     for (const layer of orderedLayers) {
       if (layer.type === 'pali') {
         if (isPaliEnabled) {
-          renderedItems.push({
-            type: 'pali',
-            lang: 'pali',
-            html: pTag,
-          });
+          const isPaliInTopPosition = renderedItems.length === 0 && orderedLayers[0]?.type === 'pali';
+          if (isPaliInTopPosition) {
+            renderedItems.push({
+              type: 'pali',
+              lang: 'pali',
+              html: pTag,
+            });
+          } else {
+            // Task 2: If Pali text is not in position top, add border-left to it as other translation languages
+            // Task 3: Dynamically apply custom colors (background, text color, border-left color)
+            const paliColors = translationColors?.pali || {};
+            const paliBorder = formatCssColor(paliColors.border) || 'var(--accent, #8b2500)';
+            const paliBg = formatCssColor(paliColors.bg);
+            const paliText = formatCssColor(paliColors.text);
+            const paliBlockStyles = [
+              `border-left: 3.5px solid ${paliBorder}`,
+              paliBg ? `background-color: ${paliBg}` : '',
+              paliText ? `color: ${paliText}` : '',
+            ].filter(Boolean).join('; ');
+
+            renderedItems.push({
+              type: 'pali',
+              lang: 'pali',
+              html: `
+      <div class="reader-trans-block reader-pali-trans-block" data-trans-lang="pali"${paliBlockStyles ? ` style="${paliBlockStyles}"` : ''}>
+        ${pTag}
+      </div>`,
+            });
+          }
         }
       } else if (layer.type === 'trans') {
         const trans = translations[layer.lang]?.[pIndex];
@@ -170,12 +216,33 @@ function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPa
             ? 'reader-trans-block reader-trans-heading-block'
             : 'reader-trans-block';
 
+          // Task 1: Traditional Tipitaka Indents applied to translation content
+          const contentClasses = [
+            'reader-trans-content',
+            paraType || '',
+          ].filter(Boolean).join(' ');
+
+          // Task 3: Dynamically apply custom colors for translation language
+          const customColors = translationColors?.[layer.id] || translationColors?.[layer.lang] || {};
+          const transBorder = formatCssColor(customColors.border);
+          const transBg = formatCssColor(customColors.bg);
+          const transText = formatCssColor(customColors.text);
+          const blockStyles = [
+            transBorder ? `border-left-color: ${transBorder}` : '',
+            transBg ? `background-color: ${transBg}` : '',
+            transText ? `color: ${transText}` : '',
+          ].filter(Boolean).join('; ');
+
+          const contentStyles = [
+            transText ? `color: ${transText}` : '',
+          ].filter(Boolean).join('; ');
+
           renderedItems.push({
             type: 'trans',
             lang: layer.lang,
             html: `
-      <div class="${blockClasses}" data-trans-lang="${layer.lang}">
-        <div class="reader-trans-content">${content}</div>
+      <div class="${blockClasses}" data-trans-lang="${layer.lang}"${blockStyles ? ` style="${blockStyles}"` : ''}>
+        <div class="${contentClasses}"${contentStyles ? ` style="${contentStyles}"` : ''}>${content}</div>
       </div>`,
           });
         }
@@ -204,9 +271,7 @@ function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPa
       const col2Html = col2Items.map((item) => item.html).join('');
       const col1Class = col1.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
       const col2Class = col2Items.some((item) => item.type === 'pali') ? 'reader-pali-col' : 'reader-trans-col';
-      const col2Wrapped = col2Class === 'reader-trans-col'
-        ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Html}</div>`
-        : col2Html;
+      const col2Wrapped = `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Html}</div>`;
       return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${col1Html}</div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
     }
 
@@ -222,9 +287,7 @@ function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPa
           return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${singleItem.html}</div><div class="reader-side-col reader-side-col-right reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
         } else {
           const col2Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
-          const col2Wrapped = col2Class === 'reader-trans-col'
-            ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`
-            : singleItem.html;
+          const col2Wrapped = `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`;
           return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col reader-trans-col-empty"></div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
         }
       }
@@ -250,6 +313,7 @@ const ChapterBlock = memo(function ChapterBlock({
   orderedLayers = [],
   isPaliEnabled = true,
   translationDisplayMode = 'stack',
+  translationColors = {},
 }) {
   const sentinelRef = useRef(null);
   const [translations, setTranslations] = React.useState({});
@@ -321,7 +385,8 @@ const ChapterBlock = memo(function ChapterBlock({
         translations,
         orderedLayers,
         isPaliEnabled,
-        translationDisplayMode
+        translationDisplayMode,
+        translationColors
       );
     }
     return processed;
@@ -335,6 +400,7 @@ const ChapterBlock = memo(function ChapterBlock({
     orderedLayers,
     isPaliEnabled,
     translationDisplayMode,
+    translationColors,
   ]);
 
   if (displayHtml) {
@@ -1720,6 +1786,52 @@ export default function ReaderView() {
         ref={containerRef}
         onScroll={handleScroll}
       >
+        {/* Dynamic Translation Colors CSS Rules */}
+        {settings?.translationColors && Object.keys(settings.translationColors).length > 0 && (
+          <style
+            dangerouslySetInnerHTML={{
+              __html: Object.entries(settings.translationColors)
+                .map(([langKey, colors]) => {
+                  if (!colors) return '';
+                  const code = LANG_KEY_TO_CODE[langKey] || langKey;
+                  const bg = formatCssColor(colors.bg);
+                  const border = formatCssColor(colors.border);
+                  const text = formatCssColor(colors.text);
+                  const cssRules = [];
+                  if (bg) {
+                    cssRules.push(`background-color: ${bg} !important;`);
+                  }
+                  if (border) {
+                    cssRules.push(`border-left-color: ${border} !important;`);
+                  }
+                  const blockCss =
+                    cssRules.length > 0
+                      ? `
+                    .reader-trans-block[data-trans-lang="${langKey}"],
+                    .reader-trans-block[data-trans-lang="${code}"] {
+                      ${cssRules.join('\n')}
+                    }
+                  `
+                      : '';
+                  const textCss = text
+                    ? `
+                    .reader-trans-block[data-trans-lang="${langKey}"] .reader-trans-content,
+                    .reader-trans-block[data-trans-lang="${code}"] .reader-trans-content,
+                    .reader-trans-block[data-trans-lang="${langKey}"] .reader-nissaya-meaning,
+                    .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
+                    .reader-trans-block[data-trans-lang="${langKey}"] p,
+                    .reader-trans-block[data-trans-lang="${code}"] p {
+                      color: ${text} !important;
+                    }
+                  `
+                    : '';
+                  return blockCss + textCss;
+                })
+                .join('\n'),
+            }}
+          />
+        )}
+
         {/* Lazy-Loaded Chapter Content Stream */}
         <div
           className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6"
@@ -1752,6 +1864,7 @@ export default function ReaderView() {
                   orderedLayers={orderedLayers}
                   isPaliEnabled={isPaliEnabled}
                   translationDisplayMode={settings?.translationDisplayMode || 'stack'}
+                  translationColors={settings?.translationColors}
                 />
               ))
             ) : (

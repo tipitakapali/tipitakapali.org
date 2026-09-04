@@ -93,6 +93,7 @@ const DEFAULT_SETTINGS = {
   },
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
   translationDisplayMode: 'stack', // 'stack' | 'side'
+  translationColors: {},
 };
 
 const ThemeSettingsContext = createContext();
@@ -140,6 +141,10 @@ export function ThemeSettingsProvider({ children }) {
           if (!['stack', 'side'].includes(merged.translationDisplayMode)) {
             merged.translationDisplayMode = 'stack';
           }
+          merged.translationColors =
+            merged.translationColors && typeof merged.translationColors === 'object'
+              ? merged.translationColors
+              : {};
           // Ensure translations object has all keys and pali defaults to true
           merged.translations = { ...prev.translations, ...(parsed.translations || {}) };
           if (merged.translations.pali === undefined) {

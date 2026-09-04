@@ -184,7 +184,11 @@ async function run() {
           if (child.classList.contains('reader-trans-block') && child.getAttribute('data-trans-lang') === 'en') {
             enIndex = idx;
           }
-          if (child.tagName.toLowerCase() === 'p' && child.hasAttribute('data-pindex')) {
+          if (
+            (child.tagName.toLowerCase() === 'p' && child.hasAttribute('data-pindex')) ||
+            child.classList.contains('reader-pali-trans-block') ||
+            child.querySelector('p[data-pindex]')
+          ) {
             paliIndex = idx;
           }
         });
