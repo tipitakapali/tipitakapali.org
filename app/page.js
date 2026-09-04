@@ -21,7 +21,7 @@ export function MainAppContent({ params: rawParams }) {
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
-  const isEkaActive = isZenMode || (!isSidebarOpen && !isHeaderVisible);
+  const isEkaActive = isZenMode;
 
 
 

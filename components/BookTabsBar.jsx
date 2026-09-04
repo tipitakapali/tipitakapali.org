@@ -220,7 +220,7 @@ export default function BookTabsBar() {
               } ${isOver && dropPosition === 'left' ? 'drag-over-left' : ''} ${
                 isOver && dropPosition === 'right' ? 'drag-over-right' : ''
               }`}
-              title={`${displayTitle} (${tab.bookCode}) — Right click for menu`}
+              title={`${displayTitle} (${tab.bookCode}) — Drag to reorder, right click for menu`}
               onClick={() => switchTab(tab.bookCode)}
               onAuxClick={(e) => {
                 if (e.button === 1) {

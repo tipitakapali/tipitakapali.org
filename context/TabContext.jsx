@@ -1367,16 +1367,14 @@ export function TabProvider({ children }) {
     const next = !isSidebarOpenRef.current;
     isSidebarOpenRef.current = next;
     setIsSidebarOpen(next);
-    setIsHeaderVisible(next);
-    setIsZenMode(!next);
-    if (typeof document !== 'undefined') {
-      if (!next) {
-        document.body.classList.add('zen-mode');
-      } else {
+    if (next) {
+      setIsHeaderVisible(true);
+      setIsZenMode(false);
+      if (typeof document !== 'undefined') {
         document.body.classList.remove('zen-mode');
       }
     }
-  }, [setIsZenMode]);
+  }, [setIsZenMode, setIsHeaderVisible]);
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 

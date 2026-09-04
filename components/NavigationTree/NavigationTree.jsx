@@ -37,8 +37,8 @@ export default function NavigationTree() {
   const [floatPos, setFloatPos] = useState({ x: 80, y: 100, width: 380, height: 600 });
   const [isResizing, setIsResizing] = useState(false);
 
-  const { isSidebarOpen, setIsSidebarOpen, setIsHeaderVisible, treeSelectedNode } = useTabs();
-  const { settings, setIsZenMode } = useThemeSettings();
+  const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
+  const { settings } = useThemeSettings();
   const { isOpen: isDictOpen, closeDictionary } = useDictionary();
   const treeContainerRef = useRef(null);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
@@ -430,18 +430,14 @@ export default function NavigationTree() {
                 <PanelRight size={12} />
               </button>
 
-              {/* Hide / Close Button -> Enter Eka Mode */}
+              {/* Close Sidebar Button */}
               <button
-                className="tree-action-btn tree-action-close p-1 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white transition cursor-pointer"
+                className="tree-action-btn tree-action-close p-1 hover:text-[var(--accent)] transition cursor-pointer"
                 onClick={() => {
                   setIsSidebarOpen(false);
-                  setIsZenMode(true);
-                  if (typeof document !== 'undefined') {
-                    document.body.classList.add('zen-mode');
-                  }
                 }}
-                title="Close Sidebar & Enter Eka Reading Mode"
-                aria-label="Close Sidebar & Enter Eka Reading Mode"
+                title="Close Sidebar (Ctrl+B)"
+                aria-label="Close Sidebar"
               >
                 <X size={13} className="stroke-[2.5]" />
               </button>
