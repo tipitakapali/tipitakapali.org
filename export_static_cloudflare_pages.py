@@ -106,25 +106,45 @@ def clean_tree(data):
 
 def write_json_multiformat(base_dir: Path, relative_path_no_ext: str, data):
     """
-    Writes data in multiple path conventions for maximum web server compatibility:
-    1. {path}.json (e.g. api/books.json)
-    2. {path}/index.json (e.g. api/books/index.json)
+    Writes data as a single {path}.json file.
+    Previously wrote a duplicate {path}/index.json copy for server compat;
+    removed to halve file count — _redirects rewrites
+    (/api/book/:code -> /api/book/:code.json) already cover clean URLs,
+    and the SPA fetches the .json variant directly (services/api.js).
     """
     json_str = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
-    
-    # 1. As .json file
+
+    # Single canonical file
     file_with_ext = base_dir / f"{relative_path_no_ext}.json"
     file_with_ext.parent.mkdir(parents=True, exist_ok=True)
     with open(file_with_ext, 'w', encoding='utf-8') as f:
         f.write(json_str)
 
-    # 2. As directory/index.json
-    dir_index_file = base_dir / relative_path_no_ext / 'index.json'
-    dir_index_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(dir_index_file, 'w', encoding='utf-8') as f:
-        f.write(json_str)
 
-def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_path: Path, tree_json_path: Path, book_mat_path: Path = None):
+def cleanup_stale_index_json(target_api_dir: Path):
+    """Remove legacy {path}/index.json duplicates from earlier dual-write exports."""
+    removed = 0
+    if not target_api_dir.exists():
+        return removed
+    for idx_file in target_api_dir.rglob('index.json'):
+        try:
+            idx_file.unlink()
+            removed += 1
+            # Prune now-empty parent dirs (e.g. api/book/<code>/chapter/0/)
+            # without touching dirs that still hold the canonical .json file.
+            parent = idx_file.parent
+            try:
+                if parent != target_api_dir and not any(parent.iterdir()):
+                    parent.rmdir()
+            except OSError:
+                pass
+        except OSError:
+            pass
+    if removed:
+        log_info(f"Removed {removed} stale index.json duplicates")
+    return removed
+
+def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_path: Path, tree_json_path: Path, book_mat_path: Path = None, include_paragraphs: bool = False):
     """Export navigation, books, chapters, TOCs, and MAT cross-references into static JSON."""
     log_info(f"Connecting to SQLite database: {db_path}")
     conn = sqlite3.connect(str(db_path))
@@ -302,21 +322,24 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             pass
 
         # Export book-specific canon paragraphs with GUIDs (/api/book/{code}/paragraphs)
-        try:
-            cur.execute(
-                "SELECT guid, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid, match_quality "
-                "FROM canon_paragraphs WHERE book_code = ? ORDER BY para_index",
-                (clean_code,)
-            )
-            canon_p_rows = [dict(r) for r in cur.fetchall()]
-            if canon_p_rows:
-                write_json_multiformat(target_api_dir, f"book/{clean_code}/paragraphs", {
-                    "book_code": clean_code,
-                    "total": len(canon_p_rows),
-                    "paragraphs": canon_p_rows
-                })
-        except Exception as e:
-            pass
+        # Opt-in only (--with-paragraphs): nothing in services/api.js fetches this;
+        # it is an LLM/GUID dump (~140MB unique, ~280MB with legacy dup).
+        if include_paragraphs:
+            try:
+                cur.execute(
+                    "SELECT guid, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid, match_quality "
+                    "FROM canon_paragraphs WHERE book_code = ? ORDER BY para_index",
+                    (clean_code,)
+                )
+                canon_p_rows = [dict(r) for r in cur.fetchall()]
+                if canon_p_rows:
+                    write_json_multiformat(target_api_dir, f"book/{clean_code}/paragraphs", {
+                        "book_code": clean_code,
+                        "total": len(canon_p_rows),
+                        "paragraphs": canon_p_rows
+                    })
+            except Exception as e:
+                pass
 
         # Build initial chapters buffer (chapters 0 and 1)
         initial_chapters_data = {}
@@ -392,374 +415,29 @@ def build_nextjs_static(web_app_dir: Path):
 
 def generate_cloudflare_edge_functions(dist_dir: Path, vps_url: str):
     """
-    Generate Cloudflare Pages Edge Functions (/functions/api/...)
-    Dynamic ops (dict lookup/inf + FTS search) are now fetched DIRECTLY from
-    https://api.tipitakapali.org (see web_app_next/services/api.js:getApiBase)
-    to eliminate extra Worker hop. Only health proxy is kept.
+    Zero-Function static deploy: remove any legacy functions/ directory.
+
+    Rationale (verified):
+    - Pure static Pages = unlimited free requests; any functions/ dir makes
+      all routes count toward the Workers 100k/day free quota (Error 1027).
+    - dict/search/inf already fetch DIRECTLY from https://api.tipitakapali.org
+      client-side (services/api.js:getApiBase), so no proxy Worker is needed.
+    - MAT jump already tries static mat_para_map/mat_chapter_map.json first
+      client-side, VPS only as fallback — no edge resolver needed.
+    - /book/* + /chapter/* SPA fallback is covered by _redirects 200 rewrites
+      to /index.html; the client router (app/page.js MainAppContent) already
+      parses /book/, /chapter/, script prefixes, chapter suffixes, and hashes.
+    - Legacy /chapter/{code}{N} 0-indexed suffixes are also parsed client-side
+      (chapSuffixMatch -> N+1), so no 301 Function is required.
+    Use --with-functions only as an opt-in escape hatch (not recommended).
     """
-    functions_api_dir = dist_dir / 'functions' / 'api'
-    functions_api_dir.mkdir(parents=True, exist_ok=True)
-    # Remove stale proxy files/dirs (Worker hop eliminated — direct VPS)
-    functions_dict_dir = functions_api_dir / 'dict'
-    if functions_dict_dir.exists():
-        shutil.rmtree(functions_dict_dir)
-    stale_search = functions_api_dir / 'search.js'
-    if stale_search.exists():
-        stale_search.unlink()
-
-    # If raw IP is provided, default to domain https://api.tipitakapali.org for Cloudflare Worker compliance
-    configured_vps = vps_url.rstrip('/')
-    if '85.190.97.158' in configured_vps:
-        fallback_vps = 'https://api.tipitakapali.org'
-    else:
-        fallback_vps = configured_vps
-
-    log_info(f"Generating Cloudflare Pages Edge Functions (VPS Target: {fallback_vps}) — dict+search directly via VPS, only health Worker")
-
-    # 2 & 3. Dict + Search proxies REMOVED — served directly from https://api.tipitakapali.org
-    # (see services/api.js:getApiBase). No functions/api/search.js or functions/api/dict/* generated.
-
-    # 4. Legacy Chapter URL Redirect Function (/functions/chapter/[[path]].js)
-    # Old static-site URLs like /chapter/abh03m10.mul8 (0-indexed chapter suffix)
-    # are permanently 301-redirected to /book/abh03m10.mul?chapter=9.
-    # Any other /chapter/* path (new SPA routes) falls back to the SPA shell (/).
-    functions_chapter_dir = dist_dir / 'functions' / 'chapter'
-    functions_chapter_dir.mkdir(parents=True, exist_ok=True)
-    chapter_redirect_code = r'''// Cloudflare Pages Edge Function - Legacy Chapter URL Redirects
-// =============================================================
-// The pre-Next.js static site served each chapter as a separate file with a
-// 0-indexed chapter suffix appended to the book code, e.g.:
-//
-//   /chapter/abh03m10.mul8        (chapter_index 8)
-//
-// The Next.js app's canonical URL for the same chapter is 1-indexed:
-//
-//   /book/abh03m10.mul?chapter=9
-//
-// This function issues a permanent 301 redirect for every legacy URL of the
-// form /chapter/{bookCode}{chapterIndex}, so search engines consolidate on
-// the new canonical URLs.
-//
-// Examples:
-//   /chapter/abh03m10.mul8  ->  301  /book/abh03m10.mul/9
-//   /chapter/abh03m10.mul0  ->  301  /book/abh03m10.mul/1
-//   /chapter/s0402m1.mul3   ->  301  /book/s0402m1.mul/4
-//
-export async function onRequest(context) {
-  const url = new URL(context.request.url);
-
-  // Match /chapter/{code}{chapterIndex} where code ends in .mul/.att/.tik/.nrf
-  // and chapterIndex is one or more digits (0-based), with optional trailing slash.
-  const match = url.pathname.match(/^\/chapter\/(.+?\.(?:mul|att|tik|nrf))(\d+)\/?$/i);
-
-  if (match) {
-    const bookCode = match[1];
-    const chapterIndex = parseInt(match[2], 10);
-    const chapter = chapterIndex + 1;
-    const target = url.origin + '/book/' + bookCode + '/' + chapter;
-    return Response.redirect(target, 301);
-  }
-
-  // Not a legacy chapter-suffixed URL — this is a new-style SPA route such as
-  // /chapter/{code} or /chapter/{code}/{n}. Serve the SPA shell at "/" so the
-  // client-side router opens the right chapter. Note: fetch "/" and NOT
-  // "/index.html" — Cloudflare 308-canonicalizes /index.html -> /, which would
-  // bounce the whole URL to the homepage.
-  const shellUrl = new URL('/', url.origin);
-  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
-}
-'''
-    with open(functions_chapter_dir / '[[path]].js', 'w', encoding='utf-8') as f:
-        f.write(chapter_redirect_code)
-
-    # 5. Book SPA Shell Function (/functions/book/[[path]].js)
-    # Direct visits to /book/* that don't exactly match a generated file return 404
-    # because Cloudflare's _redirects proxying (`/book/* /index.html 200`) is
-    # unreliable for splat->index SPA fallbacks. This breaks script-prefixed codes
-    # (e.g. /book/si.s0102m.mul) and chapter deep-links (/book/s0102m.mul/5).
-    # Strategy: try to serve the real static asset first (keeps pre-rendered SEO
-    # pages for real codes); if it 404s, serve the SPA shell at "/" so the app's
-    # client-side router (which reads window.location.pathname) opens the right book.
-    functions_book_dir = dist_dir / 'functions' / 'book'
-    functions_book_dir.mkdir(parents=True, exist_ok=True)
-    book_shell_code = r'''// Cloudflare Pages Edge Function - /book/* SPA Shell & Script-Prefix Fallback
-// =============================================================================
-// The Next.js static export pre-renders a full HTML page for every real book code
-// (e.g. /book/s0102m.mul served from s0102m.mul.html via clean URLs) so search
-// engines get full metadata.
-//
-// But Cloudflare's _redirects proxying of `/book/* /index.html 200` is unreliable
-// and 404s any /book/* path that isn't a real generated file. That broke:
-//   - script-prefixed books:  /book/si.s0102m.mul
-//   - chapter deep-links:     /book/s0102m.mul/5
-//
-// This function runs ahead of _redirects and static assets:
-//   1. Try to serve the real static file first (real codes keep their SEO HTML).
-//   2. If it 404s, serve the SPA shell at "/" so the client router takes over.
-//      (Fetch "/" and NOT "/index.html" — Cloudflare 308-canonicalizes
-//       /index.html -> /, which would bounce the URL to the homepage.)
-//
-export async function onRequest(context) {
-  // 1. Serve the actual static file if it exists (real codes keep pre-rendered HTML).
-  const asset = await context.env.ASSETS.fetch(context.request);
-  if (asset.status !== 404) {
-    return asset;
-  }
-
-  // 2. Not a real generated file — serve the SPA shell; the app reads the pathname
-  //    from window.location and opens the matching book + script client-side.
-  const url = new URL(context.request.url);
-  const shellUrl = new URL('/', url.origin);
-  return context.env.ASSETS.fetch(new Request(shellUrl, context.request));
-}
-'''
-    with open(functions_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
-        f.write(book_shell_code)
-
-    # 5. Health Proxy Function (/functions/api/health.js)
-    health_proxy_code = f"""// Cloudflare Pages Edge Function - Health Status Proxy
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-  const cleanBase = vpsBase.replace(/\\/+$/, '');
-  const targetUrl = cleanBase + '/api/health' + url.search;
-
-  try {{
-    const res = await fetch(targetUrl, {{
-      headers: {{ 'User-Agent': 'Cloudflare-Edge-Health-Proxy/2.0' }}
-    }});
-    const headers = new Headers(res.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    return new Response(res.body, {{
-      status: res.status,
-      headers: headers,
-    }});
-  }} catch (err) {{
-    return new Response(JSON.stringify({{
-      status: 'degraded',
-      edge: 'online',
-      vps_backend: 'unreachable',
-      target: targetUrl,
-      detail: err.message,
-    }}), {{
-      status: 200,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-}}
-"""
-    with open(functions_api_dir / 'health.js', 'w', encoding='utf-8') as f:
-        f.write(health_proxy_code)
-
-    # 5b. MAT Jump Proxy Function (/functions/api/book/[[path]].js)
-    functions_api_book_dir = functions_api_dir / 'book'
-    functions_api_book_dir.mkdir(parents=True, exist_ok=True)
-    mat_jump_proxy_code = f"""// Cloudflare Pages Edge Function - MAT Jump Resolver & Book API Proxy
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  if (url.pathname.endsWith('/mat_jump')) {{
-    const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-    const cleanBase = vpsBase.replace(/\\/+$/, '');
-    const targetUrl = cleanBase + url.pathname + url.search;
-
-    try {{
-      const res = await fetch(targetUrl, {{
-        headers: {{ 'User-Agent': 'Cloudflare-Edge-MAT-Proxy/2.0' }}
-      }});
-      if (res.ok) {{
-        const headers = new Headers(res.headers);
-        headers.set('Access-Control-Allow-Origin', '*');
-        headers.set('Cache-Control', 'no-store');
-        return new Response(res.body, {{
-          status: res.status,
-          headers: headers,
-        }});
-      }}
-    }} catch (err) {{}}
-
-    // Fallback: Resolve MAT jump using precomputed static JSON assets on Cloudflare Edge!
-    try {{
-      const parts = url.pathname.split('/');
-      const bookIdx = parts.indexOf('book');
-      const bookCode = bookIdx !== -1 && parts.length > bookIdx + 1 ? parts[bookIdx + 1] : '';
-      const params = url.searchParams;
-      const para = params.get('para');
-      const chapter = params.get('chapter');
-      const chapInt = chapter !== null && chapter !== undefined ? parseInt(chapter, 10) : null;
-
-      if (bookCode && para && chapInt !== null) {{
-        const pUrl = new URL(`/api/book/${{encodeURIComponent(bookCode)}}/mat_para_map.json`, url.origin);
-        const pRes = await context.env.ASSETS.fetch(pUrl);
-        if (pRes.ok) {{
-          const pData = await pRes.json();
-          const cleanPStr = String(para).replace(/^(?:para-?|p)/i, '').trim();
-          let match = (pData.paras || []).find(r => r.source_chapter === chapInt && String(r.source_para) === cleanPStr);
-          let matchQuality = 'exact';
-          if (!match) {{
-            const targetP = parseInt(cleanPStr, 10);
-            if (!isNaN(targetP) && targetP > 0) {{
-              const chapParas = (pData.paras || []).filter(r => r.source_chapter === chapInt);
-              let closest = null;
-              let minDiff = Infinity;
-              for (const r of chapParas) {{
-                const pNum = parseInt(r.source_para, 10);
-                if (!isNaN(pNum)) {{
-                  const diff = Math.abs(pNum - targetP);
-                  if (diff < minDiff) {{
-                    minDiff = diff;
-                    closest = r;
-                  }}
-                }}
-              }}
-              if (closest) {{
-                match = closest;
-                matchQuality = 'closest';
-              }}
-            }}
-          }}
-          if (match) {{
-            return new Response(JSON.stringify({{
-              source_book: bookCode,
-              source_chapter: chapInt,
-              source_para: cleanPStr,
-              match_quality: matchQuality,
-              matched_source_para: match.source_para,
-              mula: match.mula_book ? {{ book: match.mula_book, chapter: match.mula_chapter, para: match.mula_para, title: match.mula_title }} : null,
-              attha: match.attha_book ? {{ book: match.attha_book, chapter: match.attha_chapter, para: match.attha_para, title: match.attha_title }} : null,
-              tika: match.tika_book ? {{ book: match.tika_book, chapter: match.tika_chapter, para: match.tika_para, title: match.tika_title }} : null,
-            }}), {{
-              status: 200,
-              headers: {{
-                'Content-Type': 'application/json; charset=utf-8',
-                'Access-Control-Allow-Origin': '*',
-                'Cache-Control': 'public, max-age=3600',
-              }},
-            }});
-          }}
-        }}
-      }}
-
-      if (bookCode && chapInt !== null) {{
-        const cUrl = new URL(`/api/book/${{encodeURIComponent(bookCode)}}/mat_chapter_map.json`, url.origin);
-        const cRes = await context.env.ASSETS.fetch(cUrl);
-        if (cRes.ok) {{
-          const cData = await cRes.json();
-          const match = (cData.chapters || []).find(r => r.source_chapter === chapInt);
-          if (match) {{
-            return new Response(JSON.stringify({{
-              source_book: bookCode,
-              source_chapter: chapInt,
-              source_para: para,
-              match_quality: 'chapter',
-              mula: match.mula_book ? {{ book: match.mula_book, chapter: match.mula_chapter, para: null, title: match.mula_title }} : null,
-              attha: match.attha_book ? {{ book: match.attha_book, chapter: match.attha_chapter, para: null, title: match.attha_title }} : null,
-              tika: match.tika_book ? {{ book: match.tika_book, chapter: match.tika_chapter, para: null, title: match.tika_title }} : null,
-            }}), {{
-              status: 200,
-              headers: {{
-                'Content-Type': 'application/json; charset=utf-8',
-                'Access-Control-Allow-Origin': '*',
-                'Cache-Control': 'public, max-age=3600',
-              }},
-            }});
-          }}
-        }}
-      }}
-    }} catch (edgeErr) {{}}
-
-    return new Response(JSON.stringify({{
-      error: 'MAT mapping unavailable',
-    }}), {{
-      status: 404,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-
-  // Default: pass through to static JSON assets
-  return context.env.ASSETS.fetch(context.request);
-}}
-"""
-    with open(functions_api_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
-        f.write(mat_jump_proxy_code)
-
-    # 5c. Paragraph API Proxy Functions (/functions/api/paragraph/[[path]].js and /functions/api/paragraphs.js)
-    functions_api_para_dir = functions_api_dir / 'paragraph'
-    functions_api_para_dir.mkdir(parents=True, exist_ok=True)
-    para_proxy_code = f"""// Cloudflare Pages Edge Function - Single Paragraph Lookup by GUID
-export async function onRequest(context) {{
-  const url = new URL(context.request.url);
-  const vpsBase = (context.env && context.env.VPS_URL) || '{fallback_vps}';
-  const cleanBase = vpsBase.replace(/\\/+$/, '');
-  const targetUrl = cleanBase + url.pathname + url.search;
-
-  try {{
-    const res = await fetch(targetUrl, {{
-      headers: {{ 'User-Agent': 'Cloudflare-Edge-Paragraph-Proxy/2.0' }}
-    }});
-    const headers = new Headers(res.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    return new Response(res.body, {{
-      status: res.status,
-      headers: headers,
-    }});
-  }} catch (err) {{
-    return new Response(JSON.stringify({{
-      error: 'VPS unreachable',
-      detail: err.message,
-    }}), {{
-      status: 502,
-      headers: {{
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-      }},
-    }});
-  }}
-}}
-"""
-    with open(functions_api_para_dir / '[[path]].js', 'w', encoding='utf-8') as f:
-        f.write(para_proxy_code)
-
-    with open(functions_api_dir / 'paragraphs.js', 'w', encoding='utf-8') as f:
-        f.write(para_proxy_code)
-
-    # 6. Global Edge Middleware for AI Agent Markdown Content Negotiation (/functions/_middleware.js)
     functions_dir = dist_dir / 'functions'
-    edge_middleware_code = """// Cloudflare Pages Edge Middleware for AI Agent Content Negotiation
-// Handles Accept: text/markdown per RFC / llmstxt.org / Cloudflare Markdown for Agents
-export async function onRequest(context) {
-  const request = context.request;
-  const accept = request.headers.get('accept') || '';
-  const url = new URL(request.url);
-
-  const isStaticDoc = /\\.(md|txt|json|xml|html|css|js|ico|png|svg|jpg|woff2?|ttf)$/i.test(url.pathname);
-
-  // Check if client explicitly requests machine-readable markdown for HTML pages
-  if (accept.includes('text/markdown') && !url.pathname.startsWith('/api/') && !isStaticDoc) {
-    const targetPath = url.pathname === '/' ? '/llms.txt' : '/llms-full.txt';
-    const response = await context.env.ASSETS.fetch(new URL(targetPath, url.origin));
-    const newHeaders = new Headers(response.headers);
-    newHeaders.set('content-type', 'text/markdown; charset=utf-8');
-    newHeaders.set('vary', 'Accept');
-    newHeaders.set('x-markdown-tokens', url.pathname === '/' ? '1250' : '8500');
-    return new Response(response.body, {
-      status: 200,
-      headers: newHeaders,
-    });
-  }
-
-  return context.next();
-}
-"""
-    with open(functions_dir / '_middleware.js', 'w', encoding='utf-8') as f:
-        f.write(edge_middleware_code)
-
-    log_success(f"Generated Cloudflare Pages Edge Functions: /functions/chapter/[[path]].js + /functions/book/[[path]].js + /functions/api/book/[[path]].js + /functions/api/paragraph/[[path]].js + /functions/api/paragraphs.js + /functions/api/health.js + /functions/_middleware.js (AI markdown)")
+    if functions_dir.exists():
+        shutil.rmtree(functions_dir)
+        log_info("Removed legacy Cloudflare Pages Functions (zero-Function unlimited static mode)")
+    else:
+        log_info("No functions/ to generate (zero-Function unlimited static mode)")
+    log_success("Zero-Function mode: no edge functions deployed; all traffic is static (unlimited)")
 
 
 def generate_cloudflare_redirects(dist_dir: Path):
@@ -783,12 +461,12 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/paragraphs             /api/book/:code/paragraphs.json            200
 /api/book/:code                        /api/book/:code.json                       200
 
-# 2. Client-side SPA Fallbacks — /book/* and /chapter/* are handled primarily by Cloudflare
-#    Pages Functions, which take precedence over _redirects and serve the index shell for
-#    non-file paths (incl. script-prefixed codes like /book/si.s0102m.mul). These 200 rewrites
-#    remain as a harmless fallback:
-#    - /functions/book/[[path]].js       serves the real book file if present, else the SPA shell
-#    - /functions/chapter/[[path]].js    301-redirects legacy /chapter/{code}{N}, else the SPA shell
+# 2. Client-side SPA Fallbacks (zero-Function mode — no functions/ dir).
+#    /book/* covers script-prefixed codes (/book/si.s0102m.mul) and chapter
+#    deep-links (/book/s0102m.mul/5): real files serve directly, others rewrite
+#    to the SPA shell where MainAppContent parses the pathname client-side.
+#    /chapter/* likewise serves the shell; legacy 0-indexed suffixes
+#    (/chapter/abh03m10.mul8) are parsed client-side (chapSuffixMatch -> N+1).
 /book/*       /index.html                   200
 /chapter/*    /index.html                   200
 
@@ -969,6 +647,21 @@ def main():
         default=None,
         help="Custom Git commit message"
     )
+    parser.add_argument(
+        "--with-paragraphs",
+        action="store_true",
+        help="Also export per-book canon paragraphs JSON (/api/book/{code}/paragraphs.json). Skipped by default: nothing in services/api.js fetches it (~140MB)"
+    )
+    parser.add_argument(
+        "--keep-chapter",
+        action="store_true",
+        help="Keep the duplicate Next.js chapter/ prerender output. Pruned by default: /chapter/* falls back to the SPA shell via _redirects and is parsed client-side"
+    )
+    parser.add_argument(
+        "--with-functions",
+        action="store_true",
+        help="Opt-in: keep legacy functions/ edge proxies. Not recommended: any functions/ dir makes all routes count toward the Workers 100k/day quota"
+    )
     args = parser.parse_args()
 
     paths = find_paths()
@@ -1016,16 +709,45 @@ def main():
             db_path=db_path,
             catalog_path=paths['catalog_path'],
             tree_json_path=paths['tree_json_path'],
-            book_mat_path=paths.get('book_mat_path')
+            book_mat_path=paths.get('book_mat_path'),
+            include_paragraphs=args.with_paragraphs,
         )
+        # Drop legacy index.json duplicates from earlier dual-write exports
+        cleanup_stale_index_json(target_api_dir)
+        # Drop paragraphs dumps unless explicitly opted in
+        if not args.with_paragraphs and target_api_dir.exists():
+            for stale_para in target_api_dir.rglob('paragraphs.json'):
+                try:
+                    stale_para.unlink()
+                except OSError:
+                    pass
 
         # Sync static API data to public/api for offline local dev
         public_api_dir = web_app_dir / 'public' / 'api'
         log_info(f"Syncing static API data to local development folder: {public_api_dir}")
+        public_api_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(target_api_dir, public_api_dir, dirs_exist_ok=True)
+        cleanup_stale_index_json(public_api_dir)
+        if not args.with_paragraphs:
+            for stale_para in public_api_dir.rglob('paragraphs.json'):
+                try:
+                    stale_para.unlink()
+                except OSError:
+                    pass
 
-    # 4. Generate Cloudflare Edge Functions
-    generate_cloudflare_edge_functions(dist_dir, args.vps_url)
+    # 3b. Prune duplicate chapter/ prerender (canonical SEO lives on /book/*;
+    # /chapter/* is served by the SPA shell + client-side parser via _redirects)
+    if not args.keep_chapter:
+        pruned_chapter = dist_dir / 'chapter'
+        if pruned_chapter.exists():
+            shutil.rmtree(pruned_chapter)
+            log_info("Pruned duplicate chapter/ prerender output (served via SPA shell + _redirects)")
+
+    # 4. Zero-Function static deploy (unlimited free requests) unless opted in
+    if args.with_functions:
+        log_warn("--with-functions: legacy edge functions retained (counts toward Workers 100k/day quota)")
+    else:
+        generate_cloudflare_edge_functions(dist_dir, args.vps_url)
 
     # 5. Generate _redirects & _headers
     generate_cloudflare_redirects(dist_dir)
