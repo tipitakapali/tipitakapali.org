@@ -9,9 +9,9 @@ const compress = require('@fastify/compress');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
-// Default to 127.0.0.1 for desktop security; override with HOST when needed.
+// Default to 0.0.0.0; override with other for security reasons when needed.
 const PORT = parseInt(process.env.PORT || '8400', 10);
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 
 function getDbCandidates(filename) {
   const candidates = [];
@@ -92,6 +92,7 @@ let stmtGetMatChapter = null;
 let stmtGetCanonPara = null;
 let stmtGetClosestCanonPara = null;
 let stmtGetClosestMatParaChap = null;
+let stmtGetMatParaSibs = null;
 let stmtGetCanonByGuid = null;
 try {
   stmtGetMat = db.prepare('SELECT book_code, category, mula_code, mula_title, attha_code, attha_title, tika_code, tika_title FROM book_mat WHERE book_code = ?');
@@ -101,6 +102,7 @@ try {
   stmtGetMatParaSub = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND sub_book = ? AND source_para = ?');
   stmtGetMatPara = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND source_para = ?');
   stmtGetMatChapter = db.prepare('SELECT mula_book, mula_chapter, mula_title, attha_book, attha_chapter, attha_title, tika_book, tika_chapter, tika_title FROM mat_chapter_map WHERE source_book = ? AND source_chapter = ?');
+  stmtGetMatParaSibs = db.prepare('SELECT mula_book, mula_chapter, mula_para, mula_title, attha_book, attha_chapter, attha_para, attha_title, tika_book, tika_chapter, tika_para, tika_title, source_para FROM mat_para_map WHERE source_book = ? AND source_chapter = ?');
   stmtGetCanonPara = db.prepare('SELECT guid, book_code, chapter_index, para_num, mula_guid, mula_book, mula_chapter, mula_para, attha_guid, attha_book, attha_chapter, attha_para, tika_guid, tika_book, tika_chapter, tika_para, match_quality FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND (para_num = ? OR (para_first <= ? AND para_last >= ?)) LIMIT 1');
   stmtGetClosestCanonPara = db.prepare('SELECT guid, book_code, chapter_index, para_num, mula_guid, mula_book, mula_chapter, mula_para, attha_guid, attha_book, attha_chapter, attha_para, tika_guid, tika_book, tika_chapter, tika_para, match_quality FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_first IS NOT NULL ORDER BY ABS(para_first - ?) ASC LIMIT 1');
   stmtGetCanonByGuid = db.prepare('SELECT * FROM canon_paragraphs WHERE guid = ? LIMIT 1');
@@ -684,6 +686,44 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
           matchedSourcePara = paraRow.source_para;
         }
       }
+    }
+    // Neighbor fill (same rule as the static edge path in services/api.js fetchMatJump):
+    // an exact row may name book/chapter with a null para for a layer (e.g. s0201m.mul
+    // ch0 para 9 -> attha para null). Borrow chapter+para from the closest same-chapter
+    // row that has one, so clients can offer closest-para jumps instead of chapter-only.
+    if (paraRow && cIdx !== null && !isNaN(cIdx) && stmtGetMatParaSibs) {
+      try {
+        const selfNum = parseInt(String(baseP).split('-')[0], 10);
+        if (!isNaN(selfNum)) {
+          const sibs = stmtGetMatParaSibs.all(cleanCode, cIdx);
+          for (const layer of ['mula', 'attha', 'tika']) {
+            const bKey = `${layer}_book`;
+            const pKey = `${layer}_para`;
+            if (!paraRow[bKey] || (paraRow[pKey] !== null && paraRow[pKey] !== undefined)) continue;
+            let best = null;
+            let bestDiff = Infinity;
+            let bestNum = Infinity;
+            for (const r of sibs) {
+              if (r[bKey] !== paraRow[bKey]) continue;
+              const rp = r[pKey];
+              if (rp === null || rp === undefined) continue;
+              const rn = parseInt(String(r.source_para).split('-')[0], 10);
+              if (isNaN(rn)) continue;
+              const diff = Math.abs(rn - selfNum);
+              if (diff < bestDiff || (diff === bestDiff && rn < bestNum)) {
+                best = r;
+                bestDiff = diff;
+                bestNum = rn;
+              }
+            }
+            if (best) {
+              paraRow[`${layer}_chapter`] = best[`${layer}_chapter`];
+              paraRow[`${layer}_para`] = best[`${layer}_para`];
+              if (!paraRow[`${layer}_title`]) paraRow[`${layer}_title`] = best[`${layer}_title`];
+            }
+          }
+        }
+      } catch (e) {}
     }
     let chapRow = null;
     if (cIdx !== null && !isNaN(cIdx) && stmtGetMatChapter) {

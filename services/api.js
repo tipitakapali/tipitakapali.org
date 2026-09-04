@@ -351,6 +351,46 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
               }
             }
             if (pMatch) {
+              // Neighbor fill: an exact row can name the connected book/chapter for a
+              // layer yet carry no para (e.g. s0201m.mul ch0 para 9 -> attha para null).
+              // Borrow chapter+para from the closest same-chapter row that HAS one for
+              // that layer (ties prefer the lower/previous para), so callers can offer
+              // "Closest Attha para 8" instead of degrading to chapter-only.
+              // match_quality stays as-is: per-layer display already distinguishes exact
+              // (targetPara === requested) from closest (targetPara !== requested).
+              const selfNum = parseInt(String(cleanPStr).split('-')[0], 10);
+              if (!isNaN(selfNum)) {
+                const chapRows = (pData.paras || []).filter((r) => r.source_chapter === chapInt);
+                for (const layer of ['mula', 'attha', 'tika']) {
+                  const bKey = `${layer}_book`;
+                  const pKey = `${layer}_para`;
+                  if (!pMatch[bKey] || (pMatch[pKey] !== null && pMatch[pKey] !== undefined)) continue;
+                  let best = null;
+                  let bestDiff = Infinity;
+                  let bestNum = Infinity;
+                  for (const r of chapRows) {
+                    if (r[bKey] !== pMatch[bKey]) continue;
+                    const rp = r[pKey];
+                    if (rp === null || rp === undefined) continue;
+                    const rn = parseInt(String(r.source_para).split('-')[0], 10);
+                    if (isNaN(rn)) continue;
+                    const diff = Math.abs(rn - selfNum);
+                    if (diff < bestDiff || (diff === bestDiff && rn < bestNum)) {
+                      best = r;
+                      bestDiff = diff;
+                      bestNum = rn;
+                    }
+                  }
+                  if (best) {
+                    pMatch = {
+                      ...pMatch,
+                      [`${layer}_chapter`]: best[`${layer}_chapter`],
+                      [`${layer}_para`]: best[`${layer}_para`],
+                      [`${layer}_title`]: pMatch[`${layer}_title`] || best[`${layer}_title`],
+                    };
+                  }
+                }
+              }
               return {
                 source_book: cleanCode,
                 source_chapter: chapInt,
