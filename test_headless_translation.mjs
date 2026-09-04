@@ -47,7 +47,7 @@ async function run() {
     { stdio: 'ignore' }
   );
 
-  await sleep(1500);
+  await sleep(3000);
 
   try {
     console.log('2. Opening /book/s0101m.mul/0 in Chromium...');

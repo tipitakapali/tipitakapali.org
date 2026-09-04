@@ -404,7 +404,7 @@
   </style>
   <script>
     function goBackOnCloudflare() {
-      if (window.history.length > 1 && document.referrer.includes('tipitakapali.org')) {
+      if (window.history.length > 1 && (document.referrer.includes('tipitakapali.org') || document.referrer.includes('localhost') || document.referrer.includes('127.0.0.1'))) {
         window.history.back();
       } else {
         window.location.href = '/';

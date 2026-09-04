@@ -11,6 +11,8 @@
 /api/book/:code/toc                    /api/book/:code/toc.json                   200
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code                        /api/book/:code.json                       200
+/info                                  /info.html                                 200
+/pali-script-converter                 /pali-script-converter.html                200
 
 # 2. Client-side SPA Fallbacks — /book/* and /chapter/* are handled primarily by Cloudflare
 # Pages Functions, which take precedence over _redirects and serve the index shell for

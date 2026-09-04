@@ -36,6 +36,14 @@ const nextConfig = {
           const backendUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8400';
           return [
             {
+              source: '/info',
+              destination: '/info.html',
+            },
+            {
+              source: '/pali-script-converter',
+              destination: '/pali-script-converter.html',
+            },
+            {
               source: '/api/:path*',
               destination: `${backendUrl}/api/:path*`,
             },

@@ -473,6 +473,22 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   min-height: 1px;
 }
 
+.reader-side-col {
+  min-width: 0;
+}
+
+.reader-side-col p {
+  margin-bottom: 0 !important;
+}
+
+.reader-side-col-left {
+  min-width: 0;
+}
+
+.reader-side-col-right {
+  min-width: 0;
+}
+
 .reader-pali-col {
   min-width: 0;
 }
@@ -527,7 +543,7 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
 }
 
 .reader-trans-block {
-  border-left: 3px solid var(--accent);
+  border-left: 3.5px solid var(--accent);
   background: var(--bg-secondary);
   border-radius: 0 0.5rem 0.5rem 0;
   padding: 0.5rem 0.85rem;
@@ -540,26 +556,163 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.reader-trans-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
+/* Language-specific left border accent colors (Task 5) */
+.reader-trans-block[data-trans-lang="en"],
+.reader-trans-block[data-trans-lang="english"] {
+  border-left-color: #2563eb; /* Royal Blue */
+}
+
+.reader-trans-block[data-trans-lang="vi"],
+.reader-trans-block[data-trans-lang="vietnamese"] {
+  border-left-color: #dc2626; /* Crimson Red */
+}
+
+.reader-trans-block[data-trans-lang="my"],
+.reader-trans-block[data-trans-lang="myanmar"] {
+  border-left-color: #059669; /* Jade Green */
+}
+
+.reader-trans-block[data-trans-lang="si"],
+.reader-trans-block[data-trans-lang="sinhala"] {
+  border-left-color: #d97706; /* Saffron Amber */
+}
+
+.reader-trans-block[data-trans-lang="zh"],
+.reader-trans-block[data-trans-lang="chinese"] {
+  border-left-color: #e11d48; /* Rose Crimson */
+}
+
+.reader-trans-block[data-trans-lang="km"],
+.reader-trans-block[data-trans-lang="khmer"] {
+  border-left-color: #0891b2; /* Deep Cyan */
+}
+
+.reader-trans-block[data-trans-lang="th"],
+.reader-trans-block[data-trans-lang="thai"] {
+  border-left-color: #7c3aed; /* Violet / Purple */
+}
+
+.reader-trans-block[data-trans-lang="lo"],
+.reader-trans-block[data-trans-lang="lao"] {
+  border-left-color: #ea580c; /* Vivid Orange */
+}
+
+.reader-trans-block[data-trans-lang="ta"],
+.reader-trans-block[data-trans-lang="tamil"] {
+  border-left-color: #c2410c; /* Deep Rust */
+}
+
+.reader-trans-block[data-trans-lang="hi"],
+.reader-trans-block[data-trans-lang="hindi"] {
+  border-left-color: #ca8a04; /* Marigold Gold */
+}
+
+.reader-trans-block[data-trans-lang="de"],
+.reader-trans-block[data-trans-lang="german"] {
+  border-left-color: #475569; /* Slate */
+}
+
+.reader-trans-block[data-trans-lang="ja"],
+.reader-trans-block[data-trans-lang="japanese"] {
+  border-left-color: #db2777; /* Cherry Pink */
+}
+
+.reader-trans-block[data-trans-lang="pt"],
+.reader-trans-block[data-trans-lang="portuguese"] {
+  border-left-color: #16a34a; /* Emerald */
+}
+
+.reader-trans-block[data-trans-lang="ru"],
+.reader-trans-block[data-trans-lang="russian"] {
+  border-left-color: #0284c7; /* Sky Blue */
+}
+
+.reader-trans-block[data-trans-lang="my_nissaya"] {
+  border-left-color: #0d9488; /* Dark Teal */
+}
+
+.reader-trans-block[data-trans-lang="ko"],
+.reader-trans-block[data-trans-lang="korean"] {
+  border-left-color: #4f46e5; /* Indigo */
+}
+
+.reader-trans-block[data-trans-lang="pali"] {
+  border-left-color: var(--accent); /* Original Pali Accent */
+}
+
+.reader-trans-empty {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Translation Headings & Colophons when Pāḷi layer is disabled */
+.reader-container .reader-trans-heading-row {
+  display: block;
+  margin-top: 1.25rem;
+  margin-bottom: 0.6rem;
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row .reader-trans-block {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-left: none !important;
+  padding: 0.2rem 0 !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+.reader-container .reader-trans-heading-row.nikaya .reader-trans-content {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.book .reader-trans-content {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.chapter .reader-trans-content {
+  font-size: 1.35em;
+  font-weight: bold;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.title .reader-trans-content {
+  font-size: 1.25em;
+  font-weight: bold;
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.subhead .reader-trans-content {
+  font-size: 1.15em;
+  font-weight: bold;
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.subsubhead .reader-trans-content {
+  font-size: 1.05em;
+  font-weight: bold;
+  text-align: center;
+}
+
+.reader-container .reader-trans-heading-row.centre .reader-trans-content,
+.reader-container .reader-trans-heading-row.centered .reader-trans-content {
+  text-align: center;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.reader-trans-block strong.paranum {
+  margin-right: 0.35rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--accent);
-  margin-bottom: 0.25rem;
-  user-select: none;
-}
-
-.reader-trans-flag {
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-.reader-trans-name {
-  line-height: 1;
 }
 
 .reader-trans-content {

@@ -23,9 +23,10 @@ import {
 
 export const HELP_SECTIONS = [
   { id: 'topic-overview', label: 'TipitakaPali.org Overview', icon: BookOpen },
+  { id: 'topic-translations', label: 'Translations & Pāḷi Layers', icon: Languages },
   { id: 'topic-search', label: 'Full-Text Search (FTS5)', icon: Search },
   { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookA },
-  { id: 'topic-velthuis', label: 'Velthuis Pāḷi Typing', icon: Keyboard },
+  { id: 'topic-velthuis', label: 'Velthuis & 17 Pāḷi Scripts', icon: Keyboard },
   { id: 'topic-mat', label: 'MAT Cross-Navigation', icon: Layers },
   { id: 'topic-shortcuts', label: 'Shortcuts & Page Editions', icon: Sliders },
   { id: 'topic-attributions', label: 'Attributions, License & Credits', icon: ShieldCheck },
@@ -208,8 +209,80 @@ export default function HelpGuideContent({ showTabBar = true }) {
         </div>
       </section>
 
+      {/* 2. Multilingual Translations & Pāḷi Layers */}
+      <section id="topic-translations" className="scroll-mt-14 space-y-4 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
+        <div className="flex items-center gap-2">
+          <Languages size={16} className="text-[var(--accent)]" />
+          <h3 className="font-bold text-sm text-[var(--text-primary)]">
+            Multilingual Translations & Pāḷi Layers
+          </h3>
+        </div>
+        <p className="text-[12px] text-[var(--text-secondary)]">
+          TipitakaPali.org supports multi-layered translation reading across <strong>16+ languages</strong> simultaneously with the original Pāḷi Canon, with independent layer control, reordering, and flexible display modes.
+        </p>
 
-      {/* 2. Full-Text Search (FTS5) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11.5px]">
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Independent Pāḷi Layer</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent-light)] text-[var(--accent)] font-semibold">Root Canon</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              The original Pāḷi text is treated as a first-class language layer. In the Language menu, you can reorder it above or below translations, move it to the top, or disable it completely to read only the translations.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Display Modes: Stack vs Side-by-Side</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold">Flexible</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Choose <strong>Stack (Vertical)</strong> to see translations directly beneath each Pāḷi paragraph, or <strong>Side-by-Side</strong> for two balanced columns (Pāḷi on the left, translation on the right).
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Color-Coded Border Indicators</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">Visual</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Each translation language features a distinct colored left border (e.g. Royal Blue for English, Crimson for Vietnamese, Jade Green for Myanmar) so you instantly recognize the active language without distracting headers.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Layer Order & Move-to-Top</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold">Custom</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              In the Language menu, use <kbd className="font-mono text-[var(--accent)] font-bold">⤒</kbd> to jump any language directly to the top, and <kbd className="font-mono text-[var(--accent)] font-bold">▲</kbd> / <kbd className="font-mono text-[var(--accent)] font-bold">▼</kbd> to fine-tune layer hierarchy.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-1.5 text-[11.5px] text-[var(--text-primary)]">
+          <div className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+            <span>⚠️ AI-Assisted Translation Notice</span>
+          </div>
+          <p className="text-[11px] text-[var(--text-secondary)]">
+            All translation corpora are adapted from the{' '}
+            <a
+              href="https://epitaka.org/about"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--accent)] underline font-semibold inline-flex items-center gap-0.5"
+            >
+              Epitaka AI Translation Project <ExternalLink size={10} />
+            </a>
+            . Because these texts are machine-generated with artificial intelligence, they <strong>may contain errors or inaccuracies and are not authoritative</strong>. Readers are urged to verify key passages against the original Pāḷi text with discernment and wisdom.
+          </p>
+        </div>
+      </section>
+
+      {/* 3. Full-Text Search (FTS5) */}
       <section id="topic-search" className="scroll-mt-14 space-y-4 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
         <div className="flex items-center gap-2">
           <Search size={16} className="text-[var(--accent)]" />
@@ -428,6 +501,25 @@ export default function HelpGuideContent({ showTabBar = true }) {
             <strong>Examples:</strong> Type <code className="font-mono bg-[var(--bg-card)] px-1 rounded text-[var(--accent)]">nibbaana</code> → <strong>nibbāna</strong>, <code className="font-mono bg-[var(--bg-card)] px-1 rounded text-[var(--accent)]">buddha.m</code> → <strong>buddhaṃ</strong>, <code className="font-mono bg-[var(--bg-card)] px-1 rounded text-[var(--accent)]">sa,,naa</code> → <strong>saññā</strong>.
           </span>
         </div>
+
+        {/* Link to Standalone Pāḷi Script Converter Tool (Task 6) */}
+        <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <strong className="text-[var(--text-primary)] text-xs">Standalone Pāḷi Script Converter Tool</strong>
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+              Convert text between all 17 Brahmic scripts and Roman Velthuis instantly. Works fully offline in browser.
+            </p>
+          </div>
+          <a
+            href="/pali-script-converter.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:opacity-90 transition shrink-0 inline-flex items-center justify-center gap-1.5 shadow-2xs"
+          >
+            <span>Open Converter</span>
+            <ExternalLink size={11} />
+          </a>
+        </div>
       </section>
 
       {/* 5. MAT Relational Navigation */}
@@ -611,7 +703,14 @@ export default function HelpGuideContent({ showTabBar = true }) {
           </div>
 
           <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
-            <strong className="text-[var(--text-primary)]">7. License & Usage Terms</strong>
+            <strong className="text-[var(--text-primary)]">7. AI-Assisted Translations (Epitaka)</strong>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Multilingual translation datasets across 16+ languages adapted from the AI-Assisted Translation Project by <a href="https://epitaka.org/about" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline inline-flex items-center gap-0.5">Epitaka <ExternalLink size={10} /></a>. Freely provided for non-commercial Dhamma study and cross-reference with the canonical Pāḷi root text.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <strong className="text-[var(--text-primary)]">8. License & Usage Terms</strong>
             <p className="text-[11px] text-[var(--text-muted)]">
               This application is distributed under the <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">Creative Commons Attribution-NonCommercial-ShareAlike 3.0 (CC BY-NC-SA 3.0)</a> and <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">CC BY-NC 4.0</a> licenses for non-commercial Dhamma dāna study.
             </p>

@@ -77,7 +77,7 @@ function formatInlineTags(str) {
 
   // Convert markdown **bold** and *italic*
   safe = safe.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-  safe = safe.replace(/(^|[^\*])\*([^*]+)\*([^\*]|$)/g, '$1<i>$2</i>$3');
+  safe = safe.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<i>$1</i>');
 
   return safe;
 }
@@ -109,64 +109,130 @@ function formatTranslationContent(text, lang) {
   return formatInlineTags(text);
 }
 
-function injectTranslationsIntoHtml(html, translations, activeLangs, displayMode) {
-  if (!html || !translations || !activeLangs || activeLangs.length === 0) return html;
+function injectTranslationsIntoHtml(html, translations, orderedLayers = [], isPaliEnabled = true, displayMode = 'stack') {
+  if (!html) return html;
 
-  let hasAny = false;
-  for (const l of activeLangs) {
-    if (translations[l] && Object.keys(translations[l]).length > 0) {
-      hasAny = true;
-      break;
-    }
+  const hasTranslations = orderedLayers.some((l) => l.type === 'trans');
+  if (isPaliEnabled && !hasTranslations) {
+    return html;
   }
-  if (!hasAny) return html;
 
   const isSide = displayMode === 'side';
+  const isSideActive = isSide && ((isPaliEnabled && hasTranslations) || (!isPaliEnabled && orderedLayers.filter((l) => l.type === 'trans').length >= 2));
 
   return html.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullMatch, pTag, pIndex) => {
-    const items = [];
-    for (const lang of activeLangs) {
-      const trans = translations[lang]?.[pIndex];
-      if (trans && trans.trim()) {
-        const meta = TRANSLATION_METAS[lang] || { label: lang.toUpperCase(), flag: '🌐' };
-        items.push({
-          lang,
-          label: meta.label,
-          flag: meta.flag,
-          text: trans.trim(),
-        });
+    const paraMatch = pTag.match(/\bdata-para="([^"]+)"/i);
+    const paraFirstMatch = pTag.match(/\bdata-para-first="([^"]+)"/i);
+    const paraLastMatch = pTag.match(/\bdata-para-last="([^"]+)"/i);
+    const idMatch = pTag.match(/\bid="([^"]+)"/i);
+    const classMatch = pTag.match(/\bclass="([^"]+)"/i);
+    const paranumMatch = pTag.match(/<strong\b[^>]*\bclass="[^"]*paranum[^"]*"[^>]*>([\s\S]*?)<\/strong>\.?\s*/i);
+
+    const pClasses = (classMatch ? classMatch[1] : '').split(/\s+/);
+    const headingClass = pClasses.find((c) =>
+      /^(nikaya|book|title|subhead|subsubhead|chapter|centre|centered)$/i.test(c)
+    );
+    const isHeading = Boolean(headingClass);
+
+    const rowAttrs = [
+      `data-pindex="${pIndex}"`,
+      paraMatch ? `data-para="${paraMatch[1]}"` : '',
+      paraFirstMatch ? `data-para-first="${paraFirstMatch[1]}"` : '',
+      paraLastMatch ? `data-para-last="${paraLastMatch[1]}"` : '',
+      !isPaliEnabled && idMatch ? `id="${idMatch[1]}"` : '',
+    ].filter(Boolean).join(' ');
+
+    const renderedItems = [];
+    let transCount = 0;
+    for (const layer of orderedLayers) {
+      if (layer.type === 'pali') {
+        if (isPaliEnabled) {
+          renderedItems.push({
+            type: 'pali',
+            lang: 'pali',
+            html: pTag,
+          });
+        }
+      } else if (layer.type === 'trans') {
+        const trans = translations[layer.lang]?.[pIndex];
+        if (trans && trans.trim()) {
+          transCount++;
+          let content = formatTranslationContent(trans.trim(), layer.lang);
+
+          // If Pali is disabled and this is a numbered paragraph, display standard paragraph number anchor
+          if (!isPaliEnabled && !isHeading && transCount === 1 && paraMatch) {
+            content = content.replace(/^\s*[\p{Nd}]+[\.၊။\s]+/u, '');
+            const pNumDisplay = paranumMatch ? paranumMatch[1] : paraMatch[1];
+            content = `<strong class="paranum" id="para-${paraMatch[1]}">${pNumDisplay}</strong>. ` + content;
+          }
+
+          const blockClasses = !isPaliEnabled && isHeading
+            ? 'reader-trans-block reader-trans-heading-block'
+            : 'reader-trans-block';
+
+          renderedItems.push({
+            type: 'trans',
+            lang: layer.lang,
+            html: `
+      <div class="${blockClasses}" data-trans-lang="${layer.lang}">
+        <div class="reader-trans-content">${content}</div>
+      </div>`,
+          });
+        }
       }
     }
 
-    if (items.length === 0) {
-      if (isSide) {
-        // Keep 2-column layout for body paragraphs so Pāli text doesn't jump width
-        const isBodyPara = /\b(bodytext|hangnum|indent|gatha\w*)\b/i.test(pTag);
-        if (isBodyPara) {
-          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" data-pindex="${pIndex}"><div class="reader-pali-col">${pTag}</div><div class="reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
-        }
+    if (renderedItems.length === 0) {
+      if (!isPaliEnabled) {
+        // Keep section headings/titles/colophons so chapter hierarchy remains visible
+        if (isHeading) return pTag;
+        return `<div class="reader-para-row reader-trans-empty" ${rowAttrs}></div>`;
       }
       return fullMatch;
     }
 
-    const transBlocksHtml = items
-      .map(
-        (item) => `
-      <div class="reader-trans-block" data-trans-lang="${item.lang}">
-        <div class="reader-trans-header">
-          <span class="reader-trans-flag">${item.flag}</span>
-          <span class="reader-trans-name">${item.label}</span>
-        </div>
-        <div class="reader-trans-content">${formatTranslationContent(item.text, item.lang)}</div>
-      </div>`
-      )
-      .join('');
-
-    if (isSide) {
-      return `<div class="reader-para-row reader-trans-side-row" data-pindex="${pIndex}"><div class="reader-pali-col">${pTag}</div><div class="reader-trans-col"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${transBlocksHtml}</div></div></div>`;
+    // Heading row styling when Pāḷi is disabled
+    if (!isPaliEnabled && isHeading) {
+      const headingItemsHtml = renderedItems.map((item) => item.html).join('');
+      return `<div class="reader-para-row reader-trans-heading-row ${headingClass}" ${rowAttrs}>${headingItemsHtml}</div>`;
     }
 
-    return `<div class="reader-para-row reader-trans-stack-row" data-pindex="${pIndex}">${pTag}<div class="reader-translation-container reader-stack-container" data-pindex="${pIndex}">${transBlocksHtml}</div></div>`;
+    if (isSideActive && renderedItems.length >= 2) {
+      const col1 = renderedItems[0];
+      const col2Items = renderedItems.slice(1);
+      const col1Html = col1.html;
+      const col2Html = col2Items.map((item) => item.html).join('');
+      const col1Class = col1.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
+      const col2Class = col2Items.some((item) => item.type === 'pali') ? 'reader-pali-col' : 'reader-trans-col';
+      const col2Wrapped = col2Class === 'reader-trans-col'
+        ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Html}</div>`
+        : col2Html;
+      return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${col1Html}</div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
+    }
+
+    if (isSideActive && renderedItems.length === 1 && !isHeading) {
+      const isBodyPara = /\b(bodytext|hangnum|indent|gatha\w*)\b/i.test(pTag);
+      if (isBodyPara) {
+        const singleItem = renderedItems[0];
+        const isCol1 = singleItem.type === orderedLayers[0]?.type &&
+          (singleItem.type === 'pali' || singleItem.lang === orderedLayers[0]?.lang);
+
+        if (isCol1) {
+          const col1Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
+          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${singleItem.html}</div><div class="reader-side-col reader-side-col-right reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
+        } else {
+          const col2Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
+          const col2Wrapped = col2Class === 'reader-trans-col'
+            ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`
+            : singleItem.html;
+          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col reader-trans-col-empty"></div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
+        }
+      }
+    }
+
+    // Stack mode or single-layer side mode
+    const itemsHtml = renderedItems.map((item) => item.html).join('');
+    return `<div class="reader-para-row reader-trans-stack-row" ${rowAttrs}>${itemsHtml}</div>`;
   });
 }
 
@@ -181,6 +247,8 @@ const ChapterBlock = memo(function ChapterBlock({
   searchHighlight = null,
   highlightSearchTerms = true,
   activeLangs = [],
+  orderedLayers = [],
+  isPaliEnabled = true,
   translationDisplayMode = 'stack',
 }) {
   const sentinelRef = useRef(null);
@@ -246,16 +314,28 @@ const ChapterBlock = memo(function ChapterBlock({
         searchHighlight.paraNum
       );
     }
-    if (activeLangs.length > 0 && Object.keys(translations).length > 0) {
+    const hasActiveTrans = activeLangs.length > 0;
+    if (hasActiveTrans || !isPaliEnabled) {
       processed = injectTranslationsIntoHtml(
         processed,
         translations,
-        activeLangs,
+        orderedLayers,
+        isPaliEnabled,
         translationDisplayMode
       );
     }
     return processed;
-  }, [html, paliScript, searchHighlight, highlightSearchTerms, activeLangs, translations, translationDisplayMode]);
+  }, [
+    html,
+    paliScript,
+    searchHighlight,
+    highlightSearchTerms,
+    activeLangs,
+    translations,
+    orderedLayers,
+    isPaliEnabled,
+    translationDisplayMode,
+  ]);
 
   if (displayHtml) {
     return (
@@ -457,22 +537,42 @@ export default function ReaderView() {
   const { settings, setIsZenMode } = useThemeSettings();
   const pulseAnimation = Boolean(settings?.pulseAnimation);
 
-  const activeLangs = React.useMemo(() => {
-    if (!settings?.translations) return [];
-    const order = settings.translationOrder || [];
-    const langs = [];
+  const isPaliEnabled = settings?.translations?.pali !== false;
+
+  const orderedLayers = React.useMemo(() => {
+    const order = settings?.translationOrder || [];
+    const layers = [];
     for (const id of order) {
-      if (settings.translations[id] && LANG_KEY_TO_CODE[id]) {
-        langs.push(LANG_KEY_TO_CODE[id]);
+      if (id === 'pali') {
+        if (isPaliEnabled) {
+          layers.push({ id: 'pali', type: 'pali' });
+        }
+      } else if (settings?.translations?.[id] && LANG_KEY_TO_CODE[id]) {
+        layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
       }
     }
-    for (const [id, enabled] of Object.entries(settings.translations)) {
-      if (enabled && LANG_KEY_TO_CODE[id] && !langs.includes(LANG_KEY_TO_CODE[id])) {
-        langs.push(LANG_KEY_TO_CODE[id]);
+    if (isPaliEnabled && !layers.some((l) => l.id === 'pali')) {
+      layers.unshift({ id: 'pali', type: 'pali' });
+    }
+    if (settings?.translations) {
+      for (const [id, enabled] of Object.entries(settings.translations)) {
+        if (id !== 'pali' && enabled && LANG_KEY_TO_CODE[id] && !layers.some((l) => l.id === id)) {
+          layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
+        }
+      }
+    }
+    return layers;
+  }, [settings?.translations, settings?.translationOrder, isPaliEnabled]);
+
+  const activeLangs = React.useMemo(() => {
+    const langs = [];
+    for (const layer of orderedLayers) {
+      if (layer.type === 'trans' && !langs.includes(layer.lang)) {
+        langs.push(layer.lang);
       }
     }
     return langs;
-  }, [settings?.translations, settings?.translationOrder]);
+  }, [orderedLayers]);
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -1085,20 +1185,15 @@ export default function ReaderView() {
       return;
     }
 
-    // 1.5. Ignore clicks inside translation containers (prevents accidental Pali dict lookup on translations)
-    if (e.target.closest('.reader-translation-container')) {
-      return;
-    }
-
-    // 2. Track reading position and active paragraph
-    const pEl = e.target.closest('p[data-pindex]');
+    // 2. Track reading position and active paragraph (supports Pali <p> or translation row when Pali is disabled)
+    const pEl = e.target.closest('p[data-pindex], .reader-para-row[data-pindex]');
     if (pEl && activeTab) {
       let pNum = pEl.getAttribute('data-para');
       if (!pNum) {
         let row = pEl.closest('.reader-para-row') || pEl;
         let prev = row.previousElementSibling;
         while (prev) {
-          const foundP = prev.matches?.('p[data-para]') ? prev : prev.querySelector?.('p[data-para]');
+          const foundP = prev.matches?.('p[data-para], [data-para]') ? prev : prev.querySelector?.('p[data-para], [data-para]');
           if (foundP) {
             pNum = foundP.getAttribute('data-para');
             if (pNum) break;
@@ -1130,6 +1225,11 @@ export default function ReaderView() {
         paraIndex: pIdx ? parseInt(pIdx, 10) : undefined,
         snippet: snip || `${activeTab.title} — ${activeTab.chapters?.[chapIdx]?.title || `Chapter ${chapIdx + 1}`}`,
       });
+    }
+
+    // 2.5. Ignore clicks inside translation blocks (prevents accidental Pali dict lookup on translations)
+    if (e.target.closest('.reader-trans-block')) {
+      return;
     }
 
     // 3. Single-Click Dictionary Word Lookup
@@ -1215,6 +1315,11 @@ export default function ReaderView() {
     const mode = clickLookupMode || settings?.dictLookupTrigger || 'single';
 
     if (!isLookupActive || mode !== 'double') {
+      return;
+    }
+
+    // Ignore double clicks on translation blocks
+    if (e.target.closest('.reader-trans-block')) {
       return;
     }
 
@@ -1624,9 +1729,11 @@ export default function ReaderView() {
           <div
             className="reader-container w-full"
             style={{
-              maxWidth: (activeLangs.length > 0 && settings?.translationDisplayMode === 'side')
-                ? '1400px'
-                : 'var(--reader-max-width, 880px)',
+              maxWidth:
+                settings?.translationDisplayMode === 'side' &&
+                ((isPaliEnabled && activeLangs.length > 0) || (!isPaliEnabled && activeLangs.length >= 2))
+                  ? '1400px'
+                  : 'var(--reader-max-width, 880px)',
             }}
           >
             {activeTab.chapters && activeTab.chapters.length > 0 ? (
@@ -1642,6 +1749,8 @@ export default function ReaderView() {
                   searchHighlight={searchHighlight}
                   highlightSearchTerms={settings?.highlightSearchTerms ?? true}
                   activeLangs={activeLangs}
+                  orderedLayers={orderedLayers}
+                  isPaliEnabled={isPaliEnabled}
                   translationDisplayMode={settings?.translationDisplayMode || 'stack'}
                 />
               ))

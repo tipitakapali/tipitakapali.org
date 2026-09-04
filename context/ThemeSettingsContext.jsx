@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DEFAULT_TRANSLATION_ORDER = [
+  'pali',
   'english',
   'vietnamese',
   'myanmar',
@@ -72,6 +73,7 @@ const DEFAULT_SETTINGS = {
   dictLookupTrigger: 'single', // 'single' | 'double'
   defaultEditionPage: 'M', // 'M' (Myanmar) | 'V' (VRI) | 'P' (PTS) | 'T' (Thai) | 'all' (All editions)
   translations: {
+    pali: true,
     english: false,
     vietnamese: false,
     myanmar: false,
@@ -124,6 +126,9 @@ export function ThemeSettingsProvider({ children }) {
           if (!Array.isArray(merged.translationOrder) || merged.translationOrder.length === 0) {
             merged.translationOrder = [...DEFAULT_TRANSLATION_ORDER];
           } else {
+            if (!merged.translationOrder.includes('pali')) {
+              merged.translationOrder.unshift('pali');
+            }
             const seen = new Set(merged.translationOrder);
             for (const id of DEFAULT_TRANSLATION_ORDER) {
               if (!seen.has(id)) merged.translationOrder.push(id);
@@ -135,8 +140,16 @@ export function ThemeSettingsProvider({ children }) {
           if (!['stack', 'side'].includes(merged.translationDisplayMode)) {
             merged.translationDisplayMode = 'stack';
           }
-          // Ensure translations object has all keys
+          // Ensure translations object has all keys and pali defaults to true
           merged.translations = { ...prev.translations, ...(parsed.translations || {}) };
+          if (merged.translations.pali === undefined) {
+            merged.translations.pali = true;
+          }
+          // Ensure at least one language layer (defaulting to pali) remains active
+          const hasAnyActive = Object.values(merged.translations).some(Boolean);
+          if (!hasAnyActive) {
+            merged.translations.pali = true;
+          }
           return merged;
         });
       }
