@@ -14,8 +14,10 @@
   <meta property="og:title" content="Pāḷi Script Converter | Chaṭṭha Saṅgāyana Tipiṭaka" />
   <meta property="og:description" content="Instant multi-script Pāḷi transliteration tool supporting 17 Brahmic scripts and Roman Velthuis input." />
   <meta property="og:image" content="https://tipitakapali.org/android-chrome-512x512.png" />
-  <meta property="og:url" content="https://tipitakapali.org/pali-script-converter.html" />
+  <meta property="og:url" content="https://tipitakapali.org/pali-script-converter" />
   <meta property="og:type" content="website" />
+  <link rel="canonical" href="https://tipitakapali.org/pali-script-converter" />
+  <meta name="keywords" content="Pali script converter, Pali transliteration, Roman to Sinhala, Devanagari, Myanmar, Thai, Velthuis, Tipitaka" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
@@ -317,6 +319,88 @@
       font-size: 0.9rem;
       text-align: center;
     }
+
+    /* Guide, examples & footer */
+    .guide-card {
+      margin: 18px auto 0 auto;
+      max-width: 820px;
+      background: var(--bg-card);
+      padding: 18px 20px;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+    .guide-card h2 {
+      font-size: 1rem;
+      color: var(--accent);
+      margin: 0 0 8px 0;
+    }
+    .guide-card ol {
+      margin: 0;
+      padding-left: 1.2rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .guide-card ol li { margin-bottom: 4px; }
+    .examples-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .example-chip {
+      padding: 5px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .example-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .page-footer {
+      max-width: 820px;
+      margin: 18px auto 0 auto;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .page-footer .links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 16px;
+      margin-top: 8px;
+    }
+
+    /* Dark mode (follows system preference) */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --accent: #e07a3c;
+        --accent-hover: #f08e50;
+        --bg-page: #18191a;
+        --bg-card: #28292a;
+        --border-color: #3a3b3c;
+        --text-primary: #e4e6eb;
+        --text-secondary: #b0b3b8;
+      }
+      #uSelectScript { background-color: #1c1d1e; }
+      #uType, #convertedArea { background-color: #1c1d1e; color: var(--text-primary); }
+      #uType:focus, #convertedArea:focus { background-color: #242526; }
+      #uSelectScript:focus { background-color: #242526; }
+      .tCenter th { background: #242526; }
+      .back-button:hover { background: #242526; }
+      .brand-logo-wrap { background: #1c1d1e; }
+      #clearText { background-color: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.35); }
+      #clearText:hover { background-color: rgba(239, 68, 68, 0.25); color: #fca5a5; }
+      #copyButtonID { background-color: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.35); }
+      #copyButtonID:hover { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; }
+    }
   </style>
   <script>
     function goBackOnCloudflare() {
@@ -367,27 +451,23 @@
     </form>
   </div>
 
-  <br>
-  <div class="help">
-    <button class="back-button" onclick="goBackOnCloudflare()" style="margin-right: 8px;">
-      <img width="18" height="18" src="/tipitakapali_org_logo.svg" alt="Logo" class="nav-logo-icon" /> Back to Tipiṭaka
-    </button>
-    <span style="font-size: 0.85rem;">
-      <a href="/pali-script-converter.zip" style="font-weight: 600; color: #2e7d32;">⬇ Download Offline Tool (~12 KB)</a>
-    </span>
+  <div class="guide-card">
+    <h2>How to use</h2>
+    <ol>
+      <li>Choose the target script from the dropdown above — your choice is remembered.</li>
+      <li>Type using Velthuis (e.g. <code>aa</code> → ā, <code>.m</code> → ṃ) — or paste text in any of the 17 scripts.</li>
+      <li>The output converts instantly as you type. Copy it, or grab the offline tool below.</li>
+    </ol>
+    <div class="examples-row" id="exampleRow" aria-label="Try an example">
+      <button type="button" class="example-chip" data-ex="sabbe saṅkhārā aniccā">sabbe saṅkhārā aniccā</button>
+      <button type="button" class="example-chip" data-ex="namo tassa bhagavato arahato sammāsambuddhassa">vandana</button>
+      <button type="button" class="example-chip" data-ex="evaṃ me sutaṃ">evaṃ me sutaṃ</button>
+      <button type="button" class="example-chip" data-ex="dhammacakkappavattana">dhammacakka…</button>
+    </div>
   </div>
-  <div class="help">
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
-    <br>
+
+  <div class="guide-card">
+    <h2>Latin Velthuis scheme (modified) — type &amp; get, example: aa =&gt; ā</h2>
     <table class="tCenter">
       <tr>
         <th colspan="8">Latin Velthuis scheme (modified):</th>
@@ -434,15 +514,18 @@
     </table>
   </div>
 
-  <p class="center" style="text-align: center;">
-    <br>
-
-    <b>Attributions</b>: <a style="text-decoration: none;" target="_blank"
-      href="https://github.com/Path-Nirvana-Foundation/pali-script-converter">1. pali-script-converter</a>
-    <br><br>
-  </p>
+  <div class="page-footer">
+    <div class="links">
+      <a href="/">← Back to Tipiṭaka</a>
+      <a href="/info">About &amp; Guide</a>
+      <a href="/pali-script-converter.zip">⬇ Offline tool (~25 KB)</a>
+    </div>
+    <p style="margin-top: 10px;">
+      <b>Attributions</b>: converter engine by
+      <a target="_blank" rel="noopener" href="https://github.com/Path-Nirvana-Foundation/pali-script-converter">Path Nirvana Foundation</a>
+      (non-commercial use).
+    </p>
   </div>
-  <br>
 
   <script>
 /**
@@ -484,6 +567,16 @@ function runOnStartUpLoaded() {
   document.getElementById("uType").addEventListener("input", uTyping, { passive: false })
   document.getElementById("clearText").addEventListener("click", clearTextArea, { passive: false })
   document.getElementById("copyButtonID").addEventListener("click", copyButton, { passive: false })
+  document.querySelectorAll("#exampleRow .example-chip").forEach(function (chip) {
+    chip.addEventListener("click", function () { fillExample(chip.getAttribute("data-ex")) }, { passive: true })
+  })
+  document.getElementById("uType").focus()
+}
+
+function fillExample(text) {
+  if (!text) return
+  document.getElementById("uType").value = text
+  uTyping()
   document.getElementById("uType").focus()
 }
 
@@ -595,8 +688,8 @@ function loadSavedPaliScript(id) {
     console.log(`${e} \n\nError when loading last used pali script.
 Is this id ${id} changed in the UI?
 It is now removing the mising key and reloading.`)
-    localStorage.remove(SKEY)
-    window.location.reload(true)
+    localStorage.removeItem(SKEY)
+    window.location.reload()
   }
 }
 
@@ -633,8 +726,15 @@ function copyButton() {
         updateCopyStatus("Copied to clipboard!", "success")
       }
     })
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    // Modern async clipboard API (works on desktop & mobile HTTPS)
+    navigator.clipboard.writeText(tex).then(function () {
+      updateCopyStatus("Copied to clipboard!", "success")
+    }, function (err) {
+      updateCopyStatus("Failed to copy: " + err, "error")
+    })
   } else {
-    // Fallback to execCommand for browsers that support it
+    // Last-resort fallback for very old browsers
     try {
       var successful = document.execCommand("copy")
       if (successful) {
@@ -660,7 +760,7 @@ function updateCopyStatus(message, status) {
   statusEl.textContent = message
 
   if (status === "success") {
-    statusEl.style.color = "white"
+    statusEl.style.color = "#137333"
     iconEl.textContent = "✅" // Checkmark emoji
   } else if (status === "error") {
     statusEl.style.color = "red"

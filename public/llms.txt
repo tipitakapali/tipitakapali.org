@@ -15,6 +15,7 @@
 ## Key Reading Links
 - [Home & Canonical Navigation](https://tipitakapali.org/)
 - [About, User Guide & Help](https://tipitakapali.org/info)
+- [Pāḷi Script Converter (17 scripts, Velthuis input)](https://tipitakapali.org/pali-script-converter)
 - [Full Catalog & AI Documentation](https://tipitakapali.org/llms-full.txt)
 - [XML Sitemap Index](https://tipitakapali.org/sitemap.xml)
 - [OpenAPI for AI Tools](https://tipitakapali.org/openapi.json)

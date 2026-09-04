@@ -288,3 +288,4 @@ Users can open any canonical text directly in their preferred script by prefixin
 - OpenAPI: `GET https://tipitakapali.org/openapi.json` (for ChatGPT/MCP tool import)
 - AI Plugin: `GET https://tipitakapali.org/.well-known/ai-plugin.json`
 - Human Guide (features, shortcuts, dictionaries, scripts): `https://tipitakapali.org/info`
+- Human Script Converter (17 scripts, Velthuis input, offline .zip): `https://tipitakapali.org/pali-script-converter`
