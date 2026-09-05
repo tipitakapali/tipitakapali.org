@@ -120,6 +120,16 @@ export function DictionaryProvider({ children }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Shrinking from desktop to mobile while the dictionary is open docked: close it
+  // instead of popping it into a center modal. It reopens on the next word click.
+  const prevMobileRef = useRef(isMobileScreen);
+  useEffect(() => {
+    if (!prevMobileRef.current && isMobileScreen && isOpen) {
+      setIsOpen(false);
+    }
+    prevMobileRef.current = isMobileScreen;
+  }, [isMobileScreen, isOpen]);
+
   // Fetch dynamic DPD feedback template on first visit (payload ##tipitakapalidpdfeedback)
   useEffect(() => {
     getFeedbackTemplateFromDb();

@@ -918,7 +918,7 @@ export default function SettingsModal() {
 
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 text-xs leading-relaxed">
               <BookOpen size={14} className="shrink-0 mt-0.5" />
-              <span>Your bookmarks stay safe — they will be exactly where you left them.</span>
+              <span>Restoring TipitakaPali.org&apos;s original defaults often clears up mysterious glitches — odd layouts, stuck panels, or settings that don&apos;t seem to apply.</span>
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
