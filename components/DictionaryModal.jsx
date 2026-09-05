@@ -867,8 +867,8 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       {/* Dictionary Switcher Tabs Bar (Only display tabs with results - Task 4) */}
       {/* ========================================================= */}
-      {visibleTabs.length > 0 && (
-        <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      {(visibleTabs.length > 0 || queryWord) && (
+        <div className="dict-tabs-bar px-3 py-1.5 bg-[var(--bg-secondary)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 min-h-[38px]">
           {visibleTabs.map((tab) => {
             const isActive = activeDictTab === tab.id;
             const hasMatches = tab.count > 0;

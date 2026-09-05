@@ -95,6 +95,12 @@ export function DictionaryProvider({ children }) {
 
   const lookupSeqRef = useRef(0);
   const lookupAbortControllerRef = useRef(null);
+  // Mirror of the latest lookup results for the repeat-word fast path below
+  // (avoids adding lookupData to performLookup's dep array).
+  const lookupDataRef = useRef(null);
+  useEffect(() => {
+    lookupDataRef.current = lookupData;
+  }, [lookupData]);
 
   // Cache for loaded inflection tables: { [targetId]: htmlString }
   const [inflectionCache, setInflectionCache] = useState({});
@@ -322,6 +328,17 @@ export function DictionaryProvider({ children }) {
 
     const romanWord = convertAnyToRoman(sanitizedInput).trim().toLowerCase();
     const cleanWord = (romanWord || sanitizedInput.trim().toLowerCase()).replace(/ṁ/g, 'ṃ');
+
+    // Repeat lookup of the word already displayed (e.g. clicking "dhamma" again):
+    // show the cached results instantly with zero state churn — no loading flash,
+    // no history duplicate, no in-flight abort, no tab/content motion.
+    // (An in-flight first request, if any, is left alone to complete normally.)
+    // Header labels still follow the clicked form; the results body is untouched.
+    if (lookupDataRef.current?.word === cleanWord) {
+      setQueryWord(cleanWord);
+      setDisplayWord(rawDisplay);
+      return;
+    }
 
     const currentSeq = ++lookupSeqRef.current;
     lookupAbortControllerRef.current?.abort();

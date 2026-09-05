@@ -21,7 +21,7 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 
 export const TRANSLATIONS = [
-  { id: 'pali', label: 'Pāḷi (Root Canon)', flag: '☸️', desc: 'Chaṭṭha Saṅgāyana Tipiṭaka • CST Edition', color: '#8b2500' },
+  { id: 'pali', label: 'Pāḷi (Root Canon)', flag: '☸️', desc: 'Chaṭṭha Saṅgāyana Tipiṭaka (VRI)', color: '#8b2500' },
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • 1.28M sentences', color: '#2563eb' },
   { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Bản dịch Tiếng Việt • 1.28M câu', color: '#dc2626' },
   { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'မြန်မာဘာသာပြန် • 1.28M စာကြောင်း', color: '#059669' },
