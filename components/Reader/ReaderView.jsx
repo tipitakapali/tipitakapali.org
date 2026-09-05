@@ -1021,6 +1021,33 @@ export default function ReaderView() {
   const prevBookCodeRef = useRef(null);
   const clickedWordsByBookRef = useRef({});
 
+  // Chapter-jump settle tracking (sidebar chapter clicks): lazy translations streaming
+  // into chapters above the target can shift it after we measured, so a guarded
+  // one-shot drift correction is scheduled per jump. Any manual scroll cancels it.
+  const chapterJumpRef = useRef({ key: null, lastOffset: 0, timer: null });
+
+  useEffect(() => {
+    const cancelJump = () => {
+      const st = chapterJumpRef.current;
+      if (!st.key) return;
+      clearTimeout(st.timer);
+      chapterJumpRef.current = { key: null, lastOffset: 0, timer: null };
+      clearTargetScrollIntent();
+    };
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', cancelJump, { passive: true });
+      container.addEventListener('touchstart', cancelJump, { passive: true });
+    }
+    return () => {
+      clearTimeout(chapterJumpRef.current.timer);
+      if (container) {
+        container.removeEventListener('wheel', cancelJump);
+        container.removeEventListener('touchstart', cancelJump);
+      }
+    };
+  }, [clearTargetScrollIntent]);
+
   // Initialize clicked words from localStorage
   useEffect(() => {
     try {
@@ -1436,11 +1463,9 @@ export default function ReaderView() {
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
-          if (settings.pulseAnimation) {
-            target.classList.remove('pulse-highlight');
-            void target.offsetWidth;
-            target.classList.add('pulse-highlight');
-          }
+          // NOTE (Fix 1): no pulse-highlight on whole-chapter jumps — with translation
+          // layers enabled the entire chapter flashes and repaints expensively.
+          // Pulse is kept for precise targets (search/MAT/bookmark/GoTo/page jumps).
 
           // Detect first paragraph in the chapter
           const inP = target.querySelector ? target.querySelector('[data-para]') : null;
@@ -1472,6 +1497,42 @@ export default function ReaderView() {
           }
 
           saveTabScroll(activeTab.bookCode, offset);
+
+          // Drift correction (Fix 2): lazy translations streaming into chapters above
+          // this one can shift it after we measured (the scroll journey itself triggers
+          // those loads via the 800px observer margin). One guarded re-verify shortly
+          // after; manual scrolling cancels it via the mount listener above.
+          const jumpKey = `${activeTab.bookCode}:${chapterIdx}`;
+          clearTimeout(chapterJumpRef.current.timer);
+          chapterJumpRef.current = { key: jumpKey, lastOffset: offset, timer: null };
+          chapterJumpRef.current.timer = setTimeout(() => {
+            const cur = chapterJumpRef.current;
+            const container = containerRef.current;
+            if (cur.key !== jumpKey || !container) return;
+            const el =
+              container.querySelector(`#chap-${chapterIdx}`) ||
+              container.querySelector(`[data-chapter="${chapterIdx}"]`);
+            if (!el) {
+              chapterJumpRef.current.key = null;
+              return;
+            }
+            // User scrolled meanwhile (or a smooth animation is still running):
+            // never yank — just stand down.
+            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
+              chapterJumpRef.current.key = null;
+              return;
+            }
+            const cRect = container.getBoundingClientRect();
+            const rRect = el.getBoundingClientRect();
+            if (Math.abs(rRect.top - cRect.top - 60) > 12) {
+              const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+              smartScrollTo(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
+              saveTabScroll(activeTab.bookCode, fresh);
+              chapterJumpRef.current.lastOffset = fresh;
+            }
+            chapterJumpRef.current.key = null;
+          }, 750);
+
           clearTargetScrollIntent();
           return;
         }
@@ -1981,11 +2042,7 @@ export default function ReaderView() {
       const currentScroll = containerRef.current.scrollTop;
       const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
       smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-      if (settings?.pulseAnimation) {
-        target.classList.remove('pulse-highlight');
-        void target.offsetWidth;
-        target.classList.add('pulse-highlight');
-      }
+      // No pulse-highlight on whole-chapter jumps (see section 4 above).
     }
   };
 
