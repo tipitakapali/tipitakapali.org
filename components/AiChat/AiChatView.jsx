@@ -20,6 +20,10 @@ import {
   ExternalLink,
   Loader2,
   Bot,
+  Search,
+  FileText,
+  Bookmark,
+  Compass,
 } from 'lucide-react';
 import AiMarkdown from './AiMarkdown';
 import AiSettingsModal, { getStoredAiSettings, DEFAULT_AI_SETTINGS } from './AiSettingsModal';
@@ -53,6 +57,29 @@ const STARTER_PROMPTS = [
     query: 'Find canonical discourses where the Buddha explains the virtue of gratitude (kataññū katavedī) towards parents and teachers.',
   },
 ];
+
+function getToolMeta(toolName) {
+  switch (toolName) {
+    case 'search_sections':
+      return { label: 'Sutta & Section Search', icon: Compass, color: 'text-blue-500 dark:text-blue-400' };
+    case 'search_tipitaka':
+    case 'search_by_category':
+    case 'search_tipitaka_batch':
+      return { label: 'Full-Text Canon Search', icon: Search, color: 'text-amber-500 dark:text-amber-400' };
+    case 'get_paragraph_content':
+    case 'get_paragraph_content_batch':
+      return { label: 'Passage Fetch', icon: BookOpen, color: 'text-emerald-500 dark:text-emerald-400' };
+    case 'get_commentaries':
+      return { label: 'Aṭṭhakathā & Ṭīkā Review', icon: FileText, color: 'text-purple-500 dark:text-purple-400' };
+    case 'get_dictionary':
+    case 'get_dictionary_batch':
+      return { label: 'DPD Pāli Lexicon', icon: Bookmark, color: 'text-cyan-500 dark:text-cyan-400' };
+    case 'final_answer':
+      return { label: 'Synthesis', icon: Sparkles, color: 'text-violet-500 dark:text-violet-400' };
+    default:
+      return { label: toolName || 'Tool Execution', icon: Bot, color: 'text-violet-500 dark:text-violet-400' };
+  }
+}
 
 export default function AiChatView({ initialQuery = null }) {
   const { openBook } = useTabs();
@@ -417,6 +444,9 @@ export default function AiChatView({ initialQuery = null }) {
               <h2 className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate max-w-[200px] sm:max-w-[340px]">
                 {activeThread?.title || 'Ani (AI Nissaya)'}
               </h2>
+              <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
+                Beta
+              </span>
               {/* RAG Mode indicator badge */}
               <span
                 onClick={() => setIsSettingsOpen(true)}
@@ -497,11 +527,14 @@ export default function AiChatView({ initialQuery = null }) {
           <div className="max-w-2xl mx-auto py-8 sm:py-12 space-y-8 animate-fade-in text-center">
             <div className="flex flex-col items-center gap-3">
               <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-                Ani (AI Nissaya)
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+                Ask Ani
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400">
+                  Beta
+                </span>
               </h1>
               <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                Your dedicated AI companion for the Chaṭṭha Saṅgāyana Tipiṭaka. Direct citations, term deconstruction, and commentary insights.
+                Your dedicated AI companion for studying the Tipiṭaka. Direct citations, term deconstruction, and commentary insights.
               </p>
             </div>
 
@@ -551,7 +584,7 @@ export default function AiChatView({ initialQuery = null }) {
         {/* Message Stream */}
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
-          const isExpanded = expandedToolCalls[msg.id] ?? false;
+          const isExpanded = expandedToolCalls[msg.id] ?? Boolean(msg.isStreaming);
 
           return (
             <div
@@ -593,19 +626,51 @@ export default function AiChatView({ initialQuery = null }) {
                       className="w-full px-3 py-2 flex items-center justify-between text-violet-700 dark:text-violet-300 font-semibold hover:bg-violet-500/10 transition cursor-pointer"
                     >
                       <span className="flex items-center gap-1.5">
-                        <BookOpen size={13} />
-                        Canonical Research ({msg.toolCalls.length} queries executed)
+                        <BookOpen size={13} className="text-violet-500 shrink-0" />
+                        <span>
+                          Canonical Research ({msg.toolCalls.length} step{msg.toolCalls.length > 1 ? 's' : ''})
+                        </span>
+                        {msg.isStreaming && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300 animate-pulse font-normal">
+                            <Loader2 size={10} className="animate-spin" />
+                            Researching...
+                          </span>
+                        )}
                       </span>
                       {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                     {isExpanded && (
                       <div className="p-3 pt-1 space-y-1.5 border-t border-violet-500/15 text-[11px] text-[var(--text-secondary)]">
-                        {msg.toolCalls.map((tc, idx) => (
-                          <div key={idx} className="flex items-start gap-1.5">
-                            <span className="font-mono text-violet-500 font-bold shrink-0">›</span>
-                            <span>{tc.summary || tc.tool}</span>
-                          </div>
-                        ))}
+                        {msg.toolCalls.map((tc, idx) => {
+                          const meta = getToolMeta(tc.tool);
+                          const IconComp = meta.icon;
+                          const paramDesc = tc.args?.query
+                            ? `"${tc.args.query}"`
+                            : tc.args?.book_code
+                            ? `${tc.args.book_code}${tc.args.para_start ? ` §${tc.args.para_start}` : tc.args.para_number ? ` §${tc.args.para_number}` : ''}`
+                            : tc.args?.terms
+                            ? `[${tc.args.terms.join(', ')}]`
+                            : '';
+
+                          return (
+                            <div key={idx} className="flex items-start gap-2 bg-[var(--bg-card)]/60 p-2 rounded-lg border border-violet-500/10">
+                              <IconComp size={13} className={`mt-0.5 shrink-0 ${meta.color}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                                  <span>{meta.label}</span>
+                                  {paramDesc && (
+                                    <span className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[260px] sm:max-w-[360px]">
+                                      {paramDesc}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 break-words">
+                                  {tc.summary || (tc.args ? JSON.stringify(tc.args) : tc.tool)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

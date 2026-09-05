@@ -149,13 +149,13 @@ export default function WelcomeView() {
           onClick={() => openAiChatTab()}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !bg-gradient-to-br from-[var(--bg-card)] to-[var(--accent-light)]/40 !min-h-0"
         >
-          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">Ani</div>
+          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">Beta</div>
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:scale-105 transition shrink-0">
             <Bot size={18} />
           </div>
           <div className="min-w-0 flex-1 pr-6">
             <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-violet-600 transition flex items-center gap-1 truncate">
-              Ani (AI Nissaya) <Sparkles size={11} className="text-violet-500 shrink-0" />
+              Ani (AI Nissaya) <span className="text-[9px] font-bold px-1 py-px rounded bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">Beta</span> <Sparkles size={11} className="text-violet-500 shrink-0" />
             </h3>
             <p className="!text-[11px] !leading-tight !truncate">Your Tipiṭaka Study companion</p>
           </div>

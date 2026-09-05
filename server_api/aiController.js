@@ -16,23 +16,79 @@ const translationDbs = new Map();
 const translationFtsDbs = new Map();
 const bookCodeMap = new Map();
 
+let resolveDbPathFn = null;
+
+function getTranslationDb(lang) {
+  if (!lang) return null;
+  const cleanLang = String(lang).toLowerCase();
+  if (translationDbs.has(cleanLang)) return translationDbs.get(cleanLang);
+
+  const candidates = [
+    resolveDbPathFn ? resolveDbPathFn(`translation_${cleanLang}.db`) : null,
+    path.resolve(__dirname, `db/translation_${cleanLang}.db`),
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) {
+      try {
+        const tdb = new Database(p, { readonly: true });
+        tdb.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
+        translationDbs.set(cleanLang, tdb);
+        return tdb;
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
+function getTranslationFtsDb(lang) {
+  if (!lang) return null;
+  const cleanLang = String(lang).toLowerCase();
+  if (translationFtsDbs.has(cleanLang)) return translationFtsDbs.get(cleanLang);
+
+  const candidates = [
+    resolveDbPathFn ? resolveDbPathFn(`fts_translation_${cleanLang}.db`) : null,
+    path.resolve(__dirname, `db/fts_translation_${cleanLang}.db`),
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) {
+      try {
+        const fdb = new Database(p, { readonly: true });
+        fdb.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
+        translationFtsDbs.set(cleanLang, fdb);
+        return fdb;
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
 function initAiController({ db, dbFts: fts, resolveDbPath }) {
   dbTipitaka = db;
   dbFts = fts;
+  resolveDbPathFn = resolveDbPath || ((f) => path.join(__dirname, 'db', f));
 
   // Load book mapping from epitaka.db or tipitaka.db
   try {
-    const epiDbPath = path.resolve(__dirname, '../ref/epitaka_app/assets/db/epitaka.db');
-    if (fs.existsSync(epiDbPath)) {
-      const epiDb = new Database(epiDbPath, { readonly: true });
-      const rows = epiDb.prepare("SELECT book_id, vri_id, book_name FROM books WHERE vri_id IS NOT NULL AND vri_id != ''").all();
-      for (const r of rows) {
-        bookCodeMap.set(r.book_id.toLowerCase(), r.vri_id);
-        bookCodeMap.set(r.book_id, r.vri_id);
-        bookCodeMap.set(r.vri_id, r.vri_id);
-        bookCodeMap.set(r.vri_id.toLowerCase(), r.vri_id);
+    const epiDbCandidates = [
+      resolveDbPathFn('epitaka.db'),
+      path.resolve(__dirname, '../ref/epitaka_app/assets/db/epitaka.db'),
+    ];
+    for (const epiDbPath of epiDbCandidates) {
+      if (epiDbPath && fs.existsSync(epiDbPath)) {
+        const epiDb = new Database(epiDbPath, { readonly: true });
+        const rows = epiDb.prepare("SELECT book_id, vri_id, book_name FROM books WHERE vri_id IS NOT NULL AND vri_id != ''").all();
+        for (const r of rows) {
+          const vri = String(r.vri_id).trim();
+          const bid = String(r.book_id).trim();
+          bookCodeMap.set(bid, vri);
+          bookCodeMap.set(bid.toLowerCase(), vri);
+          bookCodeMap.set(vri, vri);
+          bookCodeMap.set(vri.toLowerCase(), vri);
+        }
+        epiDb.close();
+        console.log(`[AI Controller] Loaded ${rows.length} book mappings from ${epiDbPath}`);
+        break;
       }
-      epiDb.close();
     }
   } catch (e) {
     console.warn('[AI Controller] Notice loading epitaka.db book mapping:', e.message);
@@ -57,55 +113,36 @@ function initAiController({ db, dbFts: fts, resolveDbPath }) {
     'm-i': 's0201m.mul', 'm-ii': 's0202m.mul', 'm-iii': 's0203m.mul',
     'sn1': 's0301m.mul', 'sn2': 's0302m.mul', 'sn3': 's0303m.mul', 'sn4': 's0304m.mul', 'sn5': 's0305m.mul',
     's-i': 's0301m.mul', 's-ii': 's0302m.mul', 's-iii': 's0303m.mul', 's-iv': 's0304m.mul', 's-v': 's0305m.mul',
-    'an1': 's0401m1.mul', 'an2': 's0402m1.mul', 'an3': 's0402m2.mul', 'an4': 's0403m1.mul', 'an5': 's0403m2.mul',
-    'a-i': 's0401m1.mul', 'a-ii': 's0402m1.mul', 'a-iii': 's0402m2.mul', 'a-iv': 's0403m1.mul', 'a-v': 's0404m3.mul',
-    'dhp': 's0502m.mul', 'ud': 's0503m.mul', 'it': 's0504m.mul', 'snp': 's0505m.mul',
-    'ja': 's0513m.mul', 'jat': 's0513m.mul', 'jataka': 's0513m.mul',
+    'an1': 's0401m1.mul', 'an2': 's0402m1.mul', 'an3': 's0402m2.mul', 'an4': 's0402m3.mul', 'an5': 's0403m1.mul',
+    'an6': 's0403m2.mul', 'an7': 's0403m3.mul', 'an8': 's0404m1.mul', 'an9': 's0404m2.mul', 'an10': 's0404m3.mul', 'an11': 's0404m4.mul',
+    'a-i': 's0401m1.mul', 'a-ii': 's0402m1.mul', 'a-iii': 's0402m2.mul', 'a-iv': 's0402m3.mul', 'a-v': 's0403m1.mul',
+    'khp': 's0501m.mul', 'dhp': 's0502m.mul', 'ud': 's0503m.mul', 'it': 's0504m.mul', 'snp': 's0505m.mul',
     'vv': 's0506m.mul', 'pv': 's0507m.mul', 'thag': 's0508m.mul', 'thig': 's0509m.mul',
-    'vibhanga': 'abh02m.mul', 'dhammasangani': 'abh01m.mul', 'patthana': 'abh07m.mul',
+    'ja': 's0513m.mul', 'jat': 's0513m.mul', 'jataka': 's0513m.mul',
+    'vin1': 'vin01m.mul', 'vin2': 'vin02m.mul', 'patimokkha': 'vin01m.mul',
+    'vibhanga': 'abh02m.mul', 'dhammasangani': 'abh01m.mul', 'dhatukatha': 'abh03m.mul',
+    'puggalapannatti': 'abh04m.mul', 'kathavatthu': 'abh05m.mul', 'yamaka': 'abh06m.mul', 'patthana': 'abh07m.mul',
   };
   for (const [k, v] of Object.entries(commonAliases)) {
     bookCodeMap.set(k.toLowerCase(), v);
   }
 
   // Load summaries.db if available
-  const sumPath = resolveDbPath('summaries.db');
-  if (sumPath && fs.existsSync(sumPath)) {
-    try {
-      dbSummaries = new Database(sumPath, { readonly: true });
-      dbSummaries.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
-      console.log(`[AI Controller] Connected to summaries database: ${sumPath}`);
-    } catch (err) {
-      console.warn('[AI Controller] Error connecting to summaries.db:', err.message);
-    }
-  }
-
-  function getTranslationDb(lang) {
-    if (translationDbs.has(lang)) return translationDbs.get(lang);
-    const p = resolveDbPath(`translation_${lang}.db`);
-    if (p && fs.existsSync(p)) {
+  const sumCandidates = [
+    resolveDbPathFn('summaries.db'),
+    path.resolve(__dirname, 'db/summaries.db'),
+  ];
+  for (const sumPath of sumCandidates) {
+    if (sumPath && fs.existsSync(sumPath)) {
       try {
-        const tdb = new Database(p, { readonly: true });
-        tdb.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
-        translationDbs.set(lang, tdb);
-        return tdb;
-      } catch (e) {}
+        dbSummaries = new Database(sumPath, { readonly: true });
+        dbSummaries.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
+        console.log(`[AI Controller] Connected to summaries database: ${sumPath}`);
+        break;
+      } catch (err) {
+        console.warn('[AI Controller] Error connecting to summaries.db:', err.message);
+      }
     }
-    return null;
-  }
-
-  function getTranslationFtsDb(lang) {
-    if (translationFtsDbs.has(lang)) return translationFtsDbs.get(lang);
-    const p = resolveDbPath(`fts_translation_${lang}.db`);
-    if (p && fs.existsSync(p)) {
-      try {
-        const fdb = new Database(p, { readonly: true });
-        fdb.exec('PRAGMA synchronous = NORMAL; PRAGMA query_only = 1;');
-        translationFtsDbs.set(lang, fdb);
-        return fdb;
-      } catch (e) {}
-    }
-    return null;
   }
 
   return {
@@ -139,7 +176,7 @@ const kAiToolDeclarations = [
   {
     name: 'search_sections',
     description:
-      'Search section, sutta, and vagga TITLES (and rich study summaries) across the whole 217-book canon. ' +
+      'Search section, sutta, and vagga TITLES (with study summaries) across the whole 217-book canon. ' +
       'Use this FIRST for concept questions to discover WHICH suttas discuss a topic before reading full passages.',
     parameters: {
       type: 'OBJECT',
@@ -155,7 +192,7 @@ const kAiToolDeclarations = [
   {
     name: 'search_tipitaka',
     description:
-      'Search the Tipitaka database for passages using full-text search across Pāḷi Canon and translations. ' +
+      'Search the Tipitaka database for passages using full-text search across Pāḷi Canon and English translations. ' +
       'Returns matching passages with book codes, chapter titles, paragraph numbers, and text snippets.',
     parameters: {
       type: 'OBJECT',
@@ -195,7 +232,7 @@ const kAiToolDeclarations = [
       properties: {
         queries: {
           type: 'ARRAY',
-          description: 'Array of search queries to execute within target books.',
+          description: 'Array of 2 to 4 search queries to execute within target books.',
           items: { type: 'STRING' },
         },
         categories: {
@@ -213,6 +250,26 @@ const kAiToolDeclarations = [
     },
   },
   {
+    name: 'get_headings',
+    description:
+      'Get table of contents and heading hierarchy for a canonical book (e.g. "s0101m.mul", "dn1", "mn1", "dhp"). ' +
+      'Use this to browse sutta structures, vaggas, and find exact chapter and paragraph index boundaries.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        book_code: {
+          type: 'STRING',
+          description: 'Canonical book code or short alias (e.g. "s0101m.mul", "dn1", "mn1", "dhp").',
+        },
+        chapter_index: {
+          type: 'INTEGER',
+          description: 'Optional chapter index to filter headings within a specific chapter.',
+        },
+      },
+      required: ['book_code'],
+    },
+  },
+  {
     name: 'get_section',
     description:
       'Get details of a specific chapter or section: title, summary, outline, and paragraph boundaries.',
@@ -226,6 +283,10 @@ const kAiToolDeclarations = [
         chapter_index: {
           type: 'INTEGER',
           description: 'Chapter index (0-based integer).',
+        },
+        para_start: {
+          type: 'INTEGER',
+          description: 'Optional starting paragraph index to locate the specific sub-section.',
         },
       },
       required: ['book_code'],
@@ -244,18 +305,22 @@ const kAiToolDeclarations = [
         },
         chapter_index: {
           type: 'INTEGER',
-          description: 'Chapter index (0-based). Optional if para_start is provided.',
+          description: 'Chapter index (0-based). Optional if para_start or para_num is provided.',
         },
         para_start: {
           type: 'INTEGER',
-          description: 'Starting paragraph index or paragraph number (inclusive).',
+          description: 'Starting paragraph index (0-based sequential paragraph position).',
         },
         para_end: {
           type: 'INTEGER',
-          description: 'Ending paragraph index or paragraph number (inclusive).',
+          description: 'Ending paragraph index (inclusive).',
+        },
+        para_num: {
+          type: 'STRING',
+          description: 'Canonical paragraph number (e.g. "1", "10", "139"). Use this when referring to canonical paragraph numbers.',
         },
       },
-      required: ['book_code', 'para_start'],
+      required: ['book_code'],
     },
   },
   {
@@ -286,7 +351,7 @@ const kAiToolDeclarations = [
   {
     name: 'get_commentaries',
     description:
-      'Find related Aṭṭhakathā (commentary) and Ṭīkā (sub-commentary) passages for a given Mūla (root) paragraph.',
+      'Find related Aṭṭhakathā (commentary) and Ṭīkā (sub-commentary) passages for a given Mūla (root) paragraph, returning their actual Pāḷi text.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -296,20 +361,24 @@ const kAiToolDeclarations = [
         },
         chapter_index: {
           type: 'INTEGER',
-          description: 'Chapter index in the Mūla text.',
+          description: 'Chapter index in the Mūla text (optional).',
         },
         para_num: {
           type: 'STRING',
-          description: 'Paragraph number (e.g. "1", "10", "165").',
+          description: 'Paragraph number (e.g. "1", "15", "165").',
+        },
+        para_index: {
+          type: 'INTEGER',
+          description: 'Paragraph index (0-based integer, optional).',
         },
       },
-      required: ['book_code', 'chapter_index', 'para_num'],
+      required: ['book_code'],
     },
   },
   {
     name: 'get_dictionary',
     description:
-      'Get definitions, grammatical analysis, and meanings for a Pāli term from the Digital Pāli Dictionary (DPD).',
+      'Get definitions, grammatical analysis, root family, and meanings for a Pāli term from the Digital Pāli Dictionary (DPD).',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -360,42 +429,92 @@ const kAiToolDeclarations = [
   },
 ];
 
+function convertSchemaToOpenAi(schema) {
+  if (!schema || typeof schema !== 'object') return schema;
+  const converted = { ...schema };
+  if (converted.type && typeof converted.type === 'string') {
+    converted.type = converted.type.toLowerCase();
+  }
+  if (converted.properties) {
+    const props = {};
+    for (const [k, v] of Object.entries(converted.properties)) {
+      props[k] = convertSchemaToOpenAi(v);
+    }
+    converted.properties = props;
+  }
+  if (converted.items) {
+    converted.items = convertSchemaToOpenAi(converted.items);
+  }
+  return converted;
+}
+
+function getOpenAiToolDeclarations() {
+  return kAiToolDeclarations.map((t) => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: convertSchemaToOpenAi(t.parameters),
+    },
+  }));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-//  SYSTEM PROMPTS
+//  SYSTEM PROMPTS (DEEPCODER & VIMAMSA MULTI-STEP STRATEGY)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const kAiDefaultToolSystemPrompt = `You are Ani (AI Nissaya), the dedicated scholarly AI assistant for the Chaṭṭha Saṅgāyana Tipiṭaka (Pāli Canon).
-Your duty is to systematically investigate the Dhamma through precise canonical research.
+const kAiDefaultToolSystemPrompt = `You are Ani (AI Nissaya), the dedicated scholarly AI assistant for the Chaṭṭha Saṅgāyana Tipiṭaka (Pāḷi Canon).
+Your duty is to systematically investigate the Dhamma through precise canonical research using the local database tools.
 
 ## Available Research Tools
 1. search_sections(query) — Search sutta and vagga titles across the entire canon. Use this FIRST to identify relevant suttas.
-2. get_section(book_code, chapter_index) — Read section overview, outline, and study guides.
-3. search_by_category(queries, categories, nikayas) — Search within specific Piṭakas ("vinaya", "sutta", "abhidhamma") or Nikāyas ("dn", "mn", "sn", "an", "kn", "dhp").
-4. search_tipitaka_batch(queries) — Run multiple search terms in parallel (synonyms, technical compounds).
-5. search_tipitaka(query) — Full-text search across Pāḷi and translations.
-6. get_paragraph_content(book_code, chapter_index, para_start, para_end) — Read exact Pāḷi text and translations.
-7. get_paragraph_content_batch(ranges) — Read multiple passages across suttas in parallel.
-8. get_commentaries(book_code, chapter_index, para_num) — Retrieve corresponding Aṭṭhakathā and Ṭīkā explanations.
-9. get_dictionary(word) / get_dictionary_batch(words) — DPD dictionary definitions and grammatical roots.
-10. get_books() — List of books and their codes.
-11. final_answer(summary) — Finalize research once you have gathered sufficient canonical evidence.
+2. get_headings(book_code, chapter_index) — Get table of contents, vagga outlines, and chapter structure for a book.
+3. get_section(book_code, chapter_index, para_start) — Read section overview, outline, and study guides.
+4. search_by_category(queries, categories, nikayas) — Search within specific Piṭakas ("vinaya", "sutta", "abhidhamma") or Nikāyas ("dn", "mn", "sn", "an", "kn", "dhp", "ja").
+5. search_tipitaka_batch(queries) — Run multiple search terms in parallel (synonyms, technical compounds).
+6. search_tipitaka(query) — Full-text search across Pāḷi and English translations.
+7. get_paragraph_content(book_code, chapter_index, para_start, para_end, para_num) — Read exact Pāḷi text and verified translations.
+8. get_paragraph_content_batch(ranges) — Read multiple passages across suttas in parallel.
+9. get_commentaries(book_code, chapter_index, para_num, para_index) — Retrieve corresponding Aṭṭhakathā and Ṭīkā explanations and text.
+10. get_dictionary(word) / get_dictionary_batch(words) — DPD dictionary definitions, etymology, and grammatical roots.
+11. get_books() — List of books, nikāyas, and their codes.
+12. final_answer(summary) — Finalize research once you have gathered sufficient canonical evidence.
 
-## Strategic Research Workflow
-- Phase 1: Disambiguate technical terms. E.g., for "saṅkhāra", identify distinct senses: (1) conditioned things in general (anicca), (2) 4th aggregate (saṅkhārakkhandho), (3) link in paṭiccasamuppāda, (4) volitional formations (cetanā).
-- Phase 2: Sutta discovery with search_sections or search_by_category.
-- Phase 3: Read exact paragraphs using get_paragraph_content.
-- Phase 4: Retrieve commentaries (Aṭṭhakathā) when deeper clarification or orthodox interpretation is needed.
-- Strip final vowel (-a, -ā) when searching Pāḷi word stems to match all case endings (e.g. "buddh", "dhamm", "sacc").
-- Call final_answer when you have solid passages directly addressing the inquiry.`;
+## Strategic Research Workflow (DeepCoder & Vīmaṃsā Multi-Step Loop)
+You have up to 6 iterations. Use them with deep scholarly discipline:
+
+### Phase 0: Disambiguate Concepts & Technical Terms
+- If the question involves complex or polysemous terms (e.g. "saṅkhāra", "nāmarūpa", "viññāṇa", "khandha", "kamma"), identify distinct canonical senses:
+  * E.g. saṅkhāra: (1) 4th aggregate (saṅkhārakkhandho, SN 22), (2) link in dependent origination (saṅkhārapaccayā viññāṇaṃ, SN 12.2), (3) conditioned things in general (sabbe saṅkhārā aniccā, Dhp 277).
+- Identify which Piṭaka or Nikāya contains the primary discourses.
+
+### Phase 1: Canonical Discovery
+- Call search_sections first to find specific sutta titles (e.g. "kaccānagotta", "anattalakkhaṇa", "satipaṭṭhāna").
+- Use search_by_category or search_tipitaka_batch with Pāḷi stems:
+  * Strip final vowels (-a, -ā, -e, -o) from Pāḷi nouns to match all case inflections (e.g. "buddh*", "dhamm*", "mett*", "saṅkhār*", "paṭiccasamuppād*").
+
+### Phase 2: Exact Textual Verification
+- Once relevant discourses are located, call get_paragraph_content or get_paragraph_content_batch to read the exact Pāḷi paragraphs and their translations.
+- Never rely solely on summaries — always confirm with the actual canonical text.
+
+### Phase 3: Commentarial Depth (Aṭṭhakathā & Ṭīkā)
+- When orthodox Theravāda doctrinal clarification is needed, call get_commentaries on the key Mūla paragraph.
+- Examine Buddhaghosa's commentaries and Dhammapāla's sub-commentaries.
+
+### Phase 4: Linguistic Etymology (DPD)
+- If key technical terms need precise grammatical breakdown or root analysis, call get_dictionary or get_dictionary_batch.
+
+### Phase 5: Synthesis Trigger
+- Once you have sufficient canonical and commentarial evidence directly answering the inquiry, call final_answer(summary).`;
 
 function buildAnswerSystemPrompt({ orthodoxMode = true }) {
   const grounding = orthodoxMode
     ? `## RAG Mode Rules (Strict Grounding)
 1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}].
-2. Answer the user's question using ONLY the canonical passages and commentaries returned by the research tools.
-3. Quote Pāḷi verses or phrases EXACTLY as written in the sources; provide clear English translations following each quote.
+2. Answer the user's question using ONLY the canonical passages, commentaries, and dictionary definitions returned by the research tools.
+3. Quote Pāḷi verses or phrases EXACTLY as written in the sources (use Markdown blockquotes); provide clear English translations following each quote.
 4. If the retrieved sources do not fully answer the question, state this with complete honesty rather than speculating.
-5. Explain technical Pāḷi terms on first mention.
+5. Explain technical Pāḷi terms on first mention with etymological clarity.
 6. Format citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]) so users can click them directly to read the original text.`
     : `## Knowledge Mode Rules (Canonical + Contextual Knowledge)
 1. Base your answer primarily on the canonical passages retrieved by the tools, with inline citations [book_code:c{chap}:p{para}].
@@ -404,7 +523,7 @@ function buildAnswerSystemPrompt({ orthodoxMode = true }) {
 4. Format citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]) so users can click them to navigate in the reader.`;
 
   return `You are Ani (AI Nissaya), the scholarly Pāḷi Canon companion on tipitakapali.org.
-You have been supplied with verified passages and dictionary entries from the Chaṭṭha Saṅgāyana Tipiṭaka and its commentaries.
+You have been supplied with verified passages, commentaries, and dictionary entries from the Chaṭṭha Saṅgāyana Tipiṭaka database.
 
 ## Task
 Write a comprehensive, insightful, and clearly structured answer to the user's question using rich Markdown (headers, bullet points, blockquotes for Pāḷi verses).
@@ -413,7 +532,7 @@ Write a comprehensive, insightful, and clearly structured answer to the user's q
 All canonical citations MUST appear as clickable chips in square brackets:
   [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_start}-{para_end}]
 Example:
-  > "Namo tassa bhagavato arahato sammāsambuddhassa..." [s0101m.mul:c0:p0]
+  > "Dvayanissito khvāyaṃ, kaccāna, loko yebhuyyena..." [s0302m.mul:c0:p103]
 
 ${grounding}`;
 }
@@ -552,7 +671,7 @@ function aiSearchSections({ query, limit = 20 }) {
           // B. Check summaries_fts (121,555 study guides and overviews)
           const sumHits = dbSummaries.prepare(`
             SELECT rowid, book_code, book_title, title, sutta_title, vagga_title, heading_title,
-                   snippet(summaries_fts, 7, '<mark>', '</mark>', '...', 25) AS snippet
+                   snippet(summaries_fts, 6, '<mark>', '</mark>', '...', 25) AS snippet
             FROM summaries_fts
             WHERE summaries_fts MATCH ?
             ORDER BY rank
@@ -629,6 +748,90 @@ function aiSearchSections({ query, limit = 20 }) {
   return { success: true, count: results.length, results };
 }
 
+function resolveAllowedBooksForCategory({ categories = [], nikayas = [] }) {
+  if (!dbTipitaka) return null;
+  const cats = (Array.isArray(categories) ? categories : (categories ? [categories] : [])).filter(Boolean).map((c) => String(c).toLowerCase().trim());
+  const niks = (Array.isArray(nikayas) ? nikayas : (nikayas ? [nikayas] : [])).filter(Boolean).map((n) => String(n).toLowerCase().trim());
+
+  if (cats.length === 0 && niks.length === 0) return null;
+
+  const catConds = [];
+  const catParams = [];
+  for (const c of cats) {
+    if (c === 'vinaya') {
+      catConds.push("(code LIKE 'vin%' OR LOWER(nikaya) LIKE '%vinaya%')");
+    } else if (c === 'sutta') {
+      catConds.push("(code LIKE 's0%' OR LOWER(nikaya) LIKE '%sutta%' OR LOWER(nikaya) LIKE '%nikāy%')");
+    } else if (c === 'abhidhamma') {
+      catConds.push("(code LIKE 'abh%' OR LOWER(nikaya) LIKE '%abhidhamma%')");
+    } else if (c === 'mula' || c === 'mūla') {
+      catConds.push("(category = 'mūla' OR code LIKE '%.mul')");
+    } else if (c === 'atthakatha' || c === 'aṭṭhakathā' || c === 'commentary') {
+      catConds.push("(category = 'aṭṭhakathā' OR code LIKE '%.att')");
+    } else if (c === 'tika' || c === 'ṭīkā' || c === 'subcommentary') {
+      catConds.push("(category = 'ṭīkā' OR code LIKE '%.tik')");
+    } else {
+      catConds.push("(LOWER(category) = ? OR LOWER(nikaya) LIKE ? OR code LIKE ?)");
+      catParams.push(c, `%${c}%`, `%${c}%`);
+    }
+  }
+
+  const nikConds = [];
+  const nikParams = [];
+  for (const n of niks) {
+    if (n === 'dn') {
+      nikConds.push("(code LIKE 's01%' OR LOWER(nikaya) LIKE '%dīgha%')");
+    } else if (n === 'mn') {
+      nikConds.push("(code LIKE 's02%' OR LOWER(nikaya) LIKE '%majjhima%')");
+    } else if (n === 'sn') {
+      nikConds.push("(code LIKE 's03%' OR LOWER(nikaya) LIKE '%saṃyutta%')");
+    } else if (n === 'an') {
+      nikConds.push("(code LIKE 's04%' OR LOWER(nikaya) LIKE '%aṅguttara%')");
+    } else if (n === 'kn') {
+      nikConds.push("(code LIKE 's05%' OR LOWER(nikaya) LIKE '%khuddaka%')");
+    } else if (n === 'dhp') {
+      nikConds.push("code LIKE 's0502%'");
+    } else if (n === 'ja' || n === 'jataka') {
+      nikConds.push("(code LIKE 's0513%' OR code LIKE 's0514%')");
+    } else if (n === 'ud') {
+      nikConds.push("code LIKE 's0503%'");
+    } else if (n === 'it') {
+      nikConds.push("code LIKE 's0504%'");
+    } else if (n === 'snp') {
+      nikConds.push("code LIKE 's0505%'");
+    } else if (n === 'thag') {
+      nikConds.push("code LIKE 's0508%'");
+    } else if (n === 'thig') {
+      nikConds.push("code LIKE 's0509%'");
+    } else {
+      nikConds.push("(LOWER(nikaya) LIKE ? OR LOWER(code) LIKE ? OR LOWER(title) LIKE ?)");
+      nikParams.push(`%${n}%`, `%${n}%`, `%${n}%`);
+    }
+  }
+
+  const overallConds = [];
+  const overallParams = [];
+  if (catConds.length > 0) {
+    overallConds.push(`(${catConds.join(' OR ')})`);
+    overallParams.push(...catParams);
+  }
+  if (nikConds.length > 0) {
+    overallConds.push(`(${nikConds.join(' OR ')})`);
+    overallParams.push(...nikParams);
+  }
+
+  if (overallConds.length === 0) return null;
+
+  try {
+    const q = `SELECT code FROM books WHERE ${overallConds.join(' AND ')}`;
+    const rows = dbTipitaka.prepare(q).all(...overallParams);
+    return new Set(rows.map((r) => r.code));
+  } catch (e) {
+    console.warn('[AI Category Resolver] Error:', e.message);
+    return null;
+  }
+}
+
 function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) {
   if (!dbFts && !dbTipitaka) return { success: false, results: [], error: 'Database unavailable' };
   const ftsQ = formatFtsQuery(query);
@@ -638,26 +841,7 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
   const results = [];
   const seenKeys = new Set();
 
-  let allowedBooks = null;
-  if ((categories && categories.length > 0) || (nikayas && nikayas.length > 0)) {
-    const conds = [];
-    const params = [];
-    if (categories && categories.length > 0) {
-      conds.push(`category IN (${categories.map(() => '?').join(',')})`);
-      params.push(...categories.map((c) => c.toLowerCase()));
-    }
-    if (nikayas && nikayas.length > 0) {
-      conds.push(`(${nikayas.map(() => 'LOWER(nikaya) LIKE ? OR LOWER(code) LIKE ?').join(' OR ')})`);
-      for (const n of nikayas) {
-        params.push(`%${n.toLowerCase()}%`, `%${n.toLowerCase()}%`);
-      }
-    }
-    try {
-      const q = `SELECT code FROM books WHERE ${conds.join(' AND ')}`;
-      const rows = dbTipitaka.prepare(q).all(...params);
-      allowedBooks = new Set(rows.map((r) => r.code));
-    } catch (e) {}
-  }
+  const allowedBooks = resolveAllowedBooksForCategory({ categories, nikayas });
 
   // 1. Search Pāli Canon FTS
   try {
@@ -716,12 +900,11 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
     console.warn('[AI Search] Pāli FTS query error:', err.message);
   }
 
-  // 2. Search English translation FTS if needed
+  // 2. Search English translation FTS if available
   if (results.length < activeLimit) {
     try {
-      const enFtsPath = path.join(__dirname, 'db/fts_translation_en.db');
-      if (fs.existsSync(enFtsPath)) {
-        const enDb = new Database(enFtsPath, { readonly: true });
+      const enDb = getTranslationFtsDb('en');
+      if (enDb) {
         const enHits = enDb.prepare(`
           SELECT book_code, book_title, nikaya, para_num, para_index,
                  snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) AS snippet,
@@ -731,7 +914,6 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
           ORDER BY rank
           LIMIT ?
         `).all(ftsQ, activeLimit);
-        enDb.close();
 
         for (const h of enHits) {
           if (allowedBooks && !allowedBooks.has(h.book_code)) continue;
@@ -741,11 +923,13 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
 
           let chapIdx = 0;
           let chapTitle = '';
+          let suttaTitle = '';
           try {
-            const cRow = dbTipitaka.prepare('SELECT chapter_index, chapter_title FROM canon_paragraphs WHERE book_code = ? AND para_index = ?').get(h.book_code, h.para_index);
+            const cRow = dbTipitaka.prepare('SELECT chapter_index, chapter_title, sutta_title FROM canon_paragraphs WHERE book_code = ? AND para_index = ?').get(h.book_code, h.para_index);
             if (cRow) {
               chapIdx = cRow.chapter_index;
               chapTitle = cRow.chapter_title || '';
+              suttaTitle = cRow.sutta_title || '';
             }
           } catch (e) {}
 
@@ -755,10 +939,11 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
             nikaya: h.nikaya,
             chapter_index: chapIdx,
             chapter_title: chapTitle,
+            sutta_title: suttaTitle,
             para_index: h.para_index,
             para_num: h.para_num,
             snippet: h.snippet,
-            text: h.content ? h.content.substring(0, 320) : '',
+            text: h.content ? h.content.substring(0, 350) : '',
             citation_ref: `[${h.book_code}:c${chapIdx}:p${h.para_index}]`,
             source_type: 'translation_en',
           });
@@ -771,19 +956,77 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
   return { success: true, count: results.length, results };
 }
 
-function aiGetSection({ book_code, chapter_index = 0 }) {
+function aiGetHeadings({ book_code, chapter_index }) {
+  if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
+  const targetCode = resolveCanonicalBookCode(book_code);
+  if (!targetCode) return { success: false, error: 'Missing book_code' };
+
+  try {
+    const bookInfo = dbTipitaka.prepare('SELECT code, title, nikaya, category FROM books WHERE code = ?').get(targetCode);
+    let rows;
+    if (chapter_index !== undefined && chapter_index !== null) {
+      rows = dbTipitaka.prepare(`
+        SELECT chapter_index, item_index, title, level, type, para_index, para_num
+        FROM book_toc
+        WHERE book_code = ? AND chapter_index = ?
+        ORDER BY item_index ASC
+        LIMIT 60
+      `).all(targetCode, chapter_index);
+    } else {
+      rows = dbTipitaka.prepare(`
+        SELECT chapter_index, item_index, title, level, type, para_index, para_num
+        FROM book_toc
+        WHERE book_code = ?
+        ORDER BY item_index ASC
+        LIMIT 60
+      `).all(targetCode);
+    }
+
+    return {
+      success: true,
+      book_code: targetCode,
+      book_title: bookInfo?.title || targetCode,
+      headings: rows.map((r) => ({
+        chapter_index: r.chapter_index,
+        title: r.title,
+        level: r.level,
+        type: r.type,
+        para_index: r.para_index,
+        para_num: r.para_num || '',
+        citation_ref: `[${targetCode}:c${r.chapter_index}:p${r.para_index}]`,
+      })),
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function aiGetSection({ book_code, chapter_index, para_start }) {
   if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
   const targetCode = resolveCanonicalBookCode(book_code);
 
   try {
-    const chap = dbTipitaka.prepare('SELECT title, anchor_id, para_index FROM chapters WHERE book_code = ? AND chapter_index = ?').get(targetCode, chapter_index);
+    let resolvedChap = chapter_index !== undefined && chapter_index !== null ? parseInt(chapter_index, 10) : null;
+    if (resolvedChap === null && para_start !== undefined && para_start !== null) {
+      const pRow = dbTipitaka.prepare('SELECT chapter_index FROM canon_paragraphs WHERE book_code = ? AND (para_index = ? OR para_num = ?) LIMIT 1').get(targetCode, para_start, String(para_start));
+      if (pRow) resolvedChap = pRow.chapter_index;
+    }
+    if (resolvedChap === null) resolvedChap = 0;
+
+    const chap = dbTipitaka.prepare('SELECT title, anchor_id, para_index FROM chapters WHERE book_code = ? AND chapter_index = ?').get(targetCode, resolvedChap);
     const book = dbTipitaka.prepare('SELECT title, nikaya, category FROM books WHERE code = ?').get(targetCode);
-    const tocItems = dbTipitaka.prepare('SELECT title, level, type, para_index, para_num FROM book_toc WHERE book_code = ? AND chapter_index = ? ORDER BY item_index ASC LIMIT 30').all(targetCode, chapter_index);
+    const tocItems = dbTipitaka.prepare('SELECT title, level, type, para_index, para_num FROM book_toc WHERE book_code = ? AND chapter_index = ? ORDER BY item_index ASC LIMIT 30').all(targetCode, resolvedChap);
 
     let summaryContent = null;
     if (dbSummaries) {
       try {
-        const sumRow = dbSummaries.prepare('SELECT title, content, sources FROM summaries WHERE book_code = ? AND chapter_index = ?').get(targetCode, chapter_index);
+        let sumRow = null;
+        if (para_start !== undefined && para_start !== null) {
+          sumRow = dbSummaries.prepare('SELECT title, content, sources FROM summaries WHERE book_code = ? AND chapter_index = ? AND ? BETWEEN para_start AND para_end LIMIT 1').get(targetCode, resolvedChap, para_start);
+        }
+        if (!sumRow) {
+          sumRow = dbSummaries.prepare('SELECT title, content, sources FROM summaries WHERE book_code = ? AND chapter_index = ? LIMIT 1').get(targetCode, resolvedChap);
+        }
         if (sumRow) summaryContent = sumRow;
       } catch (e) {}
     }
@@ -792,7 +1035,7 @@ function aiGetSection({ book_code, chapter_index = 0 }) {
       success: true,
       book_code: targetCode,
       book_title: book ? book.title : targetCode,
-      chapter_index,
+      chapter_index: resolvedChap,
       chapter_title: chap ? chap.title : '',
       para_start_index: chap ? chap.para_index : 0,
       headings: tocItems,
@@ -803,58 +1046,94 @@ function aiGetSection({ book_code, chapter_index = 0 }) {
   }
 }
 
-function aiGetParagraphContent({ book_code, chapter_index, para_start, para_end, langs = ['en', 'vi'] }) {
+function aiGetParagraphContent({
+  book_code,
+  chapter_index,
+  para_start,
+  para_end,
+  para_num,
+  para_index,
+  langs = ['en', 'vi'],
+}) {
   if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
   const targetCode = resolveCanonicalBookCode(book_code);
-  const start = parseInt(para_start !== undefined ? para_start : '0', 10);
-  const end = parseInt(para_end !== undefined ? para_end : start, 10);
+  const pNum = para_num !== undefined && para_num !== null ? String(para_num).replace(/^(?:para-?|p)/i, '').trim() : null;
+  const pIdx = para_index !== undefined && para_index !== null
+    ? parseInt(para_index, 10)
+    : (para_start !== undefined && !pNum ? parseInt(para_start, 10) : null);
+  const endIdx = para_end !== undefined && para_end !== null
+    ? parseInt(para_end, 10)
+    : (pIdx !== null ? pIdx : null);
 
   try {
     let pRows = [];
 
-    // 1. Try with chapter_index first
-    if (chapter_index !== undefined && chapter_index !== null) {
-      pRows = dbTipitaka.prepare(`
-        SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
-               para_index, para_num, pali_text
-        FROM canon_paragraphs
-        WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ?
-        ORDER BY para_index
-      `).all(targetCode, chapter_index, start, end);
+    // Priority 1: Query by canonical para_num if provided
+    if (pNum) {
+      if (chapter_index !== undefined && chapter_index !== null) {
+        pRows = dbTipitaka.prepare(`
+          SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
+                 para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_num = ?
+          ORDER BY para_index
+        `).all(targetCode, chapter_index, pNum);
+      }
+      if (pRows.length === 0) {
+        pRows = dbTipitaka.prepare(`
+          SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
+                 para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND para_num = ?
+          ORDER BY para_index
+        `).all(targetCode, pNum);
+      }
     }
 
-    // 2. If not found, query by book_code and para_index directly (para_index is book-wide)
-    if (pRows.length === 0) {
-      pRows = dbTipitaka.prepare(`
-        SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
-               para_index, para_num, pali_text
-        FROM canon_paragraphs
-        WHERE book_code = ? AND para_index BETWEEN ? AND ?
-        ORDER BY para_index
-      `).all(targetCode, start, end);
+    // Priority 2: Query by sequential para_index range
+    if (pRows.length === 0 && pIdx !== null && !isNaN(pIdx)) {
+      const activeEnd = endIdx !== null && !isNaN(endIdx) ? endIdx : pIdx;
+      if (chapter_index !== undefined && chapter_index !== null) {
+        pRows = dbTipitaka.prepare(`
+          SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
+                 para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ?
+          ORDER BY para_index
+        `).all(targetCode, chapter_index, pIdx, activeEnd);
+      }
+      if (pRows.length === 0) {
+        pRows = dbTipitaka.prepare(`
+          SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
+                 para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND para_index BETWEEN ? AND ?
+          ORDER BY para_index
+        `).all(targetCode, pIdx, activeEnd);
+      }
     }
 
-    // 3. If still empty, check if start/end was actually a para_num
-    if (pRows.length === 0) {
+    // Priority 3: Fallback check if pIdx might have been intended as para_num
+    if (pRows.length === 0 && pIdx !== null && !isNaN(pIdx)) {
       pRows = dbTipitaka.prepare(`
         SELECT global_id, guid, book_code, chapter_index, chapter_title, sutta_title,
                para_index, para_num, pali_text
         FROM canon_paragraphs
         WHERE book_code = ? AND para_num = ?
-        LIMIT 1
-      `).all(targetCode, String(start));
+        ORDER BY para_index
+      `).all(targetCode, String(pIdx));
     }
 
     const passages = [];
+    const bookInfo = dbTipitaka.prepare('SELECT title FROM books WHERE code = ?').get(targetCode);
+
     for (const p of pRows) {
       const translations = {};
       for (const lang of langs) {
-        const transDbPath = path.join(__dirname, `db/translation_${lang}.db`);
-        if (fs.existsSync(transDbPath)) {
+        const tdb = getTranslationDb(lang);
+        if (tdb) {
           try {
-            const tdb = new Database(transDbPath, { readonly: true });
             const tRow = tdb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(p.book_code, p.chapter_index, p.para_index);
-            tdb.close();
             if (tRow && tRow.translation) {
               translations[lang] = tRow.translation;
             }
@@ -865,6 +1144,7 @@ function aiGetParagraphContent({ book_code, chapter_index, para_start, para_end,
       passages.push({
         guid: p.guid,
         book_code: p.book_code,
+        book_title: bookInfo?.title || p.book_code,
         chapter_index: p.chapter_index,
         chapter_title: p.chapter_title || '',
         sutta_title: p.sutta_title || '',
@@ -882,63 +1162,239 @@ function aiGetParagraphContent({ book_code, chapter_index, para_start, para_end,
   }
 }
 
-function aiGetCommentaries({ book_code, chapter_index, para_num }) {
+function aiGetCommentaries({ book_code, chapter_index, para_num, para_index }) {
   if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
   const targetCode = resolveCanonicalBookCode(book_code);
+  const pNumStr = para_num !== undefined && para_num !== null ? String(para_num).replace(/^(?:para-?|p)/i, '').trim() : '';
+  const pIdx = para_index !== undefined && para_index !== null ? parseInt(para_index, 10) : -1;
 
   try {
-    const cleanNum = String(para_num || '').replace(/^(?:para-?|p)/i, '').trim();
-    const mapRow = dbTipitaka.prepare(`
-      SELECT source_book, source_chapter, source_para,
-             mula_book, mula_chapter, mula_para, mula_title,
-             attha_book, attha_chapter, attha_para, attha_title,
-             tika_book, tika_chapter, tika_para, tika_title
-      FROM mat_para_map
-      WHERE (source_book = ? OR mula_book = ?) AND (source_para = ? OR mula_para = ?)
-      LIMIT 1
-    `).get(targetCode, targetCode, cleanNum, cleanNum);
+    // 1. Locate canonical root row
+    let canonRow = null;
 
-    if (!mapRow) {
-      const canonRow = dbTipitaka.prepare(`
-        SELECT mula_book, mula_chapter, mula_para, attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para
+    // Priority 1A: Query by para_num if provided
+    if (pNumStr) {
+      if (chapter_index !== undefined && chapter_index !== null) {
+        canonRow = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num,
+                 attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_num = ?
+          LIMIT 1
+        `).get(targetCode, chapter_index, pNumStr);
+      }
+      if (!canonRow) {
+        canonRow = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num,
+                 attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND para_num = ?
+          LIMIT 1
+        `).get(targetCode, pNumStr);
+      }
+    }
+
+    // Priority 1B: Query by para_index if provided
+    if (!canonRow && pIdx >= 0) {
+      if (chapter_index !== undefined && chapter_index !== null) {
+        canonRow = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num,
+                 attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_index = ?
+          LIMIT 1
+        `).get(targetCode, chapter_index, pIdx);
+      }
+      if (!canonRow) {
+        canonRow = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num,
+                 attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND para_index = ?
+          LIMIT 1
+        `).get(targetCode, pIdx);
+      }
+    }
+
+    // Priority 1C: Query by chapter_index
+    if (!canonRow && chapter_index !== undefined && chapter_index !== null) {
+      canonRow = dbTipitaka.prepare(`
+        SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num,
+               attha_book, attha_chapter, attha_para, tika_book, tika_chapter, tika_para, pali_text
         FROM canon_paragraphs
-        WHERE book_code = ? AND para_num = ?
+        WHERE book_code = ? AND chapter_index = ? AND para_num IS NOT NULL
         LIMIT 1
-      `).get(targetCode, cleanNum);
-
-      return {
-        success: true,
-        source: { book_code: targetCode, chapter_index, para_num: cleanNum },
-        commentaries: canonRow || null,
-      };
+      `).get(targetCode, chapter_index);
     }
 
-    let atthaText = null;
-    if (mapRow.attha_book && mapRow.attha_para) {
-      try {
-        const row = dbTipitaka.prepare('SELECT pali_text, chapter_title, para_index FROM canon_paragraphs WHERE book_code = ? AND para_num = ? LIMIT 1').get(mapRow.attha_book, mapRow.attha_para);
-        if (row) atthaText = row;
-      } catch (e) {}
+    // 2. Check mat_para_map as secondary source
+    let matRow = null;
+    if (pNumStr) {
+      matRow = dbTipitaka.prepare(`
+        SELECT source_book, source_chapter, source_para,
+               mula_book, mula_chapter, mula_para, mula_title,
+               attha_book, attha_chapter, attha_para, attha_title,
+               tika_book, tika_chapter, tika_para, tika_title
+        FROM mat_para_map
+        WHERE (source_book = ? OR mula_book = ?) AND (source_para = ? OR mula_para = ?)
+        LIMIT 1
+      `).get(targetCode, targetCode, pNumStr, pNumStr);
     }
 
-    let tikaText = null;
-    if (mapRow.tika_book && mapRow.tika_para) {
-      try {
-        const row = dbTipitaka.prepare('SELECT pali_text, chapter_title, para_index FROM canon_paragraphs WHERE book_code = ? AND para_num = ? LIMIT 1').get(mapRow.tika_book, mapRow.tika_para);
-        if (row) tikaText = row;
-      } catch (e) {}
+    const atthaBook = canonRow?.attha_book || matRow?.attha_book;
+    const atthaChap = canonRow?.attha_chapter ?? matRow?.attha_chapter ?? null;
+    const atthaPara = canonRow?.attha_para || matRow?.attha_para || pNumStr;
+
+    const tikaBook = canonRow?.tika_book || matRow?.tika_book;
+    const tikaChap = canonRow?.tika_chapter ?? matRow?.tika_chapter ?? null;
+    const tikaPara = canonRow?.tika_para || matRow?.tika_para || pNumStr;
+
+    // Fetch Atthakatha commentary text
+    let atthaEntries = [];
+    if (atthaBook) {
+      const atthaBookInfo = dbTipitaka.prepare('SELECT title FROM books WHERE code = ?').get(atthaBook);
+      let rows = [];
+
+      // Try 1: Match by paragraph number in commentary
+      if (atthaPara) {
+        if (atthaChap !== null && atthaChap !== undefined) {
+          rows = dbTipitaka.prepare(`
+            SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+            FROM canon_paragraphs
+            WHERE book_code = ? AND chapter_index = ? AND para_num = ?
+            ORDER BY para_index
+            LIMIT 3
+          `).all(atthaBook, atthaChap, String(atthaPara));
+        }
+        if (rows.length === 0) {
+          rows = dbTipitaka.prepare(`
+            SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+            FROM canon_paragraphs
+            WHERE book_code = ? AND para_num = ?
+            ORDER BY para_index
+            LIMIT 3
+          `).all(atthaBook, String(atthaPara));
+        }
+      }
+
+      // Try 2: Relative chapter / paragraph index range
+      if (rows.length === 0 && atthaChap !== null && atthaChap !== undefined) {
+        const targetParaIdx = canonRow?.para_index ?? pIdx;
+        rows = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_num IS NOT NULL AND para_index >= ?
+          ORDER BY para_index
+          LIMIT 3
+        `).all(atthaBook, atthaChap, Math.max(0, targetParaIdx));
+      }
+
+      // Filter out non-commentary book title lines if any
+      rows = rows.filter((r) => r.pali_text && !r.pali_text.startsWith('Namo tassa') && !r.pali_text.endsWith('nikāye') && !r.pali_text.endsWith('nikāyo'));
+
+      if (rows.length > 0) {
+        atthaEntries = rows.map((r) => ({
+          book_code: r.book_code,
+          book_title: atthaBookInfo?.title || r.book_code,
+          chapter_index: r.chapter_index,
+          chapter_title: r.chapter_title,
+          para_index: r.para_index,
+          para_num: r.para_num,
+          pali_text: r.pali_text ? r.pali_text.substring(0, 600) : '',
+          citation_ref: `[${r.book_code}:c${r.chapter_index}:p${r.para_index}]`,
+        }));
+      }
+    }
+
+    // Fetch Tika sub-commentary text
+    let tikaEntries = [];
+    if (tikaBook) {
+      const tikaBookInfo = dbTipitaka.prepare('SELECT title FROM books WHERE code = ?').get(tikaBook);
+      let rows = [];
+
+      if (tikaPara) {
+        if (tikaChap !== null && tikaChap !== undefined) {
+          rows = dbTipitaka.prepare(`
+            SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+            FROM canon_paragraphs
+            WHERE book_code = ? AND chapter_index = ? AND para_num = ?
+            ORDER BY para_index
+            LIMIT 3
+          `).all(tikaBook, tikaChap, String(tikaPara));
+        }
+        if (rows.length === 0) {
+          rows = dbTipitaka.prepare(`
+            SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+            FROM canon_paragraphs
+            WHERE book_code = ? AND para_num = ?
+            ORDER BY para_index
+            LIMIT 3
+          `).all(tikaBook, String(tikaPara));
+        }
+      }
+
+      if (rows.length === 0 && tikaChap !== null && tikaChap !== undefined) {
+        const targetParaIdx = canonRow?.para_index ?? pIdx;
+        rows = dbTipitaka.prepare(`
+          SELECT book_code, chapter_index, chapter_title, sutta_title, para_index, para_num, pali_text
+          FROM canon_paragraphs
+          WHERE book_code = ? AND chapter_index = ? AND para_num IS NOT NULL AND para_index >= ?
+          ORDER BY para_index
+          LIMIT 3
+        `).all(tikaBook, tikaChap, Math.max(0, targetParaIdx));
+      }
+
+      rows = rows.filter((r) => r.pali_text && !r.pali_text.startsWith('Namo tassa') && !r.pali_text.endsWith('nikāye') && !r.pali_text.endsWith('nikāyo'));
+
+      if (rows.length > 0) {
+        tikaEntries = rows.map((r) => ({
+          book_code: r.book_code,
+          book_title: tikaBookInfo?.title || r.book_code,
+          chapter_index: r.chapter_index,
+          chapter_title: r.chapter_title,
+          para_index: r.para_index,
+          para_num: r.para_num,
+          pali_text: r.pali_text ? r.pali_text.substring(0, 600) : '',
+          citation_ref: `[${r.book_code}:c${r.chapter_index}:p${r.para_index}]`,
+        }));
+      }
     }
 
     return {
       success: true,
-      source: { book_code: targetCode, chapter_index, para_num: cleanNum },
-      mula: { book: mapRow.mula_book, chapter: mapRow.mula_chapter, para: mapRow.mula_para, title: mapRow.mula_title },
-      atthakatha: { book: mapRow.attha_book, chapter: mapRow.attha_chapter, para: mapRow.attha_para, title: mapRow.attha_title, text: atthaText?.pali_text || '' },
-      tika: { book: mapRow.tika_book, chapter: mapRow.tika_chapter, para: mapRow.tika_para, title: mapRow.tika_title, text: tikaText?.pali_text || '' },
+      source: {
+        book_code: targetCode,
+        chapter_index: canonRow?.chapter_index ?? chapter_index ?? 0,
+        para_index: canonRow?.para_index ?? pIdx,
+        para_num: canonRow?.para_num ?? pNumStr,
+        sutta_title: canonRow?.sutta_title,
+      },
+      atthakatha: atthaEntries.length > 0 ? atthaEntries : null,
+      tika: tikaEntries.length > 0 ? tikaEntries : null,
+      attha_book: atthaBook || null,
+      tika_book: tikaBook || null,
     };
   } catch (err) {
     return { success: false, error: err.message };
   }
+}
+
+function cleanDpdDefinition(item) {
+  if (!item || !item.html) return '';
+  let h = item.html;
+  // Remove interactive UI button boxes, audio players, svg icons, and feedback forms
+  h = h.replace(/<div class="?button-box"?[\s\S]*?<\/div>/gi, ' ');
+  h = h.replace(/<svg[\s\S]*?<\/svg>/gi, ' ');
+  h = h.replace(/<div class="?content"?[\s\S]*?<\/div>/gi, ' ');
+  let text = h.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  // Strip GoldenDict submission links
+  text = text.replace(/Did you spot a mistake\?.*$/i, '').replace(/Can you think of a better example\?.*$/i, '').trim();
+  if (text.length > 450) {
+    const cut = text.substring(0, 450);
+    const lastSpace = cut.lastIndexOf(' ');
+    text = (lastSpace > 350 ? cut.substring(0, lastSpace) : cut) + '…';
+  }
+  return text;
 }
 
 function aiGetDictionary({ word }) {
@@ -948,22 +1404,34 @@ function aiGetDictionary({ word }) {
     const cleanEntries = [];
     if (dpdResult && Array.isArray(dpdResult.dpd)) {
       for (const item of dpdResult.dpd.slice(0, 4)) {
-        const plainHtml = (item.html || '')
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        cleanEntries.push({
-          word: item.word,
-          isExact: item.isExact,
-          definition: plainHtml.substring(0, 350),
-        });
+        const cleanDef = cleanDpdDefinition(item);
+        if (cleanDef) {
+          cleanEntries.push({
+            word: item.word,
+            isExact: Boolean(item.isExact),
+            definition: cleanDef,
+          });
+        }
       }
     }
-    return { success: true, word: word.trim(), entries: cleanEntries };
+    return { success: true, word: word.trim(), count: cleanEntries.length, entries: cleanEntries };
   } catch (err) {
     return { success: false, error: err.message };
   }
+}
+
+function aiGetDictionaryBatch({ words = [] }) {
+  const list = (Array.isArray(words) ? words : [words]).filter(Boolean);
+  const flattened = [];
+  for (const w of list.slice(0, 6)) {
+    const res = aiGetDictionary({ word: w });
+    if (res.success && Array.isArray(res.entries)) {
+      for (const e of res.entries) {
+        flattened.push(e);
+      }
+    }
+  }
+  return { success: true, count: flattened.length, entries: flattened };
 }
 
 function aiGetBooks() {
@@ -987,7 +1455,7 @@ async function executeAiTool(name, args = {}) {
     case 'search_tipitaka':
       return aiSearchTipitaka({ query: args.query, limit: 15 });
     case 'search_tipitaka_batch': {
-      const queries = Array.isArray(args.queries) ? args.queries : [];
+      const queries = Array.isArray(args.queries) ? args.queries : (args.query ? [args.query] : []);
       const combined = [];
       const seen = new Set();
       for (const q of queries.slice(0, 4)) {
@@ -1006,8 +1474,8 @@ async function executeAiTool(name, args = {}) {
     }
     case 'search_by_category': {
       const queries = Array.isArray(args.queries) ? args.queries : [args.query || ''];
-      const categories = Array.isArray(args.categories) ? args.categories : [];
-      const nikayas = Array.isArray(args.nikayas) ? args.nikayas : [];
+      const categories = Array.isArray(args.categories) ? args.categories : (args.category ? [args.category] : []);
+      const nikayas = Array.isArray(args.nikayas) ? args.nikayas : (args.nikaya ? [args.nikaya] : []);
       const combined = [];
       const seen = new Set();
       for (const q of queries.slice(0, 4)) {
@@ -1024,24 +1492,35 @@ async function executeAiTool(name, args = {}) {
       }
       return { success: true, count: combined.length, results: combined.slice(0, 25) };
     }
+    case 'get_headings':
+      return aiGetHeadings({ book_code: args.book_code || args.book_id, chapter_index: args.chapter_index });
     case 'get_section':
-      return aiGetSection({ book_code: args.book_code, chapter_index: args.chapter_index });
-    case 'get_paragraph_content':
+      return aiGetSection({ book_code: args.book_code, chapter_index: args.chapter_index, para_start: args.para_start });
+    case 'get_paragraph_content': {
+      const pNum = args.para_num ?? args.para_number;
+      const pStart = args.para_start ?? args.para_index;
       return aiGetParagraphContent({
         book_code: args.book_code,
         chapter_index: args.chapter_index,
-        para_start: args.para_start,
+        para_start: pStart,
         para_end: args.para_end,
+        para_num: pNum,
+        para_index: args.para_index,
       });
+    }
     case 'get_paragraph_content_batch': {
       const ranges = Array.isArray(args.ranges) ? args.ranges : [];
       const allPassages = [];
       for (const r of ranges.slice(0, 6)) {
+        const pNum = r.para_num ?? r.para_number;
+        const pStart = r.para_start ?? r.para_index;
         const res = aiGetParagraphContent({
           book_code: r.book_code,
           chapter_index: r.chapter_index,
-          para_start: r.para_start,
+          para_start: pStart,
           para_end: r.para_end,
+          para_num: pNum,
+          para_index: r.para_index,
         });
         if (res.success && Array.isArray(res.passages)) {
           allPassages.push(...res.passages);
@@ -1049,22 +1528,24 @@ async function executeAiTool(name, args = {}) {
       }
       return { success: true, count: allPassages.length, passages: allPassages };
     }
-    case 'get_commentaries':
+    case 'get_commentaries': {
+      const pNum = args.para_num ?? args.para_number ?? (args.para_index !== undefined ? String(args.para_index) : undefined);
       return aiGetCommentaries({
         book_code: args.book_code,
         chapter_index: args.chapter_index,
-        para_num: args.para_num,
+        para_num: pNum,
+        para_index: args.para_index,
       });
+    }
     case 'get_dictionary':
       return aiGetDictionary({ word: args.word });
     case 'get_dictionary_batch': {
-      const words = Array.isArray(args.words) ? args.words : [];
-      const dictEntries = [];
-      for (const w of words.slice(0, 5)) {
-        const res = aiGetDictionary({ word: w });
-        if (res.success) dictEntries.push(res);
-      }
-      return { success: true, count: dictEntries.length, entries: dictEntries };
+      const words = Array.isArray(args.words)
+        ? args.words
+        : Array.isArray(args.terms)
+        ? args.terms
+        : [];
+      return aiGetDictionaryBatch({ words });
     }
     case 'get_books':
       return aiGetBooks();
@@ -1076,7 +1557,7 @@ async function executeAiTool(name, args = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  CITATION PARSING
+//  CITATION PARSING & VERIFICATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 function parseCitations(text) {
@@ -1090,19 +1571,63 @@ function parseCitations(text) {
     const rawTag = match[0];
     const rawBook = match[1];
     const bookCode = resolveCanonicalBookCode(rawBook);
-    const chapIdx = match[2] !== undefined ? parseInt(match[2], 10) : 0;
-    const paraIdx = parseInt(match[3], 10);
+    const hasExplicitChap = match[2] !== undefined;
+    let chapIdx = hasExplicitChap ? parseInt(match[2], 10) : 0;
+    let paraIdx = parseInt(match[3], 10);
     const paraEnd = match[4] ? parseInt(match[4], 10) : null;
     const lineId = match[5] ? parseInt(match[5], 10) : null;
+
+    let bookTitle = rawBook;
+    let chapterTitle = '';
+    let resolvedParaNum = '';
+
+    if (dbTipitaka) {
+      try {
+        let row = null;
+        if (hasExplicitChap) {
+          row = dbTipitaka.prepare(`
+            SELECT p.chapter_index, b.title AS book_title, p.chapter_title, p.sutta_title, p.para_index, p.para_num
+            FROM canon_paragraphs p
+            LEFT JOIN books b ON b.code = p.book_code
+            WHERE p.book_code = ? AND p.chapter_index = ? AND (p.para_index = ? OR p.para_num = ?)
+            ORDER BY (p.para_index = ?) DESC
+            LIMIT 1
+          `).get(bookCode, chapIdx, paraIdx, String(paraIdx), paraIdx);
+        } else {
+          row = dbTipitaka.prepare(`
+            SELECT p.chapter_index, b.title AS book_title, p.chapter_title, p.sutta_title, p.para_index, p.para_num
+            FROM canon_paragraphs p
+            LEFT JOIN books b ON b.code = p.book_code
+            WHERE p.book_code = ? AND (p.para_index = ? OR p.para_num = ?)
+            ORDER BY (p.para_index = ?) DESC
+            LIMIT 1
+          `).get(bookCode, paraIdx, String(paraIdx), paraIdx);
+        }
+
+        if (row) {
+          bookTitle = row.book_title || bookTitle;
+          chapterTitle = row.sutta_title || row.chapter_title || '';
+          chapIdx = row.chapter_index;
+          resolvedParaNum = row.para_num || '';
+          if (row.para_index !== undefined && row.para_index !== null) {
+            paraIdx = row.para_index;
+          }
+        }
+      } catch (e) {}
+    }
 
     const key = `${bookCode}:${chapIdx}:${paraIdx}${paraEnd ? `-${paraEnd}` : ''}`;
     if (!seen.has(key)) {
       seen.add(key);
+
       citations.push({
         bookCode,
         rawBook,
+        bookTitle,
+        chapterTitle,
         chapterIndex: chapIdx,
         paraIndex: paraIdx,
+        paraNum: resolvedParaNum,
         paraEnd,
         lineId,
         ref: rawTag,
@@ -1113,29 +1638,177 @@ function parseCitations(text) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  OFFLINE CANONICAL REPORT GENERATOR
+//  SAFE COMPACT TOOL RESULT FORMATTER (PREVENTS INVALID JSON TRUNCATION)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function generateOfflineCanonicalAnswer(userQuery, collectedToolData) {
-  const passages = [];
-  const sections = [];
-  const dictEntries = [];
-
-  for (const item of collectedToolData) {
-    if (item.result?.results) {
-      if (item.tool === 'search_sections') sections.push(...item.result.results);
-      else passages.push(...item.result.results);
-    }
-    if (item.result?.passages) passages.push(...item.result.passages);
-    if (item.result?.entries) dictEntries.push(...item.result.entries);
+function formatCompactToolResponse(toolName, result) {
+  if (!result || !result.success) {
+    return { error: result?.error || 'Tool execution produced no result' };
   }
 
+  switch (toolName) {
+    case 'search_sections':
+      return {
+        count: result.results?.length || 0,
+        matches: (result.results || []).slice(0, 8).map((r) => ({
+          title: r.title,
+          book_code: r.book_code,
+          chapter_index: r.chapter_index,
+          para_index: r.para_index,
+          citation: r.citation_ref,
+          snippet: (r.snippet || '').slice(0, 200),
+        })),
+      };
+    case 'search_tipitaka':
+    case 'search_tipitaka_batch':
+    case 'search_by_category':
+      return {
+        count: result.results?.length || 0,
+        passages: (result.results || []).slice(0, 8).map((p) => ({
+          book_code: p.book_code,
+          chapter_title: p.chapter_title,
+          sutta_title: p.sutta_title,
+          para_index: p.para_index,
+          citation: p.citation_ref,
+          snippet: (p.snippet || p.text || '').slice(0, 250),
+        })),
+      };
+    case 'get_paragraph_content':
+    case 'get_paragraph_content_batch':
+      return {
+        count: result.passages?.length || 0,
+        passages: (result.passages || []).slice(0, 6).map((p) => ({
+          book_code: p.book_code,
+          chapter_index: p.chapter_index,
+          para_index: p.para_index,
+          para_num: p.para_num,
+          citation: p.citation_ref,
+          pali: (p.pali || '').slice(0, 500),
+          translation_en: (p.translations?.en || '').slice(0, 500),
+          translation_vi: (p.translations?.vi || '').slice(0, 500),
+        })),
+      };
+    case 'get_commentaries':
+      return {
+        source: result.source,
+        atthakatha: (result.atthakatha || []).slice(0, 2).map((a) => ({
+          book_code: a.book_code,
+          title: a.book_title,
+          citation: a.citation_ref,
+          pali: (a.pali_text || '').slice(0, 450),
+        })),
+        tika: (result.tika || []).slice(0, 2).map((t) => ({
+          book_code: t.book_code,
+          title: t.book_title,
+          citation: t.citation_ref,
+          pali: (t.pali_text || '').slice(0, 450),
+        })),
+      };
+    case 'get_dictionary':
+    case 'get_dictionary_batch':
+      return {
+        count: result.entries?.length || 0,
+        entries: (result.entries || []).slice(0, 4).map((e) => ({
+          word: e.word,
+          definition: (e.definition || '').slice(0, 300),
+        })),
+      };
+    case 'get_section':
+      return {
+        book_code: result.book_code,
+        chapter_title: result.chapter_title,
+        headings: (result.headings || []).slice(0, 10),
+        summary: result.summary ? (result.summary.content || '').slice(0, 400) : null,
+      };
+    default:
+      return result;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SMART OFFLINE CANONICAL RAG (WHEN NO API KEY IS CONFIGURED)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function executeSmartOfflineCanonicalSearch(userQuery, onEvent) {
+  const collectedEvidence = {
+    sections: [],
+    passages: [],
+    commentaries: [],
+    dictionaries: [],
+  };
+  const toolLogs = [];
+
+  // 1. Analyze for Pāli keywords
+  onEvent('status', { message: '🔍 Extracting Pāḷi technical terms from inquiry…' });
+  const terms = userQuery
+    .toLowerCase()
+    .replace(/[^a-zāīūṅñṭḍṇḷṃ\s]/gi, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !AI_STOP_WORDS.has(w));
+
+  for (const term of terms.slice(0, 3)) {
+    const dictRes = aiGetDictionary({ word: term });
+    if (dictRes.success && dictRes.entries?.length > 0) {
+      collectedEvidence.dictionaries.push(...dictRes.entries);
+      toolLogs.push({ tool: 'get_dictionary', summary: `Looked up DPD definition for "${term}"` });
+      onEvent('tool_call', { tool: 'get_dictionary', summary: `Looked up DPD definition for "${term}"` });
+    }
+  }
+
+  // 2. Search sections & sutta titles
+  onEvent('status', { message: '📑 Searching 217 canonical books for matching discourses…' });
+  const secRes = aiSearchSections({ query: userQuery, limit: 5 });
+  if (secRes.results?.length > 0) {
+    collectedEvidence.sections.push(...secRes.results);
+    toolLogs.push({ tool: 'search_sections', summary: `Found ${secRes.results.length} related suttas/sections` });
+    onEvent('tool_call', { tool: 'search_sections', summary: `Found ${secRes.results.length} related suttas/sections` });
+  }
+
+  // 3. Search canonical text
+  onEvent('status', { message: '📖 Retrieving canonical root passages (Pāḷi + English)…' });
+  const tipRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
+  if (tipRes.results?.length > 0) {
+    collectedEvidence.passages.push(...tipRes.results);
+    toolLogs.push({ tool: 'search_tipitaka', summary: `Retrieved ${tipRes.results.length} canonical passages with citations` });
+    onEvent('tool_call', { tool: 'search_tipitaka', summary: `Retrieved ${tipRes.results.length} canonical passages with citations` });
+
+    // Fetch full paragraph content & commentaries for top 2 matches
+    for (const p of tipRes.results.slice(0, 2)) {
+      const fullPara = aiGetParagraphContent({
+        book_code: p.book_code,
+        chapter_index: p.chapter_index,
+        para_start: p.para_index,
+        para_end: p.para_index,
+      });
+      if (fullPara.passages?.[0]?.translations?.en) {
+        p.translation_en = fullPara.passages[0].translations.en;
+      }
+
+      const commRes = aiGetCommentaries({
+        book_code: p.book_code,
+        chapter_index: p.chapter_index,
+        para_index: p.para_index,
+        para_num: p.para_num,
+      });
+      if (commRes.atthakatha || commRes.tika) {
+        collectedEvidence.commentaries.push(commRes);
+        toolLogs.push({ tool: 'get_commentaries', summary: `Cross-referenced Aṭṭhakathā commentary for ${p.citation_ref}` });
+        onEvent('tool_call', { tool: 'get_commentaries', summary: `Cross-referenced Aṭṭhakathā commentary for ${p.citation_ref}` });
+      }
+    }
+  }
+
+  return { collectedEvidence, toolLogs };
+}
+
+function generateSmartOfflineCanonicalReport(userQuery, evidence) {
   let text = `## Ani (AI Nissaya) Canonical Research Report\n\n`;
   text += `Regarding your inquiry: *"${userQuery}"*\n\n`;
 
-  if (sections.length > 0) {
-    text += `### Relevant Suttas & Sections in the Tipiṭaka:\n`;
-    for (const sec of sections.slice(0, 4)) {
+  // 1. Relevant Suttas & Sections
+  if (evidence.sections?.length > 0) {
+    text += `### 📜 Relevant Suttas & Discourses in the Tipiṭaka:\n`;
+    for (const sec of evidence.sections.slice(0, 4)) {
       const cite = sec.citation_ref || `[${sec.book_code}:c${sec.chapter_index}:p${sec.para_index}]`;
       text += `- **${sec.title || sec.sutta_title}** (${sec.book_title}) ${cite}\n`;
       if (sec.snippet) {
@@ -1145,35 +1818,409 @@ function generateOfflineCanonicalAnswer(userQuery, collectedToolData) {
     text += `\n`;
   }
 
-  if (passages.length > 0) {
-    text += `### Key Canonical Passages:\n\n`;
-    for (let i = 0; i < Math.min(passages.length, 5); i++) {
-      const p = passages[i];
+  // 2. Canonical Passages
+  if (evidence.passages?.length > 0) {
+    text += `### 📖 Canonical Root Passages (Mūla):\n\n`;
+    for (let i = 0; i < Math.min(evidence.passages.length, 5); i++) {
+      const p = evidence.passages[i];
       const paliSnippet = p.text || p.snippet || p.pali || '';
       const cleanSnippet = paliSnippet.replace(/<mark>/g, '**').replace(/<\/mark>/g, '**');
       const cite = p.citation_ref || `[${p.book_code}:c${p.chapter_index}:p${p.para_index}]`;
       text += `> "${cleanSnippet}" ${cite}\n\n`;
-      if (p.translations?.en) {
-        text += `*English Translation:* ${p.translations.en}\n\n`;
+      if (p.translation_en || p.translations?.en) {
+        text += `*English Meaning:* ${p.translation_en || p.translations.en}\n\n`;
       }
     }
   }
 
-  if (dictEntries.length > 0) {
-    text += `### Pāḷi Term Analysis (DPD):\n\n`;
-    for (const d of dictEntries.slice(0, 3)) {
+  // 3. Commentaries
+  if (evidence.commentaries?.length > 0) {
+    text += `### 🏛️ Commentarial Clarifications (Aṭṭhakathā & Ṭīkā):\n\n`;
+    for (const comm of evidence.commentaries.slice(0, 2)) {
+      if (comm.atthakatha && comm.atthakatha.length > 0) {
+        const a = comm.atthakatha[0];
+        text += `- **${a.book_title || 'Aṭṭhakathā'}** ${a.citation_ref}:\n`;
+        text += `  > "${(a.pali_text || '').slice(0, 280)}..."\n\n`;
+      }
+      if (comm.tika && comm.tika.length > 0) {
+        const t = comm.tika[0];
+        text += `- **${t.book_title || 'Ṭīkā'}** ${t.citation_ref}:\n`;
+        text += `  > "${(t.pali_text || '').slice(0, 250)}..."\n\n`;
+      }
+    }
+  }
+
+  // 4. Dictionary Term Analysis
+  if (evidence.dictionaries?.length > 0) {
+    text += `### 📚 Pāḷi Term Breakdown (Digital Pāḷi Dictionary):\n\n`;
+    for (const d of evidence.dictionaries.slice(0, 3)) {
       text += `- **${d.word}**: ${d.definition}\n`;
     }
     text += `\n`;
   }
 
-  if (passages.length === 0 && sections.length === 0) {
-    text += `The database was searched across the Chaṭṭha Saṅgāyana Tipiṭaka. `;
-    text += `To unlock full multi-turn conversational AI reasoning, please configure your free **Google Gemini API Key** in AI Settings (⚙️) — available at [Google AI Studio](https://aistudio.google.com/app/apikey).\n\n`;
+  if (evidence.passages?.length === 0 && evidence.sections?.length === 0) {
+    text += `The database was searched across all 217 books of the Chaṭṭha Saṅgāyana Tipiṭaka. `;
+    text += `To unlock full multi-turn conversational AI reasoning, please configure your **Google Gemini API Key** (free) or OpenAI/OpenRouter key in AI Settings (⚙️).\n\n`;
   }
 
-  text += `---\n*Canonical references link directly to Chaṭṭha Saṅgāyana paragraphs. Add an API key in Settings (⚙️) to enable full natural-language synthesis.*`;
+  text += `---\n*Canonical citations link directly to Chaṭṭha Saṅgāyana paragraphs. Add an API key in Settings (⚙️) to enable full natural-language synthesis.*`;
   return text;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  AGENTIC MULTI-STEP TOOL LOOP (GEMINI & OPENAI/OPENROUTER)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function runAgenticToolLoop({
+  provider,
+  apiKey,
+  baseUrl,
+  toolModel,
+  userQuery,
+  customSystemPrompt,
+  onEvent,
+}) {
+  const toolSystemPrompt = customSystemPrompt?.trim() || kAiDefaultToolSystemPrompt;
+  const toolLogs = [];
+  const allCollectedEvidence = {
+    sections: [],
+    passages: [],
+    commentaries: [],
+    dictionaries: [],
+  };
+
+  const maxIterations = 6;
+  let iterations = 0;
+  let toolsDone = false;
+
+  if (provider === 'gemini') {
+    const conversation = [{ role: 'user', parts: [{ text: userQuery }] }];
+
+    while (!toolsDone && iterations < maxIterations) {
+      iterations++;
+      const geminiToolUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey}`;
+      const payload = {
+        system_instruction: { parts: [{ text: toolSystemPrompt }] },
+        contents: conversation,
+        tools: [{ functionDeclarations: kAiToolDeclarations }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+      };
+
+      let toolRes;
+      try {
+        toolRes = await fetch(geminiToolUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(35000),
+        });
+      } catch (err) {
+        console.warn(`[Gemini Tool Loop Round ${iterations} Error]:`, err.message);
+        break;
+      }
+
+      if (!toolRes.ok) {
+        console.warn(`[Gemini Tool Loop Round ${iterations} HTTP ${toolRes.status}]`);
+        break;
+      }
+
+      const resJson = await toolRes.json();
+      const candidate = resJson.candidates?.[0];
+      const content = candidate?.content;
+      const parts = content?.parts || [];
+
+      if (!content || parts.length === 0) {
+        toolsDone = true;
+        break;
+      }
+
+      conversation.push(content);
+
+      const callSpecs = [];
+      let hasFinalAnswer = false;
+
+      for (const part of parts) {
+        if (part.functionCall) {
+          const fc = part.functionCall;
+          if (fc.name === 'final_answer') {
+            hasFinalAnswer = true;
+          } else {
+            callSpecs.push(fc);
+          }
+        } else if (part.text && parts.length === 1) {
+          onEvent('status', { message: `Ani is thinking: ${part.text.slice(0, 120)}…` });
+        }
+      }
+
+      if (callSpecs.length === 0) {
+        toolsDone = true;
+        break;
+      }
+
+      // Execute all tool calls in parallel
+      onEvent('status', { message: `Executing ${callSpecs.length} canonical database research step(s)…` });
+      const toolResults = await Promise.allSettled(
+        callSpecs.map((spec) => executeAiTool(spec.name, spec.args || {}))
+      );
+
+      const functionResponses = [];
+      for (let i = 0; i < callSpecs.length; i++) {
+        const spec = callSpecs[i];
+        const resObj = toolResults[i].status === 'fulfilled' ? toolResults[i].value : { success: false, error: toolResults[i].reason?.message };
+        const compact = formatCompactToolResponse(spec.name, resObj);
+
+        // Accumulate evidence
+        if (spec.name === 'search_sections' && resObj.results) {
+          allCollectedEvidence.sections.push(...resObj.results);
+        } else if ((spec.name === 'search_tipitaka' || spec.name === 'search_tipitaka_batch' || spec.name === 'search_by_category') && resObj.results) {
+          allCollectedEvidence.passages.push(...resObj.results);
+        } else if ((spec.name === 'get_paragraph_content' || spec.name === 'get_paragraph_content_batch') && resObj.passages) {
+          allCollectedEvidence.passages.push(...resObj.passages);
+        } else if (spec.name === 'get_commentaries' && (resObj.atthakatha || resObj.tika)) {
+          allCollectedEvidence.commentaries.push(resObj);
+        } else if ((spec.name === 'get_dictionary' || spec.name === 'get_dictionary_batch') && resObj.entries) {
+          allCollectedEvidence.dictionaries.push(...resObj.entries);
+        }
+
+        const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || spec.args?.book_code || '';
+        const summary = `${spec.name}${summaryArg ? ` (${summaryArg})` : ''}`;
+        toolLogs.push({ tool: spec.name, summary, args: spec.args });
+        onEvent('tool_call', { tool: spec.name, summary, args: spec.args });
+
+        functionResponses.push({
+          functionResponse: {
+            name: spec.name,
+            response: { content: compact },
+          },
+        });
+      }
+
+      conversation.push({ role: 'user', parts: functionResponses });
+
+      if (hasFinalAnswer) {
+        toolsDone = true;
+        break;
+      }
+    }
+  } else {
+    // OpenAI / OpenRouter / Custom endpoints
+    const endpoint = (baseUrl && baseUrl.trim())
+      ? `${baseUrl.trim().replace(/\/+$/, '')}/chat/completions`
+      : provider === 'openrouter'
+      ? 'https://openrouter.ai/api/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const openAiTools = getOpenAiToolDeclarations();
+    const openAiMessages = [
+      { role: 'system', content: toolSystemPrompt },
+      { role: 'user', content: userQuery },
+    ];
+
+    while (!toolsDone && iterations < maxIterations) {
+      iterations++;
+      const payload = {
+        model: toolModel || 'gpt-4o-mini',
+        messages: openAiMessages,
+        tools: openAiTools,
+        tool_choice: 'auto',
+        temperature: 0.2,
+      };
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      };
+      if (provider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://tipitakapali.org';
+        headers['X-Title'] = 'tipitakapali.org';
+      }
+
+      let toolRes;
+      try {
+        toolRes = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(35000),
+        });
+      } catch (err) {
+        console.warn(`[OpenAI Tool Loop Round ${iterations} Error]:`, err.message);
+        break;
+      }
+
+      if (!toolRes.ok) {
+        console.warn(`[OpenAI Tool Loop Round ${iterations} HTTP ${toolRes.status}]`);
+        break;
+      }
+
+      const resJson = await toolRes.json();
+      const choice = resJson.choices?.[0];
+      const message = choice?.message;
+
+      if (!message) {
+        toolsDone = true;
+        break;
+      }
+
+      openAiMessages.push(message);
+
+      const toolCalls = message.tool_calls || [];
+      if (toolCalls.length === 0) {
+        toolsDone = true;
+        break;
+      }
+
+      onEvent('status', { message: `Executing ${toolCalls.length} canonical database research step(s)…` });
+
+      let hasFinalAnswer = false;
+      const callSpecs = [];
+
+      for (const tc of toolCalls) {
+        const fnName = tc.function?.name || '';
+        let parsedArgs = {};
+        try {
+          parsedArgs = JSON.parse(tc.function?.arguments || '{}');
+        } catch (e) {}
+
+        if (fnName === 'final_answer') {
+          hasFinalAnswer = true;
+        } else {
+          callSpecs.push({ id: tc.id, name: fnName, args: parsedArgs });
+        }
+      }
+
+      const toolResults = await Promise.allSettled(
+        callSpecs.map((spec) => executeAiTool(spec.name, spec.args))
+      );
+
+      for (let i = 0; i < callSpecs.length; i++) {
+        const spec = callSpecs[i];
+        const resObj = toolResults[i].status === 'fulfilled' ? toolResults[i].value : { success: false, error: toolResults[i].reason?.message };
+        const compact = formatCompactToolResponse(spec.name, resObj);
+
+        // Accumulate evidence
+        if (spec.name === 'search_sections' && resObj.results) {
+          allCollectedEvidence.sections.push(...resObj.results);
+        } else if ((spec.name === 'search_tipitaka' || spec.name === 'search_tipitaka_batch' || spec.name === 'search_by_category') && resObj.results) {
+          allCollectedEvidence.passages.push(...resObj.results);
+        } else if ((spec.name === 'get_paragraph_content' || spec.name === 'get_paragraph_content_batch') && resObj.passages) {
+          allCollectedEvidence.passages.push(...resObj.passages);
+        } else if (spec.name === 'get_commentaries' && (resObj.atthakatha || resObj.tika)) {
+          allCollectedEvidence.commentaries.push(resObj);
+        } else if ((spec.name === 'get_dictionary' || spec.name === 'get_dictionary_batch') && resObj.entries) {
+          allCollectedEvidence.dictionaries.push(...resObj.entries);
+        }
+
+        const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || spec.args?.book_code || '';
+        const summary = `${spec.name}${summaryArg ? ` (${summaryArg})` : ''}`;
+        toolLogs.push({ tool: spec.name, summary, args: spec.args });
+        onEvent('tool_call', { tool: spec.name, summary, args: spec.args });
+
+        openAiMessages.push({
+          role: 'tool',
+          tool_call_id: spec.id,
+          content: JSON.stringify(compact),
+        });
+      }
+
+      if (hasFinalAnswer) {
+        toolsDone = true;
+        break;
+      }
+    }
+  }
+
+  // Automatic Fallback Search if no passages or sections collected
+  if (allCollectedEvidence.passages.length === 0 && allCollectedEvidence.sections.length === 0) {
+    onEvent('status', { message: 'Performing canonical fallback search…' });
+    const sRes = aiSearchSections({ query: userQuery, limit: 4 });
+    if (sRes.results?.length > 0) {
+      allCollectedEvidence.sections.push(...sRes.results);
+      toolLogs.push({ tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
+      onEvent('tool_call', { tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
+    }
+    const tRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
+    if (tRes.results?.length > 0) {
+      allCollectedEvidence.passages.push(...tRes.results);
+      toolLogs.push({ tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations` });
+      onEvent('tool_call', { tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations` });
+    }
+  }
+
+  return { collectedEvidence: allCollectedEvidence, toolLogs };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONTEXT COMPILER FOR ANSWER SYNTHESIS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildSynthesisContextBlock(evidence) {
+  let block = '';
+
+  // 1. Root Passages (Mūla)
+  if (evidence.passages && evidence.passages.length > 0) {
+    block += `### CANONICAL ROOT TEXTS (MŪLA SUTTAS & VINAYA):\n\n`;
+    for (let i = 0; i < Math.min(evidence.passages.length, 10); i++) {
+      const p = evidence.passages[i];
+      const title = p.sutta_title || p.chapter_title || p.book_title || p.book_code;
+      block += `[Source ${i + 1}] ${title} (${p.book_code}) §${p.para_num || p.para_index}\n`;
+      block += `Citation: ${p.citation_ref || `[${p.book_code}:c${p.chapter_index || 0}:p${p.para_index}]`}\n`;
+      block += `Pāḷi Text:\n${p.pali || p.text || p.snippet}\n`;
+      if (p.translations?.en || p.translation_en) {
+        block += `English Translation:\n${p.translations?.en || p.translation_en}\n`;
+      }
+      block += `\n`;
+    }
+  }
+
+  // 2. Commentaries (Aṭṭhakathā & Ṭīkā)
+  if (evidence.commentaries && evidence.commentaries.length > 0) {
+    block += `### COMMENTARIAL EXPOSITIONS (AṬṬHAKATHĀ & ṬĪKĀ):\n\n`;
+    for (const comm of evidence.commentaries.slice(0, 4)) {
+      if (comm.atthakatha) {
+        for (const a of comm.atthakatha.slice(0, 2)) {
+          block += `[Commentary] ${a.book_title} (${a.book_code})\n`;
+          block += `Citation: ${a.citation_ref}\n`;
+          block += `Pāḷi Text: ${a.pali_text}\n\n`;
+        }
+      }
+      if (comm.tika) {
+        for (const t of comm.tika.slice(0, 2)) {
+          block += `[Sub-Commentary] ${t.book_title} (${t.book_code})\n`;
+          block += `Citation: ${t.citation_ref}\n`;
+          block += `Pāḷi Text: ${t.pali_text}\n\n`;
+        }
+      }
+    }
+  }
+
+  // 3. Dictionary Definitions (DPD)
+  if (evidence.dictionaries && evidence.dictionaries.length > 0) {
+    block += `### PĀḶI LINGUISTIC & DICTIONARY ANALYSIS (DPD):\n\n`;
+    for (const d of evidence.dictionaries.slice(0, 5)) {
+      block += `- Word: "${d.word}"\n  Definition: ${d.definition}\n`;
+    }
+    block += `\n`;
+  }
+
+  // 4. Section Outlines & Summaries
+  if (evidence.sections && evidence.sections.length > 0) {
+    block += `### SUTTA OUTLINES & SECTION OVERVIEWS:\n\n`;
+    for (const s of evidence.sections.slice(0, 4)) {
+      block += `- Section: ${s.title || s.sutta_title} (${s.book_title}) ${s.citation_ref}\n`;
+      if (s.snippet) {
+        block += `  Overview: ${s.snippet.replace(/<[^>]*>/g, '')}\n`;
+      }
+    }
+    block += `\n`;
+  }
+
+  return block.trim();
+}
+
+function evidenceWithFallback(ev) {
+  return ev || { sections: [], passages: [], commentaries: [], dictionaries: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1207,7 +2254,12 @@ function registerAiRoutes(fastify) {
   fastify.get('/api/ai/section', async (req) => {
     const book = req.query.book || req.query.book_code || '';
     const chap = parseInt(req.query.chapter || req.query.chapter_index || '0', 10);
-    return aiGetSection({ book_code: book, chapter_index: chap });
+    const pStart = req.query.start || req.query.para_start;
+    return aiGetSection({
+      book_code: book,
+      chapter_index: chap,
+      para_start: pStart !== undefined ? parseInt(pStart, 10) : undefined,
+    });
   });
 
   fastify.get('/api/ai/paragraph_content', async (req) => {
@@ -1228,14 +2280,26 @@ function registerAiRoutes(fastify) {
     const book = req.query.book || req.query.book_code || '';
     const chap = parseInt(req.query.chapter || req.query.chapter_index || '0', 10);
     const pnum = req.query.para || req.query.para_num || '';
-    return aiGetCommentaries({ book_code: book, chapter_index: chap, para_num: pnum });
+    const pidx = req.query.idx || req.query.para_index;
+    return aiGetCommentaries({
+      book_code: book,
+      chapter_index: chap,
+      para_num: pnum,
+      para_index: pidx !== undefined ? parseInt(pidx, 10) : undefined,
+    });
   });
 
   fastify.get('/api/ai/commentary_link', async (req) => {
     const book = req.query.book || req.query.book_code || '';
     const chap = parseInt(req.query.chapter || req.query.chapter_index || '0', 10);
     const pnum = req.query.para || req.query.para_num || '';
-    return aiGetCommentaries({ book_code: book, chapter_index: chap, para_num: pnum });
+    const pidx = req.query.idx || req.query.para_index;
+    return aiGetCommentaries({
+      book_code: book,
+      chapter_index: chap,
+      para_num: pnum,
+      para_index: pidx !== undefined ? parseInt(pidx, 10) : undefined,
+    });
   });
 
   fastify.get('/api/ai/dictionary', async (req) => {
@@ -1287,26 +2351,12 @@ function registerAiRoutes(fastify) {
     };
 
     try {
-      // 1. OFFLINE CANONICAL RAG (when no external API key is provided)
+      // 1. SMART OFFLINE CANONICAL RAG (when no external API key is provided)
       if (!apiKey || apiKey.trim().length < 5) {
         sendEvent('status', { message: 'Conducting local database search across Tipitaka…' });
 
-        const sectionRes = aiSearchSections({ query: userQuery, limit: 5 });
-        sendEvent('tool_call', {
-          tool: 'search_sections',
-          summary: `Searched section headings for "${userQuery}" (${sectionRes.results.length} matches)`,
-        });
-
-        const tipitakaRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
-        sendEvent('tool_call', {
-          tool: 'search_tipitaka',
-          summary: `Searched canonical text for "${userQuery}" (${tipitakaRes.results.length} passages found)`,
-        });
-
-        const offlineText = generateOfflineCanonicalAnswer(userQuery, [
-          { tool: 'search_sections', result: sectionRes },
-          { tool: 'search_tipitaka', result: tipitakaRes },
-        ]);
+        const { collectedEvidence, toolLogs } = await executeSmartOfflineCanonicalSearch(userQuery, sendEvent);
+        const offlineText = generateSmartOfflineCanonicalReport(userQuery, evidenceWithFallback(collectedEvidence));
 
         const chunks = offlineText.split(/(?<=\s)/);
         for (const chunk of chunks) {
@@ -1317,141 +2367,42 @@ function registerAiRoutes(fastify) {
         const citations = parseCitations(offlineText);
         sendEvent('citations', { citations });
         sendEvent('done', {
-          mode: 'offline_rag',
-          note: 'Add Gemini API Key in Settings for generative reasoning',
+          mode: 'smart_offline_rag',
+          toolCalls: toolLogs,
+          note: 'Add Gemini or OpenAI API Key in Settings to enable generative synthesis',
         });
         reply.raw.end();
         return;
       }
 
-      // 2. AGENTIC TOOL LOOP (with Gemini or OpenAI)
-      const toolSystemPrompt = customSystemPrompt.trim() || kAiDefaultToolSystemPrompt;
-      const toolLogs = [];
-      const collectedData = [];
+      // 2. AGENTIC MULTI-STEP TOOL CALLING LOOP
+      sendEvent('status', { message: 'Initiating canonical research with scholarly agent loop…' });
 
-      sendEvent('status', { message: 'Initiating canonical research…' });
+      const { collectedEvidence, toolLogs } = await runAgenticToolLoop({
+        provider,
+        apiKey: apiKey.trim(),
+        baseUrl,
+        toolModel,
+        userQuery,
+        customSystemPrompt,
+        onEvent: sendEvent,
+      });
 
-      // PHASE 1: Function Calling Loop
-      let toolIterations = 0;
-      const maxIterations = 5;
-      let toolsDone = false;
+      // 3. SYNTHESIS PHASE WITH ANSWER MODEL
+      sendEvent('status', { message: 'Synthesizing authoritative response with canonical citations…' });
 
-      if (provider === 'gemini') {
-        const conversationParts = [{ role: 'user', parts: [{ text: userQuery }] }];
-
-        while (!toolsDone && toolIterations < maxIterations) {
-          toolIterations++;
-          const geminiToolUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey}`;
-          const toolPayload = {
-            system_instruction: { parts: [{ text: toolSystemPrompt }] },
-            contents: conversationParts,
-            tools: [{ functionDeclarations: kAiToolDeclarations }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
-          };
-
-          try {
-            const toolRes = await fetch(geminiToolUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(toolPayload),
-            });
-
-            if (!toolRes.ok) break;
-            const resJson = await toolRes.json();
-            const candidate = resJson.candidates?.[0];
-            const parts = candidate?.content?.parts || [];
-
-            conversationParts.push(candidate.content);
-
-            const callSpecs = [];
-            let hasFinalAnswer = false;
-
-            for (const part of parts) {
-              if (part.functionCall) {
-                const fc = part.functionCall;
-                if (fc.name === 'final_answer') {
-                  hasFinalAnswer = true;
-                } else {
-                  callSpecs.push(fc);
-                }
-              }
-            }
-
-            if (callSpecs.length === 0) {
-              toolsDone = true;
-              break;
-            }
-
-            const functionResponses = [];
-            for (const spec of callSpecs) {
-              sendEvent('status', { message: `Researching: ${spec.name}…` });
-              const execRes = await executeAiTool(spec.name, spec.args || {});
-              collectedData.push({ tool: spec.name, args: spec.args, result: execRes });
-
-              const summary = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.book_code || spec.name;
-              toolLogs.push({ tool: spec.name, summary: `${spec.name}: ${summary}` });
-              sendEvent('tool_call', { tool: spec.name, summary: `Executed ${spec.name} (${summary})` });
-
-              const resultStr = JSON.stringify(execRes).slice(0, 3000);
-              functionResponses.push({
-                functionResponse: {
-                  name: spec.name,
-                  response: { content: resultStr },
-                },
-              });
-            }
-
-            conversationParts.push({ role: 'user', parts: functionResponses });
-            if (hasFinalAnswer) {
-              toolsDone = true;
-              break;
-            }
-          } catch (err) {
-            console.warn('[Gemini Tool Loop Error]', err.message);
-            break;
-          }
-        }
-      }
-
-      // If tool loop returned no results, run default fallback searches
-      if (collectedData.length === 0) {
-        const sRes = aiSearchSections({ query: userQuery, limit: 4 });
-        if (sRes.results.length > 0) {
-          collectedData.push({ tool: 'search_sections', result: sRes });
-          toolLogs.push({ tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
-          sendEvent('tool_call', { tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
-        }
-        const tRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
-        if (tRes.results.length > 0) {
-          collectedData.push({ tool: 'search_tipitaka', result: tRes });
-          toolLogs.push({ tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages` });
-          sendEvent('tool_call', { tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations` });
-        }
-      }
-
-      // PHASE 2: Synthesis with Answer Model
-      sendEvent('status', { message: 'Synthesizing response with canonical citations…' });
-
-      let contextBlock = '';
-      for (const item of collectedData) {
-        if (item.result?.passages) {
-          contextBlock += item.result.passages.map((p, idx) => `[Source ${idx + 1}] ${p.book_title} (${p.book_code}) §${p.para_num || p.para_index}\nCitation: ${p.citation_ref}\nPāḷi: ${p.pali}\n${p.translations?.en ? `English: ${p.translations.en}\n` : ''}`).join('\n\n') + '\n\n';
-        } else if (item.result?.results) {
-          contextBlock += item.result.results.map((r, idx) => `[Source ${idx + 1}] ${r.book_title} (${r.book_code}) §${r.para_num || r.para_index}\nCitation: ${r.citation_ref}\nText: ${r.text || r.snippet}\n${r.translations?.en ? `English: ${r.translations.en}\n` : ''}`).join('\n\n') + '\n\n';
-        }
-      }
-
+      const contextBlock = buildSynthesisContextBlock(collectedEvidence);
       const answerSystemPrompt = buildAnswerSystemPrompt({ orthodoxMode });
       const synthesisPrompt = `USER QUESTION:
 ${userQuery}
 
-CANONICAL EVIDENCE GATHERED FROM TIPITAKA DATABASE:
-${contextBlock || 'No direct text matches found; please synthesize strictly according to canonical Theravāda principles.'}
+VERIFIED CANONICAL EVIDENCE GATHERED FROM TIPITAKA DATABASE:
+${contextBlock || 'No direct text matches found in search; please synthesize strictly according to canonical Theravāda principles.'}
 
-Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases accurately and format EVERY citation as [book_code:c{chap}:p{para}].`;
+Please write a comprehensive, clearly structured answer. Quote Pāḷi verses or phrases accurately and format EVERY citation as [book_code:c{chapter_index}:p{para_index}].`;
 
       if (provider === 'gemini') {
-        const geminiStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${answerModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
+        const geminiStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${answerModel}:streamGenerateContent?alt=sse&key=${apiKey.trim()}`;
         const payload = {
           system_instruction: { parts: [{ text: answerSystemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: synthesisPrompt }] }],
@@ -1462,6 +2413,7 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
         });
 
         if (!res.ok) {
@@ -1481,7 +2433,7 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
-          buffer = lines.pop();
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             const trimmed = line.trim();
@@ -1501,10 +2453,15 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
 
         const citations = parseCitations(fullAnswer);
         sendEvent('citations', { citations });
-        sendEvent('done', { toolCalls: toolLogs });
+        sendEvent('done', { toolCalls: toolLogs, mode: 'gemini_agent_loop' });
       } else {
-        // OpenAI / OpenRouter / Custom
-        const endpoint = (baseUrl && baseUrl.trim()) ? `${baseUrl.trim().replace(/\/+$/, '')}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+        // OpenAI / OpenRouter / Custom endpoints
+        const endpoint = (baseUrl && baseUrl.trim())
+          ? `${baseUrl.trim().replace(/\/+$/, '')}/chat/completions`
+          : provider === 'openrouter'
+          ? 'https://openrouter.ai/api/v1/chat/completions'
+          : 'https://api.openai.com/v1/chat/completions';
+
         const payload = {
           model: answerModel || 'gpt-4o-mini',
           messages: [
@@ -1515,13 +2472,20 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
           stream: true,
         };
 
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`,
+        };
+        if (provider === 'openrouter') {
+          headers['HTTP-Referer'] = 'https://tipitakapali.org';
+          headers['X-Title'] = 'tipitakapali.org';
+        }
+
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
+          headers,
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
         });
 
         if (!res.ok) {
@@ -1541,7 +2505,7 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
-          buffer = lines.pop();
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             const trimmed = line.trim();
@@ -1561,7 +2525,7 @@ Write a comprehensive, clear, structured answer. Quote Pāḷi verses or phrases
 
         const citations = parseCitations(fullAnswer);
         sendEvent('citations', { citations });
-        sendEvent('done', { toolCalls: toolLogs });
+        sendEvent('done', { toolCalls: toolLogs, mode: 'openai_agent_loop' });
       }
     } catch (err) {
       console.error('[AI Chat Stream Error]', err);
@@ -1585,4 +2549,7 @@ module.exports = {
   aiGetBooks,
   parseCitations,
   resolveCanonicalBookCode,
+  kAiToolDeclarations,
+  getOpenAiToolDeclarations,
+  buildSynthesisContextBlock,
 };
