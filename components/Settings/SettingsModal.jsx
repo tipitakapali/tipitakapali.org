@@ -20,7 +20,7 @@ import {
   BookOpen,
   Search,
   Layers,
-  BookA,
+  BookSearch,
   PanelLeft,
   PanelRight,
   Maximize2,
@@ -39,7 +39,7 @@ const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v2';
 
 const TABS = [
   { id: 'backup', label: 'Reset', icon: RotateCcw },
-  { id: 'dictionary', label: 'Dictionary', icon: BookA },
+  { id: 'dictionary', label: 'Dictionary', icon: BookSearch },
   { id: 'themes', label: 'Themes', icon: Palette },
   { id: 'typography', label: 'Typography', icon: Type },
   { id: 'display', label: 'Page Editions', icon: Eye },
@@ -361,7 +361,7 @@ export default function SettingsModal() {
                 <div className="pt-3 border-t border-[var(--border-color)]">
                   <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
                     <span className="flex items-center gap-1.5">
-                      <BookA size={14} className="text-[var(--accent)]" />
+                      <BookSearch size={14} className="text-[var(--accent)]" />
                       <span>Dictionary Font Size</span>
                     </span>
                     <span className="font-mono text-[var(--accent)] font-bold">

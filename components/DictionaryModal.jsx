@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  BookA,
+  BookSearch,
   X,
   Search,
   ArrowLeft,
@@ -812,7 +812,7 @@ export default function DictionaryModal() {
 
         {/* Input Field with Dictionary Icon */}
         <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-0">
-          <BookA size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
+          <BookSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
           <input
             ref={inputRef}
             type="text"

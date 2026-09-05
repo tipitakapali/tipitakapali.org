@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
-import { Bookmark, BookmarkCheck, BookA } from 'lucide-react';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
 import BookTocView from './BookTocView';
@@ -340,14 +340,23 @@ function injectTranslationsIntoHtml(
             content = highlightTranslationText(content, searchHighlight.query, layer.lang);
           }
 
-          const blockClasses = !isPaliEnabled && isHeading
-            ? 'reader-trans-block reader-trans-heading-block'
-            : 'reader-trans-block';
+          // Task 2: Typographic and formatting classes from the original Pali <p> inherited by translation content
+          const inheritedClasses = pClasses.filter((c) =>
+            /^(nikaya|book|title|subhead|subsubhead|chapter|centre|centered|bodytext|indent|hangnum|unindented|gatha1|gatha2|gatha3|gathalast)$/i.test(c)
+          );
+          if (inheritedClasses.length === 0 && paraType) {
+            inheritedClasses.push(paraType);
+          }
 
-          // Task 1: Traditional Tipitaka Indents applied to translation content
+          const blockClasses = [
+            'reader-trans-block',
+            isHeading ? 'reader-trans-heading-block' : '',
+            ...inheritedClasses,
+          ].filter(Boolean).join(' ');
+
           const contentClasses = [
             'reader-trans-content',
-            paraType || '',
+            ...inheritedClasses,
           ].filter(Boolean).join(' ');
 
           // Task 3: Dynamically apply custom colors for translation language
@@ -1068,7 +1077,7 @@ export default function ReaderView() {
     }
 
     let retries = 0;
-    const maxRetries = 40; // Check every 60ms for up to 2.4 seconds
+    const maxRetries = 80; // Check every 50ms for up to 4.0 seconds (sufficient time for chapter & translation loading)
 
     let timerId = null;
 
@@ -1141,8 +1150,77 @@ export default function ReaderView() {
     const attemptScroll = () => {
       if (!containerRef.current) return;
 
-      // 1. Target paragraph by number (Highest Priority for Bookmarks, History, MAT, and GoTo)
-      if (paraNum) {
+      // 1. Target paragraph by index (Highest Priority for Translation FTS, Pāḷi FTS, TOC, and para_index targets)
+      if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
+        const chapterEl = (chapterIdx !== undefined && chapterIdx !== null)
+          ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+          : null;
+
+        // If target chapter element is still a placeholder or not in DOM yet, wait and retry
+        if (chapterIdx !== undefined && chapterIdx !== null && (!chapterEl || chapterEl.classList.contains('chapter-placeholder'))) {
+          // Chapter HTML still loading/rendering, will retry on next tick
+        } else {
+          const scope = chapterEl || containerRef.current;
+          const el =
+            scope.querySelector(`.reader-para-row[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`p[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`[id="pindex-${paraIndex}"]`) ||
+            findElement(`pindex-${paraIndex}`);
+
+          if (el) {
+            let targetEl = null;
+            if (isTransTarget) {
+              const row = el.closest('.reader-para-row') || el;
+              const transEl =
+                row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`) ||
+                row?.querySelector(`[data-trans-lang="${targetTransLang}"]`);
+
+              if (transEl) {
+                targetEl = transEl;
+              } else {
+                // Check if translations for this chapter have already arrived into the DOM
+                const chapterHasTranslations = Boolean(
+                  (chapterEl || containerRef.current)?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`)
+                );
+                if (chapterHasTranslations) {
+                  // Translation loaded for this chapter, but this specific paragraph has no translation: fall back to Pali
+                  targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+                } else if (retries < maxRetries - 5) {
+                  // Wait for translation block to finish loading and rendering before jumping
+                  targetEl = null;
+                } else {
+                  targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+                }
+              }
+            } else {
+              targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+            }
+
+            if (targetEl) {
+              const containerRect = containerRef.current.getBoundingClientRect();
+              const rect = targetEl.getBoundingClientRect();
+              const currentScroll = containerRef.current.scrollTop;
+              const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+              smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+              if (settings.pulseAnimation) {
+                targetEl.classList.remove('pulse-highlight');
+                void targetEl.offsetWidth;
+                targetEl.classList.add('pulse-highlight');
+              }
+              const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
+              if (foundPNum) setActiveParaNum(foundPNum);
+              saveTabScroll(activeTab.bookCode, offset);
+              clearTargetScrollIntent();
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Target paragraph by number (Bookmarks, History, MAT, and GoTo)
+      if (paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '')) {
         const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
         const targetInt = parseInt(cleanPara, 10);
 
@@ -1324,56 +1402,8 @@ export default function ReaderView() {
         }
       }
 
-      // 3. Target paragraph by index (within chapter if given)
-      if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
-        const scope = (chapterIdx !== undefined && chapterIdx !== null)
-          ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`) || containerRef.current
-          : containerRef.current;
-        const el =
-          scope.querySelector(`[id="pindex-${paraIndex}"]`) ||
-          scope.querySelector(`p[data-pindex="${paraIndex}"]`) ||
-          scope.querySelector(`[data-pindex="${paraIndex}"]`) ||
-          findElement(`pindex-${paraIndex}`);
-
-        if (el) {
-          let targetEl = null;
-          if (isTransTarget) {
-            const row = el.closest('.reader-para-row') || el;
-            const transEl = row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`);
-            if (transEl) {
-              targetEl = transEl;
-            } else if (retries < maxRetries - 2) {
-              // Translation block still loading/rendering, wait and retry
-            } else {
-              targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
-            }
-          } else {
-            targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
-          }
-
-          if (targetEl) {
-            const containerRect = containerRef.current.getBoundingClientRect();
-            const rect = targetEl.getBoundingClientRect();
-            const currentScroll = containerRef.current.scrollTop;
-            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-
-            if (settings.pulseAnimation) {
-              targetEl.classList.remove('pulse-highlight');
-              void targetEl.offsetWidth;
-              targetEl.classList.add('pulse-highlight');
-            }
-            const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
-            if (foundPNum) setActiveParaNum(foundPNum);
-            saveTabScroll(activeTab.bookCode, offset);
-            clearTargetScrollIntent();
-            return;
-          }
-        }
-      }
-
       // 4. Target chapter header
-      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && paraIndex === undefined && !page) {
+      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '') && !page) {
         if (chapterIdx === 0) {
           smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
           saveTabScroll(activeTab.bookCode, 0);
@@ -1440,7 +1470,7 @@ export default function ReaderView() {
 
       retries++;
       if (retries < maxRetries) {
-        timerId = setTimeout(attemptScroll, 60);
+        timerId = setTimeout(attemptScroll, 50);
       } else {
         clearTargetScrollIntent();
       }

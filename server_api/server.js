@@ -960,7 +960,8 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
 // Helper to build FTS5 match query supporting single words, exact phrases, proximity (NEAR), and multi-word AND
 function buildFts5Query(cleanText, distance = 'any') {
   if (!cleanText) return '';
-  const tokens = cleanText
+  const tokens = String(cleanText)
+    .normalize('NFC')
     .replace(/[^\p{L}\p{N}\p{M}\u200C\u200D\s*]/gu, ' ')
     .trim()
     .split(/\s+/)
@@ -1150,7 +1151,7 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
   // Full-Text Search across 520,000+ paragraphs with In-Memory LRU Caching
   fastify.get('/api/search', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
-    const rawQuery = req.query.q || req.query.query || '';
+    const rawQuery = String(req.query.q || req.query.query || '').trim().normalize('NFC');
     const dbParam = req.query.db || req.query.lang || 'pali';
     const target = getSearchDatabase(dbParam);
     const isPali = target.isPali;
@@ -1166,17 +1167,17 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = Math.max(0, parseInt(req.query.offset || '0', 10));
 
-    const isCjkChar = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery.trim());
+    const isCjkChar = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery);
     const minLength = isCjkChar ? 1 : 2;
 
-    if (!rawQuery || rawQuery.trim().length < minLength) {
+    if (!rawQuery || rawQuery.length < minLength) {
       return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
     }
 
-    // Auto-normalize Velthuis typing and nigghahita for Pāḷi searches only
+    // Auto-normalize Velthuis typing and nigghahita for Pāḷi searches only (all normalized to NFC)
     const cleanQuery = isPali
-      ? typeVelthuis(rawQuery.trim()).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ').trim()
-      : rawQuery.trim();
+      ? typeVelthuis(rawQuery).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ').trim().normalize('NFC')
+      : rawQuery;
 
     // Construct FTS5 match query
     const ftsMatch = buildFts5Query(cleanQuery, distanceVal);

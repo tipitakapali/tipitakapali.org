@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Search, Settings, Bookmark, HelpCircle, BookA } from 'lucide-react';
+import { Menu, Search, Settings, Bookmark, HelpCircle, BookSearch } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import HelpModal from './HelpModal';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -143,7 +143,7 @@ export default function Header() {
           title="Pāḷi Dictionary Look-up"
           aria-label="Pāḷi Dictionary Look-up"
         >
-          <BookA size={14} className="text-[var(--accent)]" />
+          <BookSearch size={14} className="text-[var(--accent)]" />
           <span className="hidden sm:inline">Dict</span>
         </button>
 

@@ -670,29 +670,27 @@ export function TabProvider({ children }) {
 
         const targetSub = options.targetSubBook || tab.sub_book || tab.chapter_to_sub_book?.[targetChapIdx ?? tab.currentChapterIdx ?? 0];
         let effectivePara = rawParaNum;
-        if (rawParaNum && tab.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
-          if (resolved) {
-            if (!hasTargetChapter || resolved.isSubSpecific) {
-              targetChapIdx = resolved.chapterIdx;
-              hasTargetChapter = true;
-            }
-            effectivePara = resolved.paraNum || rawParaNum;
-          }
-        }
-        if (effectivePara) {
-          setActiveParaNum(effectivePara);
-        }
 
-        // Fallback: resolve chapter via para_index for headings/subheads where para_num is empty
-        if (!hasTargetChapter && options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
+        // 1. If targetParaIndex is explicitly provided (e.g. from FTS translation search or TOC), resolve target chapter directly and accurately
+        if (options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
           const chapFromIdx = getChapterIdxForParaIndex(tab.chapters, options.targetParaIndex);
           if (chapFromIdx !== null && chapFromIdx !== undefined) {
             targetChapIdx = chapFromIdx;
             hasTargetChapter = true;
-            // For para_index targets (e.g. sutta titles), clear activeParaNum if it was stale from previous chapter
-            // ReaderView will scroll via paraIndex, not paraNum
           }
+        }
+
+        // 2. If targetChapter not resolved via targetParaIndex, resolve via rawParaNum
+        if (!hasTargetChapter && rawParaNum && tab.para_to_chapter) {
+          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
+          if (resolved) {
+            targetChapIdx = resolved.chapterIdx;
+            hasTargetChapter = true;
+            effectivePara = resolved.paraNum || rawParaNum;
+          }
+        }
+        if (effectivePara && (!options.lang || options.lang === 'pali')) {
+          setActiveParaNum(effectivePara);
         }
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
@@ -918,27 +916,27 @@ export function TabProvider({ children }) {
 
         const targetSub = options.targetSubBook || bookData.sub_book || bookData.chapter_to_sub_book?.[targetChapIdx ?? 0];
         let effectivePara = rawParaNum;
-        if (rawParaNum && bookData.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
-          if (resolved) {
-            if (!hasTargetChapter || resolved.isSubSpecific) {
-              targetChapIdx = resolved.chapterIdx;
-              hasTargetChapter = true;
-            }
-            effectivePara = resolved.paraNum || rawParaNum;
-          }
-        }
-        if (effectivePara) {
-          setActiveParaNum(effectivePara);
-        }
 
-        // Fallback: resolve chapter via para_index for headings where para_num is empty (e.g. Paṭhamakoṭigāmasuttaṃ)
-        if (!hasTargetChapter && options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
+        // 1. If targetParaIndex is explicitly provided (e.g. from FTS translation search or TOC), resolve target chapter directly and accurately
+        if (options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
           const chapFromIdx = getChapterIdxForParaIndex(bookData.chapters, options.targetParaIndex);
           if (chapFromIdx !== null && chapFromIdx !== undefined) {
             targetChapIdx = chapFromIdx;
             hasTargetChapter = true;
           }
+        }
+
+        // 2. If targetChapter not resolved via targetParaIndex, resolve via rawParaNum
+        if (!hasTargetChapter && rawParaNum && bookData.para_to_chapter) {
+          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
+          if (resolved) {
+            targetChapIdx = resolved.chapterIdx;
+            hasTargetChapter = true;
+            effectivePara = resolved.paraNum || rawParaNum;
+          }
+        }
+        if (effectivePara && (!options.lang || options.lang === 'pali')) {
+          setActiveParaNum(effectivePara);
         }
 
         // Critical: Ensure targetChapIdx is loaded into chapters_data (especially in static Cloudflare Pages mode)

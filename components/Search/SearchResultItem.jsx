@@ -72,6 +72,7 @@ export default function SearchResultItem({ result, onClick }) {
       </div>
       <div
         className="result-snippet"
+        data-trans-lang={isTranslation ? result.lang : undefined}
         dangerouslySetInnerHTML={{ __html: displaySnippet }}
       />
     </div>

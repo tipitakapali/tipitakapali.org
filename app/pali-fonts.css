@@ -133,6 +133,24 @@
   line-height: 1.85;
 }
 
+/* Myanmar translation blocks typography using local Pyidaungsu (Task 1) */
+.reader-trans-block[data-trans-lang="my"],
+.reader-trans-block[data-trans-lang="myanmar"],
+.reader-trans-block[data-trans-lang="my_nissaya"],
+.reader-trans-block[data-trans-lang="my"] *,
+.reader-trans-block[data-trans-lang="myanmar"] *,
+.reader-trans-block[data-trans-lang="my_nissaya"] *,
+.result-snippet[data-trans-lang="my"],
+.result-snippet[data-trans-lang="myanmar"],
+.result-snippet[data-trans-lang="my_nissaya"],
+.result-snippet[data-trans-lang="my"] *,
+.result-snippet[data-trans-lang="myanmar"] *,
+.result-snippet[data-trans-lang="my_nissaya"] * {
+  font-family: "Pyidaungsu", "Myanmar Text", Myanmar Text, sans-serif;
+  line-height: 2.1;
+}
+
+
 /* Noto Serif (Vietnamese + Pali Roman diacritics) */
 @font-face {
   font-family: "Noto Serif";

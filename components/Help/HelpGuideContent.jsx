@@ -8,7 +8,7 @@ import {
   Search,
   Layers,
   Sparkles,
-  BookA,
+  BookSearch,
   ArrowRightLeft,
   CheckCircle2,
   ExternalLink,
@@ -25,7 +25,7 @@ export const HELP_SECTIONS = [
   { id: 'topic-overview', label: 'TipitakaPali.org Overview', icon: BookOpen },
   { id: 'topic-translations', label: 'Translations & Pāḷi Layers', icon: Languages },
   { id: 'topic-search', label: 'Full-Text Search (FTS5)', icon: Search },
-  { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookA },
+  { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookSearch },
   { id: 'topic-velthuis', label: 'Velthuis & 17 Pāḷi Scripts', icon: Keyboard },
   { id: 'topic-mat', label: 'MAT Cross-Navigation', icon: Layers },
   { id: 'topic-shortcuts', label: 'Shortcuts & Page Editions', icon: Sliders },
@@ -393,7 +393,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
       {/* 3. Integrated Dictionaries */}
       <section id="topic-dict" className="scroll-mt-14 space-y-4 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
         <div className="flex items-center gap-2">
-          <BookA size={16} className="text-[var(--accent)]" />
+          <BookSearch size={16} className="text-[var(--accent)]" />
           <h3 className="font-bold text-sm text-[var(--text-primary)]">
             Integrated Pāḷi & Sanskrit Dictionaries
           </h3>

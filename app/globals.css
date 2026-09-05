@@ -511,6 +511,106 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   text-indent: 0 !important;
 }
 
+/* Translation Heading & Typographic Styling Inherited from Pali (Task 2) */
+.reader-container .reader-trans-content.nikaya {
+  font-size: 1.5em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+.reader-container .reader-trans-content.book {
+  font-size: 1.85em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+  line-height: 1.3;
+}
+
+.reader-container .reader-trans-content.chapter {
+  font-size: 1.4em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+.reader-container .reader-trans-content.title {
+  font-size: 1.25em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+.reader-container .reader-trans-content.subhead {
+  font-size: 1.15em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+.reader-container .reader-trans-content.subsubhead {
+  font-size: 1.05em;
+  font-weight: bold;
+  text-align: center !important;
+  text-indent: 0 !important;
+}
+
+.reader-container .reader-trans-content.gatha1,
+.reader-container .reader-trans-content.gatha2,
+.reader-container .reader-trans-content.gatha3 {
+  margin-left: 3.5em;
+  padding-left: 0;
+  text-indent: 0;
+  text-align: left;
+  margin-bottom: 0.25em;
+}
+
+.reader-container .reader-trans-content.gathalast {
+  margin-left: 3.5em;
+  padding-left: 0;
+  text-indent: 0;
+  text-align: left;
+  margin-bottom: 0.5em;
+}
+
+.reader-container .reader-trans-block.gatha1,
+.reader-container .reader-trans-block.gatha2,
+.reader-container .reader-trans-block.gatha3,
+.reader-container .reader-trans-block.gathalast {
+  margin-left: 3.5em;
+}
+
+.reader-container .reader-trans-block.gatha1 .reader-trans-content,
+.reader-container .reader-trans-block.gatha2 .reader-trans-content,
+.reader-container .reader-trans-block.gatha3 .reader-trans-content,
+.reader-container .reader-trans-block.gathalast .reader-trans-content {
+  margin-left: 0;
+}
+
+.reader-container .reader-trans-block.reader-trans-heading-block,
+.reader-container .reader-trans-block.book,
+.reader-container .reader-trans-block.chapter,
+.reader-container .reader-trans-block.title,
+.reader-container .reader-trans-block.subhead,
+.reader-container .reader-trans-block.subsubhead,
+.reader-container .reader-trans-block.nikaya,
+.reader-container .reader-trans-block.centre,
+.reader-container .reader-trans-block.centered {
+  text-align: center;
+}
+
+/* Ensure translation custom text color and language font settings are preserved and not overridden by Pali heading color */
+.reader-trans-block .reader-trans-content.book,
+.reader-trans-block .reader-trans-content.nikaya,
+.reader-trans-block .reader-trans-content.chapter,
+.reader-trans-block .reader-trans-content.title,
+.reader-trans-block .reader-trans-content.subhead,
+.reader-trans-block .reader-trans-content.subsubhead {
+  color: inherit;
+  margin-top: 0.25em;
+  margin-bottom: 0.25em !important;
+}
+
 body.no-indent .reader-container .reader-trans-content.bodytext,
 body.no-indent .reader-container .reader-trans-content.indent {
   text-indent: 0 !important;
@@ -864,9 +964,27 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 }
 
 /* Script-specific typography adjustments for translations */
+.reader-trans-block[data-trans-lang="my"],
+.reader-trans-block[data-trans-lang="myanmar"],
+.reader-trans-block[data-trans-lang="my_nissaya"],
+.reader-trans-block[data-trans-lang="my"] *,
+.reader-trans-block[data-trans-lang="myanmar"] *,
+.reader-trans-block[data-trans-lang="my_nissaya"] *,
+.result-snippet[data-trans-lang="my"],
+.result-snippet[data-trans-lang="myanmar"],
+.result-snippet[data-trans-lang="my_nissaya"],
+.result-snippet[data-trans-lang="my"] *,
+.result-snippet[data-trans-lang="myanmar"] *,
+.result-snippet[data-trans-lang="my_nissaya"] * {
+  font-family: "Pyidaungsu", "Myanmar Text", Myanmar Text, sans-serif;
+}
+
+.reader-trans-block[data-trans-lang="my"],
+.reader-trans-block[data-trans-lang="myanmar"],
+.reader-trans-block[data-trans-lang="my_nissaya"],
 .reader-trans-block[data-trans-lang="my"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="myanmar"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="my_nissaya"] .reader-trans-content {
-  font-family: "Padauk", "Myanmar Text", sans-serif;
   line-height: 2.1;
   font-size: calc(var(--font-size-base, 22px) * 0.95);
 }

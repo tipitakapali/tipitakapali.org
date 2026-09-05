@@ -813,6 +813,8 @@ export default function LanguageMenu() {
                           fontFamily:
                             colorPickerTarget.id === 'vietnamese'
                               ? '"Be Vietnam Pro", "Noto Serif", "Literata", serif'
+                              : colorPickerTarget.id === 'myanmar' || colorPickerTarget.id === 'my_nissaya'
+                              ? '"Pyidaungsu", Myanmar Text, sans-serif'
                               : 'inherit',
                         }}
                       >
@@ -820,6 +822,8 @@ export default function LanguageMenu() {
                           ? 'Namo tassa bhagavato arahato sammāsambuddhassa. Evaṃ me sutaṃ—ekaṃ samayaṃ bhagavā...'
                           : colorPickerTarget.id === 'vietnamese'
                           ? 'Tôi từng nghe như vầy: Một thời Thế Tôn du hành trên đại đạo giữa Rājagaha và Nālandā (ā, ī, ū, ṭ, ḍ, ṇ, ṅ, ñ, ḷ, ṃ)...'
+                          : colorPickerTarget.id === 'myanmar' || colorPickerTarget.id === 'my_nissaya'
+                          ? 'မြတ်စွာဘုရား၊ အရဟန္တ၊ သမ္မာသမ္ဗုဒ္ဓမြတ်စွာဘုရားအား ရှိခိုးပါ၏။ ဧဝံ မေ သုတံ—ဧကံ သမယံ ဘဂဝါ...'
                           : 'Thus have I heard. On one occasion the Blessed One was travelling along the highway between Rājagaha and Nālandā...'}
                       </p>
                     </div>

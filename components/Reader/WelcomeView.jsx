@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, BookA, PanelLeft, History, Bookmark, Sparkles, Bot, X, Send } from 'lucide-react';
+import { Search, BookSearch, PanelLeft, History, Bookmark, Sparkles, Bot, X, Send } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useDictionary } from '../../context/DictionaryContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
@@ -174,7 +174,7 @@ export default function WelcomeView() {
       {/* Dictionary input — below category cards */}
       <div className="w-full mt-5">
         <form onSubmit={handleDictSearch} className="relative group w-full">
-          <BookA size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition" />
+          <BookSearch size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition" />
           <input
             type="text"
             value={dictQuery}

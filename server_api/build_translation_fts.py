@@ -28,6 +28,7 @@ import re
 import sqlite3
 import sys
 import time
+import unicodedata
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(SCRIPT_DIR, "db")
@@ -43,6 +44,7 @@ ALL_LANGS = [
 def clean_translation_text(raw_text: str) -> str:
     """
     Sanitizes paragraph translation text for FTS5 full-text indexing:
+      - Normalizes Unicode to NFC (composed forms)
       - Strips HTML / XML tags (e.g. <i>, </i>, <b>, <span>, <pb.../>)
       - Preserves Unicode diacritics and text
       - Strips zero-width spaces and BOMs (preserves ZWJ/ZWNJ for Indic scripts)
@@ -50,8 +52,10 @@ def clean_translation_text(raw_text: str) -> str:
     """
     if not raw_text:
         return ""
+    # Normalize Unicode to NFC
+    text = unicodedata.normalize("NFC", raw_text)
     # Strip HTML / XML markup
-    text = re.sub(r"<[^>]+>", " ", raw_text)
+    text = re.sub(r"<[^>]+>", " ", text)
     # Strip zero-width space \u200B and byte order mark \uFEFF and non-breaking space \u00A0
     text = re.sub(r"[\u200B\uFEFF\u00A0]", " ", text)
     # Collapse whitespace

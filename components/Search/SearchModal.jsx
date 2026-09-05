@@ -148,35 +148,8 @@ export default function SearchModal() {
   const [ftsDatabases, setFtsDatabases] = useState(DEFAULT_FTS_DATABASES);
   const isPaliDb = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
 
-  // Task 1: Filter databases to only show those currently enabled in the Language menu
-  const enabledFtsDatabases = useMemo(() => {
-    const transSettings = settings?.translations || {};
-    return ftsDatabases.filter((db) => {
-      const isPali = Boolean(db.isPali || db.id === 'fts_tipitaka.db' || db.key === 'pali');
-      if (isPali) {
-        return transSettings.pali !== false;
-      }
-      const langKey = toLangKey(db.key || db.id);
-      return Boolean(transSettings[langKey]);
-    });
-  }, [ftsDatabases, settings?.translations]);
-
-  // Gracefully fall back to fts_tipitaka.db or first available enabled database if selectedDb is not in enabled list
-  useEffect(() => {
-    if (enabledFtsDatabases.length > 0) {
-      const isCurrentEnabled = enabledFtsDatabases.some((d) => d.id === selectedDb);
-      if (!isCurrentEnabled) {
-        const fallbackDb =
-          enabledFtsDatabases.find((d) => d.id === 'fts_tipitaka.db' || d.key === 'pali') ||
-          enabledFtsDatabases[0];
-        if (fallbackDb) {
-          setSelectedDb(fallbackDb.id);
-        }
-      }
-    }
-  }, [enabledFtsDatabases, selectedDb]);
-
-  const displayedDatabases = enabledFtsDatabases.length > 0 ? enabledFtsDatabases : DEFAULT_FTS_DATABASES.slice(0, 1);
+  // All available FTS databases from server or fallback defaults
+  const displayedDatabases = ftsDatabases && ftsDatabases.length > 0 ? ftsDatabases : DEFAULT_FTS_DATABASES;
 
   // Search Filter and Sort Controls (Default: Piṭaka Sort, Any Distance, All MAT, All Piṭakas)
   const [matFilter, setMatFilter] = useState('all');
@@ -277,6 +250,8 @@ export default function SearchModal() {
         abortControllerRef.current?.abort();
         abortControllerRef.current = new AbortController();
         setLoading(true);
+        setResults([]);
+        setTotal(0);
       } else {
         setLoadingMore(true);
       }
@@ -390,6 +365,8 @@ export default function SearchModal() {
   const handleDbChange = (e) => {
     const newDb = e.target.value;
     setSelectedDb(newDb);
+    setResults([]);
+    setTotal(0);
     savePrefs(matFilter, pitakaFilter, distanceFilter, sortOption, newDb);
 
     const isNewPali = newDb === 'fts_tipitaka.db' || newDb === 'pali';
@@ -463,7 +440,7 @@ export default function SearchModal() {
 
     await openBook(result.book_code, {
       targetParaIndex: result.para_index,
-      targetParaNum: cleanParaNum,
+      targetParaNum: isPali ? cleanParaNum : undefined,
       highlightQuery: romanQuery,
       searchQuery: romanQuery || query.trim(),
       lang: cleanLangCode,
