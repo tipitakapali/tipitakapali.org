@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, BookSearch, PanelLeft, History, Bookmark, Sparkles, Bot, X, Send } from 'lucide-react';
+import { Search, BookSearch, PanelLeft, History, Bookmark, Sparkles, Bot } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useDictionary } from '../../context/DictionaryContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
@@ -9,12 +9,10 @@ import { convertPaliScript } from '../../services/transliterate';
 import { typeVelthuis } from '../../services/transliterate';
 
 export default function WelcomeView() {
-  const { recentHistory, bookmarks, setIsHistoryOpen, setIsBookmarkOpen, setIsSidebarOpen, openBook } = useTabs();
+  const { recentHistory, bookmarks, setIsHistoryOpen, setIsBookmarkOpen, setIsSidebarOpen, openBook, openAiChatTab } = useTabs();
   const { settings, setIsZenMode } = useThemeSettings();
   const { openDictionary } = useDictionary();
   const [dictQuery, setDictQuery] = useState('');
-  const [isAISayaOpen, setIsAISayaOpen] = useState(false);
-  const [aiInput, setAiInput] = useState('');
 
   const { openSearchModal, isSidebarOpen, setIsHeaderVisible } = useTabs();
 
@@ -46,13 +44,6 @@ export default function WelcomeView() {
       e.preventDefault();
       handleDictSearch();
     }
-  };
-
-  const handleAISubmit = (e) => {
-    if (e) e.preventDefault();
-    if (!aiInput.trim()) return;
-    setAiInput('');
-    setIsAISayaOpen(false);
   };
 
   return (
@@ -153,18 +144,18 @@ export default function WelcomeView() {
           </div>
         </button>
 
-        {/* 4. Study with AI Assistant */}
+        {/* 4. Study with Ani (AI Nissaya) */}
         <button
-          onClick={() => setIsAISayaOpen(true)}
+          onClick={() => openAiChatTab()}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !bg-gradient-to-br from-[var(--bg-card)] to-[var(--accent-light)]/40 !min-h-0"
         >
-          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">AI</div>
+          <div className="absolute top-1.5 right-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--accent)] text-white">Ani</div>
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:scale-105 transition shrink-0">
-            <Bot size={16} />
+            <Bot size={18} />
           </div>
           <div className="min-w-0 flex-1 pr-6">
             <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-violet-600 transition flex items-center gap-1 truncate">
-              AI Assistant <Sparkles size={11} className="text-violet-500 shrink-0" />
+              Ani (AI Nissaya) <Sparkles size={11} className="text-violet-500 shrink-0" />
             </h3>
             <p className="!text-[11px] !leading-tight !truncate">Your Tipiṭaka Study companion</p>
           </div>
@@ -194,57 +185,6 @@ export default function WelcomeView() {
           />
         </form>
       </div>
-
-      {/* AI Assistant Modal */}
-      {isAISayaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setIsAISayaOpen(false)}>
-          <div
-            className="w-full max-w-lg bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 bg-gradient-to-br from-violet-500 via-indigo-500 to-violet-600 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-                  <Bot size={18} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm">AI Assistant</h3>
-                  <p className="text-xs text-white/80">Your Tipiṭaka Study companion • tipitakapali.org</p>
-                </div>
-              </div>
-              <button onClick={() => setIsAISayaOpen(false)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[var(--bg-secondary)]/50">
-              <div className="flex gap-3">
-                <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center shrink-0">
-                  <Bot size={14} className="text-white" />
-                </div>
-                <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed text-[var(--text-primary)] shadow-sm">
-                  <p>Sādhu! I am <b>AI Assistant</b> — ask me about Pāḷi grammar, translation, or Dhamma concepts.</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1.5">Try: “Explain paṭiccasamuppāda in simple terms” or “What is the difference between samādhi and jhāna?”</p>
-                </div>
-              </div>
-              <div className="text-center py-2">
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">Not available yet — AI tab will open here</span>
-              </div>
-            </div>
-            <form onSubmit={handleAISubmit} className="p-3 bg-[var(--bg-primary)] border-t border-[var(--border-color)] flex items-center gap-2">
-              <input
-                type="text"
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Ask AI Assistant anything…"
-                className="flex-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2.5 px-3.5 text-sm outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-              />
-              <button type="submit" className="p-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white transition shadow-sm">
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
       {/* Store & App Download Links — theme-aware: card wrapper softens black badges on light */}
       <div className="w-full mt-7 pt-5 border-t border-[var(--border-color)]/60 flex flex-col items-center gap-2.5 select-none">
         <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-muted)]">

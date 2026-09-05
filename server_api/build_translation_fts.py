@@ -9,10 +9,29 @@ translated Tipiṭaka corpora:
   - Source DBs: server_api/db/translation_<lang>.db
   - Destination: server_api/db/fts_translation_<lang>.db
   - Schema matches fts_tipitaka.db:
-      (book_code, book_title, nikaya, para_num, para_index UNINDEXED, para_rend, content, prefix = 3)
-      For Vietnamese (vi): tokenize = 'unicode61 remove_diacritics 2' for accent-agnostic FTS.
+      (book_code, book_title, nikaya, para_num, para_index UNINDEXED, para_rend, content)
+  - Per-language tokenizer is chosen via LANG_TOKENIZE (see below) because a single
+    tokenizer does not work well across scripts:
+      * vi            - unicode61 remove_diacritics 0  (exact-diacritic search; user
+                         must type correct tone marks, e.g. "việt" != "viet")
+      * th/km/lo/my/
+        my_nissaya/
+        hi/ta/si      - unicode61 categories 'L* N* Mn'  (these scripts use combining
+                         vowel/tone marks - category Mn - which default unicode61
+                         treats as a token BREAK, shattering words into meaningless
+                         consonant fragments; widening categories to include Mn keeps
+                         the mark attached to its base letter)
+      * zh/ja         - trigram  (no whitespace between words at all; default
+                         unicode61 would tokenize an entire sentence as ONE token,
+                         making sub-string/word search impossible; trigram indexes
+                         every 3-character window instead, no prefix= needed)
+      * en/de/pt/ru
+        (fallback)    - unicode61 remove_diacritics 2  (accent-insensitive search;
+                         verified safe only for Latin/Cyrillic scripts with
+                         precomposed diacritics - do NOT add hi/ta/si/th/etc. here)
   - Copies translation_meta table for direct language information
-  - Sanitizes HTML/XML tags, collapses whitespace, preserves Unicode diacritics
+  - Sanitizes HTML/XML tags, decodes HTML entities, collapses whitespace, preserves
+    Unicode diacritics/combining marks
   - B-tree optimization ('optimize') & VACUUM for maximum query speed.
 
 Usage:
@@ -24,6 +43,7 @@ Usage:
 
 import argparse
 import glob
+import html
 import os
 import re
 import sqlite3
@@ -41,13 +61,51 @@ ALL_LANGS = [
     "pt", "ru", "si", "ta", "th", "vi", "zh"
 ]
 
+# --- Minimum SQLite version required for 'remove_diacritics 2' / 'categories' /
+#     'trigram' tokenizer support (added around SQLite 3.27 - 3.34). ---
+_MIN_SQLITE = (3, 34, 0)
+if sqlite3.sqlite_version_info < _MIN_SQLITE:
+    print(
+        f"[!] WARNING: bundled SQLite is {sqlite3.sqlite_version} but "
+        f"{'.'.join(map(str, _MIN_SQLITE))}+ is required for the tokenizer "
+        f"options used below (remove_diacritics 2, custom categories, trigram). "
+        f"FTS indexes built with this interpreter may silently misbehave."
+    )
+
+# Per-language FTS5 tokenizer configuration.
+# See the module docstring above for the reasoning behind each entry.
+LANG_TOKENIZE = {
+    "vi": "unicode61 remove_diacritics 0",
+    "th": "unicode61 categories 'L* N* Mn'",
+    "km": "unicode61 categories 'L* N* Mn'",
+    "lo": "unicode61 categories 'L* N* Mn'",
+    "my": "unicode61 categories 'L* N* Mn'",
+    "my_nissaya": "unicode61 categories 'L* N* Mn'",
+    "hi": "unicode61 categories 'L* N* Mn'",
+    "ta": "unicode61 categories 'L* N* Mn'",
+    "si": "unicode61 categories 'L* N* Mn'",
+    "zh": "trigram",
+    "ja": "trigram",
+}
+DEFAULT_TOKENIZE = "unicode61 remove_diacritics 2"  # en, de, pt, ru, and anything unlisted
+
+# Languages that use the 'trigram' tokenizer already index every character
+# n-gram, so a separate prefix index is redundant bloat - skip it for those.
+TRIGRAM_LANGS = {"zh", "ja"}
+
+
+def get_tokenize_clause(lang_code: str) -> str:
+    """Returns the FTS5 `tokenize = '...'` value for a given language code."""
+    return LANG_TOKENIZE.get(lang_code, DEFAULT_TOKENIZE)
+
 
 def clean_translation_text(raw_text: str) -> str:
     """
     Sanitizes paragraph translation text for FTS5 full-text indexing:
       - Normalizes Unicode to NFC (composed forms)
       - Strips HTML / XML tags (e.g. <i>, </i>, <b>, <span>, <pb.../>)
-      - Preserves Unicode diacritics and text
+      - Decodes HTML entities (e.g. &amp; -> &, &nbsp; -> space)
+      - Preserves Unicode diacritics and combining marks
       - Strips zero-width spaces and BOMs (preserves ZWJ/ZWNJ for Indic scripts)
       - Collapses multiple whitespace characters.
     """
@@ -57,6 +115,10 @@ def clean_translation_text(raw_text: str) -> str:
     text = unicodedata.normalize("NFC", raw_text)
     # Strip HTML / XML markup
     text = re.sub(r"<[^>]+>", " ", text)
+    # Decode HTML entities (&amp;, &nbsp;, &quot;, numeric refs, etc.)
+    text = html.unescape(text)
+    # Re-normalize to NFC in case entity decoding introduced decomposed forms
+    text = unicodedata.normalize("NFC", text)
     # Strip zero-width space \u200B and byte order mark \uFEFF and non-breaking space \u00A0
     text = re.sub(r"[\u200B\uFEFF\u00A0]", " ", text)
     # Collapse whitespace
@@ -105,8 +167,11 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
         print(f"[*] FTS DB already exists: {dst_db} (use --force to overwrite), skipping.")
         return True
 
+    tokenize_clause = get_tokenize_clause(lang_code)
+
     print(f"\n{'='*70}")
     print(f"[*] Indexing translation FTS: {lang_code.upper()} -> {os.path.basename(dst_db)}")
+    print(f"[*] Tokenizer: {tokenize_clause}")
     print(f"{'='*70}")
 
     tmp_dst_db = dst_db + ".tmp"
@@ -152,36 +217,33 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
         dst_cur.executemany("INSERT OR REPLACE INTO translation_meta (key, value) VALUES (?, ?);", meta_rows)
     dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_built_at', datetime('now'));")
     dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_indexed_rows', ?);", (str(total_rows),))
+    dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_tokenize', ?);", (tokenize_clause,))
 
-    # Create paragraphs_fts virtual table with prefix = 3
-    # For Vietnamese (vi), use tokenize = 'unicode61 remove_diacritics 2' for diacritic-agnostic search
-    if lang_code == "vi":
-        dst_cur.execute("""
-        CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
-            book_code,
-            book_title,
-            nikaya,
-            para_num,
-            para_index UNINDEXED,
-            para_rend,
-            content,
-            tokenize = 'unicode61 remove_diacritics 2',
-            prefix = 3
-        );
-        """)
-    else:
-        dst_cur.execute("""
-        CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
-            book_code,
-            book_title,
-            nikaya,
-            para_num,
-            para_index UNINDEXED,
-            para_rend,
-            content,
-            prefix = 3
-        );
-        """)
+    # Create paragraphs_fts virtual table using the per-language tokenizer.
+    # prefix=3 is skipped for trigram-tokenized languages (zh/ja) since trigram
+    # already indexes every 3-char window - a prefix index there is pure bloat.
+    #
+    # IMPORTANT: tokenize_clause values like "unicode61 categories 'L* N* Mn'"
+    # contain their own single quotes (required by FTS5's tokenizer-argument
+    # syntax). Since the whole clause is embedded inside a SQL single-quoted
+    # string literal (tokenize = '...'), any single quote INSIDE it must be
+    # doubled ('' ) or SQLite's parser sees it as the string terminating early
+    # and throws a syntax error. Plain values like "unicode61 remove_diacritics 0"
+    # or "trigram" have no inner quotes, so doubling is a no-op for them.
+    escaped_tokenize = tokenize_clause.replace("'", "''")
+    prefix_clause = "" if lang_code in TRIGRAM_LANGS else ",\n            prefix = 3"
+    dst_cur.execute(f"""
+    CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
+        book_code,
+        book_title,
+        nikaya,
+        para_num,
+        para_index UNINDEXED,
+        para_rend,
+        content,
+        tokenize = '{escaped_tokenize}'{prefix_clause}
+    );
+    """)
     dst_conn.commit()
 
     # 3. Batch insert clean text into FTS5 virtual table

@@ -1247,6 +1247,11 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
   color: #0369a1 !important;
 }
 
+/* AI tab styling */
+.book-tab.book-tab-ai.active {
+  border-bottom-color: #8b5cf6;
+}
+
 .book-tab .tab-close-btn {
   width: 16px;
   height: 16px;

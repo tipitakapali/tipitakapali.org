@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, Suspense } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, Suspense } from 'react';
 import { Minimize2 } from 'lucide-react';
 
 import Header from '../components/Header';
@@ -17,7 +17,7 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
+  const { openBook, openAiChatTab, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
@@ -25,6 +25,67 @@ export function MainAppContent({ params: rawParams }) {
 
 
 
+
+  const { pageTitle, pageDesc } = useMemo(() => {
+    if (isNotFound) {
+      return {
+        pageTitle: 'Lost in Saṃsāra (404) | Tipiṭaka Pāḷi',
+        pageDesc: 'The page you seek has wandered — like all conditioned things, it is anicca, impermanent.',
+      };
+    }
+
+    if (activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat') {
+      return {
+        pageTitle: 'Ani Assistant | Tipiṭaka Pāḷi',
+        pageDesc: 'AI-powered Dhamma study companion for the Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon.',
+      };
+    }
+
+    if (!activeTab) {
+      return {
+        pageTitle: convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript),
+        pageDesc: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+      };
+    }
+
+    const currentChapIdx = activeTab.currentChapterIdx || 0;
+    const currentChap = activeTab.chapters?.[currentChapIdx];
+
+    const bookTitle = convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript);
+    const chapTitle = currentChap?.title ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
+    const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), settings?.paliScript) : '';
+
+    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi', settings?.paliScript);
+    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
+
+    let docTitle = '';
+    let subject = '';
+
+    if (chapTitle && chapTitle !== bookTitle) {
+      subject = `${bookTitle} › ${chapTitle}`;
+      docTitle = `${subject} | ${tipitakaLabel}`;
+    } else if (nikaya && nikaya !== bookTitle) {
+      subject = `${bookTitle} (${nikaya})`;
+      docTitle = `${subject} | ${tipitakaLabel}`;
+    } else {
+      subject = bookTitle;
+      docTitle = `${bookTitle} | ${fullAppTitle}`;
+    }
+
+    return {
+      pageTitle: docTitle,
+      pageDesc: `Complete ${subject} with rich typography, multi-script support, and full-text search.`,
+    };
+  }, [
+    isNotFound,
+    activeTab,
+    activeTab?.bookCode,
+    activeTab?.title,
+    activeTab?.currentChapterIdx,
+    activeTab?.chapters,
+    activeTab?.nikaya,
+    settings?.paliScript,
+  ]);
 
   // Dynamic Browser, Search & SEO friendly Title & Meta Synchronizer
   useEffect(() => {
@@ -44,64 +105,18 @@ export function MainAppContent({ params: rawParams }) {
       if (ogEl) ogEl.setAttribute('content', content);
     };
 
-    if (isNotFound) {
-      document.title = 'Lost in Saṃsāra (404) | Tipiṭaka Pāḷi';
-      setMetaDesc('The page you seek has wandered — like all conditioned things, it is anicca, impermanent.');
-      return;
-    }
+    document.title = pageTitle;
+    setMetaDesc(pageDesc);
 
-    if (!activeTab) {
-      if (typeof window !== 'undefined') {
-        const path = window.location.pathname;
-        const search = window.location.search;
-        const hasUrlBook = path.startsWith('/book/') || path.startsWith('/chapter/') || search.includes('book=');
-        if (hasUrlBook) {
-          // A book is currently loading from URL params; keep server-rendered title
-          return;
-        }
+    // Re-assert title after React 19 / Next.js layout metadata reconciliation pass
+    const timer = setTimeout(() => {
+      if (document.title !== pageTitle) {
+        document.title = pageTitle;
       }
-      document.title = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
-      setMetaDesc('Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.');
-      return;
-    }
+    }, 100);
 
-    const currentChapIdx = activeTab.currentChapterIdx || 0;
-    const currentChap = activeTab.chapters?.[currentChapIdx];
-
-    const bookTitle = convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript);
-    const chapTitle = currentChap?.title ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
-    const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), settings?.paliScript) : '';
-
-    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi', settings?.paliScript);
-    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
-
-    let docTitle = '';
-    let subject = '';
-
-    // Clean, search & bookmark-friendly title format matching breadcrumbs
-    if (chapTitle && chapTitle !== bookTitle) {
-      subject = `${bookTitle} › ${chapTitle}`;
-      docTitle = `${subject} | ${tipitakaLabel}`;
-    } else if (nikaya && nikaya !== bookTitle) {
-      subject = `${bookTitle} (${nikaya})`;
-      docTitle = `${subject} | ${tipitakaLabel}`;
-    } else {
-      subject = bookTitle;
-      docTitle = `${bookTitle} | ${fullAppTitle}`;
-    }
-
-    document.title = docTitle;
-    setMetaDesc(`Complete ${subject} with rich typography, multi-script support, and full-text search.`);
-  }, [
-    isNotFound,
-    activeTab,
-    activeTab?.bookCode,
-    activeTab?.title,
-    activeTab?.currentChapterIdx,
-    activeTab?.chapters,
-    activeTab?.nikaya,
-    settings?.paliScript,
-  ]);
+    return () => clearTimeout(timer);
+  }, [pageTitle, pageDesc]);
 
   // Listen for dynamic hash navigation (e.g. user changes URL hash or clicks an anchor link)
   useEffect(() => {
@@ -217,6 +232,12 @@ export function MainAppContent({ params: rawParams }) {
       hashParaIndex ||
       (urlParams.get('pindex') ? parseInt(urlParams.get('pindex'), 10) : undefined);
 
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'ai' || tabParam === 'ai_chat' || bookParam === 'ai_chat') {
+      openAiChatTab();
+      return;
+    }
+
     if (query) {
       openSearchModal(query);
     } else if (bookParam) {
@@ -234,7 +255,7 @@ export function MainAppContent({ params: rawParams }) {
         l: cleanL || undefined,
       });
     }
-  }, [openBook, openSearchModal, updateUrlParams, params]);
+  }, [openBook, openAiChatTab, openSearchModal, updateUrlParams, params]);
 
   // Full exit Eka mode handler — restores app header, book tabs bar, breadcrumbs, and footer (leaves sidebar as-is)
   const handleExitZen = useCallback(() => {
@@ -273,6 +294,7 @@ export function MainAppContent({ params: rawParams }) {
 
   return (
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <title>{pageTitle}</title>
       <Header />
       <div className="flex flex-1 min-h-0 overflow-hidden relative w-full max-w-full">
         <NavigationTree />

@@ -348,7 +348,16 @@ export function TabProvider({ children }) {
         url.searchParams.delete('book_code');
         url.searchParams.delete('chapter');
         url.searchParams.delete('c');
+        url.searchParams.delete('tab');
+      } else if (bookTarget === 'ai_chat') {
+        url.pathname = '/';
+        url.searchParams.set('tab', 'ai');
+        url.searchParams.delete('book');
+        url.searchParams.delete('book_code');
+        url.searchParams.delete('chapter');
+        url.searchParams.delete('c');
       } else if (bookTarget) {
+        url.searchParams.delete('tab');
         const prefix = tabScriptPrefixRef.current[bookTarget];
         const fullBookCode = prefix ? `${prefix}.${bookTarget}` : bookTarget;
 
@@ -565,11 +574,59 @@ export function TabProvider({ children }) {
     [loadChapter]
   );
 
+  // Open or switch to Ani (AI Nissaya) Chat tab
+  const openAiChatTab = useCallback(
+    (options = {}) => {
+      setIsNotFound(false);
+      setIsZenMode(false);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('zen-mode');
+      }
+
+      const currentTabs = openTabsRef.current;
+      const existingIndex = currentTabs.findIndex((t) => t.type === 'ai_chat' || t.bookCode === 'ai_chat');
+
+      if (existingIndex !== -1) {
+        setActiveBookCode('ai_chat');
+        setTreeSelectedNode(null);
+        setSearchHighlight(null);
+        persistTabs(currentTabs, 'ai_chat');
+        updateUrlParams({ book: 'ai_chat' });
+        return;
+      }
+
+      const aiTab = {
+        bookCode: 'ai_chat',
+        type: 'ai_chat',
+        title: 'Ani Assistant',
+        viewMode: 'ai_chat',
+        initialQuery: options?.query || null,
+      };
+
+      const nextTabs = [...currentTabs, aiTab];
+      setOpenTabs(nextTabs);
+      setActiveBookCode('ai_chat');
+      setTreeSelectedNode(null);
+      setSearchHighlight(null);
+      persistTabs(nextTabs, 'ai_chat');
+      updateUrlParams({ book: 'ai_chat' });
+    },
+    [persistTabs, setIsZenMode, updateUrlParams]
+  );
+
   const openBook = useCallback(
     async (bookCode, options = {}) => {
       if (!bookCode) return;
+      if (bookCode === 'ai_chat') {
+        openAiChatTab(options);
+        return;
+      }
       setIsNotFound(false);
       let cleanCode = bookCode.replace('.xml', '');
+      if (cleanCode === 'ai_chat') {
+        openAiChatTab(options);
+        return;
+      }
 
       // Optional script prefix (e.g. si.abh03m10.mul -> abh03m10.mul): apply the script
       // app-wide (global setting) and remember the prefix so the URL keeps it.
@@ -1185,6 +1242,13 @@ export function TabProvider({ children }) {
 
       const tab = openTabsRef.current.find((t) => t.bookCode === bookCode);
       if (tab) {
+        if (tab.type === 'ai_chat' || tab.bookCode === 'ai_chat') {
+          setTreeSelectedNode(null);
+          setSearchHighlight(null);
+          updateUrlParams({ book: 'ai_chat' });
+          persistTabs(openTabsRef.current, 'ai_chat');
+          return;
+        }
         const isToc = tab.viewMode === 'toc' || tab.isTocView;
         if (isToc) {
           // TOC view: no chapter fetch, just show TOC
@@ -1297,8 +1361,13 @@ export function TabProvider({ children }) {
           const nextIdx = Math.min(idx, newTabs.length - 1);
           const nextTab = newTabs[nextIdx];
           setActiveBookCode(nextTab.bookCode);
+          const isAi = nextTab.type === 'ai_chat' || nextTab.bookCode === 'ai_chat';
           const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
-          if (isToc) {
+          if (isAi) {
+            setTreeSelectedNode(null);
+            setSearchHighlight(null);
+            updateUrlParams({ book: 'ai_chat' });
+          } else if (isToc) {
             setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
             updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
           } else {
@@ -1336,10 +1405,13 @@ export function TabProvider({ children }) {
         if (t.bookCode !== bookCode) delete tabScriptPrefixRef.current[t.bookCode];
       }
       setOpenTabs(newTabs);
-      setActiveBookCode(bookCode);
-
+      const isAi = targetTab.type === 'ai_chat' || targetTab.bookCode === 'ai_chat';
       const isToc = targetTab.viewMode === 'toc' || targetTab.isTocView;
-      if (isToc) {
+      if (isAi) {
+        setTreeSelectedNode(null);
+        setSearchHighlight(null);
+        updateUrlParams({ book: 'ai_chat' });
+      } else if (isToc) {
         setTreeSelectedNode({ bookCode: targetTab.bookCode, chapterIdx: null });
         updateUrlParams({ book: targetTab.bookCode, chapter: null, q: null, search: null });
       } else {
@@ -1385,8 +1457,13 @@ export function TabProvider({ children }) {
       if (!activeStillPresent) {
         const nextTab = newTabs[0];
         setActiveBookCode(nextTab.bookCode);
+        const isAi = nextTab.type === 'ai_chat' || nextTab.bookCode === 'ai_chat';
         const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
-        if (isToc) {
+        if (isAi) {
+          setTreeSelectedNode(null);
+          setSearchHighlight(null);
+          updateUrlParams({ book: 'ai_chat' });
+        } else if (isToc) {
           setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
           updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
         } else {
@@ -1420,8 +1497,13 @@ export function TabProvider({ children }) {
       if (!activeStillPresent) {
         const nextTab = newTabs[newTabs.length - 1];
         setActiveBookCode(nextTab.bookCode);
+        const isAi = nextTab.type === 'ai_chat' || nextTab.bookCode === 'ai_chat';
         const isToc = nextTab.viewMode === 'toc' || nextTab.isTocView;
-        if (isToc) {
+        if (isAi) {
+          setTreeSelectedNode(null);
+          setSearchHighlight(null);
+          updateUrlParams({ book: 'ai_chat' });
+        } else if (isToc) {
           setTreeSelectedNode({ bookCode: nextTab.bookCode, chapterIdx: null });
           updateUrlParams({ book: nextTab.bookCode, chapter: null, q: null, search: null });
         } else {
@@ -1911,6 +1993,7 @@ export function TabProvider({ children }) {
         addToHistory,
         clearHistory,
         openBook,
+        openAiChatTab,
         loadChapter,
         bufferAdjacentChapters,
         switchTab,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Search, Settings, Bookmark, HelpCircle, BookSearch } from 'lucide-react';
+import { Menu, Search, Settings, Bookmark, HelpCircle, BookSearch, Bot } from 'lucide-react';
 import LanguageMenu from './LanguageMenu';
 import HelpModal from './HelpModal';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -17,6 +17,7 @@ export default function Header() {
     isHeaderVisible,
     openSearchModal,
     setIsBookmarkOpen,
+    openAiChatTab,
   } = useTabs();
 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
@@ -134,6 +135,17 @@ export default function Header() {
           aria-label="Search books"
         >
           <Search size={14} className="text-[var(--accent)]" />
+        </button>
+
+        {/* Ani (AI Nissaya) Chat Button */}
+        <button
+          className="flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-violet-600 dark:text-violet-400 hover:border-violet-500 hover:text-violet-600 transition cursor-pointer group"
+          onClick={() => openAiChatTab()}
+          title="Ani (AI Nissaya)"
+          aria-label="Ani (AI Nissaya)"
+        >
+          <Bot size={14} className="text-violet-600 dark:text-violet-400 group-hover:scale-110 transition shrink-0" />
+          <span className="hidden min-[560px]:inline">Ani</span>
         </button>
 
         {/* Dictionary Button */}

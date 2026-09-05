@@ -5,6 +5,7 @@ import { Bookmark, BookmarkCheck } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
 import BookTocView from './BookTocView';
+import AiChatView from '../AiChat/AiChatView';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
@@ -2185,6 +2186,15 @@ export default function ReaderView() {
     return (
       <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
         <WelcomeView />
+      </main>
+    );
+  }
+
+  // AI Chat tab view
+  if (activeTab.type === 'ai_chat' || activeTab.bookCode === 'ai_chat' || activeTab.viewMode === 'ai_chat') {
+    return (
+      <main className="content-area flex-1 min-h-0 overflow-hidden relative flex flex-col bg-[var(--bg-primary)]">
+        <AiChatView initialQuery={activeTab.initialQuery} />
       </main>
     );
   }

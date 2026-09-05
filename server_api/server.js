@@ -6,6 +6,7 @@ const Database = require('better-sqlite3');
 const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
+const { initAiController, registerAiRoutes } = require('./aiController');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
@@ -1389,6 +1390,10 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     reply.header('Content-Type', 'text/html; charset=utf-8');
     return res ? res.html : '';
   });
+
+  // Initialize Ani (AI Nissaya) Controller & Register Endpoints
+  initAiController({ db, dbFts, resolveDbPath });
+  registerAiRoutes(fastify);
 
   // Health and metrics endpoint
   fastify.get('/api/health', async () => {

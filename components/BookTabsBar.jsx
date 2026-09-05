@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Book, X, History } from 'lucide-react';
+import { Book, X, History, Bot } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 
 
@@ -193,6 +193,7 @@ export default function BookTabsBar() {
       <div className="tabs-scroll-container" ref={tabsScrollRef}>
         {openTabs.map((tab, idx) => {
           const isActive = tab.bookCode === activeBookCode;
+          const isAiTab = tab.type === 'ai_chat' || tab.bookCode === 'ai_chat';
           const isDragging = draggedIndex === idx;
           const isOver = dragOverIndex === idx;
           const textType = (() => {
@@ -203,7 +204,11 @@ export default function BookTabsBar() {
             if (code.endsWith('.tik') || code.includes('t.tik') || cat.includes('ṭīkā') || cat.includes('tika')) return 'tika';
             return 'other';
           })();
-          const displayTitle = convertPaliScript(capitalizePali(tab.title), settings?.paliScript);
+          const displayTitle = isAiTab
+            ? (!tab.title || tab.title.includes('Vīmaṃsā') || tab.title.includes('Vimamsa') || tab.title.includes('Ani (AI Nissaya)')
+                ? 'Ani Assistant'
+                : tab.title)
+            : convertPaliScript(capitalizePali(tab.title), settings?.paliScript);
 
           return (
             <div
@@ -216,6 +221,8 @@ export default function BookTabsBar() {
               onDragEnd={handleDragEnd}
               onContextMenu={(e) => handleContextMenu(e, tab, idx)}
               className={`book-tab group cursor-grab active:cursor-grabbing ${isActive ? 'active' : ''} ${
+                isAiTab ? 'book-tab-ai' : ''
+              } ${
                 isDragging ? 'is-dragging' : ''
               } ${isOver && dropPosition === 'left' ? 'drag-over-left' : ''} ${
                 isOver && dropPosition === 'right' ? 'drag-over-right' : ''
@@ -229,8 +236,14 @@ export default function BookTabsBar() {
                 }
               }}
             >
-              <Book size={12} className={`tab-icon tab-icon-${textType} shrink-0 opacity-90`} />
-              <span className={`tab-title truncate`}>{displayTitle}</span>
+              {isAiTab ? (
+                <Bot size={12} className="tab-icon text-violet-600 dark:text-violet-400 shrink-0" />
+              ) : (
+                <Book size={12} className={`tab-icon tab-icon-${textType} shrink-0 opacity-90`} />
+              )}
+              <span className={`tab-title truncate ${isAiTab ? 'font-semibold text-violet-700 dark:text-violet-300' : ''}`}>
+                {displayTitle}
+              </span>
               <button
                 className="tab-close-btn"
                 title="Close tab (Middle click)"
