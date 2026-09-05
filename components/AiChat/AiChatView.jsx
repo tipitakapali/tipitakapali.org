@@ -626,13 +626,14 @@ export default function AiChatView({ initialQuery = null }) {
             <div className="flex flex-col items-center gap-3">
               <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-                Ask Ani
+                Ask{' '}
+                <span className="text-violet-600 dark:text-violet-400">Ani</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400">
                   Beta
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                Your dedicated AI companion for studying the Tipiṭaka. Ani can make mistakes. Please verify important info.
+                Your dedicated AI companion for studying the Tipiṭaka. <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
               </p>
             </div>
 
