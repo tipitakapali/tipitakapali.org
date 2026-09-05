@@ -313,7 +313,10 @@ const fastify = Fastify({
 async function main() {
   await fastify.register(cors, {
     origin: true,
-    methods: ['GET', 'HEAD', 'OPTIONS'],
+    // POST is required for the cross-origin Ani AI chat endpoint (/api/ai/chat,
+    // /api/ai/search_batch, /api/ai/tool-call) called from the static site at
+    // https://tipitakapali.org (see getApiBase in services/api.js).
+    methods: ['GET', 'HEAD', 'OPTIONS', 'POST'],
   });
 
   if (compress) {

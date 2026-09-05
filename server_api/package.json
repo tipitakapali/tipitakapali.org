@@ -10,7 +10,10 @@
     "pm2:stop": "npx pm2 stop ecosystem.config.js",
     "pm2:restart": "npx pm2 restart ecosystem.config.js",
     "pm2:logs": "npx pm2 logs api.tipitakapali.org",
-    "pm2:status": "npx pm2 status"
+    "pm2:status": "npx pm2 status",
+    "pm2:start-eu": "npx pm2 start eco_eu.config.js",
+    "pm2:stop-eu": "npx pm2 stop eco_eu.config.js",
+    "pm2:restart-eu": "npx pm2 restart eco_eu.config.js"
   },
   "dependencies": {
     "@fastify/compress": "^9.2.0",

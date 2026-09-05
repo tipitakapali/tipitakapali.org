@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Key, Cpu, ShieldCheck, ExternalLink, Check, AlertCircle, AlertTriangle, Bot, RefreshCw, Sparkles } from 'lucide-react';
+import { getApiBase } from '../../services/api';
 
 export const DEFAULT_AI_SETTINGS = {
   provider: 'gemini',
@@ -287,7 +288,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
     try {
       if (!config.apiKey && config.provider === 'gemini') {
         // Test local database tools instead
-        const res = await fetch('/api/ai/tools');
+        const res = await fetch(`${getApiBase()}/api/ai/tools`);
         if (res.ok) {
           setTestStatus('success');
           setTestMessage('Local Tipitaka tools active. Add your Gemini API key to enable full AI generative synthesis.');

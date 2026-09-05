@@ -484,10 +484,10 @@ export async function searchTipitaka(query, options = {}) {
 import { cleanDictionaryQuery, splitScriptCode } from './transliterate';
 import { setDpdFeedbackTemplate, dpd_feedback_s } from './dpdFeedback';
 
-// Direct VPS base for dynamic ops (dict + search) — bypasses Cloudflare Worker proxy hop
+// Direct VPS base for dynamic ops (dict + search + AI chat) — bypasses Cloudflare Worker proxy hop
 // In static export on https://tipitakapali.org, fetch goes straight to VPS.
 // In dev (localhost / 127.0.0.1) keep relative for next.config.js rewrites.
-function getApiBase() {
+export function getApiBase() {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     // Allow override via env (e.g. NEXT_PUBLIC_API_URL)

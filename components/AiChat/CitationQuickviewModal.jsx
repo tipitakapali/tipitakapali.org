@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, BookOpen, ExternalLink, Globe, Loader2, Quote } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
+import { getApiBase } from '../../services/api';
 
 export default function CitationQuickviewModal({ isOpen, citation, onClose, onOpenInReader }) {
   const { settings } = useThemeSettings();
@@ -24,7 +25,7 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
 
     const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd } = citation;
     const endPara = paraEnd !== null && paraEnd !== undefined ? paraEnd : paraIndex;
-    const url = `/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=en,vi`;
+    const url = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=en,vi`;
 
     fetch(url)
       .then((res) => {

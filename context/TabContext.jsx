@@ -1625,7 +1625,9 @@ export function TabProvider({ children }) {
 
   // Auto-fetch MAT if missing on activeTab or ensure split_targets populated
   useEffect(() => {
-    if (activeTab) {
+    // ai_chat is a pseudo-tab (Ani AI chat), not a real book — it has no MAT data,
+    // so skip the fetch that would otherwise 404 on /api/book/ai_chat/mat.
+    if (activeTab && activeTab.bookCode !== 'ai_chat' && activeTab.type !== 'ai_chat') {
       if (!activeTab.mat || (!activeTab.split_targets && activeTab.mat?.split_targets)) {
         if (!activeTab.mat) {
           fetchMat(activeTab.bookCode).then((mat) => {

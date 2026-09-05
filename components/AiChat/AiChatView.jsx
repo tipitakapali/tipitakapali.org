@@ -32,6 +32,7 @@ import CitationQuickviewModal from './CitationQuickviewModal';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
+import { getApiBase } from '../../services/api';
 
 const THREADS_STORAGE_KEY = 'tipitaka_ai_threads_v1';
 const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v1';
@@ -329,7 +330,7 @@ export default function AiChatView({ initialQuery = null }) {
         baseUrl: currentSettings.baseUrl || '',
       };
 
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch(`${getApiBase()}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
