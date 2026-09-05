@@ -12,12 +12,12 @@ import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
 import DictionaryModal from '../components/DictionaryModal';
 import NotFound from './not-found';
-import { useTabs } from '../context/TabContext';
+import { useTabs, normalizeLangCode } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openSearchModal, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
+  const { openBook, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
@@ -130,6 +130,22 @@ export function MainAppContent({ params: rawParams }) {
     if (typeof window === 'undefined') return;
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q') || urlParams.get('search');
+    const rawLang = urlParams.get('l') || urlParams.get('lang') || urlParams.get('db');
+    const normLang = rawLang ? normalizeLangCode(rawLang) : null;
+    const cleanL = normLang && normLang !== 'pali' ? normLang : null;
+
+    // Clean up legacy URL parameters: migrate ?db=... / ?lang=... into ?l=... or remove if pali
+    if (
+      urlParams.has('db') ||
+      urlParams.has('lang') ||
+      (urlParams.has('l') && urlParams.get('l') !== cleanL)
+    ) {
+      updateUrlParams({
+        l: cleanL,
+        db: null,
+        lang: null,
+      });
+    }
 
     // Check pathname: e.g. /book/s0505m.mul, /book/s0201m.mul/2, /chapter/s0201m.mul1, /chapter/s0201m.mul/2
     const pathname = window.location.pathname;
@@ -214,9 +230,11 @@ export function MainAppContent({ params: rawParams }) {
         targetChapterIdx,
         targetParaNum: explicitParaNum,
         targetParaIndex: explicitParaIndex,
+        lang: cleanL || undefined,
+        l: cleanL || undefined,
       });
     }
-  }, [openBook, openSearchModal, params]);
+  }, [openBook, openSearchModal, updateUrlParams, params]);
 
   // Full exit Eka mode handler — restores app header, book tabs bar, breadcrumbs, and footer (leaves sidebar as-is)
   const handleExitZen = useCallback(() => {

@@ -452,6 +452,7 @@ export async function fetchSearchDatabases() {
 export async function searchTipitaka(query, options = {}) {
   const params = new URLSearchParams();
   params.set('q', query);
+  if (options.l && options.l !== 'pali') params.set('l', options.l);
   if (options.db && options.db !== 'fts_tipitaka.db' && options.db !== 'pali') params.set('db', options.db);
   if (options.lang && options.lang !== 'pali') params.set('lang', options.lang);
   if (options.book && options.book !== 'all') params.set('book', options.book);

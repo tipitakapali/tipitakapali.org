@@ -51,9 +51,21 @@ export const CODE_TO_LANG_KEY = {
 export function normalizeLangCode(langOrDb) {
   if (!langOrDb) return null;
   const str = String(langOrDb).trim().toLowerCase();
-  if (str === 'pali' || str === 'fts_tipitaka.db' || str === 'tipitaka.db' || str === 'fts_pali.db') return 'pali';
+  if (
+    str === 'pali' ||
+    str === 'tipitaka' ||
+    str === 'fts_tipitaka' ||
+    str === 'fts_pali' ||
+    str === 'cst' ||
+    str === 'cst4' ||
+    str === 'fts_tipitaka.db' ||
+    str === 'tipitaka.db' ||
+    str === 'fts_pali.db'
+  ) {
+    return 'pali';
+  }
   const clean = str.replace(/^(?:fts_)?(?:translation_)?/i, '').replace(/\.db$/i, '');
-  if (clean === 'pali' || clean === 'tipitaka') return 'pali';
+  if (clean === 'pali' || clean === 'tipitaka' || clean === 'cst' || clean === 'cst4') return 'pali';
   if (LANG_KEY_TO_CODE[clean]) return LANG_KEY_TO_CODE[clean];
   if (CODE_TO_LANG_KEY[clean]) return clean;
   return clean;
@@ -128,6 +140,23 @@ const DEFAULT_FTS_DATABASES = [
   { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷' },
 ];
 
+export function resolveDbFromLangParam(param, databases = DEFAULT_FTS_DATABASES) {
+  if (!param) return null;
+  const normCode = normalizeLangCode(param);
+  if (!normCode) return null;
+  if (normCode === 'pali') return 'fts_tipitaka.db';
+  const list = databases && databases.length > 0 ? databases : DEFAULT_FTS_DATABASES;
+  const found = list.find(
+    (d) => d.id === param || d.key === normCode || d.id === `fts_translation_${normCode}.db`
+  );
+  if (found) return found.id;
+  const defaultFound = DEFAULT_FTS_DATABASES.find(
+    (d) => d.id === param || d.key === normCode || d.id === `fts_translation_${normCode}.db`
+  );
+  if (defaultFound) return defaultFound.id;
+  return 'fts_tipitaka.db';
+}
+
 const SEARCH_PREFS_KEY = 'tipitaka_search_prefs_v1';
 
 export default function SearchModal() {
@@ -143,18 +172,15 @@ export default function SearchModal() {
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
 
-  // Database selection state (Default: Pāḷi fts_tipitaka.db, or URL param db/lang)
+  // Database selection state (Default: Pāḷi fts_tipitaka.db, or URL param l/lang/db)
   const [selectedDb, setSelectedDb] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const urlDb = urlParams.get('db') || urlParams.get('lang');
+        const urlDb = urlParams.get('l') || urlParams.get('lang') || urlParams.get('db');
         if (urlDb) {
-          const normCode = normalizeLangCode(urlDb);
-          const found = DEFAULT_FTS_DATABASES.find(
-            (d) => d.id === urlDb || d.key === normCode || d.id === `fts_translation_${normCode}.db`
-          );
-          if (found) return found.id;
+          const resolved = resolveDbFromLangParam(urlDb, DEFAULT_FTS_DATABASES);
+          if (resolved) return resolved;
         }
         const saved = localStorage.getItem(SEARCH_PREFS_KEY);
         if (saved) {
@@ -180,6 +206,8 @@ export default function SearchModal() {
   const inputRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const handledInitialQueryRef = useRef(null);
+  const performSearchRef = useRef(null);
 
   // Dynamically load available FTS databases from server
   useEffect(() => {
@@ -210,14 +238,11 @@ export default function SearchModal() {
     try {
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
-        const urlDb = urlParams.get('db') || urlParams.get('lang');
+        const urlDb = urlParams.get('l') || urlParams.get('lang') || urlParams.get('db');
         if (urlDb) {
-          const normCode = normalizeLangCode(urlDb);
-          const found = DEFAULT_FTS_DATABASES.find(
-            (d) => d.id === urlDb || d.key === normCode || d.id === `fts_translation_${normCode}.db`
-          );
-          if (found) {
-            setSelectedDb(found.id);
+          const resolved = resolveDbFromLangParam(urlDb, DEFAULT_FTS_DATABASES);
+          if (resolved) {
+            setSelectedDb(resolved);
             return;
           }
         }
@@ -278,8 +303,12 @@ export default function SearchModal() {
       setError(null);
 
       try {
+        const langCode = (currentDb !== 'fts_tipitaka.db' && currentDb !== 'pali')
+          ? normalizeLangCode(currentDb)
+          : null;
         const data = await searchTipitaka(searchQuery, {
           db: currentDb,
+          l: langCode,
           mat: currentMat,
           pitaka: currentPitaka,
           distance: currentDist,
@@ -300,7 +329,9 @@ export default function SearchModal() {
         setTotal(data.total || 0);
         updateUrlParams({
           q: searchQuery,
-          db: currentDb !== 'fts_tipitaka.db' && currentDb !== 'pali' ? currentDb : null,
+          l: langCode,
+          db: null,
+          lang: null,
         });
       } catch (err) {
         if (err.name === 'AbortError' || err.message?.includes('aborted')) return;
@@ -317,46 +348,51 @@ export default function SearchModal() {
   );
 
   useEffect(() => {
-    if (isSearchOpen) {
-      if (searchInitialQuery) {
-        const raw = searchInitialQuery;
-        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const urlDb = urlParams?.get('db') || urlParams?.get('lang');
-        let effectiveDb = selectedDb;
-        if (urlDb) {
-          const normCode = normalizeLangCode(urlDb);
-          const found = DEFAULT_FTS_DATABASES.find(
-            (d) => d.id === urlDb || d.key === normCode || d.id === `fts_translation_${normCode}.db`
-          );
-          if (found) {
-            effectiveDb = found.id;
-            setSelectedDb(found.id);
-          }
-        }
-        const isPali = effectiveDb === 'fts_tipitaka.db' || effectiveDb === 'pali';
-        let displayedVal = raw;
-        if (isPali) {
-          const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-          displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
-        }
-        setQuery(displayedVal);
+    performSearchRef.current = performSearch;
+  });
 
-        const searchQuery = isPali ? convertAnyToRoman(displayedVal).trim() : displayedVal.trim();
-        const minLen = getMinSearchLength(searchQuery);
-        if (searchQuery.length >= minLen) {
-          performSearch(searchQuery, 0, effectiveDb);
+  useEffect(() => {
+    if (!isSearchOpen) {
+      handledInitialQueryRef.current = null;
+      return;
+    }
+
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const len = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(len, len);
+      }
+    }, 50);
+
+    if (searchInitialQuery && handledInitialQueryRef.current !== searchInitialQuery) {
+      handledInitialQueryRef.current = searchInitialQuery;
+      const raw = searchInitialQuery;
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlDb = urlParams?.get('l') || urlParams?.get('lang') || urlParams?.get('db');
+      let effectiveDb = selectedDb;
+      if (urlDb) {
+        const resolved = resolveDbFromLangParam(urlDb, displayedDatabases);
+        if (resolved) {
+          effectiveDb = resolved;
+          setSelectedDb(resolved);
         }
       }
+      const isPali = effectiveDb === 'fts_tipitaka.db' || effectiveDb === 'pali';
+      let displayedVal = raw;
+      if (isPali) {
+        const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+        displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
+      }
+      setQuery(displayedVal);
 
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-          const len = inputRef.current.value.length;
-          inputRef.current.setSelectionRange(len, len);
-        }
-      }, 50);
+      const searchQuery = isPali ? convertAnyToRoman(displayedVal).trim() : displayedVal.trim();
+      const minLen = getMinSearchLength(searchQuery);
+      if (searchQuery.length >= minLen) {
+        performSearchRef.current?.(searchQuery, 0, effectiveDb);
+      }
     }
-  }, [isSearchOpen, searchInitialQuery, selectedDb, performSearch]);
+  }, [isSearchOpen, searchInitialQuery, displayedDatabases]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -386,6 +422,9 @@ export default function SearchModal() {
       setResults([]);
       setTotal(0);
       setLoading(false);
+      if (searchQuery.length === 0) {
+        updateUrlParams({ q: null, l: null, db: null, lang: null });
+      }
       return;
     }
 
@@ -403,6 +442,9 @@ export default function SearchModal() {
     savePrefs(matFilter, pitakaFilter, distanceFilter, sortOption, newDb);
 
     const isNewPali = newDb === 'fts_tipitaka.db' || newDb === 'pali';
+    const langCode = !isNewPali ? normalizeLangCode(newDb) : null;
+    updateUrlParams({ l: langCode, db: null, lang: null });
+
     const searchQuery = isNewPali ? convertAnyToRoman(query).trim() : query.trim();
     const minLen = getMinSearchLength(searchQuery);
     if (searchQuery.length >= minLen) {
@@ -477,6 +519,7 @@ export default function SearchModal() {
       highlightQuery: romanQuery,
       searchQuery: romanQuery || query.trim(),
       lang: cleanLangCode,
+      l: cleanLangCode !== 'pali' ? cleanLangCode : null,
       db: selectedDb,
     });
   };
@@ -569,7 +612,7 @@ export default function SearchModal() {
                     setQuery('');
                     setResults([]);
                     setTotal(0);
-                    updateUrlParams({ q: null });
+                    updateUrlParams({ q: null, l: null, db: null, lang: null });
                     inputRef.current?.focus();
                   }}
                   className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"

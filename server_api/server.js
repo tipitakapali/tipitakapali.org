@@ -1152,7 +1152,7 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
   fastify.get('/api/search', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
     const rawQuery = String(req.query.q || req.query.query || '').trim().normalize('NFC');
-    const dbParam = req.query.db || req.query.lang || 'pali';
+    const dbParam = req.query.l || req.query.db || req.query.lang || 'pali';
     const target = getSearchDatabase(dbParam);
     const isPali = target.isPali;
     const targetKey = target.key;

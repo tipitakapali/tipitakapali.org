@@ -380,7 +380,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
                 <span className="text-[10px] text-[var(--text-muted)]">q= required</span>
               </li>
               <li className="p-1.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)]">
-                Combine with filters via URL as well: <code className="font-mono text-[var(--accent)]">?q=mettā&pitaka=sutta&mat=mula</code> (handled by advanced search modal after open).
+                Combine with language or filters via URL as well: <code className="font-mono text-[var(--accent)]">?q=mettā&pitaka=sutta&mat=mula</code> or <code className="font-mono text-[var(--accent)]">?l=si&q=...</code> (handled by advanced search modal after open).
               </li>
               <li className="p-1.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)]">
                 Tip: Copy URL after searching — it retains <code className="font-mono text-[var(--accent)]">?q=</code> via <code className="font-mono">history.replaceState</code> for easy sharing.

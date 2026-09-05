@@ -105,14 +105,17 @@ function getChapterIdxForParaIndex(chapters, targetParaIndex) {
   return sorted[0]?.chapter_index ?? 0;
 }
 
-const LANG_KEY_TO_CODE = {
+export const LANG_KEY_TO_CODE = {
   english: 'en',
   vietnamese: 'vi',
+  viet: 'vi',
   myanmar: 'my',
   burmese: 'my',
   sinhala: 'si',
+  sinhalese: 'si',
   chinese: 'zh',
   khmer: 'km',
+  cambodian: 'km',
   thai: 'th',
   lao: 'lo',
   tamil: 'ta',
@@ -124,9 +127,10 @@ const LANG_KEY_TO_CODE = {
   russian: 'ru',
   my_nissaya: 'my_nissaya',
   nissaya: 'my_nissaya',
+  burmese_nissaya: 'my_nissaya',
 };
 
-const CODE_TO_LANG_KEY = {
+export const CODE_TO_LANG_KEY = {
   en: 'english',
   vi: 'vietnamese',
   my: 'myanmar',
@@ -145,18 +149,30 @@ const CODE_TO_LANG_KEY = {
   ko: 'korean',
 };
 
-function normalizeLangCode(langOrDb) {
+export function normalizeLangCode(langOrDb) {
   if (!langOrDb) return null;
   const str = String(langOrDb).trim().toLowerCase();
-  if (str === 'pali' || str === 'fts_tipitaka.db' || str === 'tipitaka.db' || str === 'fts_pali.db') return 'pali';
+  if (
+    str === 'pali' ||
+    str === 'tipitaka' ||
+    str === 'fts_tipitaka' ||
+    str === 'fts_pali' ||
+    str === 'cst' ||
+    str === 'cst4' ||
+    str === 'fts_tipitaka.db' ||
+    str === 'tipitaka.db' ||
+    str === 'fts_pali.db'
+  ) {
+    return 'pali';
+  }
   const clean = str.replace(/^(?:fts_)?(?:translation_)?/i, '').replace(/\.db$/i, '');
-  if (clean === 'pali' || clean === 'tipitaka') return 'pali';
+  if (clean === 'pali' || clean === 'tipitaka' || clean === 'cst' || clean === 'cst4') return 'pali';
   if (LANG_KEY_TO_CODE[clean]) return LANG_KEY_TO_CODE[clean];
   if (CODE_TO_LANG_KEY[clean]) return clean;
   return clean;
 }
 
-function toLangKey(langOrDb) {
+export function toLangKey(langOrDb) {
   const code = normalizeLangCode(langOrDb);
   if (!code) return null;
   if (code === 'pali') return 'pali';
@@ -320,6 +336,7 @@ export function TabProvider({ children }) {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location);
     const preservedHash = window.location.hash || '';
+    let targetLang = undefined;
 
     if (paramsToUpdate) {
       const bookTarget = paramsToUpdate.book !== undefined ? paramsToUpdate.book : activeBookCodeRef.current;
@@ -346,14 +363,62 @@ export function TabProvider({ children }) {
         url.searchParams.delete('c');
       }
 
+      // Handle language/database parameter normalization:
+      // Primary: l=<lang_code> (omitted when 'pali' or null).
+      // Disallow db and lang in URL; map legacy db/lang into l.
+      if (paramsToUpdate.l !== undefined) {
+        targetLang = paramsToUpdate.l;
+      } else if (paramsToUpdate.lang !== undefined) {
+        targetLang = paramsToUpdate.lang;
+      } else if (paramsToUpdate.db !== undefined) {
+        targetLang = paramsToUpdate.db;
+      }
+
       Object.entries(paramsToUpdate).forEach(([k, v]) => {
         if (k === 'book' || k === 'chapter' || k === 'c' || k === 'book_code') return;
+        if (k === 'db' || k === 'lang' || k === 'l') return; // Handled specially below
         if (v === null || v === undefined) {
           url.searchParams.delete(k);
         } else {
           url.searchParams.set(k, v);
         }
       });
+
+      if (targetLang !== undefined) {
+        const norm = normalizeLangCode(targetLang);
+        if (norm && norm !== 'pali') {
+          url.searchParams.set('l', norm);
+        } else {
+          url.searchParams.delete('l');
+        }
+      }
+
+      // If search query is explicitly removed/cleared and 'l' was not explicitly passed, clear 'l' as well
+      if (paramsToUpdate.q === null && paramsToUpdate.l === undefined) {
+        url.searchParams.delete('l');
+      }
+    }
+
+    // Always clean up legacy 'db' and 'lang' from URL searchParams
+    if (url.searchParams.has('db')) {
+      const legacyDb = url.searchParams.get('db');
+      url.searchParams.delete('db');
+      if (targetLang === undefined && !url.searchParams.has('l') && legacyDb) {
+        const norm = normalizeLangCode(legacyDb);
+        if (norm && norm !== 'pali') url.searchParams.set('l', norm);
+      }
+    }
+    if (url.searchParams.has('lang')) {
+      const legacyLang = url.searchParams.get('lang');
+      url.searchParams.delete('lang');
+      if (targetLang === undefined && !url.searchParams.has('l') && legacyLang) {
+        const norm = normalizeLangCode(legacyLang);
+        if (norm && norm !== 'pali') url.searchParams.set('l', norm);
+      }
+    }
+    // Ensure 'l=pali' is never in URL
+    if (url.searchParams.get('l') === 'pali') {
+      url.searchParams.delete('l');
     }
 
     const newUrl = url.pathname + (url.search || '') + preservedHash;
@@ -720,9 +785,12 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
-        if (options.lang && options.lang !== 'pali') {
-          const langCode = options.lang.toLowerCase().trim();
-          const langKey = CODE_TO_LANG_KEY[langCode] || langCode;
+        const rawLang = options.l || options.lang || options.db || null;
+        const normLang = rawLang ? normalizeLangCode(rawLang) : null;
+        const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
+
+        if (cleanLangCode) {
+          const langKey = CODE_TO_LANG_KEY[cleanLangCode] || cleanLangCode;
           if (langKey && (!settings?.translations || !settings.translations[langKey])) {
             updateSetting('translations', {
               ...(settings?.translations || {}),
@@ -740,7 +808,8 @@ export function TabProvider({ children }) {
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
-            lang: options.lang || null,
+            lang: cleanLangCode || options.lang || null,
+            l: cleanLangCode,
             db: options.db || null,
             timestamp: Date.now(),
           });
@@ -753,19 +822,21 @@ export function TabProvider({ children }) {
           : currentTabs[existingTabIndex].currentChapterIdx || 0;
 
         const qParam = options.searchQuery || options.highlightQuery || null;
+        const lParam = (qParam && cleanLangCode) ? cleanLangCode : null;
         if (qParam) {
           setSearchHighlight({
             query: qParam,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
-            lang: options.lang || null,
+            lang: cleanLangCode || options.lang || null,
+            l: lParam,
             db: options.db || null,
           });
         } else {
           setSearchHighlight(null);
         }
         setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: activeChap });
-        updateUrlParams({ book: cleanCode, chapter: activeChap + 1, q: qParam, search: null });
+        updateUrlParams({ book: cleanCode, chapter: activeChap + 1, q: qParam, l: lParam, search: null });
         persistTabs(openTabsRef.current, cleanCode);
 
         addToHistory({
@@ -1018,9 +1089,12 @@ export function TabProvider({ children }) {
 
 
 
-        if (options.lang && options.lang !== 'pali') {
-          const langCode = options.lang.toLowerCase().trim();
-          const langKey = CODE_TO_LANG_KEY[langCode] || langCode;
+        const rawLang = options.l || options.lang || options.db || null;
+        const normLang = rawLang ? normalizeLangCode(rawLang) : null;
+        const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
+
+        if (cleanLangCode) {
+          const langKey = CODE_TO_LANG_KEY[cleanLangCode] || cleanLangCode;
           if (langKey && (!settings?.translations || !settings.translations[langKey])) {
             updateSetting('translations', {
               ...(settings?.translations || {}),
@@ -1038,7 +1112,8 @@ export function TabProvider({ children }) {
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
-            lang: options.lang || null,
+            lang: cleanLangCode || options.lang || null,
+            l: cleanLangCode,
             db: options.db || null,
             timestamp: Date.now(),
           });
@@ -1053,18 +1128,20 @@ export function TabProvider({ children }) {
         });
 
         const qParam = options.searchQuery || options.highlightQuery || null;
+        const lParam = (qParam && cleanLangCode) ? cleanLangCode : null;
         if (qParam) {
           setSearchHighlight({
             query: qParam,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
-            lang: options.lang || null,
+            lang: cleanLangCode || options.lang || null,
+            l: lParam,
             db: options.db || null,
           });
         } else {
           setSearchHighlight(null);
         }
-        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, q: qParam, search: null });
+        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, q: qParam, l: lParam, search: null });
         bufferAdjacentChapters(cleanCode, targetChapIdx);
 
 
