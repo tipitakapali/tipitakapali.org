@@ -83,6 +83,7 @@ export default function SettingsModal() {
 
   const {
     dockMode,
+    rawDockMode,
     isMobileScreen,
     setDockMode,
     fontSizeMultiplier,
@@ -323,7 +324,11 @@ export default function SettingsModal() {
                       { id: 'side', label: 'Right Dock', icon: PanelRight },
                     ].map((m) => {
                       const Icon = m.icon;
-                      const isSelected = dockMode === m.id || (m.id === 'side' && dockMode === 'right');
+                      // Show the SAVED preference (rawDockMode), not the transient mobile
+                      // override: otherwise resizing below 768px makes Center Modal look
+                      // selected, and clicking it would permanently overwrite Right Dock.
+                      const savedMode = rawDockMode || dockMode;
+                      const isSelected = savedMode === m.id || (m.id === 'side' && savedMode === 'right');
                       const isDisabled = isMobileScreen && m.id !== 'modal';
                       return (
                         <button
@@ -350,7 +355,7 @@ export default function SettingsModal() {
                   </div>
                   {isMobileScreen && (
                     <p className="text-[10.5px] text-[var(--text-muted)] mt-1.5">
-                      * Docked side panels require desktop screens (≥768px). Center modal is automatically used on mobile devices.
+                      * Docked side panels require desktop screens (≥768px). Center modal is temporarily used below that width — your saved preference ({(rawDockMode || dockMode) === 'left' ? 'Left Dock' : (rawDockMode || dockMode) === 'modal' ? 'Center Modal' : 'Right Dock'}) is kept and restored automatically.
                     </p>
                   )}
                 </div>
