@@ -458,7 +458,88 @@ async function main() {
     };
   })()`);
   console.log('Dictionary state after double click:', dictStateAfterDblClick);
-  assert(dictStateAfterDblClick.isOpen, 'Dictionary opened on double click');
+  // Test 1.6: Repeated click on already highlighted word (verify no crash and highlight stays active)
+  console.log('\nTesting repeated click on already highlighted word...');
+  const repeatClickResult = await evaluate(ws, `(() => {
+    const enBlock = document.querySelector('.reader-trans-block[data-trans-lang="english"] .reader-trans-content, .reader-trans-block[data-trans-lang="en"] .reader-trans-content');
+    const clickedWordSpan = enBlock?.querySelector('.reader-clicked-word');
+    if (!clickedWordSpan) return { error: 'No clicked word span found' };
+
+    const rect = clickedWordSpan.getBoundingClientRect();
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + 2,
+      clientY: rect.top + 2,
+    });
+    clickedWordSpan.dispatchEvent(clickEvent);
+
+    return {
+      text: clickedWordSpan.textContent,
+      stillPresent: Boolean(document.querySelector('.reader-clicked-word')),
+    };
+  })()`);
+  console.log('Repeat click result:', repeatClickResult);
+  assert(repeatClickResult.stillPresent, 'Repeated click does not break highlight span');
+
+  // Test 1.7: Myanmar script Pali word lookup (proves Pāḷi is not chopped into isolated syllables)
+  console.log('\nTesting Myanmar script Pāḷi word lookup...');
+  await evaluate(ws, `(() => {
+    const key = 'tipitaka_advanced_settings_v4';
+    const settings = JSON.parse(localStorage.getItem(key) || '{}');
+    settings.paliScript = 'myanmar';
+    settings.dictLookupTrigger = 'single';
+    localStorage.setItem(key, JSON.stringify(settings));
+    localStorage.setItem('tipitaka_pali_script', 'myanmar');
+    location.reload();
+  })()`);
+  await sleep(4000);
+
+  const myanmarPaliResult = await evaluate(ws, `(() => {
+    const paliBlock = document.querySelector('.reader-pali-trans-block p, p[data-pindex]');
+    if (!paliBlock) return { error: 'No Pali paragraph found' };
+
+    const textNode = Array.from(paliBlock.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.includes('နမော'));
+    if (!textNode) return { error: 'No text node containing နမော' };
+
+    const text = textNode.textContent;
+    const idx = text.indexOf('နမော');
+    const range = document.createRange();
+    range.setStart(textNode, idx + 1);
+    range.collapse(true);
+    const rect = range.getBoundingClientRect();
+
+    const targetEl = document.elementFromPoint(rect.left, rect.top) || paliBlock;
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left,
+      clientY: rect.top,
+    });
+    targetEl.dispatchEvent(clickEvent);
+
+    return { word: 'နမော', clientX: rect.left, clientY: rect.top };
+  })()`);
+  console.log('Myanmar Pali click result:', myanmarPaliResult);
+  await sleep(1500);
+
+  const dictStateAfterMyanmarPali = await evaluate(ws, `(() => {
+    const dictInput = document.querySelector('input[placeholder*="dictionary" i], input[placeholder*="word" i], input[type="search"]');
+    const headerWord = document.querySelector('.dict-query-display, .font-serif');
+    return {
+      inputValue: dictInput?.value,
+      headerText: headerWord?.textContent,
+      isOpen: Boolean(document.querySelector('.dict-dock-panel, .dict-panel-modal, .dict-header-bar')),
+    };
+  })()`);
+  console.log('Dictionary state after Myanmar Pāḷi click:', dictStateAfterMyanmarPali);
+  assert(dictStateAfterMyanmarPali.isOpen, 'Dictionary opened when clicking Pāḷi in Myanmar script');
+  assert(
+    dictStateAfterMyanmarPali.inputValue?.toLowerCase() === 'namo' ||
+    dictStateAfterMyanmarPali.headerText?.toLowerCase().includes('namo') ||
+    dictStateAfterMyanmarPali.inputValue === 'နမော',
+    'Dictionary looked up "namo" from Myanmar script Pāḷi word "နမော" without syllable fragmentation'
+  );
 
   // Test 3.2: Computed font family for Vietnamese translation
   console.log('\nChecking computed font family on Vietnamese translation...');

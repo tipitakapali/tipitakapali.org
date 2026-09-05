@@ -186,7 +186,7 @@ function injectTranslationsIntoHtml(
           if (isPaliTop) {
             if (hasCustomPali) {
               const paliBlockStyles = [
-                paliBorder ? `border-left: 3.5px solid ${paliBorder}` : 'border-left: none',
+                paliBorder ? `border-left: 2px solid ${paliBorder}` : 'border-left: none',
                 paliBg ? `background-color: ${paliBg}` : '',
                 paliText ? `color: ${paliText}` : '',
                 (paliBorder || paliBg) ? 'padding: 0.5rem 0.85rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 0.5rem;' : '',
@@ -220,7 +220,7 @@ function injectTranslationsIntoHtml(
             // Task 3: Dynamically apply custom colors (background, text color, border-left color)
             const borderValue = paliBorder || 'var(--accent, #8b2500)';
             const paliBlockStyles = [
-              `border-left: 3.5px solid ${borderValue}`,
+              `border-left: 2px solid ${borderValue}`,
               paliBg ? `background-color: ${paliBg}` : '',
               paliText ? `color: ${paliText}` : '',
             ].filter(Boolean).join('; ');
@@ -307,7 +307,9 @@ function injectTranslationsIntoHtml(
       const col2Html = col2Items.map((item) => item.html).join('');
       const col1Class = col1.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
       const col2Class = col2Items.some((item) => item.type === 'pali') ? 'reader-pali-col' : 'reader-trans-col';
-      const col2Wrapped = `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Html}</div>`;
+      const col2Wrapped = col2Class === 'reader-trans-col'
+        ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Html}</div>`
+        : col2Html;
       return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${col1Html}</div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
     }
 
@@ -323,7 +325,9 @@ function injectTranslationsIntoHtml(
           return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${singleItem.html}</div><div class="reader-side-col reader-side-col-right reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
         } else {
           const col2Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
-          const col2Wrapped = `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`;
+          const col2Wrapped = col2Class === 'reader-trans-col'
+            ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`
+            : singleItem.html;
           return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col reader-trans-col-empty"></div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
         }
       }
@@ -586,10 +590,51 @@ function getWordSegmenter(locale) {
   return wordSegmenters.get(locale);
 }
 
+// Stop characters and word delimiters for Pāḷi, Nissaya, and Latin text
+const STOP_CHAR = /[\s.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။，。！？；：（）【】《》、·'‘’’"“”«»‹›„“”「」『』]/;
+
+function extractWordDelimiter(text, safeOffset) {
+  if (!text || safeOffset < 0 || safeOffset >= text.length) return null;
+  let start = safeOffset;
+  let end = safeOffset;
+  if (STOP_CHAR.test(text[safeOffset])) {
+    if (safeOffset > 0 && !STOP_CHAR.test(text[safeOffset - 1])) {
+      start = safeOffset - 1;
+      end = safeOffset;
+    } else if (safeOffset < text.length - 1 && !STOP_CHAR.test(text[safeOffset + 1])) {
+      start = safeOffset + 1;
+      end = safeOffset + 2;
+    } else {
+      return null;
+    }
+  } else {
+    end = safeOffset + 1;
+  }
+
+  while (start > 0 && !STOP_CHAR.test(text[start - 1])) {
+    start--;
+  }
+  while (end < text.length && !STOP_CHAR.test(text[end])) {
+    end++;
+  }
+
+  const word = text.slice(start, end).trim();
+  if (!word) return null;
+  return { word, start, end };
+}
+
 // Extract word and boundaries at offset inside a text string (supports CJK, Myanmar, Indic, Latin)
 function extractWordAtOffset(text, offset, lang = 'en') {
   if (!text || offset < 0 || offset > text.length) return null;
   const safeOffset = Math.min(offset, Math.max(0, text.length - 1));
+
+  // Pali (in all scripts: Roman, Myanmar, Sinhala, Devanagari, Thai, etc.) and Myanmar Nissaya:
+  // words are strictly space/punctuation delimited. Intl.Segmenter shatters non-Roman Pali
+  // words into single syllables/characters. Use delimiter-based extraction first.
+  if (lang === 'pali' || lang === 'pi' || lang === 'my_nissaya') {
+    const delimMatch = extractWordDelimiter(text, safeOffset);
+    if (delimMatch) return delimMatch;
+  }
 
   const localeMap = {
     pali: 'pi',
@@ -677,40 +722,13 @@ function extractWordAtOffset(text, offset, lang = 'en') {
     } catch (e) {}
   }
 
-  // Regex fallback when Intl.Segmenter is unavailable or did not match
+  // Fallback for single characters in any script (Han, Kana, Latin, Myanmar, etc.)
   const char = text[safeOffset];
-  if (char && /\p{Script=Han}/u.test(char)) {
+  if (char && /\p{L}/u.test(char)) {
     return { word: char, start: safeOffset, end: safeOffset + 1 };
   }
 
-  const STOP_CHAR = /[\s.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`၊။，。！？；：（）【】《》、·'‘’’"“”«»‹›„“”「」『』]/;
-
-  let start = safeOffset;
-  let end = safeOffset;
-  if (STOP_CHAR.test(text[safeOffset])) {
-    if (safeOffset > 0 && !STOP_CHAR.test(text[safeOffset - 1])) {
-      start = safeOffset - 1;
-      end = safeOffset;
-    } else if (safeOffset < text.length - 1 && !STOP_CHAR.test(text[safeOffset + 1])) {
-      start = safeOffset + 1;
-      end = safeOffset + 2;
-    } else {
-      return null;
-    }
-  } else {
-    end = safeOffset + 1;
-  }
-
-  while (start > 0 && !STOP_CHAR.test(text[start - 1])) {
-    start--;
-  }
-  while (end < text.length && !STOP_CHAR.test(text[end])) {
-    end++;
-  }
-
-  const word = text.slice(start, end).trim();
-  if (!word) return null;
-  return { word, start, end };
+  return extractWordDelimiter(text, safeOffset);
 }
 
 // Helper to find and highlight a stored word inside a book container
@@ -1527,6 +1545,8 @@ export default function ReaderView() {
       const selection = window.getSelection()?.toString()?.trim();
       // Only trigger if not dragging/selecting multiple words
       if (!selection || selection.length <= 1) {
+        clearClickedWordHighlight();
+
         let range = null;
         if (document.caretRangeFromPoint) {
           range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -1539,9 +1559,26 @@ export default function ReaderView() {
           }
         }
 
-        if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
-          const node = range.startContainer;
-          const offset = range.startOffset;
+        let node = range?.startContainer;
+        let offset = range?.startOffset || 0;
+        if (node && node.nodeType === Node.ELEMENT_NODE) {
+          const child = node.childNodes[offset] || node.lastChild;
+          if (child) {
+            if (child.nodeType === Node.TEXT_NODE) {
+              node = child;
+              offset = 0;
+            } else {
+              const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
+              const textChild = walker.nextNode();
+              if (textChild) {
+                node = textChild;
+                offset = 0;
+              }
+            }
+          }
+        }
+
+        if (node && node.nodeType === Node.TEXT_NODE) {
           const text = node.textContent || '';
           const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
           const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
@@ -1550,7 +1587,7 @@ export default function ReaderView() {
           if (extracted) {
             const { word: rawWord, start, end } = extracted;
             const wordToLookup = cleanDictionaryQuery(rawWord);
-            if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
+            if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
               const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
               const blockEl = transBlock || pEl;
               const pIndex = pEl?.getAttribute('data-pindex') || null;
@@ -1621,6 +1658,7 @@ export default function ReaderView() {
         const range = sel.getRangeAt(0);
         node = range.startContainer;
         startOffset = range.startOffset;
+        clearClickedWordHighlight();
         const clonedRange = range.cloneRange();
         highlightRangeInReader(clonedRange);
         sel.removeAllRanges();
@@ -1651,6 +1689,8 @@ export default function ReaderView() {
       }
     } else {
       // 2. Extract word at click point
+      clearClickedWordHighlight();
+
       let range = null;
       if (document.caretRangeFromPoint) {
         range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -1663,9 +1703,26 @@ export default function ReaderView() {
         }
       }
 
-      if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
-        const node = range.startContainer;
-        const offset = range.startOffset;
+      let node = range?.startContainer;
+      let offset = range?.startOffset || 0;
+      if (node && node.nodeType === Node.ELEMENT_NODE) {
+        const child = node.childNodes[offset] || node.lastChild;
+        if (child) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            node = child;
+            offset = 0;
+          } else {
+            const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
+            const textChild = walker.nextNode();
+            if (textChild) {
+              node = textChild;
+              offset = 0;
+            }
+          }
+        }
+      }
+
+      if (node && node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
         const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
         const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
@@ -1674,7 +1731,7 @@ export default function ReaderView() {
         if (extracted) {
           const { word: rawWord, start, end } = extracted;
           wordToLookup = cleanDictionaryQuery(rawWord);
-          if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
+          if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
             const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
             const blockEl = transBlock || pEl;
             const pIndex = pEl?.getAttribute('data-pindex') || null;
@@ -1706,7 +1763,7 @@ export default function ReaderView() {
       }
     }
 
-    if (wordToLookup && (wordToLookup.length >= 2 || /\p{Script=Han}/u.test(wordToLookup))) {
+    if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
       openDictionary(wordToLookup);
     }
   }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, activeTab, recordClickedWord]);

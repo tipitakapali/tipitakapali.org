@@ -348,9 +348,17 @@ export default function LanguageMenu() {
     const idx = translationOrder.indexOf(dictId);
     if (idx === -1) return;
     const next = [...translationOrder];
-    if (direction === 'top' && idx > 0) {
-      const [item] = next.splice(idx, 1);
-      next.unshift(item);
+    if (direction === 'top') {
+      const isPaliAtTop = translationOrder[0] === 'pali';
+      if (isPaliAtTop && dictId !== 'pali') {
+        if (idx === 1) return;
+        const [item] = next.splice(idx, 1);
+        next.splice(1, 0, item);
+      } else {
+        if (idx === 0) return;
+        const [item] = next.splice(idx, 1);
+        next.unshift(item);
+      }
     } else if (direction === 'up' && idx > 0) {
       const tmp = next[idx - 1];
       next[idx - 1] = next[idx];
@@ -492,7 +500,7 @@ export default function LanguageMenu() {
               <div className="pt-3 border-t border-[var(--border-color)]">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    Languages & Display Order
+                    Translation Order
                   </span>
                   <div className="flex items-center gap-1">
                     <button

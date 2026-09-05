@@ -644,7 +644,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 }
 
 .reader-trans-block {
-  border-left: 3.5px solid var(--accent);
+  border-left: 2px solid var(--accent);
   background: var(--bg-secondary);
   border-radius: 0 0.5rem 0.5rem 0;
   padding: 0.5rem 0.85rem;
@@ -751,7 +751,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 }
 
 .reader-trans-block.reader-pali-top-block.has-custom-border {
-  border-left: 3.5px solid var(--accent);
+  border-left: 2px solid var(--accent);
   padding: 0.5rem 0.85rem;
   border-radius: 0 0.5rem 0.5rem 0;
   margin-bottom: 0.5rem;
