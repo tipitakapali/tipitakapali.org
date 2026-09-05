@@ -22,7 +22,7 @@ const DEFAULT_TRANSLATION_ORDER = [
   'russian',
 ];
 
-const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v4';
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v5';
 
 // One-per-theme page background (matches --bg-primary in globals.css). iOS Safari tints
 // its chrome to this value. Key 'default' is the :root background (no data-theme attr set).
@@ -59,7 +59,7 @@ const DEFAULT_SETTINGS = {
   fontSize: 22,
   lineHeight: 1.85,
   textAlign: 'justify',
-  paragraphIndent: true,
+  paragraphIndent: false,
   readerMaxWidth: '880px',
   showPageBreaks: false,
   showParaNumbers: true,
@@ -106,18 +106,7 @@ export function ThemeSettingsProvider({ children }) {
 
   useEffect(() => {
     try {
-      let saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (!saved) {
-        // Upgrade from v3 if exists: retain all user preferences (theme, font, etc.) but apply new default translationOrder
-        const prevSaved = localStorage.getItem('tipitaka_advanced_settings_v3');
-        if (prevSaved) {
-          try {
-            const prevParsed = JSON.parse(prevSaved);
-            const { translationOrder, ...rest } = prevParsed;
-            saved = JSON.stringify({ ...rest, translationOrder: [...DEFAULT_TRANSLATION_ORDER] });
-          } catch (e) {}
-        }
-      }
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         // Merge and migrate translationOrder / translationDisplayMode for older saves
