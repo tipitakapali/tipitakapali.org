@@ -128,7 +128,11 @@
 .reader-trans-block[data-trans-lang="vi"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="vietnamese"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="vi"] p,
-.reader-trans-block[data-trans-lang="vietnamese"] p {
+.reader-trans-block[data-trans-lang="vietnamese"] p,
+.result-snippet[data-trans-lang="vi"],
+.result-snippet[data-trans-lang="vietnamese"],
+.result-snippet[data-trans-lang="vi"] *,
+.result-snippet[data-trans-lang="vietnamese"] * {
   font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.85;
 }

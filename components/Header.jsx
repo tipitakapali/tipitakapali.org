@@ -100,7 +100,7 @@ export default function Header() {
 
         <button
           onClick={toggleSidebar}
-          className="flex font-bold text-[14px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer items-center gap-1.5 focus:outline-none truncate"
+          className="hidden sm:flex font-bold text-[14px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer items-center gap-1.5 focus:outline-none truncate"
           title="Toggle Navigation Tree (Ctrl+B)"
           aria-label="Toggle Navigation Tree"
         >
@@ -125,11 +125,11 @@ export default function Header() {
       </div>
 
       {/* Right Controls */}
-      <div className="flex-1 sm:flex-initial flex items-center justify-center sm:justify-end gap-1.5 sm:gap-2 shrink-0 sm:min-w-[190px]">
+      <div className="flex-1 sm:flex-initial flex items-center justify-end gap-2 sm:gap-2 shrink-0 sm:min-w-[190px]">
         {/* Mobile Search Button */}
         <button
           onClick={() => openSearchModal('')}
-          className="sm:hidden p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="sm:hidden p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           title="Search books (/)"
           aria-label="Search books"
         >
@@ -138,13 +138,13 @@ export default function Header() {
 
         {/* Dictionary Button */}
         <button
-          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={() => openDictionary()}
           title="Pāḷi Dictionary Look-up"
           aria-label="Pāḷi Dictionary Look-up"
         >
           <BookSearch size={14} className="text-[var(--accent)]" />
-          <span className="hidden sm:inline">Dict</span>
+          <span className="hidden min-[560px]:inline">Dict</span>
         </button>
 
         {/* Language & Multi-Translation Menu */}
@@ -152,20 +152,20 @@ export default function Header() {
 
         {/* Saved (Bookmarks) Button */}
         <button
-          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={() => setIsBookmarkOpen(true)}
           title="Saved Bookmarks"
           aria-label="Saved Bookmarks"
         >
           <Bookmark size={14} className="text-[var(--accent)]" />
-          <span className="hidden sm:inline">Saved</span>
+          <span className="hidden min-[560px]:inline">Saved</span>
         </button>
 
         {/* Theme Menu (Icon-only on button, labels inside dropdown) */}
         <div className="relative shrink-0" ref={themeRef}>
           <button
             onClick={() => setIsThemeOpen((prev) => !prev)}
-            className={`flex items-center justify-center p-1.5 sm:px-2 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
+            className={`flex items-center justify-center p-2 sm:px-2 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
               isThemeOpen ? 'border-[var(--accent)] bg-[var(--accent-light)]' : ''
             }`}
             title="Theme Selection"
@@ -209,13 +209,13 @@ export default function Header() {
 
         {/* Settings Button */}
         <button
-          className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           onClick={openSettingsModal}
           title="Advanced Reader Settings"
           aria-label="Advanced Reader Settings"
         >
           <Settings size={14} />
-          <span className="hidden sm:inline">Settings</span>
+          <span className="hidden min-[560px]:inline">Settings</span>
         </button>
       </div>
 

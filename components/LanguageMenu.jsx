@@ -382,14 +382,14 @@ export default function LanguageMenu() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
+        className={`flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer ${
           isOpen ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
         }`}
         title="Pāḷi script and translation Language"
         aria-label="Pāḷi script and translation Language"
       >
         <Languages size={14} className="text-[var(--accent)]" />
-        <span className="hidden sm:inline">Language</span>
+        <span className="hidden min-[560px]:inline">Language</span>
       </button>
 
       {isOpen && (

@@ -1030,6 +1030,15 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
   line-height: 1.85;
 }
 
+/* Vietnamese search snippets use the same font family as Vietnamese translation text */
+.result-snippet[data-trans-lang="vi"],
+.result-snippet[data-trans-lang="vietnamese"],
+.result-snippet[data-trans-lang="vi"] *,
+.result-snippet[data-trans-lang="vietnamese"] * {
+  font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.85;
+}
+
 /* Tabs Bar */
 .book-tabs-bar {
   height: var(--tabs-height);
