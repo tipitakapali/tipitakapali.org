@@ -46,7 +46,8 @@ export default function SearchResultItem({ result, onClick }) {
   const { settings } = useThemeSettings();
   const displayTitle = convertPaliScript(capitalizePali(result.book_title), settings?.paliScript);
   const displayNikaya = convertPaliScript(capitalizePali(result.nikaya || ''), settings?.paliScript);
-  const displaySnippet = transliterateHtml(result.snippet, settings?.paliScript);
+  const isTranslation = Boolean(result.is_translation || (result.lang && result.lang !== 'pali'));
+  const displaySnippet = isTranslation ? result.snippet : transliterateHtml(result.snippet, settings?.paliScript);
   const badgeKey = getNikayaBadgeKey(result.nikaya, result.book_code);
 
   return (
@@ -61,6 +62,11 @@ export default function SearchResultItem({ result, onClick }) {
           <span className={`result-nikaya-badge nikaya-badge-${badgeKey}`} title={result.nikaya}>
             <span className="nikaya-badge-dot" aria-hidden="true" />
             {displayNikaya}
+          </span>
+        )}
+        {isTranslation && result.lang && (
+          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 ml-auto">
+            {result.lang}
           </span>
         )}
       </div>

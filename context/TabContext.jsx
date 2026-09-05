@@ -105,10 +105,68 @@ function getChapterIdxForParaIndex(chapters, targetParaIndex) {
   return sorted[0]?.chapter_index ?? 0;
 }
 
+const LANG_KEY_TO_CODE = {
+  english: 'en',
+  vietnamese: 'vi',
+  myanmar: 'my',
+  burmese: 'my',
+  sinhala: 'si',
+  chinese: 'zh',
+  khmer: 'km',
+  thai: 'th',
+  lao: 'lo',
+  tamil: 'ta',
+  hindi: 'hi',
+  german: 'de',
+  japanese: 'ja',
+  korean: 'ko',
+  portuguese: 'pt',
+  russian: 'ru',
+  my_nissaya: 'my_nissaya',
+  nissaya: 'my_nissaya',
+};
+
+const CODE_TO_LANG_KEY = {
+  en: 'english',
+  vi: 'vietnamese',
+  my: 'myanmar',
+  my_nissaya: 'my_nissaya',
+  si: 'sinhala',
+  th: 'thai',
+  zh: 'chinese',
+  km: 'khmer',
+  lo: 'lao',
+  ta: 'tamil',
+  hi: 'hindi',
+  de: 'german',
+  ja: 'japanese',
+  pt: 'portuguese',
+  ru: 'russian',
+  ko: 'korean',
+};
+
+function normalizeLangCode(langOrDb) {
+  if (!langOrDb) return null;
+  const str = String(langOrDb).trim().toLowerCase();
+  if (str === 'pali' || str === 'fts_tipitaka.db' || str === 'tipitaka.db' || str === 'fts_pali.db') return 'pali';
+  const clean = str.replace(/^(?:fts_)?(?:translation_)?/i, '').replace(/\.db$/i, '');
+  if (clean === 'pali' || clean === 'tipitaka') return 'pali';
+  if (LANG_KEY_TO_CODE[clean]) return LANG_KEY_TO_CODE[clean];
+  if (CODE_TO_LANG_KEY[clean]) return clean;
+  return clean;
+}
+
+function toLangKey(langOrDb) {
+  const code = normalizeLangCode(langOrDb);
+  if (!code) return null;
+  if (code === 'pali') return 'pali';
+  return CODE_TO_LANG_KEY[code] || code;
+}
+
 export function TabProvider({ children }) {
 
 
-  const { setIsZenMode, updateSetting } = useThemeSettings();
+  const { setIsZenMode, updateSetting, settings } = useThemeSettings();
 
   const [openTabs, setOpenTabs] = useState([]);
   const [activeBookCode, setActiveBookCode] = useState(null);
@@ -664,6 +722,17 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
+        if (options.lang && options.lang !== 'pali') {
+          const langCode = options.lang.toLowerCase().trim();
+          const langKey = CODE_TO_LANG_KEY[langCode] || langCode;
+          if (langKey && (!settings?.translations || !settings.translations[langKey])) {
+            updateSetting('translations', {
+              ...(settings?.translations || {}),
+              [langKey]: true,
+            });
+          }
+        }
+
         if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
@@ -673,6 +742,8 @@ export function TabProvider({ children }) {
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
+            lang: options.lang || null,
+            db: options.db || null,
             timestamp: Date.now(),
           });
         } else {
@@ -689,6 +760,8 @@ export function TabProvider({ children }) {
             query: qParam,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
+            lang: options.lang || null,
+            db: options.db || null,
           });
         } else {
           setSearchHighlight(null);
@@ -947,6 +1020,17 @@ export function TabProvider({ children }) {
 
 
 
+        if (options.lang && options.lang !== 'pali') {
+          const langCode = options.lang.toLowerCase().trim();
+          const langKey = CODE_TO_LANG_KEY[langCode] || langCode;
+          if (langKey && (!settings?.translations || !settings.translations[langKey])) {
+            updateSetting('translations', {
+              ...(settings?.translations || {}),
+              [langKey]: true,
+            });
+          }
+        }
+
         if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
@@ -956,6 +1040,8 @@ export function TabProvider({ children }) {
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
             highlightQuery: options.highlightQuery,
+            lang: options.lang || null,
+            db: options.db || null,
             timestamp: Date.now(),
           });
         } else {
@@ -974,6 +1060,8 @@ export function TabProvider({ children }) {
             query: qParam,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum || (options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '').trim() : undefined),
+            lang: options.lang || null,
+            db: options.db || null,
           });
         } else {
           setSearchHighlight(null);

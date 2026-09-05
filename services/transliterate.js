@@ -286,11 +286,13 @@ export function highlightHtmlText(
 ) {
   if (!html || !query) return html;
   const rawQ = String(query).trim();
-  if (rawQ.length < 2) return html;
+  const isCjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQ);
+  if (!isCjk && rawQ.length < 2) return html;
 
+  const minLen = isCjk ? 1 : 2;
   const romanQ = convertAnyToRoman(rawQ).trim();
   const baseTerms = [romanQ, rawQ, ...romanQ.split(/\s+/), ...rawQ.split(/\s+/)].filter(
-    (t) => t && t.trim().length >= 2
+    (t) => t && t.trim().length >= minLen
   );
   const uniqueTerms = Array.from(new Set(baseTerms));
 
@@ -333,7 +335,7 @@ export function highlightHtmlText(
 
   const patterns = [];
   for (const term of uniqueTerms) {
-    if (!term || term.length < 2) continue;
+    if (!term || term.length < minLen) continue;
     if (targetScript && targetScript !== 'roman') {
       const converted = convertPaliScript(term, targetScript);
       if (converted && converted.trim()) {
@@ -423,6 +425,106 @@ export function highlightHtmlText(
 
   // Fallback: If no specific paragraph targeted, highlight text throughout
   return highlightTextInside(html);
+}
+
+/**
+ * Highlights search terms in translation HTML content, preserving tags, attributes, and entities.
+ * Supports Latin words with boundary detection, multi-word phrases, CJK, and non-Latin scripts.
+ */
+export function highlightTranslationText(html, query, lang = 'en') {
+  if (!html || !query) return html;
+  const rawQ = String(query).trim();
+  if (!rawQ) return html;
+
+  const isCjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQ);
+  if (!isCjk && rawQ.length < 2) return html;
+
+  const minLen = isCjk ? 1 : 2;
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Term candidates: raw phrase, Roman phrase, and individual words without outer punctuation
+  const romanQ = convertAnyToRoman(rawQ).trim();
+  const rawParts = rawQ
+    .split(/\s+/)
+    .map((t) => t.replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '').trim())
+    .filter((t) => t && t.length >= minLen);
+  const romanParts = romanQ
+    ? romanQ
+        .split(/\s+/)
+        .map((t) => t.replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '').trim())
+        .filter((t) => t && t.length >= minLen)
+    : [];
+
+  const candidateTerms = [rawQ, romanQ, ...rawParts, ...romanParts].filter(
+    (t) => t && t.length >= minLen
+  );
+  const uniqueTerms = Array.from(new Set(candidateTerms));
+  if (uniqueTerms.length === 0) return html;
+
+  const diacriticMap = {
+    'a': '[aāAĀ]', 'ā': '[aāAĀ]',
+    'i': '[iīIĪ]', 'ī': '[iīIĪ]',
+    'u': '[uūUŪ]', 'ū': '[uūUŪ]',
+    'e': '[eE]',
+    'o': '[oO]',
+    'm': '[mṁṃMṀṂ]', 'ṁ': '[mṁṃMṀṂ]', 'ṃ': '[mṁṃMṀṂ]',
+    'n': '[nṅñṇNṄÑṆ]', 'ṅ': '[nṅñṇNṄÑṆ]', 'ñ': '[nṅñṇNṄÑṆ]', 'ṇ': '[nṅñṇNṄÑṆ]',
+    't': '[tṭTṬ]', 'ṭ': '[tṭTṬ]',
+    'd': '[dḍDḌ]', 'ḍ': '[dḍDḌ]',
+    'l': '[lḷLḶ]', 'ḷ': '[lḷLḶ]',
+    's': '[sṣśSṢŚ]', 'ṣ': '[sṣśSṢŚ]', 'ś': '[sṣśSṢŚ]',
+    'r': '[rṛṝRṚṜ]', 'ṛ': '[rṛṝRṚṜ]', 'ṝ': '[rṛṝRṚṜ]',
+    'h': '[hH]', 'k': '[kK]', 'g': '[gG]', 'c': '[cC]', 'j': '[jJ]',
+    'p': '[pP]', 'b': '[bB]', 'y': '[yY]', 'v': '[vV]'
+  };
+
+  const patternItems = [];
+  for (const term of uniqueTerms) {
+    const isContinuousScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Myanmar}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}]/u.test(term);
+    const escaped = escapeRegex(term);
+    const wordCount = term.trim().split(/\s+/).length;
+    const termLen = term.length;
+
+    if (isContinuousScript) {
+      patternItems.push({ regex: escaped, wordCount, termLen });
+    } else {
+      patternItems.push({ regex: `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, wordCount, termLen });
+      // For Latin terms in Pali or loanwords, also build diacritic-tolerant regex (including multi-word phrases)
+      if (/^[a-zA-ZāĀīĪūŪṁṀṃṂṅṄñÑṇṆṭṬḍḌḷḶṣṢśŚṛṚṝṜhHkKgGcCjJpPbyYvV\s]+$/.test(term)) {
+        let regexStr = '';
+        for (let i = 0; i < term.length; i++) {
+          const char = term[i].toLowerCase();
+          if (diacriticMap[char]) {
+            regexStr += diacriticMap[char];
+          } else if (/\s/.test(char)) {
+            regexStr += '\\s+';
+          } else {
+            regexStr += escapeRegex(term[i]);
+          }
+        }
+        if (regexStr && regexStr !== escaped) {
+          patternItems.push({ regex: `(?<![\\p{L}\\p{N}])${regexStr}(?![\\p{L}\\p{N}])`, wordCount, termLen });
+        }
+      }
+    }
+  }
+
+  if (patternItems.length === 0) return html;
+
+  // Sort descending by wordCount first, then by term length so longer phrases/words match first
+  patternItems.sort((a, b) => b.wordCount - a.wordCount || b.termLen - a.termLen);
+
+  const patterns = Array.from(new Set(patternItems.map((p) => p.regex)));
+  const combinedRegex = new RegExp(`(${patterns.join('|')})`, 'gui');
+
+  // Safely replace text nodes, preserving HTML tags and entities
+  return html.replace(
+    /(<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>[\s\S]*?<\/span>|<[^>]*>|&[a-z0-9#]+;)|([^<>&]+)/gi,
+    (match, nonText, textNode) => {
+      if (nonText) return nonText;
+      return textNode.replace(combinedRegex, '<mark class="search-hit">$1</mark>');
+    }
+  );
 }
 
 /**

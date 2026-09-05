@@ -436,9 +436,24 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
   }, 24 * 60 * 60 * 1000);
 }
 
+export async function fetchSearchDatabases() {
+  const base = getApiBase();
+  return cachedFetch(
+    'search_databases',
+    async () => {
+      const res = await fetch(`${base}/api/search/databases`);
+      if (!res.ok) throw new Error('Failed to load search databases');
+      return res.json();
+    },
+    60 * 60 * 1000
+  );
+}
+
 export async function searchTipitaka(query, options = {}) {
   const params = new URLSearchParams();
   params.set('q', query);
+  if (options.db && options.db !== 'fts_tipitaka.db' && options.db !== 'pali') params.set('db', options.db);
+  if (options.lang && options.lang !== 'pali') params.set('lang', options.lang);
   if (options.book && options.book !== 'all') params.set('book', options.book);
   if (options.mat && options.mat !== 'all') params.set('mat', options.mat);
   if (options.pitaka && options.pitaka !== 'all') params.set('pitaka', options.pitaka);

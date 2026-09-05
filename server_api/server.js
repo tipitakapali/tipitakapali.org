@@ -73,6 +73,73 @@ if (FTS_DB_PATH) {
   }
 }
 
+// Translation FTS database cache & resolver
+const translationFtsDbs = new Map();
+
+const LANG_NAME_TO_CODE = {
+  english: 'en',
+  vietnamese: 'vi',
+  myanmar: 'my',
+  burmese: 'my',
+  sinhala: 'si',
+  chinese: 'zh',
+  khmer: 'km',
+  thai: 'th',
+  lao: 'lo',
+  tamil: 'ta',
+  hindi: 'hi',
+  german: 'de',
+  japanese: 'ja',
+  korean: 'ko',
+  portuguese: 'pt',
+  russian: 'ru',
+  my_nissaya: 'my_nissaya',
+  nissaya: 'my_nissaya',
+};
+
+function getSearchDatabase(targetParam) {
+  const norm = String(targetParam || '').trim().toLowerCase();
+  if (!norm || norm === 'pali' || norm === 'tipitaka' || norm === 'fts_tipitaka.db' || norm === 'fts_tipitaka') {
+    return { db: dbFts || db, key: 'pali', isPali: true, dbName: 'fts_tipitaka.db' };
+  }
+
+  let lang = norm;
+  const m = norm.match(/(?:fts_)?translation_([a-z_]+)(?:\.db)?$/i);
+  if (m) {
+    lang = m[1];
+  } else {
+    lang = norm.replace(/\.db$/, '');
+  }
+
+  if (LANG_NAME_TO_CODE[lang]) {
+    lang = LANG_NAME_TO_CODE[lang];
+  }
+
+  if (translationFtsDbs.has(lang)) {
+    return { db: translationFtsDbs.get(lang), key: lang, isPali: false, dbName: `fts_translation_${lang}.db` };
+  }
+
+  const filename = `fts_translation_${lang}.db`;
+  const ftsPath = resolveDbPath(filename);
+  if (ftsPath && fs.existsSync(ftsPath)) {
+    try {
+      const transDb = new Database(ftsPath, { readonly: true });
+      transDb.exec(`
+        PRAGMA synchronous = NORMAL;
+        PRAGMA temp_store = MEMORY;
+        PRAGMA query_only = 1;
+      `);
+      translationFtsDbs.set(lang, transDb);
+      console.log(`[Database] Using translation FTS5 SQLite database for '${lang}' at: ${ftsPath}`);
+      return { db: transDb, key: lang, isPali: false, dbName: filename };
+    } catch (err) {
+      console.warn(`[Database] Error opening translation FTS DB ${filename}:`, err.message);
+    }
+  }
+
+  return { db: dbFts || db, key: 'pali', isPali: true, dbName: 'fts_tipitaka.db', notFound: lang };
+}
+
 // Prepared Statements for ultra-low latency direct execution (Zero runtime parsing)
 const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 'tree_json'");
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
@@ -894,7 +961,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
 function buildFts5Query(cleanText, distance = 'any') {
   if (!cleanText) return '';
   const tokens = cleanText
-    .replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF*]/g, ' ')
+    .replace(/[^\p{L}\p{N}\p{M}\u200C\u200D\s*]/gu, ' ')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
@@ -1047,10 +1114,50 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
   return { countSql, querySql, params };
 }
 
+  // List available FTS search databases (Pāḷi + translation languages)
+  fastify.get('/api/search/databases', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=3600, stale-while-revalidate=86400');
+    const databases = [
+      {
+        id: 'fts_tipitaka.db',
+        key: 'pali',
+        name: 'Pāḷi CST',
+        native_name: 'Pāḷi CST',
+        flag: '☸️',
+        is_pali: true,
+      },
+    ];
+
+    const transLangs = translationEngine.getAvailableLanguages();
+    for (const t of transLangs) {
+      const filename = `fts_translation_${t.code}.db`;
+      const ftsPath = resolveDbPath(filename);
+      if (ftsPath && fs.existsSync(ftsPath)) {
+        databases.push({
+          id: filename,
+          key: t.code,
+          name: t.name,
+          native_name: t.native_name,
+          flag: t.flag,
+          total_paragraphs: t.total_paragraphs,
+          is_pali: false,
+        });
+      }
+    }
+    return { databases };
+  });
+
   // Full-Text Search across 520,000+ paragraphs with In-Memory LRU Caching
   fastify.get('/api/search', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
     const rawQuery = req.query.q || req.query.query || '';
+    const dbParam = req.query.db || req.query.lang || 'pali';
+    const target = getSearchDatabase(dbParam);
+    const isPali = target.isPali;
+    const targetKey = target.key;
+    const targetDbName = target.dbName;
+    const searchDb = target.db;
+
     const bookFilter = req.query.book || null;
     const matFilter = req.query.mat || 'all';
     const pitakaFilter = req.query.pitaka || req.query.nikaya || 'all';
@@ -1059,22 +1166,26 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = Math.max(0, parseInt(req.query.offset || '0', 10));
 
-    if (!rawQuery || rawQuery.trim().length < 2) {
-      return { total: 0, count: 0, results: [] };
+    const isCjkChar = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery.trim());
+    const minLength = isCjkChar ? 1 : 2;
+
+    if (!rawQuery || rawQuery.trim().length < minLength) {
+      return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
     }
 
-    // Auto-normalize Velthuis typing and nigghahita
-    const convertedQuery = typeVelthuis(rawQuery.trim()).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ');
-    const cleanQuery = convertedQuery.trim();
+    // Auto-normalize Velthuis typing and nigghahita for Pāḷi searches only
+    const cleanQuery = isPali
+      ? typeVelthuis(rawQuery.trim()).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ').trim()
+      : rawQuery.trim();
 
     // Construct FTS5 match query
     const ftsMatch = buildFts5Query(cleanQuery, distanceVal);
     if (!ftsMatch) {
-      return { total: 0, count: 0, results: [] };
+      return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
     }
 
     // In-Memory Search Cache Lookup (< 0.05ms)
-    const cacheKey = `${ftsMatch}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${distanceVal}::${limit}::${offset}`;
+    const cacheKey = `${targetDbName}::${ftsMatch}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${distanceVal}::${limit}::${offset}`;
     const cachedEntry = searchCache.get(cacheKey);
     if (cachedEntry && Date.now() - cachedEntry.timestamp < SEARCH_CACHE_TTL) {
       searchHits++;
@@ -1093,15 +1204,25 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
         sort: sortVal,
       });
 
-      const searchDb = dbFts || db;
       const countRow = searchDb.prepare(countSql).get(...params);
       const total = countRow ? countRow.total : 0;
 
       const rows = searchDb.prepare(querySql).all(...params, limit, offset);
 
+      if (!isPali) {
+        for (const row of rows) {
+          row.is_translation = true;
+          row.lang = targetKey;
+          row.db = targetDbName;
+        }
+      }
+
       const responseData = {
         query: cleanQuery,
         ftsQuery: ftsMatch,
+        db: targetDbName,
+        lang: targetKey,
+        is_translation: !isPali,
         total: total,
         count: rows.length,
         offset: offset,
@@ -1125,6 +1246,9 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
       req.log.error({ err }, 'Search query failed');
       return {
         query: cleanQuery,
+        db: targetDbName,
+        lang: targetKey,
+        is_translation: !isPali,
         total: 0,
         count: 0,
         error: err.message,

@@ -9,7 +9,7 @@ import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
 
-import { transliterateHtml, convertPaliScript, highlightHtmlText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
+import { transliterateHtml, convertPaliScript, highlightHtmlText, highlightTranslationText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
 import { fetchChapterTranslations } from '../../services/api';
 
@@ -50,6 +50,51 @@ export const LANG_KEY_TO_CODE = {
   russian: 'ru',
   my_nissaya: 'my_nissaya',
 };
+
+export const CODE_TO_LANG_KEY = {
+  en: 'english',
+  vi: 'vietnamese',
+  my: 'myanmar',
+  my_nissaya: 'my_nissaya',
+  si: 'sinhala',
+  zh: 'chinese',
+  km: 'khmer',
+  th: 'thai',
+  lo: 'lao',
+  ta: 'tamil',
+  hi: 'hindi',
+  de: 'german',
+  ja: 'japanese',
+  ko: 'korean',
+  pt: 'portuguese',
+  ru: 'russian',
+};
+
+export function normalizeLangCode(langOrDb) {
+  if (!langOrDb) return null;
+  const str = String(langOrDb).trim().toLowerCase();
+  if (str === 'pali' || str === 'fts_tipitaka.db') return 'pali';
+  const clean = str.replace(/^fts_translation_|\.db$/g, '');
+  if (LANG_KEY_TO_CODE[clean]) return LANG_KEY_TO_CODE[clean];
+  return clean;
+}
+
+export function isSearchPali(searchHighlight) {
+  if (!searchHighlight) return true;
+  if (searchHighlight.isPali) return true;
+  if (searchHighlight.lang === 'pali') return true;
+  if (searchHighlight.db === 'fts_tipitaka.db' || searchHighlight.db === 'pali') return true;
+  if (!searchHighlight.lang && !searchHighlight.db) return true;
+  return false;
+}
+
+export function getSearchHighlightLang(searchHighlight) {
+  if (!searchHighlight) return null;
+  if (isSearchPali(searchHighlight)) return 'pali';
+  if (searchHighlight.lang) return normalizeLangCode(searchHighlight.lang);
+  if (searchHighlight.db) return normalizeLangCode(searchHighlight.db);
+  return 'pali';
+}
 
 export function formatCssColor(val, fallback = '') {
   if (!val) return fallback;
@@ -127,7 +172,8 @@ function injectTranslationsIntoHtml(
   orderedLayers = [],
   isPaliEnabled = true,
   displayMode = 'stack',
-  translationColors = {}
+  translationColors = {},
+  searchHighlight = null
 ) {
   if (!html) return html;
 
@@ -152,6 +198,46 @@ function injectTranslationsIntoHtml(
     const idMatch = pTag.match(/\bid="([^"]+)"/i);
     const classMatch = pTag.match(/\bclass="([^"]+)"/i);
     const paranumMatch = pTag.match(/<strong\b[^>]*\bclass="[^"]*paranum[^"]*"[^>]*>([\s\S]*?)<\/strong>\.?\s*/i);
+
+    // Determine if this paragraph is targeted by searchHighlight
+    let isTargetPara = false;
+    if (searchHighlight?.query && String(searchHighlight.query).trim()) {
+      const hasParaTarget =
+        (searchHighlight.paraIndex !== undefined && searchHighlight.paraIndex !== null && searchHighlight.paraIndex !== '') ||
+        (searchHighlight.paraNum !== undefined && searchHighlight.paraNum !== null && searchHighlight.paraNum !== '');
+
+      if (hasParaTarget) {
+        const cleanTargetPara = searchHighlight.paraNum
+          ? String(searchHighlight.paraNum).replace(/^(?:para-?|p)/i, '').trim()
+          : null;
+        const targetPIndexStr =
+          searchHighlight.paraIndex !== null && searchHighlight.paraIndex !== undefined
+            ? String(searchHighlight.paraIndex).trim()
+            : null;
+
+        if (targetPIndexStr && String(pIndex).trim() === targetPIndexStr) {
+          isTargetPara = true;
+        }
+        if (!isTargetPara && cleanTargetPara) {
+          const pNum = paraMatch ? paraMatch[1] : null;
+          if (pNum && pNum === cleanTargetPara) {
+            isTargetPara = true;
+          } else {
+            const targetInt = parseInt(cleanTargetPara, 10);
+            if (!isNaN(targetInt) && paraFirstMatch && paraLastMatch) {
+              const first = parseInt(paraFirstMatch[1], 10);
+              const last = parseInt(paraLastMatch[1], 10);
+              if (targetInt >= first && targetInt <= last) {
+                isTargetPara = true;
+              }
+            }
+          }
+        }
+      } else {
+        // Global search highlight without specific paragraph target
+        isTargetPara = true;
+      }
+    }
 
     const pClasses = (classMatch ? classMatch[1] : '').split(/\s+/);
     const headingClass = pClasses.find((c) =>
@@ -248,6 +334,12 @@ function injectTranslationsIntoHtml(
             content = `<strong class="paranum" id="para-${paraMatch[1]}">${pNumDisplay}</strong>. ` + content;
           }
 
+          // Task 2: Highlight translation text ONLY if search was specifically in this translation database/language
+          const searchLang = getSearchHighlightLang(searchHighlight);
+          if (isTargetPara && searchHighlight?.query && searchLang && (searchLang === layer.lang || searchLang === layer.id)) {
+            content = highlightTranslationText(content, searchHighlight.query, layer.lang);
+          }
+
           const blockClasses = !isPaliEnabled && isHeading
             ? 'reader-trans-block reader-trans-heading-block'
             : 'reader-trans-block';
@@ -339,13 +431,14 @@ function injectTranslationsIntoHtml(
   });
 }
 
-// Memoized Chapter Block with Pre-Buffering Intersection Observer and Translation Support
+// Memoized Chapter Block with Pre-Buffering Intersection Observer, Lazy Translation Loading, and Scoped Highlighting
 const ChapterBlock = memo(function ChapterBlock({
   chapter,
   bookCode,
   html,
   isLoading,
   onVisible,
+  isCurrentOrTarget = false,
   paliScript = 'roman',
   searchHighlight = null,
   highlightSearchTerms = true,
@@ -355,29 +448,46 @@ const ChapterBlock = memo(function ChapterBlock({
   translationDisplayMode = 'stack',
   translationColors = {},
 }) {
-  const sentinelRef = useRef(null);
+  const blockRef = useRef(null);
   const [translations, setTranslations] = React.useState({});
+  const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const activeLangsKey = activeLangs.join(',');
 
   useEffect(() => {
-    if (html || !sentinelRef.current) return;
+    if (isCurrentOrTarget) {
+      setIsNearViewport(true);
+    }
+  }, [isCurrentOrTarget]);
+
+  // IntersectionObserver for lazy loading chapter HTML & lazy loading translations
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsNearViewport(true);
+      return;
+    }
+    if (!blockRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          onVisible(chapter.chapter_index);
+        const entry = entries[0];
+        if (entry && entry.isIntersecting) {
+          if (!html) {
+            onVisible(chapter.chapter_index);
+          }
+          setIsNearViewport(true);
         }
       },
-      { rootMargin: '900px 0px' } // Pre-buffer 900px before scrolling into view
+      { rootMargin: '800px 0px' } // Pre-load 800px before scrolling into view
     );
 
-    observer.observe(sentinelRef.current);
+    observer.observe(blockRef.current);
     return () => observer.disconnect();
   }, [html, chapter.chapter_index, onVisible]);
 
+  // Task 3: Lazy load translations ONLY when chapter is near viewport (or current/target) and active translation languages exist
   useEffect(() => {
-    if (!html || !bookCode || !activeLangsKey) {
-      setTranslations({});
+    if (!html || !bookCode || !activeLangsKey || (!isNearViewport && !isCurrentOrTarget)) {
+      if (!activeLangsKey) setTranslations({});
       return;
     }
 
@@ -401,7 +511,7 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => {
       isMounted = false;
     };
-  }, [html, bookCode, chapter.chapter_index, activeLangsKey]);
+  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget]);
 
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
@@ -409,7 +519,9 @@ const ChapterBlock = memo(function ChapterBlock({
     if (paliScript && paliScript !== 'roman') {
       processed = transliterateHtml(processed, paliScript);
     }
-    if (highlightSearchTerms && searchHighlight?.query && searchHighlight.query.trim()) {
+    // Task 2: Only highlight Pāḷi text if search was in Root Pāḷi CST (not in translation database)
+    const isPali = isSearchPali(searchHighlight);
+    if (highlightSearchTerms && searchHighlight?.query && searchHighlight.query.trim() && isPali) {
       processed = highlightHtmlText(
         processed,
         searchHighlight.query.trim(),
@@ -432,7 +544,8 @@ const ChapterBlock = memo(function ChapterBlock({
         orderedLayers,
         isPaliEnabled,
         translationDisplayMode,
-        translationColors
+        translationColors,
+        highlightSearchTerms ? searchHighlight : null
       );
     }
     return processed;
@@ -452,6 +565,7 @@ const ChapterBlock = memo(function ChapterBlock({
   if (displayHtml) {
     return (
       <div
+        ref={blockRef}
         id={`chap-${chapter.chapter_index}`}
         data-chapter={chapter.chapter_index}
         className="chapter-content-block"
@@ -462,7 +576,7 @@ const ChapterBlock = memo(function ChapterBlock({
 
   return (
     <div
-      ref={sentinelRef}
+      ref={blockRef}
       id={`chap-${chapter.chapter_index}`}
       data-chapter={chapter.chapter_index}
       className="chapter-placeholder py-8 px-4 my-6 border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--bg-secondary)]/40 select-none"
@@ -942,7 +1056,9 @@ export default function ReaderView() {
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
 
-    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook } = targetScrollIntent;
+    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db } = targetScrollIntent;
+    const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
+    const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
 
     if (chapterIdx !== undefined && chapterIdx !== null) {
       if (!activeTab.loadedChapters?.[chapterIdx]) {
@@ -1109,27 +1225,39 @@ export default function ReaderView() {
         }
 
         if (el) {
-          const targetEl =
-            el.getClientRects().length > 0
-              ? el
-              : el.closest('p') || el.parentElement || el;
-
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = targetEl.getBoundingClientRect();
-          const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-
-          if (settings.pulseAnimation) {
-            targetEl.classList.remove('pulse-highlight');
-            void targetEl.offsetWidth;
-            targetEl.classList.add('pulse-highlight');
+          let targetEl = null;
+          if (isTransTarget) {
+            const row = el.closest('.reader-para-row') || el;
+            const transEl = row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`);
+            if (transEl) {
+              targetEl = transEl;
+            } else if (retries < maxRetries - 2) {
+              // Translation block still loading/rendering, wait and retry
+            } else {
+              targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+            }
+          } else {
+            targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
           }
-          const foundPNum = targetEl.getAttribute?.('data-para') || cleanPara;
-          if (foundPNum) setActiveParaNum(foundPNum);
-          saveTabScroll(activeTab.bookCode, offset);
-          clearTargetScrollIntent();
-          return;
+
+          if (targetEl) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const rect = targetEl.getBoundingClientRect();
+            const currentScroll = containerRef.current.scrollTop;
+            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+            if (settings.pulseAnimation) {
+              targetEl.classList.remove('pulse-highlight');
+              void targetEl.offsetWidth;
+              targetEl.classList.add('pulse-highlight');
+            }
+            const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
+            if (foundPNum) setActiveParaNum(foundPNum);
+            saveTabScroll(activeTab.bookCode, offset);
+            clearTargetScrollIntent();
+            return;
+          }
         }
       }
 
@@ -1208,27 +1336,39 @@ export default function ReaderView() {
           findElement(`pindex-${paraIndex}`);
 
         if (el) {
-          const targetEl =
-            el.getClientRects().length > 0
-              ? el
-              : el.closest('p') || el.parentElement || el;
-
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = targetEl.getBoundingClientRect();
-          const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-
-          if (settings.pulseAnimation) {
-            targetEl.classList.remove('pulse-highlight');
-            void targetEl.offsetWidth;
-            targetEl.classList.add('pulse-highlight');
+          let targetEl = null;
+          if (isTransTarget) {
+            const row = el.closest('.reader-para-row') || el;
+            const transEl = row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`);
+            if (transEl) {
+              targetEl = transEl;
+            } else if (retries < maxRetries - 2) {
+              // Translation block still loading/rendering, wait and retry
+            } else {
+              targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+            }
+          } else {
+            targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
           }
-          const foundPNum = targetEl.getAttribute?.('data-para');
-          if (foundPNum) setActiveParaNum(foundPNum);
-          saveTabScroll(activeTab.bookCode, offset);
-          clearTargetScrollIntent();
-          return;
+
+          if (targetEl) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const rect = targetEl.getBoundingClientRect();
+            const currentScroll = containerRef.current.scrollTop;
+            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+            if (settings.pulseAnimation) {
+              targetEl.classList.remove('pulse-highlight');
+              void targetEl.offsetWidth;
+              targetEl.classList.add('pulse-highlight');
+            }
+            const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
+            if (foundPNum) setActiveParaNum(foundPNum);
+            saveTabScroll(activeTab.bookCode, offset);
+            clearTargetScrollIntent();
+            return;
+          }
         }
       }
 
@@ -1317,6 +1457,8 @@ export default function ReaderView() {
     saveTabScroll,
     clearTargetScrollIntent,
     setActiveParaNum,
+    searchHighlight,
+    settings?.scrollMotion,
   ]);
 
 
@@ -2163,6 +2305,11 @@ export default function ReaderView() {
                   html={activeTab.loadedChapters?.[chap.chapter_index]}
                   isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
                   onVisible={handleChapterVisible}
+                  isCurrentOrTarget={
+                    activeTab.currentChapterIdx === chap.chapter_index ||
+                    targetScrollIntent?.chapterIdx === chap.chapter_index ||
+                    (chap.chapter_index === 0 && (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) && !targetScrollIntent?.chapterIdx)
+                  }
                   paliScript={settings?.paliScript}
                   searchHighlight={searchHighlight}
                   highlightSearchTerms={settings?.highlightSearchTerms ?? true}
@@ -2182,7 +2329,8 @@ export default function ReaderView() {
                     if (settings?.paliScript && settings.paliScript !== 'roman') {
                       processed = transliterateHtml(processed, settings.paliScript);
                     }
-                    if ((settings?.highlightSearchTerms ?? true) && searchHighlight?.query && searchHighlight.query.trim()) {
+                    const isPali = isSearchPali(searchHighlight);
+                    if ((settings?.highlightSearchTerms ?? true) && searchHighlight?.query && searchHighlight.query.trim() && isPali) {
                       processed = highlightHtmlText(
                         processed,
                         searchHighlight.query.trim(),

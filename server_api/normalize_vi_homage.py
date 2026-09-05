@@ -131,8 +131,8 @@ def default_db_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "db", "translation_vi.db")
 
 
-def count_hits(cur, pattern):
-    """Rows containing pattern in any of the three text columns."""
+def count_pattern(cur, pattern):
+    """Rows (summed over the three text columns) currently containing pattern."""
     total = 0
     for tbl, col in COLUMNS:
         cur.execute(f"SELECT count(*) FROM {tbl} WHERE {col} LIKE '%' || ? || '%'", (pattern,))
@@ -140,17 +140,26 @@ def count_hits(cur, pattern):
     return total
 
 
+def count_hits(cur, pattern):
+    """Rows containing pattern in any of the three text columns."""
+    return count_pattern(cur, pattern)
+
+
 def apply_replacement(cur, old, new):
-    """REPLACE old->new in all three text columns; return rows touched."""
-    touched = 0
+    """REPLACE old->new in all three text columns.
+
+    Returns rows actually changed, counted from UPDATE ... RETURNING
+    (robust against cursor.rowcount quirks, no extra count scans).
+    """
+    changed = 0
     for tbl, col in COLUMNS:
         cur.execute(
             f"UPDATE {tbl} SET {col} = REPLACE({col}, ?, ?) "
-            "WHERE %s LIKE '%%' || ? || '%%'" % col,
+            "WHERE %s LIKE '%%' || ? || '%%' RETURNING 1" % col,
             (old, new, old),
         )
-        touched += cur.rowcount
-    return touched
+        changed += len(cur.fetchall())
+    return changed
 
 
 def backup_db(db_path):
