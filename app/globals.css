@@ -1039,6 +1039,55 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
   line-height: 1.85;
 }
 
+/* Search snippets use the same font family as their translation text (per data-trans-lang) */
+.result-snippet[data-trans-lang="si"],
+.result-snippet[data-trans-lang="sinhala"],
+.result-snippet[data-trans-lang="si"] *,
+.result-snippet[data-trans-lang="sinhala"] * {
+  font-family: "Noto Sans Sinhala", sans-serif;
+  line-height: 2.0;
+}
+
+.result-snippet[data-trans-lang="th"],
+.result-snippet[data-trans-lang="thai"],
+.result-snippet[data-trans-lang="th"] *,
+.result-snippet[data-trans-lang="thai"] * {
+  font-family: "Noto Sans Thai", sans-serif;
+  line-height: 1.9;
+}
+
+.result-snippet[data-trans-lang="km"],
+.result-snippet[data-trans-lang="khmer"],
+.result-snippet[data-trans-lang="km"] *,
+.result-snippet[data-trans-lang="khmer"] * {
+  font-family: "Noto Sans Khmer", sans-serif;
+  line-height: 2.0;
+}
+
+.result-snippet[data-trans-lang="lo"],
+.result-snippet[data-trans-lang="lao"],
+.result-snippet[data-trans-lang="lo"] *,
+.result-snippet[data-trans-lang="lao"] * {
+  font-family: "Noto Sans Lao", sans-serif;
+  line-height: 2.0;
+}
+
+.result-snippet[data-trans-lang="zh"],
+.result-snippet[data-trans-lang="chinese"],
+.result-snippet[data-trans-lang="zh"] *,
+.result-snippet[data-trans-lang="chinese"] * {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.8;
+}
+
+.result-snippet[data-trans-lang="ja"],
+.result-snippet[data-trans-lang="japanese"],
+.result-snippet[data-trans-lang="ja"] *,
+.result-snippet[data-trans-lang="japanese"] * {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  line-height: 1.8;
+}
+
 /* Tabs Bar */
 .book-tabs-bar {
   height: var(--tabs-height);
