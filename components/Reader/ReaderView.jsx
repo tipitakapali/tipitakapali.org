@@ -596,7 +596,7 @@ const ChapterBlock = memo(function ChapterBlock({
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1">
           <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-          <span>Buffering text...</span>
+          <span>Loading happiness...</span>
         </div>
       ) : (
         <button

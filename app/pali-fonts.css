@@ -171,6 +171,24 @@
   font-display: swap;
 }
 
+/* Noto Serif SC (Simplified Chinese, variable wght 100-900) */
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("/fonts/pali/Noto_Serif_SC/NotoSerifSC-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Noto Serif JP (Japanese, variable wght 100-900) */
+@font-face {
+  font-family: "Noto Serif JP";
+  src: url("/fonts/pali/Noto_Serif_JP/NotoSerifJP-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* THSarabunPali (Thai) — thai */
 @font-face {
   font-family: "THSarabunPali";
@@ -525,7 +543,7 @@ html[data-script]:not([data-script="roman"]) .sidebar-title span,
 html[data-script]:not([data-script="roman"]) .sidebar-title button span,
 html[data-script]:not([data-script="roman"]) .tree-text,
 html[data-script]:not([data-script="roman"]) .tree-row,
-html[data-script]:not([data-script="roman"]) .result-snippet,
+html[data-script]:not([data-script="roman"]) .result-snippet:not([data-trans-lang]),
 html[data-script]:not([data-script="roman"]) .result-meta,
 html[data-script]:not([data-script="roman"]) .book-tab .tab-title,
 html[data-script]:not([data-script="roman"]) .breadcrumbs span,

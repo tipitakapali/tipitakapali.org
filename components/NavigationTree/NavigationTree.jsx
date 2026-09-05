@@ -14,8 +14,9 @@ import TreeNode from './TreeNode';
 import HelpModal from '../HelpModal';
 import { fetchTree } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
+import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
-import { typeVelthuis, normalizePaliForSearch } from '../../services/transliterate';
+import { typeVelthuis, convertPaliScript, normalizePaliForSearch } from '../../services/transliterate';
 
 export default function NavigationTree() {
   const [treeData, setTreeData] = useState([]);
@@ -37,6 +38,7 @@ export default function NavigationTree() {
   const [isResizing, setIsResizing] = useState(false);
 
   const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
+  const { settings } = useThemeSettings();
   const { isOpen: isDictOpen, closeDictionary } = useDictionary();
   const treeContainerRef = useRef(null);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
@@ -387,10 +389,11 @@ export default function NavigationTree() {
               <button
                 onClick={() => setIsHelpOpen(true)}
                 className="font-normal text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer flex items-center gap-1 focus:outline-none truncate"
-                title="TipitakaPali.org — Help & Guide (Press ?)"
-                aria-label="TipitakaPali.org Help and User Guide"
+                title="Chaṭṭha Saṅgāyana Tipiṭaka — Help & Guide (Press ?)"
+                aria-label="Chaṭṭha Saṅgāyana Tipiṭaka Help and User Guide"
               >
-                <span>TipitakaPali.org</span>
+                <span className="sm:hidden">TipitakaPali.org</span>
+                <span className="hidden sm:inline">{convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka', settings?.paliScript)}</span>
               </button>
             </div>
 

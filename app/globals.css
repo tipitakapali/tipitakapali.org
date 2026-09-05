@@ -1010,12 +1010,12 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 }
 
 .reader-trans-block[data-trans-lang="zh"] .reader-trans-content {
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: "Noto Serif SC", "Songti SC", STSong, SimSun, serif;
   line-height: 1.8;
 }
 
 .reader-trans-block[data-trans-lang="ja"] .reader-trans-content {
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "MS PMincho", serif;
   line-height: 1.8;
 }
 
@@ -1076,7 +1076,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 .result-snippet[data-trans-lang="chinese"],
 .result-snippet[data-trans-lang="zh"] *,
 .result-snippet[data-trans-lang="chinese"] * {
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: "Noto Serif SC", "Songti SC", STSong, SimSun, serif;
   line-height: 1.8;
 }
 
@@ -1084,7 +1084,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 .result-snippet[data-trans-lang="japanese"],
 .result-snippet[data-trans-lang="ja"] *,
 .result-snippet[data-trans-lang="japanese"] * {
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "MS PMincho", serif;
   line-height: 1.8;
 }
 
