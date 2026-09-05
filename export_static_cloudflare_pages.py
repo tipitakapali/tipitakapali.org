@@ -279,6 +279,7 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
         all_chapters_data = {str(r['chapter_index']): r['html'] for r in ch_rows}
 
         # Export individual chapter JSON files (/api/book/{code}/chapter/{idx})
+        written_chapter_idxs = set()
         for r in ch_rows:
             ch_idx = r['chapter_index']
             ch_html = r['html']
@@ -288,7 +289,27 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                 "html": ch_html
             }
             write_json_multiformat(target_api_dir, f"book/{clean_code}/chapter/{ch_idx}", ch_payload)
+            written_chapter_idxs.add(str(ch_idx))
             total_chapters_exported += 1
+
+        # Prune orphan chapter files left over from earlier database builds
+        # (e.g. chapter indexes that no longer exist in the current DB).
+        # Without this, stale chapter JSONs accumulate in the deployment and can
+        # surface as phantom 404-capable URLs.
+        chapter_dir = target_api_dir / 'book' / clean_code / 'chapter'
+        if chapter_dir.exists():
+            for stale_ch in chapter_dir.glob('*.json'):
+                if stale_ch.stem.isdigit() and stale_ch.stem not in written_chapter_idxs:
+                    try:
+                        stale_ch.unlink()
+                    except OSError:
+                        pass
+            # Drop the directory entirely if this book now has zero chapters.
+            if not any(chapter_dir.iterdir()):
+                try:
+                    chapter_dir.rmdir()
+                except OSError:
+                    pass
 
         # Export TOC JSON (/api/book/{code}/toc)
         toc_payload = {
@@ -312,6 +333,14 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                     book_mat_payload[k] = mat_entry[k]
         if book_mat_payload:
             write_json_multiformat(target_api_dir, f"book/{clean_code}/mat", book_mat_payload)
+        else:
+            # Book no longer has MAT relations — remove any stale previous export.
+            stale_mat_file = target_api_dir / 'book' / clean_code / 'mat.json'
+            try:
+                if stale_mat_file.exists():
+                    stale_mat_file.unlink()
+            except OSError:
+                pass
 
         # Export book-specific MAT chapter map (/api/book/{code}/mat_chapter_map)
         try:
@@ -328,6 +357,13 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                     "total": len(b_chap_rows),
                     "chapters": b_chap_rows
                 })
+            else:
+                stale_map_file = target_api_dir / 'book' / clean_code / 'mat_chapter_map.json'
+                try:
+                    if stale_map_file.exists():
+                        stale_map_file.unlink()
+                except OSError:
+                    pass
         except Exception as e:
             pass
 
@@ -346,6 +382,13 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                     "total": len(b_para_rows),
                     "paras": b_para_rows
                 })
+            else:
+                stale_map_file = target_api_dir / 'book' / clean_code / 'mat_para_map.json'
+                try:
+                    if stale_map_file.exists():
+                        stale_map_file.unlink()
+                except OSError:
+                    pass
         except Exception as e:
             pass
 
@@ -366,6 +409,13 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                         "total": len(canon_p_rows),
                         "paragraphs": canon_p_rows
                     })
+                else:
+                    stale_par_file = target_api_dir / 'book' / clean_code / 'paragraphs.json'
+                    try:
+                        if stale_par_file.exists():
+                            stale_par_file.unlink()
+                    except OSError:
+                        pass
             except Exception as e:
                 pass
 
@@ -420,6 +470,18 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
 
         if (idx + 1) % 50 == 0 or idx == len(all_books) - 1:
             log_info(f"  Processed {idx + 1}/{len(all_books)} books ({total_chapters_exported} chapters)...")
+
+    # Prune per-book directories for books that no longer exist in the current DB.
+    books_dir = target_api_dir / 'book'
+    if books_dir.exists():
+        valid_codes = {str(b['code']) for b in all_books}
+        for stale_dir in books_dir.iterdir():
+            if stale_dir.is_dir() and stale_dir.name not in valid_codes:
+                try:
+                    shutil.rmtree(stale_dir)
+                    log_info(f"Removed orphan book export dir: {stale_dir.name}")
+                except OSError as e:
+                    log_warn(f"Could not remove orphan book export dir {stale_dir.name}: {e}")
 
     conn.close()
     elapsed = time.time() - start_time

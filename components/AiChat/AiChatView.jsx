@@ -662,6 +662,24 @@ export default function AiChatView({ initialQuery = null }) {
               ))}
             </div>
 
+            {/* Inspiration & Data Credit — Vīmaṃsa feature in the ePitaka app, powered by summaries.db */}
+            <div className="flex flex-col items-center gap-1.5 text-[11px] text-[var(--text-muted)] leading-relaxed">
+              <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5">
+                Ani Assistant is inspired by and powered by the summaries.db database of{' '}
+                <a
+                  href="https://epitaka.org/about"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 font-semibold text-violet-600 dark:text-violet-400 hover:underline transition cursor-pointer"
+                  title="About the E-Piṭaka project"
+                >
+                  Vīmaṃsa{' '}
+                  <ExternalLink size={10} className="shrink-0" />
+                </a>
+                in the ePitaka app · reimplemented similar features for this web app.
+              </span>
+            </div>
+
             {!aiSettings.apiKey && (
               <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
                 <div>
