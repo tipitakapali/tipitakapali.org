@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, BookOpen, ExternalLink, Globe, Loader2, Quote } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { convertPaliScript } from '../../services/transliterate';
+import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
 
 export default function CitationQuickviewModal({ isOpen, citation, onClose, onOpenInReader }) {
   const { settings } = useThemeSettings();
@@ -75,8 +75,9 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
   const chapterTitle = passageData?.chapter_title || `Chapter ${chapterIndex + 1}`;
   const paraNum = passageData?.para_num || (paraEnd ? `${paraIndex}–${paraEnd}` : (paraIndex + 1));
 
+  // Transliterate only text nodes, preserving inline HTML markup (e.g. <i>, <strong class="paranum">)
   const displayPali = passageData?.pali
-    ? convertPaliScript(passageData.pali, settings?.paliScript)
+    ? transliterateHtml(passageData.pali, settings?.paliScript)
     : '';
 
   const handleOpenReader = () => {
@@ -156,9 +157,10 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                     {settings?.paliScript ? settings.paliScript.toUpperCase() : 'ROMAN'}
                   </span>
                 </div>
-                <div className="text-sm sm:text-[15px] leading-relaxed font-serif text-[var(--text-primary)]">
-                  {displayPali}
-                </div>
+                <div
+                  className="text-sm sm:text-[15px] leading-relaxed font-serif text-[var(--text-primary)]"
+                  dangerouslySetInnerHTML={{ __html: displayPali }}
+                />
               </div>
 
               {/* English Translation */}
@@ -168,9 +170,10 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                     <Globe size={13} />
                     English Translation
                   </div>
-                  <div className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]">
-                    {passageData.translations.en}
-                  </div>
+                  <div
+                    className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]"
+                    dangerouslySetInnerHTML={{ __html: passageData.translations.en }}
+                  />
                 </div>
               )}
 
@@ -181,9 +184,10 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                     <Globe size={13} />
                     Bản dịch Tiếng Việt
                   </div>
-                  <div className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]">
-                    {passageData.translations.vi}
-                  </div>
+                  <div
+                    className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]"
+                    dangerouslySetInnerHTML={{ __html: passageData.translations.vi }}
+                  />
                 </div>
               )}
             </>
