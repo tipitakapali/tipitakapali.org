@@ -288,6 +288,8 @@ export function MainAppContent({ params: rawParams }) {
     return () => clearTimeout(t);
   }, [isEkaActive]);
 
+  const isAiTab = activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat';
+
   if (isNotFound) {
     return <NotFound />;
   }
@@ -367,7 +369,7 @@ export function MainAppContent({ params: rawParams }) {
               </div>
             )}
           </div>
-          <Footer />
+          {!isAiTab && <Footer />}
         </div>
         <DictionaryModal />
       </div>
