@@ -143,8 +143,28 @@ export default function SearchModal() {
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
 
-  // Database selection state (Default: Pāḷi fts_tipitaka.db)
-  const [selectedDb, setSelectedDb] = useState('fts_tipitaka.db');
+  // Database selection state (Default: Pāḷi fts_tipitaka.db, or URL param db/lang)
+  const [selectedDb, setSelectedDb] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlDb = urlParams.get('db') || urlParams.get('lang');
+        if (urlDb) {
+          const normCode = normalizeLangCode(urlDb);
+          const found = DEFAULT_FTS_DATABASES.find(
+            (d) => d.id === urlDb || d.key === normCode || d.id === `fts_translation_${normCode}.db`
+          );
+          if (found) return found.id;
+        }
+        const saved = localStorage.getItem(SEARCH_PREFS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.db) return parsed.db;
+        }
+      } catch {}
+    }
+    return 'fts_tipitaka.db';
+  });
   const [ftsDatabases, setFtsDatabases] = useState(DEFAULT_FTS_DATABASES);
   const isPaliDb = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
 
@@ -300,7 +320,20 @@ export default function SearchModal() {
     if (isSearchOpen) {
       if (searchInitialQuery) {
         const raw = searchInitialQuery;
-        const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlDb = urlParams?.get('db') || urlParams?.get('lang');
+        let effectiveDb = selectedDb;
+        if (urlDb) {
+          const normCode = normalizeLangCode(urlDb);
+          const found = DEFAULT_FTS_DATABASES.find(
+            (d) => d.id === urlDb || d.key === normCode || d.id === `fts_translation_${normCode}.db`
+          );
+          if (found) {
+            effectiveDb = found.id;
+            setSelectedDb(found.id);
+          }
+        }
+        const isPali = effectiveDb === 'fts_tipitaka.db' || effectiveDb === 'pali';
         let displayedVal = raw;
         if (isPali) {
           const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
@@ -311,7 +344,7 @@ export default function SearchModal() {
         const searchQuery = isPali ? convertAnyToRoman(displayedVal).trim() : displayedVal.trim();
         const minLen = getMinSearchLength(searchQuery);
         if (searchQuery.length >= minLen) {
-          performSearch(searchQuery, 0, selectedDb);
+          performSearch(searchQuery, 0, effectiveDb);
         }
       }
 

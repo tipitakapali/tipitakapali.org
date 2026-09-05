@@ -10,6 +10,7 @@ translated Tipiṭaka corpora:
   - Destination: server_api/db/fts_translation_<lang>.db
   - Schema matches fts_tipitaka.db:
       (book_code, book_title, nikaya, para_num, para_index UNINDEXED, para_rend, content, prefix = 3)
+      For Vietnamese (vi): tokenize = 'unicode61 remove_diacritics 2' for accent-agnostic FTS.
   - Copies translation_meta table for direct language information
   - Sanitizes HTML/XML tags, collapses whitespace, preserves Unicode diacritics
   - B-tree optimization ('optimize') & VACUUM for maximum query speed.
@@ -153,18 +154,34 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
     dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_indexed_rows', ?);", (str(total_rows),))
 
     # Create paragraphs_fts virtual table with prefix = 3
-    dst_cur.execute("""
-    CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
-        book_code,
-        book_title,
-        nikaya,
-        para_num,
-        para_index UNINDEXED,
-        para_rend,
-        content,
-        prefix = 3
-    );
-    """)
+    # For Vietnamese (vi), use tokenize = 'unicode61 remove_diacritics 2' for diacritic-agnostic search
+    if lang_code == "vi":
+        dst_cur.execute("""
+        CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
+            book_code,
+            book_title,
+            nikaya,
+            para_num,
+            para_index UNINDEXED,
+            para_rend,
+            content,
+            tokenize = 'unicode61 remove_diacritics 2',
+            prefix = 3
+        );
+        """)
+    else:
+        dst_cur.execute("""
+        CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
+            book_code,
+            book_title,
+            nikaya,
+            para_num,
+            para_index UNINDEXED,
+            para_rend,
+            content,
+            prefix = 3
+        );
+        """)
     dst_conn.commit()
 
     # 3. Batch insert clean text into FTS5 virtual table
