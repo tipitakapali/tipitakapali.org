@@ -632,7 +632,7 @@ export default function AiChatView({ initialQuery = null }) {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                Your dedicated AI companion for studying the Tipiṭaka. Direct citations, term deconstruction, and commentary insights.
+                Your dedicated AI companion for studying the Tipiṭaka. Ani can make mistakes. Please verify important info.
               </p>
             </div>
 

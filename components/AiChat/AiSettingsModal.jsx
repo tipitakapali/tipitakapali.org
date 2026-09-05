@@ -361,11 +361,12 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
             <AlertTriangle size={15} className="shrink-0 mt-px text-amber-600 dark:text-amber-400" />
             <p className="text-[11px] leading-relaxed">
               <span className="font-bold">Warning: </span>
-              Ani grounds every answer with repeated AI tool calls against your Tipiṭaka database,
-              which can burn through credits / tokens quickly — especially with translation layers
-              enabled or long conversations. If you are on a paid plan, please monitor your usage.
+              Ani calls your AI repeatedly for every answer, so credits/tokens can burn quickly —
+              especially with translation layers enabled or in long conversations. If you are on a
+              paid plan, please monitor your usage.
             </p>
           </div>
+
 
           {/* Provider Selection */}
           <div className="space-y-1.5">
