@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Key, Cpu, ShieldCheck, ExternalLink, Check, AlertCircle, Bot, RefreshCw, Sparkles } from 'lucide-react';
+import { X, Key, Cpu, ShieldCheck, ExternalLink, Check, AlertCircle, AlertTriangle, Bot, RefreshCw, Sparkles } from 'lucide-react';
 
 export const DEFAULT_AI_SETTINGS = {
   provider: 'gemini',
   apiKey: '',
-  toolModel: 'gemini-2.0-flash',
-  answerModel: 'gemini-2.0-flash',
+  toolModel: 'gemini-flash-lite-latest',
+  answerModel: 'gemini-flash-latest',
   baseUrl: '',
   orthodoxMode: true,
   customSystemPrompt: '',
@@ -54,15 +54,20 @@ function compareGeminiModels(a, b) {
 }
 
 // From a fetched Gemini model list, pick the latest flash-lite (for tool calls)
-// and the latest full flash (for answers), falling back to the newest model.
+// and the second-latest full flash (for answers — the newest flash rollout is
+// skipped in favour of a proven one), falling back to the newest model.
 export function pickLatestGeminiModels(models) {
   const capable = (models || []).filter((m) => m && m.id);
   const sorted = [...capable].sort(compareGeminiModels);
   const lite = sorted.filter((m) => /flash/i.test(m.id) && /lite/i.test(m.id));
   const flash = sorted.filter((m) => /flash/i.test(m.id) && !/lite/i.test(m.id));
+  const latestLite = lite[0] || null;
+  const latestFlash = flash[0] || null;
   return {
-    toolPick: lite[0] || flash[0] || sorted[0] || null,
-    answerPick: flash[0] || lite[0] || sorted[0] || null,
+    toolPick: latestLite || latestFlash || sorted[0] || null,
+    answerPick: flash[1] || latestFlash || latestLite || sorted[0] || null,
+    latestLite,
+    latestFlash,
   };
 }
 
@@ -230,15 +235,15 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
           answerModel: answerPick ? answerPick.id : prev.answerModel,
         }));
         setModelsAutoNote(
-          `Auto-selected latest${toolPick ? ` • tool → ${toolPick.id}` : ''}${
-            answerPick ? ` • answer → ${answerPick.id}` : ''
+          `Auto-selected${toolPick ? ` • tool → ${toolPick.id} (latest lite)` : ''}${
+            answerPick ? ` • answer → ${answerPick.id} (2nd-latest flash)` : ''
           }`
         );
       }
       setModelsStatus('success');
       setModelsMessage(
         list.length
-          ? `${list.length} models loaded — latest flash-lite suggested for tools, latest flash for answers.`
+          ? `${list.length} models loaded — tool uses latest flash-lite, answer uses 2nd-latest flash.`
           : 'No generateContent-capable models returned for this key.'
       );
     } catch (err) {
@@ -248,8 +253,8 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
   };
 
   // Auto-fetch all Gemini models shortly after the user enters a key, and
-  // default the tool model to the latest flash-lite + answer model to latest flash.
-  // Runs once per key so manual edits afterwards are respected.
+  // default the tool model to the latest flash-lite + answer model to the
+  // 2nd-latest flash. Runs once per key so manual edits afterwards are respected.
   useEffect(() => {
     if (!isOpen || config.provider !== 'gemini') return;
     const key = (config.apiKey || '').trim();
@@ -262,6 +267,12 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
   }, [isOpen, config.provider, config.apiKey]);
 
   if (!isOpen) return null;
+
+  // Latest models currently available (from the fetched Gemini list) for display
+  // under each model field.
+  const { latestLite, latestFlash } = pickLatestGeminiModels(
+    config.provider === 'gemini' ? geminiModels : []
+  );
 
   const handleSave = () => {
     saveStoredAiSettings(config);
@@ -345,6 +356,17 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs text-[var(--text-primary)]">
+          {/* Usage & cost warning */}
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 flex items-start gap-2">
+            <AlertTriangle size={15} className="shrink-0 mt-px text-amber-600 dark:text-amber-400" />
+            <p className="text-[11px] leading-relaxed">
+              <span className="font-bold">Warning: </span>
+              Ani grounds every answer with repeated AI tool calls against your Tipiṭaka database,
+              which can burn through credits / tokens quickly — especially with translation layers
+              enabled or long conversations. If you are on a paid plan, please monitor your usage.
+            </p>
+          </div>
+
           {/* Provider Selection */}
           <div className="space-y-1.5">
             <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
@@ -355,19 +377,21 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               value={config.provider}
               onChange={(e) => {
                 const pid = e.target.value;
-                const defaultModel =
+                const defaultToolModel =
                   pid === 'gemini'
-                    ? 'gemini-2.0-flash'
+                    ? 'gemini-flash-lite-latest'
                     : pid === 'openai'
                     ? 'gpt-4o-mini'
                     : pid === 'openrouter'
                     ? 'google/gemini-2.0-flash-001'
                     : 'local-model';
+                const defaultAnswerModel =
+                  pid === 'gemini' ? 'gemini-flash-latest' : defaultToolModel;
                 setConfig({
                   ...config,
                   provider: pid,
-                  toolModel: defaultModel,
-                  answerModel: defaultModel,
+                  toolModel: defaultToolModel,
+                  answerModel: defaultAnswerModel,
                 });
               }}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] cursor-pointer"
@@ -447,9 +471,11 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                 value={config.toolModel}
                 onChange={(v) => setConfig({ ...config, toolModel: v })}
                 models={config.provider === 'gemini' ? geminiModels : []}
-                placeholder="e.g. gemini-2.0-flash"
+                placeholder="e.g. gemini-flash-lite-latest"
               />
-              <p className="text-[10px] text-[var(--text-muted)]">Suggested: latest flash-lite</p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {latestLite ? `Latest available: ${latestLite.id}` : 'Suggested: latest flash-lite'}
+              </p>
             </div>
             <div className="space-y-1.5">
               <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-muted)]">
@@ -459,9 +485,13 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                 value={config.answerModel}
                 onChange={(v) => setConfig({ ...config, answerModel: v })}
                 models={config.provider === 'gemini' ? geminiModels : []}
-                placeholder="e.g. gemini-2.0-flash"
+                placeholder="e.g. gemini-flash-latest"
               />
-              <p className="text-[10px] text-[var(--text-muted)]">Suggested: latest flash</p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {latestFlash
+                  ? `Latest available: ${latestFlash.id} (answer uses 2nd-latest)`
+                  : 'Suggested: 2nd-latest flash'}
+              </p>
             </div>
           </div>
 

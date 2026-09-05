@@ -38,24 +38,24 @@ const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v1';
 
 const STARTER_PROMPTS = [
   {
-    title: '12 Links of Dependent Origination',
-    desc: 'Explain the 12 links of Paṭiccasamuppāda with canonical citations',
-    query: 'Explain the twelve links of Paṭiccasamuppāda (Dependent Origination) with their canonical definitions from SN 12.2 and relevant suttas.',
+    title: 'Four Noble Truths',
+    desc: 'The Buddha’s first teaching — suffering, its origin, cessation & the path',
+    query: 'Explain the Four Noble Truths (cattāri ariyasaccāni) as taught in the Dhammacakkappavattana Sutta (SN 56.11), with canonical definitions of each truth.',
   },
   {
-    title: 'Samatha vs. Vipassanā',
-    desc: 'Explore the two wings of serenity and insight in the suttas',
-    query: 'What is the exact distinction and relationship between Samatha (tranquillity) and Vipassanā (insight) in the Pāli Canon? Quote key passages.',
+    title: 'Mahāsatipaṭṭhāna',
+    desc: 'The four foundations of mindfulness from DN 22',
+    query: 'Explain the four foundations of mindfulness (satipaṭṭhāna) — body, feelings, mind and dhammas — as taught in the Mahāsatipaṭṭhāna Sutta (DN 22).',
   },
   {
-    title: 'Four Noble Truths (12 Aspects)',
-    desc: 'The 3 turns and 12 aspects (tiparivaṭṭaṃ dvādasākāraṃ)',
-    query: 'Explain the Dhammacakkappavattana Sutta’s teaching on the Twelve Aspects of the Four Noble Truths (sacca-ñāṇa, kicca-ñāṇa, kata-ñāṇa).',
+    title: 'Ānāpānasati',
+    desc: 'Mindfulness of breathing — the sixteen steps from MN 118',
+    query: 'Explain mindfulness of breathing (ānāpānasati) and its sixteen steps as taught in the Ānāpānasati Sutta (MN 118).',
   },
   {
-    title: 'Teachings on Gratitude',
-    desc: 'Passages on Kataññū-katavedī (gratitude and reciprocity)',
-    query: 'Find canonical discourses where the Buddha explains the virtue of gratitude (kataññū katavedī) towards parents and teachers.',
+    title: 'Sīla',
+    desc: 'Virtue and moral conduct — the foundation of the gradual training',
+    query: 'What is sīla (virtue, moral conduct) in the Pāli Canon? Explain its role as the foundation of the gradual training (anupubbasikkhā) with key canonical passages.',
   },
 ];
 
@@ -322,8 +322,8 @@ export default function AiChatView({ initialQuery = null }) {
           .map((m) => ({ role: m.role, content: m.content })),
         apiKey: currentSettings.apiKey || '',
         provider: currentSettings.provider || 'gemini',
-        toolModel: currentSettings.toolModel || 'gemini-2.0-flash',
-        answerModel: currentSettings.answerModel || 'gemini-2.0-flash',
+        toolModel: currentSettings.toolModel || 'gemini-flash-lite-latest',
+        answerModel: currentSettings.answerModel || 'gemini-flash-latest',
         orthodoxMode: currentSettings.orthodoxMode !== false,
         customSystemPrompt: currentSettings.customSystemPrompt || '',
         baseUrl: currentSettings.baseUrl || '',

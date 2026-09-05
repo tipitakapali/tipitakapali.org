@@ -1027,13 +1027,25 @@ export default function ReaderView() {
   // one-shot drift correction is scheduled per jump. Any manual scroll cancels it.
   const chapterJumpRef = useRef({ key: null, lastOffset: 0, timer: null });
 
+  // Paragraph-jump settle tracking (citation / search / bookmark / history / MAT /
+  // GoTo jumps): translation batches stream in lazily AFTER the initial scroll and
+  // expand content above the target, shifting it. A guarded watcher re-verifies the
+  // landing until stable. Any manual scroll cancels it.
+  const paraJumpRef = useRef({ key: null, lastOffset: 0, timer: null, deadline: 0 });
+
   useEffect(() => {
     const cancelJump = () => {
       const st = chapterJumpRef.current;
-      if (!st.key) return;
-      clearTimeout(st.timer);
-      chapterJumpRef.current = { key: null, lastOffset: 0, timer: null };
-      clearTargetScrollIntent();
+      if (st.key) {
+        clearTimeout(st.timer);
+        chapterJumpRef.current = { key: null, lastOffset: 0, timer: null };
+        clearTargetScrollIntent();
+      }
+      const ps = paraJumpRef.current;
+      if (ps.key) {
+        clearTimeout(ps.timer);
+        paraJumpRef.current = { key: null, lastOffset: 0, timer: null, deadline: 0 };
+      }
     };
     const container = containerRef.current;
     if (container) {
@@ -1042,6 +1054,7 @@ export default function ReaderView() {
     }
     return () => {
       clearTimeout(chapterJumpRef.current.timer);
+      clearTimeout(paraJumpRef.current.timer);
       if (container) {
         container.removeEventListener('wheel', cancelJump);
         container.removeEventListener('touchstart', cancelJump);
@@ -1187,6 +1200,153 @@ export default function ReaderView() {
     const attemptScroll = () => {
       if (!containerRef.current) return;
 
+      // ── Paragraph-jump settle watcher ──────────────────────────────────
+      // Re-resolve the paragraph target the jump scrolled to (same flavour:
+      // translation block for translation-targeted jumps, row otherwise).
+      // Returns null when the target is not (yet) measurably in the DOM.
+      const resolveParaTarget = () => {
+        const container = containerRef.current;
+        if (!container) return null;
+        const visible = (el) =>
+          el && el.getClientRects && el.getClientRects().length > 0 ? el : null;
+        const pickTransOrRow = (row, scopeForChapter) => {
+          if (isTransTarget) {
+            const transEl =
+              (row.querySelector &&
+                (row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`) ||
+                  row.querySelector(`[data-trans-lang="${targetTransLang}"]`))) ||
+              null;
+            if (visible(transEl)) return transEl;
+            // Translations arrived for this chapter but this paragraph has none:
+            // the jump fell back to Pāli — measure the same fallback.
+            const chapterHasTranslations = Boolean(
+              scopeForChapter?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`)
+            );
+            if (chapterHasTranslations) return visible(row);
+            return null; // translation batch still in flight — keep waiting
+          }
+          return visible(row);
+        };
+
+        if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
+          const chapterEl =
+            chapterIdx !== undefined && chapterIdx !== null
+              ? container.querySelector(`[data-chapter="${chapterIdx}"]`)
+              : null;
+          if (
+            chapterIdx !== undefined &&
+            chapterIdx !== null &&
+            (!chapterEl || chapterEl.classList.contains('chapter-placeholder'))
+          ) {
+            return null;
+          }
+          const scope = chapterEl || container;
+          const el =
+            scope.querySelector(`.reader-para-row[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`p[data-pindex="${paraIndex}"]`) ||
+            scope.querySelector(`[id="pindex-${paraIndex}"]`);
+          if (!el) return null;
+          const row = (el.closest && el.closest('.reader-para-row')) || el;
+          return pickTransOrRow(row, chapterEl || container);
+        }
+
+        if (paraNum) {
+          const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
+          const activeSub =
+            subBook ||
+            activeTab.sub_book ||
+            activeTab.chapter_to_sub_book?.[chapterIdx ?? activeTab.currentChapterIdx ?? 0];
+          const scope =
+            chapterIdx !== undefined && chapterIdx !== null
+              ? container.querySelector(`[data-chapter="${chapterIdx}"]`) || container
+              : container;
+          if (scope.classList && scope.classList.contains('chapter-placeholder')) return null;
+          // Exact paragraph match only — never "correct" onto a neighbouring paragraph.
+          const candidates = scope.querySelectorAll(`[data-para="${cleanPara}"]`);
+          let el = null;
+          for (const c of candidates) {
+            if (!activeSub || !c.getAttribute('data-sub-book') || c.getAttribute('data-sub-book') === activeSub) {
+              el = c;
+              break;
+            }
+          }
+          if (!el) return null;
+          const row = (el.closest && el.closest('.reader-para-row')) || el;
+          return pickTransOrRow(row, scope);
+        }
+
+        return null;
+      };
+
+      // Arm a guarded settle watcher after a paragraph jump. Translation batches
+      // streaming in later can shift the target; re-verify until stable (two
+      // consecutive in-tolerance reads, so a wave landing between ticks can't
+      // fake a settle). Stands down on manual scroll, stability, bottom-clamp,
+      // timeout, or a newer jump superseding it.
+      const armParaJumpWatcher = (jumpKey, jumpOffset) => {
+        clearTimeout(paraJumpRef.current.timer);
+        const state = {
+          key: jumpKey,
+          lastOffset: jumpOffset,
+          timer: null,
+          deadline: Date.now() + 6000,
+          stableCount: 0,
+        };
+        paraJumpRef.current = state;
+        const TOL = 24;
+        const GAP = 700;
+        const tick = () => {
+          const cur = paraJumpRef.current;
+          if (!cur || cur.key !== jumpKey) return; // superseded
+          const container = containerRef.current;
+          if (!container) {
+            paraJumpRef.current.key = null;
+            return;
+          }
+          if (Date.now() > cur.deadline) {
+            paraJumpRef.current.key = null;
+            return;
+          }
+          // Bottom-clamped targets can never reach top-60 — stand down.
+          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+            paraJumpRef.current.key = null;
+            return;
+          }
+          const target = resolveParaTarget();
+          if (!target) {
+            cur.timer = setTimeout(tick, GAP);
+            return;
+          }
+          const cRect = container.getBoundingClientRect();
+          const rRect = target.getBoundingClientRect();
+          if (Math.abs(rRect.top - cRect.top - 60) <= TOL) {
+            cur.stableCount += 1;
+            if (cur.stableCount >= 2) paraJumpRef.current.key = null;
+            else cur.timer = setTimeout(tick, GAP);
+            return;
+          }
+          cur.stableCount = 0;
+          // Target drifted and the user hasn't touched the scroll: correct instantly.
+          if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
+            paraJumpRef.current.key = null;
+            return;
+          }
+          const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+          smartScrollTo(container, fresh, { scrollMotion: 'instant' });
+          if (settings.pulseAnimation) {
+            target.classList.remove('pulse-highlight');
+            void target.offsetWidth;
+            target.classList.add('pulse-highlight');
+          }
+          saveTabScroll(activeTab.bookCode, fresh);
+          cur.lastOffset = fresh;
+          cur.timer = setTimeout(tick, GAP);
+        };
+        // First check after any in-flight smooth animation has finished (max ~450ms).
+        state.timer = setTimeout(tick, 900);
+      };
+
       // 1. Target paragraph by index (Highest Priority for Translation FTS, Pāḷi FTS, TOC, and para_index targets)
       if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
         const chapterEl = (chapterIdx !== undefined && chapterIdx !== null)
@@ -1249,6 +1409,10 @@ export default function ReaderView() {
               const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
               if (foundPNum) setActiveParaNum(foundPNum);
               saveTabScroll(activeTab.bookCode, offset);
+              armParaJumpWatcher(
+                `${activeTab.bookCode}:ch${chapterIdx}:pi${paraIndex}:${Date.now()}`,
+                offset
+              );
               clearTargetScrollIntent();
               return;
             }
@@ -1367,11 +1531,15 @@ export default function ReaderView() {
               void targetEl.offsetWidth;
               targetEl.classList.add('pulse-highlight');
             }
-            const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
-            if (foundPNum) setActiveParaNum(foundPNum);
-            saveTabScroll(activeTab.bookCode, offset);
-            clearTargetScrollIntent();
-            return;
+              const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
+              if (foundPNum) setActiveParaNum(foundPNum);
+              saveTabScroll(activeTab.bookCode, offset);
+              armParaJumpWatcher(
+                `${activeTab.bookCode}:ch${chapterIdx}:pn${cleanPara}:${Date.now()}`,
+                offset
+              );
+              clearTargetScrollIntent();
+              return;
           }
         }
       }

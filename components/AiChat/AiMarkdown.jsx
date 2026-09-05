@@ -37,6 +37,16 @@ export default function AiMarkdown({ content, onCitationClick }) {
       continue;
     }
 
+    // GFM table rows: consecutive lines starting with `|` containing another `|`
+    if (trimmed.startsWith('|') && trimmed.slice(1).includes('|')) {
+      if (currentType !== 'table') {
+        flushBlock();
+        currentType = 'table';
+      }
+      currentBlock.push(line);
+      continue;
+    }
+
     if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
       flushBlock();
       blocks.push({ type: 'header', text: trimmed });
@@ -76,6 +86,64 @@ export default function AiMarkdown({ content, onCitationClick }) {
     currentBlock.push(line);
   }
   flushBlock();
+
+  // ── GFM table helpers ────────────────────────────────────────────────
+  // Split a table row on unescaped pipes, ignoring pipes inside `code spans`.
+  const splitTableRow = (line) => {
+    let t = line.trim();
+    if (t.startsWith('|')) t = t.slice(1);
+    if (t.endsWith('|')) t = t.slice(0, -1);
+    const cells = [];
+    let cur = '';
+    let inCode = false;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (ch === '`') {
+        inCode = !inCode;
+        cur += ch;
+      } else if (ch === '\\' && t[i + 1] === '|') {
+        cur += '|';
+        i++;
+      } else if (ch === '|' && !inCode) {
+        cells.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    cells.push(cur.trim());
+    return cells;
+  };
+
+  const isDelimiterRow = (cells) =>
+    cells.length > 0 && cells.every((c) => /^:?-{1,}:?$/.test(c));
+
+  // Returns { header, aligns, body } or null when the block is not a valid table.
+  const parseTable = (tableLines) => {
+    const rows = tableLines.map(splitTableRow);
+    if (rows.length < 2 || !isDelimiterRow(rows[1])) return null;
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const pad = (r, fill) => {
+      const c = [...r];
+      while (c.length < colCount) c.push(fill);
+      return c.slice(0, colCount);
+    };
+    const aligns = pad(
+      rows[1].map((c) =>
+        c.startsWith(':') && c.endsWith(':') && c.length > 2
+          ? 'center'
+          : c.endsWith(':')
+          ? 'right'
+          : 'left'
+      ),
+      'left'
+    );
+    return {
+      header: pad(rows[0], ''),
+      aligns,
+      body: rows.slice(2).map((r) => pad(r, '')),
+    };
+  };
 
   // Helper to render inline text with formatting and interactive citations
   const renderInline = (text) => {
@@ -267,6 +335,62 @@ export default function AiMarkdown({ content, onCitationClick }) {
                 </li>
               ))}
             </ol>
+          );
+        }
+
+        if (block.type === 'table') {
+          const table = parseTable(block.lines);
+          if (!table) {
+            // Not a valid table (e.g. missing delimiter row) — render as paragraph.
+            return (
+              <p key={`p_${bIdx}`} className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]">
+                {renderInline(block.text)}
+              </p>
+            );
+          }
+          return (
+            <div
+              key={`tbl_${bIdx}`}
+              className="my-3 overflow-x-auto rounded-xl border border-[var(--border-color)] shadow-2xs"
+            >
+              <table className="w-full border-collapse text-xs sm:text-[13px] leading-relaxed min-w-[520px]">
+                <thead>
+                  <tr className="bg-violet-500/10 dark:bg-violet-500/15">
+                    {table.header.map((cell, cIdx) => (
+                      <th
+                        key={`th_${cIdx}`}
+                        style={{ textAlign: table.aligns[cIdx] || 'left' }}
+                        className="px-3 py-2 font-bold text-[var(--text-primary)] border-b border-[var(--border-color)] whitespace-normal align-top"
+                      >
+                        {renderInline(cell)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.body.map((row, rIdx) => (
+                    <tr
+                      key={`tr_${rIdx}`}
+                      className={
+                        rIdx % 2 === 1
+                          ? 'bg-[var(--bg-secondary)]/60'
+                          : 'bg-[var(--bg-card)]'
+                      }
+                    >
+                      {row.map((cell, cIdx) => (
+                        <td
+                          key={`td_${rIdx}_${cIdx}`}
+                          style={{ textAlign: table.aligns[cIdx] || 'left' }}
+                          className="px-3 py-2 text-[var(--text-primary)] border-t border-[var(--border-color)]/60 whitespace-normal align-top"
+                        >
+                          {renderInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           );
         }
 
