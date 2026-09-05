@@ -19,6 +19,7 @@ import {
   MessageSquare,
   ExternalLink,
   Loader2,
+  History,
   Bot,
   Search,
   FileText,
@@ -96,6 +97,8 @@ export default function AiChatView({ initialQuery = null }) {
   const [selectedCitation, setSelectedCitation] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [expandedToolCalls, setExpandedToolCalls] = useState({});
+  const [isThreadMenuOpen, setIsThreadMenuOpen] = useState(false);
+  const threadMenuRef = useRef(null);
 
   const abortControllerRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -213,6 +216,47 @@ export default function AiChatView({ initialQuery = null }) {
       localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(remaining));
     }
   };
+
+  // 6b. Clear all chat history (fresh start)
+  const handleClearAllThreads = () => {
+    try {
+      localStorage.removeItem(MESSAGES_STORAGE_KEY);
+    } catch (e) {}
+    const newId = `thread_${Date.now()}`;
+    const freshThread = {
+      id: newId,
+      title: 'Ask Ani',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setThreads([freshThread]);
+    setActiveThreadId(newId);
+    setMessages([]);
+    try {
+      localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify([freshThread]));
+    } catch (e) {}
+    setIsThreadMenuOpen(false);
+    if (textareaRef.current) textareaRef.current.focus();
+  };
+
+  // 6c. Close thread history menu on outside click / Escape
+  useEffect(() => {
+    if (!isThreadMenuOpen) return;
+    const onPointerDown = (e) => {
+      if (threadMenuRef.current && !threadMenuRef.current.contains(e.target)) {
+        setIsThreadMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setIsThreadMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isThreadMenuOpen]);
 
   // 7. Auto-title thread from first message
   const updateThreadTitle = (threadId, query) => {
@@ -469,21 +513,75 @@ export default function AiChatView({ initialQuery = null }) {
 
         {/* Right controls */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Thread List Dropdown */}
-          {threads.length > 1 && (
-            <select
-              value={activeThreadId || ''}
-              onChange={(e) => setActiveThreadId(e.target.value)}
-              className="bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs rounded-lg px-2 py-1 outline-none max-w-[120px] sm:max-w-[160px] truncate"
-              title="Select past conversation thread"
+          {/* Chat History Menu (recent conversations — distinct from app Reading History) */}
+          <div className="relative" ref={threadMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsThreadMenuOpen((v) => !v)}
+              className={`p-1.5 rounded-lg transition cursor-pointer border ${
+                isThreadMenuOpen
+                  ? 'border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-400'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10'
+              }`}
+              title="Recent chats"
+              aria-label="Recent chats"
             >
-              {threads.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          )}
+              <History size={16} />
+            </button>
+
+            {isThreadMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 max-w-[80vw] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-left">
+                <div className="px-3 py-2 border-b border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                  <History size={12} className="text-violet-500" />
+                  <span>Recent chats</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto p-1">
+                  {threads.length === 0 && (
+                    <div className="px-3 py-4 text-xs text-[var(--text-muted)] text-center">
+                      No conversations yet
+                    </div>
+                  )}
+                  {threads.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        setActiveThreadId(t.id);
+                        setIsThreadMenuOpen(false);
+                      }}
+                      className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs cursor-pointer transition ${
+                        t.id === activeThreadId
+                          ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300 font-semibold'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                      title={t.title}
+                    >
+                      <MessageSquare size={13} className="shrink-0 opacity-70" />
+                      <span className="flex-1 truncate">{t.title}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteThread(t.id, e)}
+                        className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 transition shrink-0"
+                        title="Delete this chat"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[var(--border-color)]/60 p-1">
+                  <button
+                    type="button"
+                    onClick={handleClearAllThreads}
+                    className="w-full flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-500/10 transition cursor-pointer"
+                    title="Delete all conversations and start fresh"
+                  >
+                    <Trash2 size={13} />
+                    <span>Clear all history</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* New Chat Button */}
           <button
@@ -493,7 +591,7 @@ export default function AiChatView({ initialQuery = null }) {
             title="Ask Ani (+)"
           >
             <Plus size={13} className="text-violet-500" />
-            <span className="hidden sm:inline">New Chat</span>
+            <span className="hidden sm:inline">New</span>
           </button>
 
           {/* Delete Thread */}

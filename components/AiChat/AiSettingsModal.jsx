@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Key, Cpu, ShieldCheck, ExternalLink, Check, AlertCircle, Bot } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Key, Cpu, ShieldCheck, ExternalLink, Check, AlertCircle, Bot, RefreshCw, Sparkles } from 'lucide-react';
 
 export const DEFAULT_AI_SETTINGS = {
   provider: 'gemini',
@@ -33,18 +33,233 @@ export function saveStoredAiSettings(settings) {
   } catch (e) {}
 }
 
+// ── Gemini model auto-discovery helpers ──────────────────────────────────────
+// Compare two Gemini model ids by embedded version (e.g. gemini-2.5-flash-lite),
+// preferring higher versions and stable (non-preview/experimental) builds.
+function geminiModelScore(id) {
+  const m = String(id || '').match(/(\d+)(?:\.(\d+))?/);
+  const major = m ? parseInt(m[1], 10) : 0;
+  const minor = m && m[2] !== undefined ? parseInt(m[2], 10) : 0;
+  const stable = /preview|exp|beta|rc|thinking/i.test(id) ? 0 : 1;
+  return [major, minor, stable];
+}
+
+function compareGeminiModels(a, b) {
+  const sa = geminiModelScore(a.id);
+  const sb = geminiModelScore(b.id);
+  for (let i = 0; i < sa.length; i++) {
+    if (sb[i] !== sa[i]) return sb[i] - sa[i];
+  }
+  return a.id.localeCompare(b.id);
+}
+
+// From a fetched Gemini model list, pick the latest flash-lite (for tool calls)
+// and the latest full flash (for answers), falling back to the newest model.
+export function pickLatestGeminiModels(models) {
+  const capable = (models || []).filter((m) => m && m.id);
+  const sorted = [...capable].sort(compareGeminiModels);
+  const lite = sorted.filter((m) => /flash/i.test(m.id) && /lite/i.test(m.id));
+  const flash = sorted.filter((m) => /flash/i.test(m.id) && !/lite/i.test(m.id));
+  return {
+    toolPick: lite[0] || flash[0] || sorted[0] || null,
+    answerPick: flash[0] || lite[0] || sorted[0] || null,
+  };
+}
+
+// Combobox model picker: free-text input with auto-suggest dropdown fed by the
+// fetched model list. Typing filters the list; anything typed is usable as-is.
+function ModelSelect({ value, onChange, models, placeholder }) {
+  const hasList = Array.isArray(models) && models.length > 0;
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const wrapRef = useRef(null);
+
+  const query = (value || '').trim().toLowerCase();
+  const filtered = hasList
+    ? models.filter((m) =>
+        !query ||
+        m.id.toLowerCase().includes(query) ||
+        (m.displayName || '').toLowerCase().includes(query)
+      ).slice(0, 60)
+    : [];
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open ]);
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query, open ]);
+
+  const choose = (id) => {
+    onChange(id);
+    setOpen(false);
+  };
+
+  const handleInputKey = (e) => {
+    if (!open || filtered.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlight((h) => (h + 1) % filtered.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight((h) => (h - 1 + filtered.length) % filtered.length);
+    } else if (e.key === 'Enter') {
+      if (open && filtered[highlight]) {
+        e.preventDefault();
+        choose(filtered[highlight].id);
+      }
+    }
+  };
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (hasList) setOpen(true);
+        }}
+        onFocus={() => {
+          if (hasList) setOpen(true);
+        }}
+        onKeyDown={handleInputKey}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
+      />
+      {hasList && open && (
+        <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl z-30 py-1">
+          {filtered.length === 0 && (
+            <div className="px-3 py-2.5 text-[11px] text-[var(--text-muted)]">
+              No matches — “{value.trim()}” will be used as a custom model.
+            </div>
+          )}
+          {filtered.map((m, idx) => (
+            <button
+              key={m.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(m.id)}
+              onMouseEnter={() => setHighlight(idx)}
+              className={`w-full text-left px-3 py-1.5 font-mono text-xs truncate transition cursor-pointer flex items-center justify-between gap-2 ${
+                idx === highlight
+                  ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                  : 'text-[var(--text-secondary)]'
+              }`}
+              title={m.displayName && m.displayName !== m.id ? `${m.displayName} (${m.id})` : m.id}
+            >
+              <span className="truncate">
+                {m.displayName && m.displayName !== m.id ? `${m.displayName} (${m.id})` : m.id}
+              </span>
+              {value === m.id && <Check size={12} className="shrink-0 text-violet-500" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AiSettingsModal({ isOpen, onClose, onSave }) {
   const [config, setConfig] = useState(DEFAULT_AI_SETTINGS);
   const [testStatus, setTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
   const [testMessage, setTestMessage] = useState('');
+  const [geminiModels, setGeminiModels] = useState([]); // [{ id, displayName }]
+  const [modelsStatus, setModelsStatus] = useState(null); // null | 'loading' | 'success' | 'error'
+  const [modelsMessage, setModelsMessage] = useState('');
+  const [modelsAutoNote, setModelsAutoNote] = useState('');
+  const fetchedKeyRef = useRef(null); // Gemini key already resolved to a model list
 
   useEffect(() => {
     if (isOpen) {
       setConfig(getStoredAiSettings());
       setTestStatus(null);
       setTestMessage('');
+      setModelsAutoNote('');
     }
   }, [isOpen]);
+
+  const fetchGeminiModels = async (apiKey, { autoApply = false } = {}) => {
+    const key = (apiKey || '').trim();
+    if (!key) return;
+    setModelsStatus('loading');
+    setModelsMessage('Fetching available Gemini models…');
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const seen = new Set();
+      const list = (data.models || [])
+        .filter(
+          (m) =>
+            !m.supportedGenerationMethods ||
+            m.supportedGenerationMethods.includes('generateContent')
+        )
+        .map((m) => ({
+          id: String(m.name || '').replace(/^models\//, ''),
+          displayName: m.displayName || '',
+        }))
+        .filter((m) => m.id && !seen.has(m.id) && (seen.add(m.id), true));
+      setGeminiModels(list);
+      fetchedKeyRef.current = key;
+      const { toolPick, answerPick } = pickLatestGeminiModels(list);
+      if (autoApply && (toolPick || answerPick)) {
+        setConfig((prev) => ({
+          ...prev,
+          toolModel: toolPick ? toolPick.id : prev.toolModel,
+          answerModel: answerPick ? answerPick.id : prev.answerModel,
+        }));
+        setModelsAutoNote(
+          `Auto-selected latest${toolPick ? ` • tool → ${toolPick.id}` : ''}${
+            answerPick ? ` • answer → ${answerPick.id}` : ''
+          }`
+        );
+      }
+      setModelsStatus('success');
+      setModelsMessage(
+        list.length
+          ? `${list.length} models loaded — latest flash-lite suggested for tools, latest flash for answers.`
+          : 'No generateContent-capable models returned for this key.'
+      );
+    } catch (err) {
+      setModelsStatus('error');
+      setModelsMessage(`Could not load models: ${err.message}`);
+    }
+  };
+
+  // Auto-fetch all Gemini models shortly after the user enters a key, and
+  // default the tool model to the latest flash-lite + answer model to latest flash.
+  // Runs once per key so manual edits afterwards are respected.
+  useEffect(() => {
+    if (!isOpen || config.provider !== 'gemini') return;
+    const key = (config.apiKey || '').trim();
+    if (key.length < 20 || key === fetchedKeyRef.current) return;
+    const t = setTimeout(() => {
+      fetchGeminiModels(key, { autoApply: true });
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, config.provider, config.apiKey]);
 
   if (!isOpen) return null;
 
@@ -136,43 +351,32 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               <Cpu size={13} />
               AI Provider
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'gemini', label: 'Google Gemini', desc: 'Free key • Recommended' },
-                { id: 'openai', label: 'OpenAI', desc: 'GPT-4o • GPT-4o-mini' },
-                { id: 'openrouter', label: 'OpenRouter', desc: 'Claude • Llama • Gemini' },
-                { id: 'custom', label: 'Custom / Local', desc: 'Ollama • vLLM • LiteLLM' },
-              ].map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    const defaultModel =
-                      p.id === 'gemini'
-                        ? 'gemini-2.0-flash'
-                        : p.id === 'openai'
-                        ? 'gpt-4o-mini'
-                        : p.id === 'openrouter'
-                        ? 'google/gemini-2.0-flash-001'
-                        : 'local-model';
-                    setConfig({
-                      ...config,
-                      provider: p.id,
-                      toolModel: defaultModel,
-                      answerModel: defaultModel,
-                    });
-                  }}
-                  className={`p-2.5 text-left rounded-xl border transition cursor-pointer flex flex-col justify-between ${
-                    config.provider === p.id
-                      ? 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300 font-bold'
-                      : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-violet-500/40 text-[var(--text-secondary)]'
-                  }`}
-                >
-                  <span className="text-xs">{p.label}</span>
-                  <span className="text-[10px] opacity-75 font-normal">{p.desc}</span>
-                </button>
-              ))}
-            </div>
+            <select
+              value={config.provider}
+              onChange={(e) => {
+                const pid = e.target.value;
+                const defaultModel =
+                  pid === 'gemini'
+                    ? 'gemini-2.0-flash'
+                    : pid === 'openai'
+                    ? 'gpt-4o-mini'
+                    : pid === 'openrouter'
+                    ? 'google/gemini-2.0-flash-001'
+                    : 'local-model';
+                setConfig({
+                  ...config,
+                  provider: pid,
+                  toolModel: defaultModel,
+                  answerModel: defaultModel,
+                });
+              }}
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] cursor-pointer"
+            >
+              <option value="gemini">Google Gemini — Free key • Recommended</option>
+              <option value="openai">OpenAI compatible provider — custom endpoint • any model</option>
+              <option value="openrouter">OpenRouter — Claude • Llama • Gemini</option>
+              <option value="custom">Custom / Local — Ollama • vLLM • LiteLLM</option>
+            </select>
           </div>
 
           {/* API Key */}
@@ -206,19 +410,30 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
             </p>
           </div>
 
-          {/* Base URL (if custom or openrouter) */}
-          {(config.provider === 'custom' || config.provider === 'openrouter') && (
+          {/* Base URL (custom endpoint — for OpenAI-compatible, OpenRouter & local providers) */}
+          {(config.provider === 'custom' || config.provider === 'openrouter' || config.provider === 'openai') && (
             <div className="space-y-1.5">
               <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-muted)]">
-                Base URL
+                API Base URL
               </label>
               <input
                 type="text"
                 value={config.baseUrl}
                 onChange={(e) => setConfig({ ...config, baseUrl: e.target.value })}
-                placeholder={config.provider === 'openrouter' ? 'https://openrouter.ai/api/v1' : 'http://localhost:11434/v1'}
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)]"
+                placeholder={
+                  config.provider === 'openrouter'
+                    ? 'https://openrouter.ai/api/v1'
+                    : config.provider === 'openai'
+                    ? 'https://api.openai.com/v1 (or any OpenAI-compatible endpoint)'
+                    : 'http://localhost:11434/v1'
+                }
+                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
               />
+              {config.provider === 'openai' && (
+                <p className="text-[10.5px] text-[var(--text-muted)]">
+                  Defaults to OpenAI when blank — or enter any OpenAI-compatible endpoint (LiteLLM, vLLM, Ollama, local server) with its API key above.
+                </p>
+              )}
             </div>
           )}
 
@@ -228,27 +443,59 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-muted)]">
                 Tool Model
               </label>
-              <input
-                type="text"
+              <ModelSelect
                 value={config.toolModel}
-                onChange={(e) => setConfig({ ...config, toolModel: e.target.value })}
+                onChange={(v) => setConfig({ ...config, toolModel: v })}
+                models={config.provider === 'gemini' ? geminiModels : []}
                 placeholder="e.g. gemini-2.0-flash"
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
               />
+              <p className="text-[10px] text-[var(--text-muted)]">Suggested: latest flash-lite</p>
             </div>
             <div className="space-y-1.5">
               <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-muted)]">
                 Answer Model
               </label>
-              <input
-                type="text"
+              <ModelSelect
                 value={config.answerModel}
-                onChange={(e) => setConfig({ ...config, answerModel: e.target.value })}
+                onChange={(v) => setConfig({ ...config, answerModel: v })}
+                models={config.provider === 'gemini' ? geminiModels : []}
                 placeholder="e.g. gemini-2.0-flash"
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
               />
+              <p className="text-[10px] text-[var(--text-muted)]">Suggested: latest flash</p>
             </div>
           </div>
+
+          {/* Gemini model auto-discovery status */}
+          {config.provider === 'gemini' && (
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => fetchGeminiModels(config.apiKey, { autoApply: true })}
+                disabled={modelsStatus === 'loading' || (config.apiKey || '').trim().length < 20}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 border border-violet-500/20 transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={modelsStatus === 'loading' ? 'animate-spin' : ''} />
+                <span>{modelsStatus === 'loading' ? 'Loading models…' : 'Reload models & auto-select latest'}</span>
+              </button>
+              {modelsAutoNote && (
+                <p className="text-[11px] text-violet-700 dark:text-violet-300 flex items-start gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-xl px-3 py-2">
+                  <Sparkles size={12} className="shrink-0 mt-px" />
+                  <span>{modelsAutoNote}</span>
+                </p>
+              )}
+              {modelsMessage && (
+                <p
+                  className={`text-[11px] ${
+                    modelsStatus === 'error'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-[var(--text-muted)]'
+                  }`}
+                >
+                  {modelsMessage}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* RAG Mode Toggle */}
           <div className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-start justify-between gap-3">
