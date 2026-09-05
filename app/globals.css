@@ -3261,6 +3261,19 @@ footer.app-footer.hidden-footer,
     font-size: 1.15em;
     margin: 0.7em 0 0.3em 0;
   }
+  /* Translation headings match Pali heading sizes on mobile */
+  .reader-container .reader-trans-content.book {
+    font-size: 1.5em;
+    margin: 0.8em 0 0.3em 0;
+  }
+  .reader-container .reader-trans-content.chapter {
+    font-size: 1.25em;
+    margin: 0.8em 0 0.4em 0;
+  }
+  .reader-container .reader-trans-content.title {
+    font-size: 1.15em;
+    margin: 0.7em 0 0.3em 0;
+  }
   .chapter-pills-bar {
     padding: 5px 10px;
     gap: 4px;

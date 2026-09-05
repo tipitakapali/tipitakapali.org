@@ -348,10 +348,19 @@ function injectTranslationsIntoHtml(
             inheritedClasses.push(paraType);
           }
 
+          // Heading type classes (nikaya/book/chapter/title/subhead/subsubhead) carry em
+          // font-sizes: keep them on the content div only. If the wrapper block also has
+          // e.g. .book, .reader-container .book scales the wrapper (1.85em) AND
+          // .reader-container .reader-trans-content.book scales the content again
+          // (1.85em x 1.85em ~= 75px vs Pali ~= 41px). Centering still holds via
+          // .reader-trans-heading-block. Non-heading classes (gatha/bodytext/...) stay,
+          // as block-level rules (e.g. gatha margin) depend on them and set no font-size.
           const blockClasses = [
             'reader-trans-block',
             isHeading ? 'reader-trans-heading-block' : '',
-            ...inheritedClasses,
+            ...inheritedClasses.filter(
+              (c) => !/^(nikaya|book|title|subhead|subsubhead|chapter)$/i.test(c)
+            ),
           ].filter(Boolean).join(' ');
 
           const contentClasses = [
