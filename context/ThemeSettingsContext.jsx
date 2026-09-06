@@ -94,6 +94,7 @@ const DEFAULT_SETTINGS = {
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
   translationDisplayMode: 'stack', // 'stack' | 'side'
   translationColors: {},
+  showTranslationBorders: true,
 };
 
 const ThemeSettingsContext = createContext();
@@ -223,6 +224,7 @@ export function ThemeSettingsProvider({ children }) {
 
     // Apply Display Classes on body
     document.body.classList.toggle('hide-pb', !settings.showPageBreaks);
+    document.body.classList.toggle('hide-trans-borders', settings.showTranslationBorders === false);
     document.body.classList.toggle('hide-paranum', !settings.showParaNumbers);
     document.body.classList.toggle('hide-footnotes', !settings.showFootnotes);
     document.body.classList.toggle('hide-chap-heading', !settings.showChapterHeadings);

@@ -186,6 +186,8 @@ export default function LanguageMenu() {
   // Color customization modal state (Task 3)
   const [colorPickerTarget, setColorPickerTarget] = useState(null);
 
+
+
   const updateLangColors = (langId, partial) => {
     const current = settings.translationColors || {};
     const updated = {
@@ -449,7 +451,7 @@ export default function LanguageMenu() {
                 >
                   {PALI_SCRIPTS_LIST.map((script) => (
                     <option key={script.id} value={script.id}>
-                      {script.native} — {script.label}
+                      {script.id === 'roman' ? `🌐 ${script.native}` : script.native} — {script.label}
                     </option>
                   ))}
                 </select>
@@ -498,25 +500,41 @@ export default function LanguageMenu() {
 
               {/* Section 3: Multi-Translation Layers (including Pāḷi) */}
               <div className="pt-3 border-t border-[var(--border-color)]">
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    Translation Order
+                    Translations &amp; Display Order
                   </span>
-                  <div className="flex items-center gap-1">
+                  <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
+                    Toggle the checkbox to enable/disable a language. Use ⤒ ▲ ▼ to reorder layers. Pāḷi text can be moved or disabled if you wish to read translations only.
+                  </p>
+                  <label className="flex items-center gap-2.5 px-3 py-2 mt-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.showTranslationBorders !== false}
+                      onChange={(e) => updateSetting('showTranslationBorders', e.target.checked)}
+                      className="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer shrink-0"
+                      aria-label="Show translation left border colors"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-[var(--text-primary)]">Show left border colors for translations</span>
+                      <span className="block text-[10px] text-[var(--text-muted)]">Turn off to hide the colored language indicator border in the reader</span>
+                    </span>
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('all')}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent)] hover:text-white transition cursor-pointer shadow-2xs"
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent)] hover:text-white transition cursor-pointer shadow-2xs"
                       title="Randomize harmonious background, text, and border colors for all enabled languages matching current theme"
                       aria-label="Randomize all translation colors"
                     >
-                      <Sparkles size={11} />
+                      <Sparkles size={12} />
                       <span>Random Colors</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('bg')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
                       title="Randomize harmonious background colors for enabled languages matching current theme"
                       aria-label="Randomize background colors"
                     >
@@ -525,29 +543,32 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('text')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
                       title="Randomize readable text colors for enabled languages matching current theme"
                       aria-label="Randomize text colors"
                     >
                       Text
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApplyThemeAwareColors('border')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
-                      title="Randomize distinct left border colors for enabled languages"
-                      aria-label="Randomize border colors"
-                    >
-                      Border
-                    </button>
+                    {settings.showTranslationBorders !== false && (
+                      <button
+                        type="button"
+                        onClick={() => handleApplyThemeAwareColors('border')}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
+                        title="Randomize distinct left border colors for enabled languages"
+                        aria-label="Randomize border colors"
+                      >
+                        Border
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleResetEnabledColors}
-                      className="p-1 rounded-md text-[10px] font-bold text-[var(--accent)] hover:text-rose-600 hover:bg-rose-500/10 border border-[var(--accent-border)] transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 text-[var(--accent)] hover:text-rose-600 hover:bg-rose-500/10 border border-[var(--accent-border)] transition cursor-pointer"
                       title="Reset colors for all enabled languages to default"
                       aria-label="Reset translation colors to default"
                     >
-                      <RotateCcw size={11} />
+                      <RotateCcw size={12} />
+                      <span>Reset</span>
                     </button>
                   </div>
                 </div>
@@ -575,12 +596,14 @@ export default function LanguageMenu() {
                             : 'bg-[var(--bg-secondary)]/50 border-[var(--border-color)]/60 opacity-75'
                         }`}
                       >
-                        {/* Language color indicator bar matching custom or default border */}
-                        <span
-                          className="w-1 self-stretch rounded-full shrink-0"
-                          style={{ backgroundColor: formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color }}
-                          title={`Color: ${trans.label}`}
-                        />
+                        {/* Language color indicator bar matching custom or default border (hidden when borders are disabled) */}
+                        {settings.showTranslationBorders !== false && (
+                          <span
+                            className="w-1 self-stretch rounded-full shrink-0"
+                            style={{ backgroundColor: formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color }}
+                            title={`Color: ${trans.label}`}
+                          />
+                        )}
 
                         <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
                           <span className="text-base shrink-0">{trans.flag}</span>
@@ -652,9 +675,6 @@ export default function LanguageMenu() {
                     );
                   })}
                 </div>
-                <p className="text-[10.5px] text-[var(--text-muted)] mt-2">
-                  Use ⤒ ▲ ▼ to reorder layers. Pāḷi text can be moved or disabled if you wish to read translations only.
-                </p>
               </div>
             </div>
 
@@ -793,7 +813,7 @@ export default function LanguageMenu() {
                       Live Preview
                     </span>
                     <div
-                      className="p-3.5 rounded-xl border-l-[4px] transition-all shadow-xs"
+                      className="p-3.5 rounded-r-xl border-l-[4px] transition-all shadow-xs"
                       style={{
                         borderLeftColor: formatCssColor(activeBorder),
                         backgroundColor: formatCssColor(activeBg) || 'var(--bg-secondary)',
@@ -949,8 +969,8 @@ export default function LanguageMenu() {
                 );
               })()}
 
-              {/* 3. Border-Left Color */}
-              {(() => {
+              {/* 3. Border-Left Color (hidden when borders are disabled) */}
+              {settings.showTranslationBorders !== false && (() => {
                 const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
                 const activeBorder = langColors.border || colorPickerTarget.color || '#8b2500';
                 return (
