@@ -7,6 +7,7 @@ import {
   Layers,
   Languages,
   Navigation,
+  ScrollText,
   Type,
   X,
   Maximize2,
@@ -270,7 +271,10 @@ export default function Footer() {
                 {/* Pāḷi Font Size — number input with A− / A+ steppers */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-[var(--text-secondary)]">Pāḷi Font-size</span>
+                    <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                      <ScrollText size={13} className="text-[var(--accent)] shrink-0" />
+                      Pāḷi Font-size
+                    </span>
                     <span className="flex items-center font-mono text-[var(--accent)] bg-[var(--bg-card)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">
                       <input
                         type="number"

@@ -760,7 +760,6 @@ body.hide-trans-borders .reader-trans-block {
 }
 
 .reader-trans-block:hover {
-  background: var(--bg-card);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -847,6 +846,13 @@ body.hide-trans-borders .reader-trans-block {
 .reader-trans-block[data-trans-lang="pali"],
 .reader-trans-block.reader-pali-trans-block {
   border-left-color: var(--accent); /* Original Pali Accent */
+}
+
+/* Side-by-side layouts (Pāḷi - Translation / Translation - Pāḷi): Pāḷi gets its
+   own column, so it must not carry the colored left border — Vertical only. */
+.reader-trans-side-row .reader-pali-trans-block,
+.reader-trans-side-row .reader-trans-block[data-trans-lang="pali"] {
+  border-left: none !important;
 }
 
 /* Pali Top Block - when Pali is at top position (Task 2) */

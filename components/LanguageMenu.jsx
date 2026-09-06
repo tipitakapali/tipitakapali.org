@@ -465,22 +465,6 @@ export default function LanguageMenu() {
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleDisplayModeChange('stack')}
-                    aria-label="Translation below Pāḷi (vertical)"
-                    title="Translation below Pāḷi (vertical)"
-                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
-                      translationDisplayMode === 'stack'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                      <Rows3 size={14} className="shrink-0" />
-                      Vertical
-                    </span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleDisplayModeChange('side')}
                     aria-label="Pāḷi on the left, Translation on the right"
                     title="Pāḷi on the left, Translation on the right"
@@ -493,6 +477,22 @@ export default function LanguageMenu() {
                     <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
                       <Columns2 size={14} className="shrink-0" />
                       Pāḷi - Translation
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDisplayModeChange('stack')}
+                    aria-label="Translation below Pāḷi (vertical)"
+                    title="Translation below Pāḷi (vertical)"
+                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                      translationDisplayMode === 'stack'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                      <Rows3 size={14} className="shrink-0" />
+                      Vertical
                     </span>
                   </button>
                   <button
