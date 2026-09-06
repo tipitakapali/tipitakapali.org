@@ -959,7 +959,7 @@ body.hide-trans-borders .reader-trans-block {
 }
 
 .reader-trans-content {
-  font-size: calc(var(--font-size-base, 22px) * 0.92);
+  font-size: var(--trans-font-size-base, 22px);
   line-height: calc(var(--line-height-base, 1.85) * 0.95);
   color: var(--text-primary);
   opacity: 0.92;
@@ -991,7 +991,7 @@ body.hide-trans-borders .reader-trans-block {
 .reader-trans-block[data-trans-lang="myanmar"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="my_nissaya"] .reader-trans-content {
   line-height: 2.1;
-  font-size: calc(var(--font-size-base, 22px) * 0.95);
+  font-size: var(--trans-font-size-base, 22px);
 }
 
 .reader-trans-block[data-trans-lang="si"] .reader-trans-content {

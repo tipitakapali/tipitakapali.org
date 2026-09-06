@@ -5,6 +5,7 @@ import {
   ListTree,
   Bookmark,
   Layers,
+  Languages,
   Navigation,
   Type,
   X,
@@ -176,21 +177,6 @@ export default function Footer() {
                 <span className="font-bold text-xs text-[var(--text-primary)]">Text Size & Typography</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-1.5 py-0.5 focus-within:border-[var(--accent)] transition">
-                  <input
-                    type="number"
-                    min="8"
-                    value={settings.fontSize}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      if (!isNaN(val) && val > 0) {
-                        updateSetting('fontSize', val);
-                      }
-                    }}
-                    className="w-10 bg-transparent text-center font-mono text-xs font-bold text-[var(--accent)] outline-none"
-                  />
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono">px</span>
-                </div>
                 <button
                   onClick={() => setIsFontSizeOpen(false)}
                   className="p-1 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
@@ -201,11 +187,68 @@ export default function Footer() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5">
-              {/* Line Height — top of the Font Size group */}
+              {/* Translation-only settings */}
+              <div className="space-y-1.5 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                    <Languages size={13} className="text-violet-500 shrink-0" />
+                    Translation Font-size
+                  </span>
+                  <span className="flex items-center font-mono text-violet-600 dark:text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded border border-violet-500/40 text-[10px]">
+                    <input
+                      type="number"
+                      min="8"
+                      value={settings.translationFontSize ?? settings.fontSize}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val > 0) {
+                          updateSetting('translationFontSize', val);
+                        }
+                      }}
+                      className="w-9 bg-transparent text-center font-bold outline-none"
+                      aria-label="Translation font size in pixels"
+                    />
+                    <span>px</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateSetting('translationFontSize', Math.max(8, (settings.translationFontSize ?? settings.fontSize) - 1))}
+                    className="py-1.5 rounded-lg border border-violet-500/40 bg-[var(--bg-card)] hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400 transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                    title="Decrease translation font size"
+                  >
+                    A−
+                  </button>
+                  <button
+                    onClick={() => updateSetting('translationFontSize', (settings.translationFontSize ?? settings.fontSize) + 1)}
+                    className="py-1.5 rounded-lg border border-violet-500/40 bg-[var(--bg-card)] hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400 transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                    title="Increase translation font size"
+                  >
+                    A+
+                  </button>
+                </div>
+              </div>
+
+              {/* Line Height — applies to both Pāḷi and translation text */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] font-semibold">
                   <span className="text-[var(--text-secondary)]">Line Height</span>
-                  <span className="font-mono text-[var(--accent)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">{settings.lineHeight}</span>
+                  <span className="flex items-center font-mono text-[var(--accent)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.05"
+                      value={settings.lineHeight}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val > 0) {
+                          updateSetting('lineHeight', val);
+                        }
+                      }}
+                      className="w-12 bg-transparent text-center font-bold outline-none"
+                      aria-label="Line height"
+                    />
+                  </span>
                 </div>
                 <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-mono">
                   <span>1.4</span>
@@ -222,71 +265,56 @@ export default function Footer() {
                 />
               </div>
 
-              {/* Font Size — Slider with Label (matches Line Height style) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-semibold">
-                  <span className="text-[var(--text-secondary)]">Font Size</span>
-                  <span className="font-mono text-[var(--accent)] bg-[var(--accent-light)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">{settings.fontSize}px</span>
-                </div>
-                <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                  <span>12px</span>
-                  <span>48px</span>
-                </div>
-                <input
-                  type="range"
-                  min="12"
-                  max="48"
-                  step="1"
-                  value={Math.min(48, Math.max(12, settings.fontSize))}
-                  onChange={(e) => updateSetting('fontSize', parseInt(e.target.value, 10))}
-                  className="w-full accent-[var(--accent)] cursor-pointer h-1.5 bg-[var(--bg-secondary)] rounded-lg"
-                />
-              </div>
-
-              {/* Quick Presets — one-click font size selection */}
-              <div>
-                <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Quick Presets</div>
-                <div className="grid grid-cols-6 gap-1">
-                  {[16, 18, 20, 25, 28, 32].map((sz) => (
+              {/* Pāḷi-only settings */}
+              <div className="space-y-3 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-light)] p-3">
+                {/* Pāḷi Font Size — number input with A− / A+ steppers */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-[var(--text-secondary)]">Pāḷi Font-size</span>
+                    <span className="flex items-center font-mono text-[var(--accent)] bg-[var(--bg-card)] px-1.5 py-0.5 rounded border border-[var(--accent-border)] text-[10px]">
+                      <input
+                        type="number"
+                        min="8"
+                        value={settings.fontSize}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val > 0) {
+                            updateSetting('fontSize', val);
+                          }
+                        }}
+                        className="w-9 bg-transparent text-center font-bold text-[var(--accent)] outline-none"
+                        aria-label="Pali font size in pixels"
+                      />
+                      <span>px</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
-                      key={sz}
-                      onClick={() => updateSetting('fontSize', sz)}
-                      className={`py-1 rounded text-[10.5px] font-mono transition cursor-pointer text-center ${
-                        settings.fontSize === sz
-                          ? 'bg-[var(--accent)] text-white font-bold shadow-2xs'
-                          : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)]/50'
-                      }`}
+                      onClick={() => updateSetting('fontSize', Math.max(8, settings.fontSize - 1))}
+                      className="py-1.5 rounded-lg border border-[var(--accent-border)] bg-[var(--bg-card)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                      title="Decrease Pāḷi font size"
                     >
-                      {sz}
+                      A−
                     </button>
-                  ))}
+                    <button
+                      onClick={() => updateSetting('fontSize', settings.fontSize + 1)}
+                      className="py-1.5 rounded-lg border border-[var(--accent-border)] bg-[var(--bg-card)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
+                      title="Increase Pāḷi font size"
+                    >
+                      A+
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Font Size — Stepper Buttons */}
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => updateSetting('fontSize', Math.max(8, settings.fontSize - 1))}
-                  className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
-                  title="Decrease font size"
-                >
-                  A−
-                </button>
-                <button
-                  onClick={() => updateSettings({ fontSize: 22, lineHeight: 1.85 })}
-                  className="px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer shadow-2xs"
-                  title="Reset to defaults (22px / 1.85)"
-                >
-                  Reset (22)
-                </button>
-                <button
-                  onClick={() => updateSetting('fontSize', settings.fontSize + 1)}
-                  className="py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition font-bold text-xs flex-1 text-center cursor-pointer shadow-2xs"
-                  title="Increase font size"
-                >
-                  A+
-                </button>
-              </div>
+              {/* Reset to Defaults */}
+              <button
+                onClick={() => updateSettings({ fontSize: 22, lineHeight: 1.85, translationFontSize: null })}
+                className="w-full py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer shadow-2xs"
+                title="Reset to defaults (Pāḷi 22px / line height 1.85, translation follows Pāḷi)"
+              >
+                Reset to Defaults (22px)
+              </button>
 
               {/* Text Alignment */}
               <div>

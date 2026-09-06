@@ -22,7 +22,7 @@ const DEFAULT_TRANSLATION_ORDER = [
   'russian',
 ];
 
-const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v5';
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v6';
 
 // One-per-theme page background (matches --bg-primary in globals.css). iOS Safari tints
 // its chrome to this value. Key 'default' is the :root background (no data-theme attr set).
@@ -92,9 +92,10 @@ const DEFAULT_SETTINGS = {
     my_nissaya: false,
   },
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
-  translationDisplayMode: 'stack', // 'stack' | 'side'
+  translationDisplayMode: 'side', // 'stack' | 'side' (Pali left) | 'side_rev' (Translation left)
   translationColors: {},
-  showTranslationBorders: true,
+  showTranslationBorders: false,
+  translationFontSize: null, // null = same size as Pāḷi (fontSize)
 };
 
 const ThemeSettingsContext = createContext();
@@ -137,7 +138,7 @@ export function ThemeSettingsProvider({ children }) {
 
             if (merged.translationOrder.length === 0) merged.translationOrder = [...DEFAULT_TRANSLATION_ORDER];
           }
-          if (!['stack', 'side'].includes(merged.translationDisplayMode)) {
+          if (!['stack', 'side', 'side_rev'].includes(merged.translationDisplayMode)) {
             merged.translationDisplayMode = 'stack';
           }
           merged.translationColors =
@@ -218,6 +219,10 @@ export function ThemeSettingsProvider({ children }) {
     root.setAttribute('data-translation-mode', settings.translationDisplayMode || 'stack');
 
     root.style.setProperty('--font-size-base', `${settings.fontSize}px`);
+    root.style.setProperty(
+      '--trans-font-size-base',
+      `${settings.translationFontSize || settings.fontSize}px`
+    );
     root.style.setProperty('--line-height-base', `${settings.lineHeight}`);
     root.style.setProperty('--reader-max-width', settings.readerMaxWidth);
     root.style.setProperty('--reader-text-align', settings.textAlign);

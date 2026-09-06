@@ -235,11 +235,11 @@ export default function HelpGuideContent({ showTabBar = true }) {
 
           <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
             <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
-              <span>Display Modes: Stack vs Side-by-Side</span>
+              <span>Display Modes: Vertical vs Side-by-Side</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold">Flexible</span>
             </div>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Choose <strong>Stack (Vertical)</strong> to see translations directly beneath each Pāḷi paragraph, or <strong>Side-by-Side</strong> for two balanced columns (Pāḷi on the left, translation on the right).
+              Choose <strong>Vertical</strong> to see translations directly beneath each Pāḷi paragraph, <strong>Pāḷi - Translation</strong> for two balanced columns (Pāḷi on the left, translation on the right), or <strong>Translation - Pāḷi</strong> for the reverse (translation on the left, Pāḷi on the right).
             </p>
           </div>
 

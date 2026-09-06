@@ -376,7 +376,7 @@ export default function LanguageMenu() {
   };
 
   const handleDisplayModeChange = (mode) => {
-    if (!['stack', 'side'].includes(mode)) return;
+    if (!['stack', 'side', 'side_rev'].includes(mode)) return;
     updateSetting('translationDisplayMode', mode);
   };
 
@@ -462,37 +462,53 @@ export default function LanguageMenu() {
                 <span className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
                   Translation Display Mode
                 </span>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => handleDisplayModeChange('stack')}
                     aria-label="Translation below Pāḷi (vertical)"
                     title="Translation below Pāḷi (vertical)"
-                    className={`p-2.5 rounded-xl border text-left transition flex items-center justify-center cursor-pointer ${
+                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
                       translationDisplayMode === 'stack'
                         ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                         : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
                     }`}
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-bold">
-                      <Rows3 size={15} />
-                      Stack (Vertical)
+                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                      <Rows3 size={14} className="shrink-0" />
+                      Vertical
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDisplayModeChange('side')}
-                    aria-label="Pāḷi | Translation (horizontal)"
-                    title="Pāḷi | Translation (horizontal)"
-                    className={`p-2.5 rounded-xl border text-left transition flex items-center justify-center cursor-pointer ${
+                    aria-label="Pāḷi on the left, Translation on the right"
+                    title="Pāḷi on the left, Translation on the right"
+                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
                       translationDisplayMode === 'side'
                         ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                         : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
                     }`}
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-bold">
-                      <Columns2 size={15} />
-                      Side by Side
+                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                      <Columns2 size={14} className="shrink-0" />
+                      Pāḷi - Translation
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDisplayModeChange('side_rev')}
+                    aria-label="Translation on the left, Pāḷi on the right"
+                    title="Translation on the left, Pāḷi on the right"
+                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                      translationDisplayMode === 'side_rev'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                      <Columns2 size={14} className="shrink-0 scale-x-[-1]" />
+                      Translation - Pāḷi
                     </span>
                   </button>
                 </div>

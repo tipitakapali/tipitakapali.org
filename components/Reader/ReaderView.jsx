@@ -189,7 +189,8 @@ function injectTranslationsIntoHtml(
     return html;
   }
 
-  const isSide = displayMode === 'side';
+  const isSide = displayMode === 'side' || displayMode === 'side_rev';
+  const isSwapped = displayMode === 'side_rev';
   const isSideActive = isSide && ((isPaliEnabled && hasTranslations) || (!isPaliEnabled && orderedLayers.filter((l) => l.type === 'trans').length >= 2));
 
   return html.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullMatch, pTag, pIndex) => {
@@ -412,6 +413,16 @@ function injectTranslationsIntoHtml(
     }
 
     if (isSideActive && renderedItems.length >= 2) {
+      // Swapped mode (Translation - Pali): translations left, Pāḷi right.
+      const paliIdx = renderedItems.findIndex((item) => item.type === 'pali');
+      if (isSwapped && paliIdx !== -1) {
+        const paliItem = renderedItems[paliIdx];
+        const leftHtml = renderedItems
+          .filter((_, i) => i !== paliIdx)
+          .map((item) => item.html)
+          .join('');
+        return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${leftHtml}</div></div><div class="reader-side-col reader-side-col-right reader-pali-col">${paliItem.html}</div></div>`;
+      }
       const col1 = renderedItems[0];
       const col2Items = renderedItems.slice(1);
       const col1Html = col1.html;
@@ -428,8 +439,11 @@ function injectTranslationsIntoHtml(
       const isBodyPara = /\b(bodytext|hangnum|indent|gatha\w*)\b/i.test(pTag);
       if (isBodyPara) {
         const singleItem = renderedItems[0];
-        const isCol1 = singleItem.type === orderedLayers[0]?.type &&
-          (singleItem.type === 'pali' || singleItem.lang === orderedLayers[0]?.lang);
+        // Swapped mode: translation layers go left, Pāḷi goes right.
+        const isCol1 = isSwapped
+          ? singleItem.type !== 'pali'
+          : singleItem.type === orderedLayers[0]?.type &&
+            (singleItem.type === 'pali' || singleItem.lang === orderedLayers[0]?.lang);
 
         if (isCol1) {
           const col1Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
@@ -2677,7 +2691,7 @@ export default function ReaderView() {
             className="reader-container w-full"
             style={{
               maxWidth:
-                settings?.translationDisplayMode === 'side' &&
+                (settings?.translationDisplayMode === 'side' || settings?.translationDisplayMode === 'side_rev') &&
                 ((isPaliEnabled && activeLangs.length > 0) || (!isPaliEnabled && activeLangs.length >= 2))
                   ? '1400px'
                   : 'var(--reader-max-width, 880px)',
