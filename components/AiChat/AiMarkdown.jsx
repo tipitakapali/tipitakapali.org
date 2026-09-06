@@ -1,14 +1,121 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Quote, BookOpen } from 'lucide-react';
+import { useDictionary } from '../../context/DictionaryContext';
+import { useThemeSettings } from '../../context/ThemeSettingsContext';
+import { cleanDictionaryQuery } from '../../services/transliterate';
+
+/**
+ * Extract the word-like segment at a viewport point (mirrors Reader word lookup).
+ * Returns the raw word string or null.
+ */
+function extractWordAtPoint(clientX, clientY) {
+  let range = null;
+  try {
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(clientX, clientY);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(clientX, clientY);
+      if (pos && pos.offsetNode) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+  } catch (e) {
+    return null;
+  }
+  if (!range) return null;
+
+  let node = range.startContainer;
+  let offset = range.startOffset || 0;
+  if (node && node.nodeType === Node.ELEMENT_NODE) {
+    const child = node.childNodes[offset] || node.lastChild;
+    if (child && child.nodeType === Node.TEXT_NODE) {
+      node = child;
+      offset = 0;
+    } else {
+      return null;
+    }
+  }
+  if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+
+  const text = node.textContent || '';
+  if (!text) return null;
+  const safeOffset = Math.min(offset, Math.max(0, text.length - 1));
+
+  try {
+    const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
+    const segments = Array.from(segmenter.segment(text));
+    for (const seg of segments) {
+      const start = seg.index;
+      const end = seg.index + seg.segment.length;
+      if (seg.isWordLike && safeOffset >= start && safeOffset < end) {
+        return seg.segment;
+      }
+    }
+    for (const seg of segments) {
+      const start = seg.index;
+      const end = seg.index + seg.segment.length;
+      if (seg.isWordLike && safeOffset === end) {
+        return seg.segment;
+      }
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
 
 /**
  * Custom lightweight Markdown renderer tailored for Pāḷi Canon study and AI answers.
  * Parses headings, blockquotes, lists, bold, italics, code, and converts
  * canonical citation tags like [s0101m.mul:c0:p5] or [D-i:6:1] into interactive clickable buttons.
+ * Single/double-clicking any word opens the app-wide dictionary lookup,
+ * honoring the same Settings → dictLookupTrigger mode as the Reader.
  */
 export default function AiMarkdown({ content, onCitationClick }) {
+  const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
+  const { settings } = useThemeSettings();
+
+  const lookupWordAtPoint = useCallback((e) => {
+    // Never hijack citation chips, links, or buttons.
+    if (e.target?.closest?.('button, a, input, textarea')) return;
+    // Don't hijack text selection (copy flow).
+    const selection = window.getSelection()?.toString()?.trim();
+    if (selection && selection.length > 1) return;
+
+    const rawWord = extractWordAtPoint(e.clientX, e.clientY);
+    if (!rawWord) return;
+    const wordToLookup = cleanDictionaryQuery(rawWord);
+    if (!wordToLookup || !(wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) return;
+
+    try {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    } catch (err) {}
+    openDictionary(wordToLookup);
+  }, [openDictionary]);
+
+  const handleClick = useCallback((e) => {
+    const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
+    const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
+      ? settings.dictLookupTrigger
+      : (clickLookupMode || 'single');
+    if (!isLookupActive || mode !== 'single') return;
+    lookupWordAtPoint(e);
+  }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, lookupWordAtPoint]);
+
+  const handleDoubleClick = useCallback((e) => {
+    const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
+    const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
+      ? settings.dictLookupTrigger
+      : (clickLookupMode || 'single');
+    if (!isLookupActive || mode !== 'double') return;
+    lookupWordAtPoint(e);
+  }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, lookupWordAtPoint]);
+
   if (!content) return null;
 
   // Split content into blocks (paragraphs, headers, lists, quotes)
@@ -262,7 +369,12 @@ export default function AiMarkdown({ content, onCitationClick }) {
   };
 
   return (
-    <div className="ai-markdown space-y-3 leading-relaxed text-[var(--text-primary)]">
+    <div
+      className="ai-markdown space-y-3 leading-relaxed text-[var(--text-primary)]"
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      title="Click any word for dictionary lookup"
+    >
       {blocks.map((block, bIdx) => {
         if (block.type === 'header') {
           const match = block.text.match(/^(#{1,4})\s+(.+)$/);
