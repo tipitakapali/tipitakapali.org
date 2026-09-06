@@ -1214,15 +1214,6 @@ export default function ReaderView() {
 
     const attemptScroll = () => {
       if (!containerRef.current) return;
-      const DBG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dbgjump');
-      const dbg = (msg) => {
-        if (!DBG) return;
-        try {
-          if (!window.__jumpDbg) window.__jumpDbg = [];
-          window.__jumpDbg.push(`${Date.now()}: ${msg}`);
-        } catch (e) {}
-      };
-      dbg(`attempt start retries=${retries}`);
 
       // ── Paragraph-jump settle watcher ──────────────────────────────────
       // Re-resolve the paragraph target the jump scrolled to (same flavour:
@@ -1340,7 +1331,6 @@ export default function ReaderView() {
       // superseding it.
       const armParaJumpWatcher = (jumpKey, jumpOffset) => {
         clearTimeout(paraJumpRef.current.timer);
-        dbg(`ARM para key=${jumpKey} offset=${Math.round(jumpOffset)}`);
         const state = {
           key: jumpKey,
           lastOffset: jumpOffset,
@@ -1354,46 +1344,38 @@ export default function ReaderView() {
         const GAP = 600;
         const tick = () => {
           const cur = paraJumpRef.current;
-          if (!cur || cur.key !== jumpKey) { dbg('tick superseded'); return; } // superseded
+          if (!cur || cur.key !== jumpKey) return; // superseded
           const container = containerRef.current;
           if (!container) {
-            dbg('exit no-container');
             paraJumpRef.current.key = null;
             return;
           }
           if (Date.now() > cur.deadline) {
-            dbg('exit deadline');
             paraJumpRef.current.key = null;
             return;
           }
           // Bottom-clamped targets can never reach top-60 — stand down.
           if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
-            dbg('exit bottom-clamp');
             paraJumpRef.current.key = null;
             return;
           }
           const target = resolveParaTarget();
           if (!target) {
-            dbg('tick no-target');
             cur.timer = setTimeout(tick, GAP);
             return;
           }
           const hostChapter = target.closest ? target.closest('[data-chapter]') : null;
           const areaSettled = areaTranslationSettled(hostChapter);
-          const hostSettledAttr = hostChapter?.getAttribute('data-trans-settled') || null;
           const cRect = container.getBoundingClientRect();
           const rRect = target.getBoundingClientRect();
-          const drift = Math.round((rRect.top - cRect.top - 60) * 10) / 10;
           if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
             cur.stableCount = 0;
             // Target drifted and the user hasn't touched the scroll: correct instantly.
             if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
-              dbg(`exit user-scroll drift=${drift} scrollTop=${Math.round(container.scrollTop)} lastOffset=${Math.round(cur.lastOffset)}`);
               paraJumpRef.current.key = null;
               return;
             }
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
-            dbg(`CORRECT drift=${drift} fresh=${Math.round(fresh)} areaSettled=${areaSettled} hostSettled=${hostSettledAttr} scrollTop=${Math.round(container.scrollTop)}`);
             smartScrollTo(container, fresh, { scrollMotion: 'instant' });
             if (settings.pulseAnimation) {
               target.classList.remove('pulse-highlight');
@@ -1412,14 +1394,12 @@ export default function ReaderView() {
             cur.lastScrollHeight !== null && container.scrollHeight !== cur.lastScrollHeight;
           cur.lastScrollHeight = container.scrollHeight;
           if (!areaSettled || layoutChanged) {
-            dbg(`HOLD drift=${drift} areaSettled=${areaSettled} hostSettled=${hostSettledAttr} layoutChanged=${layoutChanged} stable=${cur.stableCount}`);
             cur.stableCount = 0;
             cur.timer = setTimeout(tick, GAP);
             return;
           }
           cur.stableCount += 1;
-          dbg(`stable x${cur.stableCount} drift=${drift}`);
-          if (cur.stableCount >= 2) { dbg('exit stable'); paraJumpRef.current.key = null; }
+          if (cur.stableCount >= 2) paraJumpRef.current.key = null;
           else cur.timer = setTimeout(tick, GAP);
         };
         // First check after any in-flight smooth animation has finished (max ~450ms).
@@ -1525,7 +1505,6 @@ export default function ReaderView() {
             findElement(`pindex-${paraIndex}`);
 
           if (el) {
-            dbg(`case1 el found pindex=${paraIndex} scrollTop=${Math.round(containerRef.current.scrollTop)}`);
             let targetEl = null;
             if (isTransTarget) {
               const row = el.closest('.reader-para-row') || el;
@@ -1559,7 +1538,6 @@ export default function ReaderView() {
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = containerRef.current.scrollTop;
               const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-              dbg(`case1 scroll offset=${Math.round(offset)} scrollTopBefore=${Math.round(currentScroll)}`);
               smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -1845,7 +1823,6 @@ export default function ReaderView() {
       if (retries < maxRetries) {
         timerId = setTimeout(attemptScroll, 50);
       } else {
-        dbg('attempt maxRetries exhausted — gave up');
         clearTargetScrollIntent();
       }
     };
