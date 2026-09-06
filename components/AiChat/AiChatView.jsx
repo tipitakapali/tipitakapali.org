@@ -25,6 +25,7 @@ import {
   FileText,
   Bookmark,
   Compass,
+  Brain,
 } from 'lucide-react';
 import AiMarkdown from './AiMarkdown';
 import AiSettingsModal, { getStoredAiSettings, DEFAULT_AI_SETTINGS } from './AiSettingsModal';
@@ -95,6 +96,244 @@ function getToolMeta(toolName) {
     default:
       return { label: toolName || 'Tool Execution', icon: Bot, color: 'text-violet-500 dark:text-violet-400' };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CANONICAL CITATION PRIORITY & SORTING (FRONTEND)
+//  Priority: Mūla > Aṭṭhakathā > Ṭīkā > Añña
+//  In each group: Sutta > Vinaya > Abhidhamma > Others
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getCitationGroupPriority(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const category = (citation.category || '').toLowerCase();
+
+  // 0: Mūla
+  if (category.includes('mūla') || category.includes('mula') || code.endsWith('.mul') || code.includes('m.mul')) return 0;
+  // 1: Aṭṭhakathā
+  if (category.includes('aṭṭha') || category.includes('attha') || code.endsWith('.att') || code.includes('a.att')) return 1;
+  // 2: Ṭīkā
+  if (category.includes('ṭīkā') || category.includes('tika') || code.endsWith('.tik') || code.includes('t.tik')) return 2;
+  // 3: Añña
+  return 3;
+}
+
+function getCitationPitakaPriority(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const nikaya = (citation.nikaya || '').toLowerCase();
+
+  // 0: Suttantapiṭaka
+  if (code.startsWith('s') || nikaya.includes('nikāy') || nikaya.includes('nikay') || nikaya.includes('sutt')) return 0;
+  // 1: Vinayapiṭaka
+  if (code.startsWith('vin') || nikaya.includes('vinay')) return 1;
+  // 2: Abhidhammapiṭaka
+  if (code.startsWith('abh') || nikaya.includes('abhidhamm')) return 2;
+  // 3: Others
+  return 3;
+}
+
+function getSuttaNikayaOrder(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const nikaya = (citation.nikaya || '').toLowerCase();
+
+  if (code.startsWith('s01') || nikaya.includes('dīgha') || nikaya.includes('digha')) return 0;
+  if (code.startsWith('s02') || nikaya.includes('majjhima')) return 1;
+  if (code.startsWith('s03') || nikaya.includes('saṃyutta') || nikaya.includes('samyutta')) return 2;
+  if (code.startsWith('s04') || nikaya.includes('aṅguttara') || nikaya.includes('anguttara')) return 3;
+  if (code.startsWith('s05') || nikaya.includes('khuddaka')) return 4;
+  return 5;
+}
+
+function compareCitations(a, b) {
+  const gA = getCitationGroupPriority(a);
+  const gB = getCitationGroupPriority(b);
+  if (gA !== gB) return gA - gB;
+
+  const pA = getCitationPitakaPriority(a);
+  const pB = getCitationPitakaPriority(b);
+  if (pA !== pB) return pA - pB;
+
+  if (pA === 0 && pB === 0) {
+    const sA = getSuttaNikayaOrder(a);
+    const sB = getSuttaNikayaOrder(b);
+    if (sA !== sB) return sA - sB;
+  }
+
+  const codeA = (a.bookCode || '').toLowerCase();
+  const codeB = (b.bookCode || '').toLowerCase();
+  if (codeA !== codeB) {
+    const codeCmp = codeA.localeCompare(codeB, undefined, { numeric: true });
+    if (codeCmp !== 0) return codeCmp;
+  }
+
+  const chapA = a.chapterIndex ?? 0;
+  const chapB = b.chapterIndex ?? 0;
+  if (chapA !== chapB) return chapA - chapB;
+
+  const paraA = a.paraIndex ?? 0;
+  const paraB = b.paraIndex ?? 0;
+  return paraA - paraB;
+}
+
+function sortCitations(citations) {
+  if (!citations || !Array.isArray(citations)) return [];
+  return [...citations].sort(compareCitations);
+}
+
+function formatIntentLabel(intent) {
+  switch (intent) {
+    case 'sutta_search':
+      return 'Sutta Search';
+    case 'canonical_search':
+      return 'Canonical Search';
+    case 'dictionary_definition':
+      return 'Pāḷi Lexicon';
+    case 'translation_lookup':
+      return 'Translation Lookup';
+    case 'doctrinal_explanation':
+      return 'Dhamma Exposition';
+    case 'cross_reference':
+      return 'Cross-Reference';
+    default:
+      return 'Canonical Research';
+  }
+}
+
+function QueryUnderstandingCard({ understanding, isStreaming }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  if (!understanding) return null;
+
+  const targetSuttas = understanding.target_sutta_names || [];
+  const primaryTarget = targetSuttas[0];
+  const terms = understanding.canonical_pali_terms || [];
+  const stems = (understanding.pali_stems || []).filter((s) => !terms.includes(s));
+  const nikayas = understanding.recommended_locations?.nikayas || [];
+  const strategy = understanding.initial_search_strategy || [];
+
+  return (
+    <div className="mb-3 rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 overflow-hidden text-xs transition">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((v) => !v)}
+        className="w-full px-3 py-2 flex items-center justify-between text-indigo-700 dark:text-indigo-300 font-semibold hover:bg-indigo-500/10 transition cursor-pointer text-left"
+      >
+        <span className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <Brain size={14} className="text-indigo-500 shrink-0" />
+          <span className="font-bold">Step 1: Query Understanding</span>
+          {understanding.intent && (
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-[10px] text-indigo-800 dark:text-indigo-200 border border-indigo-500/20 font-medium">
+              {formatIntentLabel(understanding.intent)}
+            </span>
+          )}
+          {understanding.detected_language && (
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-500/10 text-[10px] text-[var(--text-secondary)] font-mono uppercase">
+              {understanding.detected_language}
+            </span>
+          )}
+          {primaryTarget && (
+            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 truncate max-w-[200px] sm:max-w-[300px]">
+              🎯 {primaryTarget}
+            </span>
+          )}
+          {isStreaming && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 animate-pulse font-normal">
+              <Loader2 size={10} className="animate-spin" />
+              Analyzing
+            </span>
+          )}
+        </span>
+        <span className="shrink-0 ml-1 text-indigo-500">
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </button>
+
+      {/* Summary preview always visible if collapsed */}
+      {!isExpanded && understanding.user_facing_summary && (
+        <div className="px-3 pb-2 pt-0 text-[11px] text-[var(--text-secondary)] truncate">
+          {understanding.user_facing_summary}
+        </div>
+      )}
+
+      {/* Expanded detailed breakdown */}
+      {isExpanded && (
+        <div className="p-3 pt-1 space-y-2 border-t border-indigo-500/15 text-[11px] text-[var(--text-secondary)]">
+          {understanding.user_facing_summary && (
+            <div className="text-[11.5px] text-[var(--text-primary)] font-medium leading-relaxed bg-[var(--bg-card)]/60 p-2 rounded-lg border border-indigo-500/10">
+              {understanding.user_facing_summary}
+            </div>
+          )}
+
+          {/* Canonical Terms & Stems */}
+          {(terms.length > 0 || stems.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)] mr-1">
+                Pāḷi Concepts:
+              </span>
+              {terms.map((t, i) => (
+                <span
+                  key={`term-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 font-mono text-[10.5px]"
+                >
+                  {t}
+                </span>
+              ))}
+              {stems.map((s, i) => (
+                <span
+                  key={`stem-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-800 dark:text-cyan-200 font-mono text-[10.5px]"
+                  title="Stem / Root"
+                >
+                  ~{s}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Canonical Target & Locations */}
+          {(targetSuttas.length > 0 || nikayas.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)] mr-1">
+                Canonical Scope:
+              </span>
+              {targetSuttas.map((s, i) => (
+                <span
+                  key={`sutta-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-[10.5px] font-semibold"
+                >
+                  {s}
+                </span>
+              ))}
+              {nikayas.map((n, i) => (
+                <span
+                  key={`nikaya-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-800 dark:text-violet-200 text-[10.5px] uppercase font-mono"
+                >
+                  {n.toUpperCase()}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Initial Search Strategy steps */}
+          {strategy.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
+                Formulated Research Strategy:
+              </span>
+              <div className="space-y-0.5 bg-[var(--bg-card)]/40 p-2 rounded-lg border border-indigo-500/10">
+                {strategy.map((st, sIdx) => (
+                  <div key={sIdx} className="flex items-start gap-1.5 text-[10.5px]">
+                    <span className="text-indigo-500 font-bold shrink-0">{sIdx + 1}.</span>
+                    <span>{st}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AiChatView({ initialQuery = null }) {
@@ -293,13 +532,6 @@ export default function AiChatView({ initialQuery = null }) {
     const query = (textToSend || inputQuery).trim();
     if (!query || isGenerating) return;
 
-    // Without API key, do not answer — prompt to configure instead.
-    const keyCheck = getStoredAiSettings();
-    if (!keyCheck.apiKey?.trim()) {
-      setIsSettingsOpen(true);
-      return;
-    }
-
     setInputQuery('');
     const userMsgId = `usr_${Date.now()}`;
     const assistantMsgId = `ast_${Date.now()}`;
@@ -315,6 +547,7 @@ export default function AiChatView({ initialQuery = null }) {
       id: assistantMsgId,
       role: 'assistant',
       content: '',
+      understanding: null,
       toolCalls: [],
       citations: [],
       timestamp: new Date().toISOString(),
@@ -366,6 +599,7 @@ export default function AiChatView({ initialQuery = null }) {
       const decoder = new TextDecoder();
       let buffer = '';
       let accumulatedContent = '';
+      let receivedUnderstanding = null;
       const toolCalls = [];
       let citations = [];
 
@@ -390,6 +624,13 @@ export default function AiChatView({ initialQuery = null }) {
               const data = JSON.parse(dataStr);
               if (currentEvent === 'status') {
                 setStatusMessage(data.message || '');
+              } else if (currentEvent === 'understanding') {
+                receivedUnderstanding = data;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId ? { ...m, understanding: data } : m
+                  )
+                );
               } else if (currentEvent === 'tool_call') {
                 toolCalls.push(data);
                 setMessages((prev) =>
@@ -413,6 +654,10 @@ export default function AiChatView({ initialQuery = null }) {
                     m.id === assistantMsgId ? { ...m, citations } : m
                   )
                 );
+              } else if (currentEvent === 'done') {
+                if (data.understanding && !receivedUnderstanding) {
+                  receivedUnderstanding = data.understanding;
+                }
               } else if (currentEvent === 'error') {
                 accumulatedContent += `\n\n> ⚠️ **Error:** ${data.message || 'Generation failed'}`;
                 setMessages((prev) =>
@@ -432,6 +677,7 @@ export default function AiChatView({ initialQuery = null }) {
           ? {
               ...m,
               content: accumulatedContent,
+              understanding: receivedUnderstanding,
               toolCalls,
               citations,
               isStreaming: false,
@@ -746,7 +992,15 @@ export default function AiChatView({ initialQuery = null }) {
                     : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-tl-xs'
                 }`}
               >
-                {/* Collapsible Research / Tool Calling card for Assistant */}
+                {/* Step 1: Scholarly Query Understanding Card */}
+                {!isUser && msg.understanding && (
+                  <QueryUnderstandingCard
+                    understanding={msg.understanding}
+                    isStreaming={msg.isStreaming}
+                  />
+                )}
+
+                {/* Step 2: Collapsible Research / Tool Calling card for Assistant */}
                 {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="mb-4 rounded-xl border border-violet-500/20 bg-violet-500/5 overflow-hidden text-xs">
                     <button
@@ -759,7 +1013,7 @@ export default function AiChatView({ initialQuery = null }) {
                       <span className="flex items-center gap-1.5">
                         <BookOpen size={13} className="text-violet-500 shrink-0" />
                         <span>
-                          Canonical Research ({msg.toolCalls.length} step{msg.toolCalls.length > 1 ? 's' : ''})
+                          Step 2: Canonical Research ({msg.toolCalls.length} step{msg.toolCalls.length > 1 ? 's' : ''})
                         </span>
                         {msg.isStreaming && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300 animate-pulse font-normal">
@@ -823,17 +1077,24 @@ export default function AiChatView({ initialQuery = null }) {
                       <Quote size={11} />
                       Sources ({msg.citations.length}):
                     </span>
-                    {msg.citations.map((cite, cIdx) => (
-                      <button
-                        key={cIdx}
-                        type="button"
-                        onClick={() => handleCitationClick(cite)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-violet-500 hover:text-violet-600 transition cursor-pointer select-none text-[var(--text-secondary)]"
-                        title={`Click to preview passage ${cite.ref || `${cite.bookCode} §${cite.paraIndex}`}`}
-                      >
-                        <span>{cite.ref || `${cite.bookCode} §${cite.paraIndex}`}</span>
-                      </button>
-                    ))}
+                    {sortCitations(msg.citations).map((cite, cIdx) => {
+                      const isMula = cite.category === 'mūla' || cite.bookCode?.endsWith('.mul');
+                      const isAttha = cite.category === 'aṭṭhakathā' || cite.bookCode?.endsWith('.att');
+                      const isTika = cite.category === 'ṭīkā' || cite.bookCode?.endsWith('.tik');
+                      const tierLabel = isMula ? 'Mūla' : isAttha ? 'Aṭṭhakathā' : isTika ? 'Ṭīkā' : 'Añña';
+
+                      return (
+                        <button
+                          key={cIdx}
+                          type="button"
+                          onClick={() => handleCitationClick(cite)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-violet-500 hover:text-violet-600 transition cursor-pointer select-none text-[var(--text-secondary)]"
+                          title={`[${tierLabel}] Click to preview passage ${cite.ref || `${cite.bookCode} §${cite.paraIndex}`}`}
+                        >
+                          <span>{cite.ref || `${cite.bookCode} §${cite.paraIndex}`}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -889,7 +1150,7 @@ export default function AiChatView({ initialQuery = null }) {
             <div className="mb-2 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
               <div>
                 <span className="font-bold">Note: </span>
-                This is just a RANDOM demo. Please add your free Google Gemini API Key in Settings to enable REAL functionality.
+                Local canonical research is active. Add your free Google Gemini API Key in Settings to enable deep generative synthesis.
               </div>
               <button
                 type="button"
@@ -955,7 +1216,19 @@ export default function AiChatView({ initialQuery = null }) {
             <span>
               <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
             </span>
-            <span className="font-mono">
+            <span
+              className="font-mono cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 hover:underline transition"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Open Ani AI settings"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsSettingsOpen(true);
+                }
+              }}
+            >
               Model: {aiSettings.answerModel}
             </span>
           </div>

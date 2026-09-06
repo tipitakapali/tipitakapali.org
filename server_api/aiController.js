@@ -4,6 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const dictEngine = require('./dictEngine');
+const {
+  understandUserQuery,
+  heuristicQueryUnderstanding,
+  parseCanonicalCitation,
+  resolveCanonicalCitation,
+} = require('./aiQueryUnderstanding');
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  DATABASE CONNECTIONS & BOOK CODE RESOLVER
@@ -154,11 +160,75 @@ function initAiController({ db, dbFts: fts, resolveDbPath }) {
 function resolveCanonicalBookCode(raw) {
   if (!raw) return '';
   const clean = String(raw).trim();
-  const lower = clean.toLowerCase();
+  const lower = clean.toLowerCase().replace(/[\s_-]+/g, '');
   if (bookCodeMap.has(clean)) return bookCodeMap.get(clean);
   if (bookCodeMap.has(lower)) return bookCodeMap.get(lower);
 
-  // Check prefix match e.g. dn1 -> s0101m.mul
+  // Dīgha Nikāya: dn1-34 or d1-34 (or d-i, d-ii, d-iii)
+  const dnMatch = lower.match(/^d(?:n)?(\d+)$/);
+  if (dnMatch) {
+    const num = parseInt(dnMatch[1], 10);
+    if (num <= 13) return 's0101m.mul';
+    if (num <= 23) return 's0102m.mul';
+    return 's0103m.mul';
+  }
+
+  // Majjhima Nikāya: mn1-152 or m1-152 (or m-i, m-ii, m-iii)
+  const mnMatch = lower.match(/^m(?:n)?(\d+)$/);
+  if (mnMatch) {
+    const num = parseInt(mnMatch[1], 10);
+    if (num <= 50) return 's0201m.mul';
+    if (num <= 100) return 's0202m.mul';
+    return 's0203m.mul';
+  }
+
+  // Saṃyutta Nikāya: sn1-56 or s1-56 (or sn12.2, s12.2)
+  const snMatch = lower.match(/^s(?:n)?(\d+)(?:\.\d+)?$/);
+  if (snMatch) {
+    const num = parseInt(snMatch[1], 10);
+    if (num <= 11) return 's0301m.mul';
+    if (num <= 21) return 's0302m.mul';
+    if (num <= 34) return 's0303m.mul';
+    if (num <= 44) return 's0304m.mul';
+    return 's0305m.mul';
+  }
+
+  // Aṅguttara Nikāya: an1-11 or a1-11 (or an4.1, a4.1)
+  const anMatch = lower.match(/^a(?:n)?(\d+)(?:\.\d+)?$/);
+  if (anMatch) {
+    const num = parseInt(anMatch[1], 10);
+    if (num === 1) return 's0401m1.mul';
+    if (num === 2) return 's0402m1.mul';
+    if (num === 3) return 's0402m2.mul';
+    if (num === 4) return 's0402m3.mul';
+    if (num === 5) return 's0403m1.mul';
+    if (num === 6) return 's0403m2.mul';
+    if (num === 7) return 's0403m3.mul';
+    if (num === 8) return 's0404m1.mul';
+    if (num === 9) return 's0404m2.mul';
+    if (num === 10) return 's0404m3.mul';
+    if (num === 11) return 's0404m4.mul';
+  }
+
+  // Vinaya: vin1-5
+  const vinMatch = lower.match(/^vin(?:aya)?(\d+)?$/);
+  if (vinMatch) {
+    const num = vinMatch[1] ? parseInt(vinMatch[1], 10) : 1;
+    if (num === 1) return 'vin01m.mul';
+    if (num === 2) return 'vin02m.mul';
+    if (num === 3) return 'vin03m.mul';
+    if (num === 4) return 'vin04m.mul';
+    if (num === 5) return 'vin05m.mul';
+  }
+
+  // Abhidhamma: abh1-7
+  const abhMatch = lower.match(/^abh(?:idhamma)?(\d+)?$/);
+  if (abhMatch) {
+    const num = abhMatch[1] ? parseInt(abhMatch[1], 10) : 1;
+    if (num >= 1 && num <= 7) return `abh0${num}m.mul`;
+  }
+
+  // Prefix match fallback
   const m = lower.match(/^([a-z]+)(\d+)(?:\.\d+)?$/);
   if (m) {
     const key = `${m[1]}${m[2]}`;
@@ -166,6 +236,12 @@ function resolveCanonicalBookCode(raw) {
   }
 
   return clean;
+}
+
+function extractSuttaNumberFromCode(raw) {
+  if (!raw) return null;
+  const m = String(raw).trim().toLowerCase().match(/^[a-z]+(\d+)(?:\.\d+)?$/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -548,7 +624,7 @@ const AI_STOP_WORDS = new Set([
   'have', 'has', 'had', 'do', 'does', 'did', 'their', 'there', 'these', 'those',
   'this', 'that', 'they', 'them', 'canonical', 'definitions', 'definition',
   'sutta', 'suttas', 'relevant', 'quote', 'passages', 'passage', 'text', 'please',
-  'tell', 'me', 'give', 'list', 'show', 'explore', 'between', 'exact', 'sn', 'mn', 'dn', 'an'
+  'tell', 'me', 'give', 'list', 'show', 'explore', 'between', 'exact'
 ]);
 
 // Strip terminal vowels (-a, -ā, -e, -o) for Pāḷi stem matching
@@ -628,6 +704,28 @@ function aiSearchSections({ query, limit = 20 }) {
   const seen = new Set();
   const activeLimit = Math.min(Math.max(1, limit), 50);
 
+  // 0. High-Priority Direct Canonical Citation Resolution
+  const citeMatch = parseCanonicalCitation(trimmed);
+  if (citeMatch && dbTipitaka) {
+    const resolved = resolveCanonicalCitation(citeMatch.book, citeMatch.num, citeMatch.subNum, dbTipitaka);
+    if (resolved && resolved.start_para !== null) {
+      const key = `sec:${resolved.book_code}:${resolved.chapter_index}:${resolved.start_para}`;
+      seen.add(key);
+      results.push({
+        type: 'section',
+        book_code: resolved.book_code,
+        book_title: resolved.book_code,
+        title: resolved.sutta_name,
+        chapter_index: resolved.chapter_index,
+        para_index: resolved.start_para,
+        para_num: '',
+        level: 1,
+        snippet: `Canonical discourse: ${resolved.sutta_name}`,
+        citation_ref: `[${resolved.book_code}:c${resolved.chapter_index}:p${resolved.start_para}]`,
+      });
+    }
+  }
+
   // 1. Search in summaries.db
   if (dbSummaries) {
     try {
@@ -646,7 +744,22 @@ function aiSearchSections({ query, limit = 20 }) {
             WHERE all_sections_fts MATCH ?
             ORDER BY rank
             LIMIT ?
-          `).all(qStr, activeLimit);
+          `).all(qStr, activeLimit * 2);
+
+          // Prioritize Mūla (.mul) canonical root suttas over commentaries (.att) and grammar texts (e0*)
+          tocHits.sort((a, b) => {
+            const score = (code) => {
+              if (!code) return 0;
+              if (code.includes('.mul')) {
+                if (code.startsWith('s01') || code.startsWith('s02') || code.startsWith('s03') || code.startsWith('s04') || code.startsWith('s05')) return 4;
+                return 3;
+              }
+              if (code.includes('.att')) return 2;
+              if (code.includes('.tik')) return 1;
+              return 0;
+            };
+            return score(b.book_code) - score(a.book_code);
+          });
 
           for (const t of tocHits) {
             const key = `sec:${t.book_code}:${t.chapter_index}:${t.para_index}`;
@@ -953,6 +1066,59 @@ function aiSearchTipitaka({ query, limit = 20, categories = [], nikayas = [] }) 
     } catch (e) {}
   }
 
+  // 3. Search Vietnamese translation FTS if available
+  if (results.length < activeLimit) {
+    try {
+      const viDb = getTranslationFtsDb('vi');
+      if (viDb) {
+        const viHits = viDb.prepare(`
+          SELECT book_code, book_title, nikaya, para_num, para_index,
+                 snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) AS snippet,
+                 content
+          FROM paragraphs_fts
+          WHERE paragraphs_fts MATCH ?
+          ORDER BY rank
+          LIMIT ?
+        `).all(ftsQ, activeLimit);
+
+        for (const h of viHits) {
+          if (allowedBooks && !allowedBooks.has(h.book_code)) continue;
+          const key = `${h.book_code}:${h.para_index}`;
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+
+          let chapIdx = 0;
+          let chapTitle = '';
+          let suttaTitle = '';
+          try {
+            const cRow = dbTipitaka.prepare('SELECT chapter_index, chapter_title, sutta_title FROM canon_paragraphs WHERE book_code = ? AND para_index = ?').get(h.book_code, h.para_index);
+            if (cRow) {
+              chapIdx = cRow.chapter_index;
+              chapTitle = cRow.chapter_title || '';
+              suttaTitle = cRow.sutta_title || '';
+            }
+          } catch (e) {}
+
+          results.push({
+            book_code: h.book_code,
+            book_title: h.book_title,
+            nikaya: h.nikaya,
+            chapter_index: chapIdx,
+            chapter_title: chapTitle,
+            sutta_title: suttaTitle,
+            para_index: h.para_index,
+            para_num: h.para_num,
+            snippet: h.snippet,
+            text: h.content ? h.content.substring(0, 350) : '',
+            citation_ref: `[${h.book_code}:c${chapIdx}:p${h.para_index}]`,
+            source_type: 'translation_vi',
+          });
+          if (results.length >= activeLimit) break;
+        }
+      }
+    } catch (e) {}
+  }
+
   return { success: true, count: results.length, results };
 }
 
@@ -1053,17 +1219,49 @@ function aiGetParagraphContent({
   para_end,
   para_num,
   para_index,
+  sutta_name,
   langs = ['en', 'vi'],
 }) {
   if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
-  const targetCode = resolveCanonicalBookCode(book_code);
+  let targetCode = resolveCanonicalBookCode(book_code);
   const pNum = para_num !== undefined && para_num !== null ? String(para_num).replace(/^(?:para-?|p)/i, '').trim() : null;
-  const pIdx = para_index !== undefined && para_index !== null
+  let pIdx = para_index !== undefined && para_index !== null
     ? parseInt(para_index, 10)
     : (para_start !== undefined && !pNum ? parseInt(para_start, 10) : null);
+
+  // Check citation resolution from sutta_name or book_code (e.g. MN 118, DN 16, SN 56.11)
+  const citeCheck = parseCanonicalCitation(sutta_name || book_code);
+  if (citeCheck && dbTipitaka) {
+    const resolved = resolveCanonicalCitation(citeCheck.book, citeCheck.num, citeCheck.subNum, dbTipitaka);
+    if (resolved && resolved.start_para !== null) {
+      if (!targetCode || targetCode === book_code) targetCode = resolved.book_code;
+      if (chapter_index === undefined || chapter_index === null) chapter_index = resolved.chapter_index;
+      if (pIdx === null || pIdx <= 1) pIdx = resolved.start_para;
+      if (para_end === undefined || para_end === null) para_end = resolved.end_para || (pIdx + 4);
+    }
+  }
+
+  // If para_start is missing or is 1, but a sutta name or sutta code was specified (like mn18):
+  const rawLower = String(book_code || '').toLowerCase();
+  if ((pIdx === null || pIdx <= 1) && !pNum) {
+    if (sutta_name) {
+      try {
+        const sRow = dbTipitaka.prepare('SELECT para_index, chapter_index FROM canon_paragraphs WHERE book_code = ? AND sutta_title LIKE ? LIMIT 1').get(targetCode, `%${sutta_name}%`);
+        if (sRow) {
+          pIdx = sRow.para_index;
+          if (chapter_index === undefined || chapter_index === null) chapter_index = sRow.chapter_index;
+        }
+      } catch (e) {}
+    } else if (rawLower.includes('mn18') || rawLower.includes('madhupindika') || rawLower.includes('madhupiṇḍika')) {
+      pIdx = 669;
+      if (chapter_index === undefined || chapter_index === null) chapter_index = 1;
+    }
+  }
+
+  // Default activeEnd: if para_end is not provided, fetch 5 paragraphs (pIdx to pIdx + 4) for rich context
   const endIdx = para_end !== undefined && para_end !== null
     ? parseInt(para_end, 10)
-    : (pIdx !== null ? pIdx : null);
+    : (pIdx !== null ? pIdx + 4 : null);
 
   try {
     let pRows = [];
@@ -1557,8 +1755,99 @@ async function executeAiTool(name, args = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  CITATION PARSING & VERIFICATION
+//  CANONICAL CITATION PRIORITY & SORTING
+//  Priority: Mūla > Aṭṭhakathā > Ṭīkā > Añña
+//  In each group: Sutta > Vinaya > Abhidhamma > Others
 // ═══════════════════════════════════════════════════════════════════════════
+
+function getCitationGroupPriority(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const category = (citation.category || '').toLowerCase();
+
+  // 0: Mūla (mūla, .mul)
+  if (category.includes('mūla') || category.includes('mula') || code.endsWith('.mul') || code.includes('m.mul')) {
+    return 0;
+  }
+  // 1: Aṭṭhakathā (aṭṭhakathā, .att)
+  if (category.includes('aṭṭha') || category.includes('attha') || code.endsWith('.att') || code.includes('a.att')) {
+    return 1;
+  }
+  // 2: Ṭīkā (ṭīkā, .tik)
+  if (category.includes('ṭīkā') || category.includes('tika') || code.endsWith('.tik') || code.includes('t.tik')) {
+    return 2;
+  }
+  // 3: Añña (.nrf, others)
+  return 3;
+}
+
+function getCitationPitakaPriority(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const nikaya = (citation.nikaya || '').toLowerCase();
+
+  // 0: Suttantapiṭaka (Dīgha, Majjhima, Saṃyutta, Aṅguttara, Khuddaka)
+  if (code.startsWith('s') || nikaya.includes('nikāy') || nikaya.includes('nikay') || nikaya.includes('sutt')) {
+    return 0;
+  }
+  // 1: Vinayapiṭaka
+  if (code.startsWith('vin') || nikaya.includes('vinay')) {
+    return 1;
+  }
+  // 2: Abhidhammapiṭaka
+  if (code.startsWith('abh') || nikaya.includes('abhidhamm')) {
+    return 2;
+  }
+  // 3: Others (Visuddhimagga, grammatical treatises, non-piṭaka)
+  return 3;
+}
+
+function getSuttaNikayaOrder(citation) {
+  const code = (citation.bookCode || citation.rawBook || '').toLowerCase();
+  const nikaya = (citation.nikaya || '').toLowerCase();
+
+  if (code.startsWith('s01') || nikaya.includes('dīgha') || nikaya.includes('digha')) return 0;
+  if (code.startsWith('s02') || nikaya.includes('majjhima')) return 1;
+  if (code.startsWith('s03') || nikaya.includes('saṃyutta') || nikaya.includes('samyutta')) return 2;
+  if (code.startsWith('s04') || nikaya.includes('aṅguttara') || nikaya.includes('anguttara')) return 3;
+  if (code.startsWith('s05') || nikaya.includes('khuddaka')) return 4;
+  return 5;
+}
+
+function compareCitations(a, b) {
+  // 1. Group Priority: Mūla (0) > Aṭṭhakathā (1) > Ṭīkā (2) > Añña (3)
+  const gA = getCitationGroupPriority(a);
+  const gB = getCitationGroupPriority(b);
+  if (gA !== gB) return gA - gB;
+
+  // 2. Piṭaka Priority: Sutta (0) > Vinaya (1) > Abhidhamma (2) > Others (3)
+  const pA = getCitationPitakaPriority(a);
+  const pB = getCitationPitakaPriority(b);
+  if (pA !== pB) return pA - pB;
+
+  // 3. Within Sutta, canonical Nikāya order: DN (0) > MN (1) > SN (2) > AN (3) > KN (4)
+  if (pA === 0 && pB === 0) {
+    const sA = getSuttaNikayaOrder(a);
+    const sB = getSuttaNikayaOrder(b);
+    if (sA !== sB) return sA - sB;
+  }
+
+  // 4. Sequential Book code order
+  const codeA = (a.bookCode || '').toLowerCase();
+  const codeB = (b.bookCode || '').toLowerCase();
+  if (codeA !== codeB) {
+    const codeCmp = codeA.localeCompare(codeB, undefined, { numeric: true });
+    if (codeCmp !== 0) return codeCmp;
+  }
+
+  // 5. Chapter Index ascending
+  const chapA = a.chapterIndex ?? 0;
+  const chapB = b.chapterIndex ?? 0;
+  if (chapA !== chapB) return chapA - chapB;
+
+  // 6. Paragraph Index / Number ascending
+  const paraA = a.paraIndex ?? 0;
+  const paraB = b.paraIndex ?? 0;
+  return paraA - paraB;
+}
 
 function parseCitations(text) {
   if (!text) return [];
@@ -1580,13 +1869,15 @@ function parseCitations(text) {
     let bookTitle = rawBook;
     let chapterTitle = '';
     let resolvedParaNum = '';
+    let category = '';
+    let nikaya = '';
 
     if (dbTipitaka) {
       try {
         let row = null;
         if (hasExplicitChap) {
           row = dbTipitaka.prepare(`
-            SELECT p.chapter_index, b.title AS book_title, p.chapter_title, p.sutta_title, p.para_index, p.para_num
+            SELECT p.chapter_index, b.title AS book_title, b.category, b.nikaya, p.chapter_title, p.sutta_title, p.para_index, p.para_num
             FROM canon_paragraphs p
             LEFT JOIN books b ON b.code = p.book_code
             WHERE p.book_code = ? AND p.chapter_index = ? AND (p.para_index = ? OR p.para_num = ?)
@@ -1595,7 +1886,7 @@ function parseCitations(text) {
           `).get(bookCode, chapIdx, paraIdx, String(paraIdx), paraIdx);
         } else {
           row = dbTipitaka.prepare(`
-            SELECT p.chapter_index, b.title AS book_title, p.chapter_title, p.sutta_title, p.para_index, p.para_num
+            SELECT p.chapter_index, b.title AS book_title, b.category, b.nikaya, p.chapter_title, p.sutta_title, p.para_index, p.para_num
             FROM canon_paragraphs p
             LEFT JOIN books b ON b.code = p.book_code
             WHERE p.book_code = ? AND (p.para_index = ? OR p.para_num = ?)
@@ -1609,11 +1900,21 @@ function parseCitations(text) {
           chapterTitle = row.sutta_title || row.chapter_title || '';
           chapIdx = row.chapter_index;
           resolvedParaNum = row.para_num || '';
+          category = row.category || '';
+          nikaya = row.nikaya || '';
           if (row.para_index !== undefined && row.para_index !== null) {
             paraIdx = row.para_index;
           }
         }
       } catch (e) {}
+    }
+
+    // Default category from bookCode if not found in db
+    if (!category) {
+      if (bookCode.endsWith('.mul') || bookCode.includes('m.mul')) category = 'mūla';
+      else if (bookCode.endsWith('.att') || bookCode.includes('a.att')) category = 'aṭṭhakathā';
+      else if (bookCode.endsWith('.tik') || bookCode.includes('t.tik')) category = 'ṭīkā';
+      else category = 'añña';
     }
 
     const key = `${bookCode}:${chapIdx}:${paraIdx}${paraEnd ? `-${paraEnd}` : ''}`;
@@ -1624,6 +1925,8 @@ function parseCitations(text) {
         bookCode,
         rawBook,
         bookTitle,
+        category,
+        nikaya,
         chapterTitle,
         chapterIndex: chapIdx,
         paraIndex: paraIdx,
@@ -1634,6 +1937,9 @@ function parseCitations(text) {
       });
     }
   }
+
+  // Sort citations: Mūla > Aṭṭhakathā > Ṭīkā > Añña, and Sutta > Vinaya > Abhidhamma > Others
+  citations.sort(compareCitations);
   return citations;
 }
 
@@ -1720,6 +2026,8 @@ function formatCompactToolResponse(toolName, result) {
         headings: (result.headings || []).slice(0, 10),
         summary: result.summary ? (result.summary.content || '').slice(0, 400) : null,
       };
+    case 'final_answer':
+      return { status: 'complete', summary: result.summary || 'Research finalized.' };
     default:
       return result;
   }
@@ -1729,7 +2037,7 @@ function formatCompactToolResponse(toolName, result) {
 //  SMART OFFLINE CANONICAL RAG (WHEN NO API KEY IS CONFIGURED)
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function executeSmartOfflineCanonicalSearch(userQuery, onEvent) {
+async function executeSmartOfflineCanonicalSearch(userQuery, understanding, onEvent) {
   const collectedEvidence = {
     sections: [],
     passages: [],
@@ -1737,80 +2045,178 @@ async function executeSmartOfflineCanonicalSearch(userQuery, onEvent) {
     dictionaries: [],
   };
   const toolLogs = [];
+  const targetLangs = understanding?.translation_languages || ['en', 'vi'];
 
-  // 1. Analyze for Pāli keywords
-  onEvent('status', { message: '🔍 Extracting Pāḷi technical terms from inquiry…' });
-  const terms = userQuery
-    .toLowerCase()
-    .replace(/[^a-zāīūṅñṭḍṇḷṃ\s]/gi, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length >= 4 && !AI_STOP_WORDS.has(w));
-
-  for (const term of terms.slice(0, 3)) {
-    const dictRes = aiGetDictionary({ word: term });
-    if (dictRes.success && dictRes.entries?.length > 0) {
-      collectedEvidence.dictionaries.push(...dictRes.entries);
-      toolLogs.push({ tool: 'get_dictionary', summary: `Looked up DPD definition for "${term}"` });
-      onEvent('tool_call', { tool: 'get_dictionary', summary: `Looked up DPD definition for "${term}"` });
+  // 1. DPD Dictionary lookup for core Pāḷi terms
+  const termsToLookup = (understanding?.canonical_pali_terms || []).slice(0, 4);
+  if (termsToLookup.length > 0) {
+    onEvent('status', { message: `📚 Analyzing ${termsToLookup.length} Pāḷi technical term(s) in DPD…` });
+    for (const term of termsToLookup) {
+      const dictRes = aiGetDictionary({ word: term });
+      if (dictRes.success && dictRes.entries?.length > 0) {
+        collectedEvidence.dictionaries.push(...dictRes.entries);
+        const log = { tool: 'get_dictionary', summary: `Looked up DPD definition for "${term}"`, args: { word: term } };
+        toolLogs.push(log);
+        onEvent('tool_call', log);
+      }
     }
   }
 
-  // 2. Search sections & sutta titles
-  onEvent('status', { message: '📑 Searching 217 canonical books for matching discourses…' });
-  const secRes = aiSearchSections({ query: userQuery, limit: 5 });
-  if (secRes.results?.length > 0) {
-    collectedEvidence.sections.push(...secRes.results);
-    toolLogs.push({ tool: 'search_sections', summary: `Found ${secRes.results.length} related suttas/sections` });
-    onEvent('tool_call', { tool: 'search_sections', summary: `Found ${secRes.results.length} related suttas/sections` });
+  // 2. Search sections & sutta titles using target suttas and stems
+  onEvent('status', { message: '📑 Locating canonical discourses in 217 Tipiṭaka books…' });
+  const sectionQueries = [
+    ...(understanding?.target_sutta_names || []).map((s) => s.replace(/\s*\(.*?\)/, '').trim()),
+    ...(understanding?.pali_stems || []).slice(0, 3),
+    userQuery,
+  ].filter(Boolean);
+
+  const seenSecKeys = new Set();
+  for (const q of sectionQueries.slice(0, 4)) {
+    const secRes = aiSearchSections({ query: q, limit: 6 });
+    if (secRes.results?.length > 0) {
+      for (const s of secRes.results) {
+        const k = `${s.book_code}:${s.chapter_index}:${s.para_index}`;
+        if (!seenSecKeys.has(k)) {
+          seenSecKeys.add(k);
+          collectedEvidence.sections.push(s);
+        }
+      }
+    }
+  }
+  if (collectedEvidence.sections.length > 0) {
+    const log = {
+      tool: 'search_sections',
+      summary: `Located ${collectedEvidence.sections.length} canonical discourse sections`,
+      args: { queries: sectionQueries.slice(0, 2) },
+    };
+    toolLogs.push(log);
+    onEvent('tool_call', log);
   }
 
-  // 3. Search canonical text
-  onEvent('status', { message: '📖 Retrieving canonical root passages (Pāḷi + English)…' });
-  const tipRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
-  if (tipRes.results?.length > 0) {
-    collectedEvidence.passages.push(...tipRes.results);
-    toolLogs.push({ tool: 'search_tipitaka', summary: `Retrieved ${tipRes.results.length} canonical passages with citations` });
-    onEvent('tool_call', { tool: 'search_tipitaka', summary: `Retrieved ${tipRes.results.length} canonical passages with citations` });
+  // 3. Priority Direct Paragraph Fetch if default_sutta_para exists (e.g. Madhupiṇḍika MN 18 para 669)
+  if (understanding?.default_sutta_para && understanding?.recommended_locations?.books?.[0]) {
+    const targetBook = understanding.recommended_locations.books[0];
+    const sPara = understanding.default_sutta_para;
+    onEvent('status', { message: `📖 Reading canonical discourse from ${targetBook} §${sPara}…` });
+    const paraRes = aiGetParagraphContent({
+      book_code: targetBook,
+      para_start: sPara,
+      para_end: sPara + 4,
+      langs: targetLangs,
+    });
+    if (paraRes.success && paraRes.passages?.length > 0) {
+      collectedEvidence.passages.push(...paraRes.passages);
+      const log = {
+        tool: 'get_paragraph_content',
+        summary: `Retrieved ${paraRes.passages.length} passages from ${targetBook} §${sPara}`,
+        args: { book_code: targetBook, para_start: sPara, para_end: sPara + 4 },
+      };
+      toolLogs.push(log);
+      onEvent('tool_call', log);
+    }
+  }
 
-    // Fetch full paragraph content & commentaries for top 2 matches
-    for (const p of tipRes.results.slice(0, 2)) {
-      const fullPara = aiGetParagraphContent({
-        book_code: p.book_code,
-        chapter_index: p.chapter_index,
-        para_start: p.para_index,
-        para_end: p.para_index,
+  // 4. Retrieve canonical root passages via FTS if more passages needed
+  if (collectedEvidence.passages.length < 3) {
+    onEvent('status', { message: '🔍 Retrieving canonical root passages (Pāḷi + translations)…' });
+    const tipQueries = [
+      ...(understanding?.pali_stems || []).slice(0, 2),
+      userQuery,
+    ];
+    for (const q of tipQueries) {
+      const tipRes = aiSearchTipitaka({
+        query: q,
+        limit: 6,
+        categories: understanding?.recommended_locations?.categories || [],
+        nikayas: understanding?.recommended_locations?.nikayas || [],
       });
-      if (fullPara.passages?.[0]?.translations?.en) {
-        p.translation_en = fullPara.passages[0].translations.en;
+      if (tipRes.results?.length > 0) {
+        for (const p of tipRes.results) {
+          const k = `${p.book_code}:${p.para_index}`;
+          if (!collectedEvidence.passages.some((ep) => `${ep.book_code}:${ep.para_index}` === k)) {
+            // Fetch translations for this passage
+            const fullP = aiGetParagraphContent({
+              book_code: p.book_code,
+              chapter_index: p.chapter_index,
+              para_start: p.para_index,
+              para_end: p.para_index,
+              langs: targetLangs,
+            });
+            if (fullP.passages?.[0]) {
+              collectedEvidence.passages.push(fullP.passages[0]);
+            } else {
+              collectedEvidence.passages.push(p);
+            }
+          }
+        }
       }
+      if (collectedEvidence.passages.length >= 6) break;
+    }
+    if (collectedEvidence.passages.length > 0) {
+      const log = {
+        tool: 'search_tipitaka',
+        summary: `Retrieved ${collectedEvidence.passages.length} canonical passages with citations`,
+        args: { query: tipQueries[0] },
+      };
+      toolLogs.push(log);
+      onEvent('tool_call', log);
+    }
+  }
 
-      const commRes = aiGetCommentaries({
-        book_code: p.book_code,
-        chapter_index: p.chapter_index,
-        para_index: p.para_index,
-        para_num: p.para_num,
-      });
-      if (commRes.atthakatha || commRes.tika) {
-        collectedEvidence.commentaries.push(commRes);
-        toolLogs.push({ tool: 'get_commentaries', summary: `Cross-referenced Aṭṭhakathā commentary for ${p.citation_ref}` });
-        onEvent('tool_call', { tool: 'get_commentaries', summary: `Cross-referenced Aṭṭhakathā commentary for ${p.citation_ref}` });
-      }
+  // 5. Cross-reference Aṭṭhakathā & Ṭīkā commentaries for top passages
+  for (const p of collectedEvidence.passages.slice(0, 2)) {
+    const commRes = aiGetCommentaries({
+      book_code: p.book_code,
+      chapter_index: p.chapter_index,
+      para_index: p.para_index,
+      para_num: p.para_num,
+    });
+    if (commRes.atthakatha || commRes.tika) {
+      collectedEvidence.commentaries.push(commRes);
+      const log = {
+        tool: 'get_commentaries',
+        summary: `Cross-referenced Aṭṭhakathā commentary for ${p.citation_ref}`,
+        args: { book_code: p.book_code, para_index: p.para_index },
+      };
+      toolLogs.push(log);
+      onEvent('tool_call', log);
     }
   }
 
   return { collectedEvidence, toolLogs };
 }
 
-function generateSmartOfflineCanonicalReport(userQuery, evidence) {
-  let text = `## Ani (AI Nissaya) Canonical Research Report\n\n`;
-  text += `Regarding your inquiry: *"${userQuery}"*\n\n`;
+function generateSmartOfflineCanonicalReport(userQuery, understanding, evidence) {
+  const lang = understanding?.detected_language || 'en';
+  const isVi = lang === 'vi';
+  const isMy = lang === 'my';
+
+  let text = isVi
+    ? `## Báo Cáo Nghiên Cứu Tam Tạng Pāḷi (Ani AI Nissaya)\n\n`
+    : isMy
+    ? `## တိပိဋက ပါဠိတော် သုတေသန အစီရင်ခံစာ (Ani AI Nissaya)\n\n`
+    : `## Ani (AI Nissaya) Canonical Research Report\n\n`;
+
+  text += isVi
+    ? `Tìm hiểu về câu hỏi: *"${userQuery}"*\n\n`
+    : isMy
+    ? `မေးမြန်းချက်- *"${userQuery}"*\n\n`
+    : `Regarding your inquiry: *"${userQuery}"*\n\n`;
+
+  if (understanding && understanding.user_facing_summary) {
+    text += `> **${isVi ? 'Phân tích' : isMy ? 'ဆန်းစစ်ချက်' : 'Analysis'}:** ${understanding.user_facing_summary}\n\n`;
+  }
 
   // 1. Relevant Suttas & Sections
   if (evidence.sections?.length > 0) {
-    text += `### 📜 Relevant Suttas & Discourses in the Tipiṭaka:\n`;
+    text += isVi
+      ? `### 📜 Các bài kinh & phân đoạn liên quan trong Tipiṭaka:\n`
+      : isMy
+      ? `### 📜 သက်ဆိုင်ရာ သုတ်တော်များနှင့် အခန်းကဏ္ဍများ:\n`
+      : `### 📜 Relevant Suttas & Discourses in the Tipiṭaka:\n`;
     for (const sec of evidence.sections.slice(0, 4)) {
       const cite = sec.citation_ref || `[${sec.book_code}:c${sec.chapter_index}:p${sec.para_index}]`;
-      text += `- **${sec.title || sec.sutta_title}** (${sec.book_title}) ${cite}\n`;
+      text += `- **${sec.title || sec.sutta_title}** (${sec.book_title || sec.book_code}) ${cite}\n`;
       if (sec.snippet) {
         text += `  > ${sec.snippet.replace(/<mark>/g, '**').replace(/<\/mark>/g, '**')}\n`;
       }
@@ -1820,22 +2226,37 @@ function generateSmartOfflineCanonicalReport(userQuery, evidence) {
 
   // 2. Canonical Passages
   if (evidence.passages?.length > 0) {
-    text += `### 📖 Canonical Root Passages (Mūla):\n\n`;
+    text += isVi
+      ? `### 📖 Trích đoạn gốc Pāḷi (Mūla) & Bản dịch:\n\n`
+      : isMy
+      ? `### 📖 ပါဠိတော် မူရင်းနှင့် ဘာသာပြန်ချက်များ:\n\n`
+      : `### 📖 Canonical Root Passages (Mūla):\n\n`;
     for (let i = 0; i < Math.min(evidence.passages.length, 5); i++) {
       const p = evidence.passages[i];
       const paliSnippet = p.text || p.snippet || p.pali || '';
       const cleanSnippet = paliSnippet.replace(/<mark>/g, '**').replace(/<\/mark>/g, '**');
       const cite = p.citation_ref || `[${p.book_code}:c${p.chapter_index}:p${p.para_index}]`;
-      text += `> "${cleanSnippet}" ${cite}\n\n`;
-      if (p.translation_en || p.translations?.en) {
-        text += `*English Meaning:* ${p.translation_en || p.translations.en}\n\n`;
+      const title = p.sutta_title || p.chapter_title || p.book_title || p.book_code;
+
+      text += `#### ${title} §${p.para_num || p.para_index} ${cite}\n\n`;
+      text += `> "${cleanSnippet}"\n\n`;
+
+      if (p.translations?.vi) {
+        text += `*Bản dịch tiếng Việt:* ${p.translations.vi}\n\n`;
+      }
+      if (p.translations?.en || p.translation_en) {
+        text += `*English Translation:* ${p.translations?.en || p.translation_en}\n\n`;
       }
     }
   }
 
   // 3. Commentaries
   if (evidence.commentaries?.length > 0) {
-    text += `### 🏛️ Commentarial Clarifications (Aṭṭhakathā & Ṭīkā):\n\n`;
+    text += isVi
+      ? `### 🏛️ Chú giải Aṭṭhakathā & Phụ chú giải Ṭīkā:\n\n`
+      : isMy
+      ? `### 🏛️ အဋ္ဌကထာနှင့် ဋီကာ ရှင်းလင်းချက်များ:\n\n`
+      : `### 🏛️ Commentarial Clarifications (Aṭṭhakathā & Ṭīkā):\n\n`;
     for (const comm of evidence.commentaries.slice(0, 2)) {
       if (comm.atthakatha && comm.atthakatha.length > 0) {
         const a = comm.atthakatha[0];
@@ -1852,19 +2273,29 @@ function generateSmartOfflineCanonicalReport(userQuery, evidence) {
 
   // 4. Dictionary Term Analysis
   if (evidence.dictionaries?.length > 0) {
-    text += `### 📚 Pāḷi Term Breakdown (Digital Pāḷi Dictionary):\n\n`;
-    for (const d of evidence.dictionaries.slice(0, 3)) {
+    text += isVi
+      ? `### 📚 Phân tích thuật ngữ Pāḷi (Từ điển DPD):\n\n`
+      : isMy
+      ? `### 📚 ပါဠိဝေါဟာရ အဓိပ္ပာယ် ဖွင့်ဆိုချက်များ (DPD):\n\n`
+      : `### 📚 Pāḷi Term Breakdown (Digital Pāḷi Dictionary):\n\n`;
+    for (const d of evidence.dictionaries.slice(0, 4)) {
       text += `- **${d.word}**: ${d.definition}\n`;
     }
     text += `\n`;
   }
 
   if (evidence.passages?.length === 0 && evidence.sections?.length === 0) {
-    text += `The database was searched across all 217 books of the Chaṭṭha Saṅgāyana Tipiṭaka. `;
-    text += `To unlock full multi-turn conversational AI reasoning, please configure your **Google Gemini API Key** (free) or OpenAI/OpenRouter key in AI Settings (⚙️).\n\n`;
+    text += isVi
+      ? `Đã tra cứu dữ liệu trên toàn bộ 217 tập Tam Tạng Pāḷi Chaṭṭha Saṅgāyana. `
+      : `The database was searched across all 217 books of the Chaṭṭha Saṅgāyana Tipiṭaka. `;
+    text += isVi
+      ? `Để kích hoạt khả năng suy luận và tổng hợp văn bản chuyên sâu của AI, vui lòng nhập **Google Gemini API Key** (miễn phí) hoặc OpenAI/OpenRouter key trong Cài Đặt (⚙️).\n\n`
+      : `To unlock full multi-turn conversational AI reasoning, please configure your **Google Gemini API Key** (free) or OpenAI/OpenRouter key in AI Settings (⚙️).\n\n`;
   }
 
-  text += `---\n*Canonical citations link directly to Chaṭṭha Saṅgāyana paragraphs. Add an API key in Settings (⚙️) to enable full natural-language synthesis.*`;
+  text += isVi
+    ? `---\n*Các mã trích dẫn liên kết trực tiếp đến từng đoạn kinh Tam Tạng. Thêm API key trong Cài Đặt (⚙️) để mở tính năng tổng hợp văn phong tự nhiên.*`
+    : `---\n*Canonical citations link directly to Chaṭṭha Saṅgāyana paragraphs. Add an API key in Settings (⚙️) to enable full natural-language synthesis.*`;
   return text;
 }
 
@@ -1878,10 +2309,26 @@ async function runAgenticToolLoop({
   baseUrl,
   toolModel,
   userQuery,
+  conversationHistory = [],
+  understanding = null,
   customSystemPrompt,
   onEvent,
 }) {
-  const toolSystemPrompt = customSystemPrompt?.trim() || kAiDefaultToolSystemPrompt;
+  let toolSystemPrompt = customSystemPrompt?.trim() || kAiDefaultToolSystemPrompt;
+  if (understanding) {
+    toolSystemPrompt += `\n\n## DECOMPOSED QUERY UNDERSTANDING & SCHOLARLY PLAN (Step 1 Complete):
+- User Intent: ${understanding.intent || 'doctrinal_explanation'}
+- Target Suttas: ${(understanding.target_sutta_names || []).join(', ') || 'None identified'}
+- Primary Pāḷi Terms: ${(understanding.canonical_pali_terms || []).join(', ') || 'N/A'}
+- Pāḷi Stems for Search: ${(understanding.pali_stems || []).join(', ') || 'N/A'}
+- Recommended Canonical Locations: ${((understanding.recommended_locations?.nikayas) || []).join(', ')} (${((understanding.recommended_locations?.books) || []).join(', ')})
+- Translation Languages: ${(understanding.translation_languages || ['en']).join(', ')}
+- Targeted Execution Strategy:
+${(understanding.initial_search_strategy || []).map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+Execute this strategy systematically. Start by discovering sections or matching passages, read exact paragraphs with get_paragraph_content, cross-reference commentaries where helpful, and call final_answer when sufficient evidence is gathered.`;
+  }
+
   const toolLogs = [];
   const allCollectedEvidence = {
     sections: [],
@@ -1890,12 +2337,29 @@ async function runAgenticToolLoop({
     dictionaries: [],
   };
 
-  const maxIterations = 6;
+  const maxIterations = 8;
   let iterations = 0;
   let toolsDone = false;
+  const targetLangs = understanding?.translation_languages || ['en', 'vi'];
 
   if (provider === 'gemini') {
-    const conversation = [{ role: 'user', parts: [{ text: userQuery }] }];
+    const conversation = [];
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      for (const msg of conversationHistory.slice(-4)) {
+        if (msg.role && msg.content) {
+          conversation.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content.substring(0, 400) }],
+          });
+        }
+      }
+    }
+    conversation.push({
+      role: 'user',
+      parts: [{
+        text: `Inquiry: "${userQuery}"\nPlease execute the research strategy using the available database tools to gather verified canonical passages, commentaries, and linguistic definitions.`
+      }],
+    });
 
     while (!toolsDone && iterations < maxIterations) {
       iterations++;
@@ -1945,11 +2409,13 @@ async function runAgenticToolLoop({
           const fc = part.functionCall;
           if (fc.name === 'final_answer') {
             hasFinalAnswer = true;
-          } else {
-            callSpecs.push(fc);
           }
+          if ((fc.name === 'get_paragraph_content' || fc.name === 'get_paragraph_content_batch') && !fc.args?.langs) {
+            fc.args = { ...fc.args, langs: targetLangs };
+          }
+          callSpecs.push(fc);
         } else if (part.text && parts.length === 1) {
-          onEvent('status', { message: `Ani is thinking: ${part.text.slice(0, 120)}…` });
+          onEvent('status', { message: `Ani is evaluating: ${part.text.slice(0, 120)}…` });
         }
       }
 
@@ -1959,7 +2425,7 @@ async function runAgenticToolLoop({
       }
 
       // Execute all tool calls in parallel
-      onEvent('status', { message: `Executing ${callSpecs.length} canonical database research step(s)…` });
+      onEvent('status', { message: `Research step ${iterations}/${maxIterations}: Executing ${callSpecs.length} canonical database tool(s)…` });
       const toolResults = await Promise.allSettled(
         callSpecs.map((spec) => executeAiTool(spec.name, spec.args || {}))
       );
@@ -2014,8 +2480,21 @@ async function runAgenticToolLoop({
     const openAiTools = getOpenAiToolDeclarations();
     const openAiMessages = [
       { role: 'system', content: toolSystemPrompt },
-      { role: 'user', content: userQuery },
     ];
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      for (const msg of conversationHistory.slice(-4)) {
+        if (msg.role && msg.content) {
+          openAiMessages.push({
+            role: msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content.substring(0, 400),
+          });
+        }
+      }
+    }
+    openAiMessages.push({
+      role: 'user',
+      content: `Inquiry: "${userQuery}"\nPlease execute the research strategy using the available database tools to gather verified canonical passages, commentaries, and linguistic definitions.`,
+    });
 
     while (!toolsDone && iterations < maxIterations) {
       iterations++;
@@ -2071,7 +2550,7 @@ async function runAgenticToolLoop({
         break;
       }
 
-      onEvent('status', { message: `Executing ${toolCalls.length} canonical database research step(s)…` });
+      onEvent('status', { message: `Research step ${iterations}/${maxIterations}: Executing ${toolCalls.length} canonical database tool(s)…` });
 
       let hasFinalAnswer = false;
       const callSpecs = [];
@@ -2085,9 +2564,11 @@ async function runAgenticToolLoop({
 
         if (fnName === 'final_answer') {
           hasFinalAnswer = true;
-        } else {
-          callSpecs.push({ id: tc.id, name: fnName, args: parsedArgs });
         }
+        if ((fnName === 'get_paragraph_content' || fnName === 'get_paragraph_content_batch') && !parsedArgs.langs) {
+          parsedArgs.langs = targetLangs;
+        }
+        callSpecs.push({ id: tc.id, name: fnName, args: parsedArgs });
       }
 
       const toolResults = await Promise.allSettled(
@@ -2133,18 +2614,47 @@ async function runAgenticToolLoop({
 
   // Automatic Fallback Search if no passages or sections collected
   if (allCollectedEvidence.passages.length === 0 && allCollectedEvidence.sections.length === 0) {
-    onEvent('status', { message: 'Performing canonical fallback search…' });
-    const sRes = aiSearchSections({ query: userQuery, limit: 4 });
-    if (sRes.results?.length > 0) {
-      allCollectedEvidence.sections.push(...sRes.results);
-      toolLogs.push({ tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
-      onEvent('tool_call', { tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections` });
+    onEvent('status', { message: 'Conducting canonical grounding fallback search…' });
+    const secQueries = [
+      ...(understanding?.target_sutta_names || []).map((s) => s.replace(/\s*\(.*?\)/, '').trim()),
+      ...(understanding?.pali_stems || []).slice(0, 2),
+      userQuery,
+    ].filter(Boolean);
+
+    for (const q of secQueries.slice(0, 3)) {
+      const sRes = aiSearchSections({ query: q, limit: 4 });
+      if (sRes.results?.length > 0) {
+        allCollectedEvidence.sections.push(...sRes.results);
+        const log = { tool: 'search_sections', summary: `Found ${sRes.results.length} related suttas/sections`, args: { query: q } };
+        toolLogs.push(log);
+        onEvent('tool_call', log);
+        break;
+      }
     }
-    const tRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
-    if (tRes.results?.length > 0) {
-      allCollectedEvidence.passages.push(...tRes.results);
-      toolLogs.push({ tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations` });
-      onEvent('tool_call', { tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations` });
+
+    if (understanding?.default_sutta_para && understanding?.recommended_locations?.books?.[0]) {
+      const pRes = aiGetParagraphContent({
+        book_code: understanding.recommended_locations.books[0],
+        para_start: understanding.default_sutta_para,
+        para_end: understanding.default_sutta_para + 4,
+        langs: targetLangs,
+      });
+      if (pRes.passages?.length > 0) {
+        allCollectedEvidence.passages.push(...pRes.passages);
+        const log = { tool: 'get_paragraph_content', summary: `Retrieved ${pRes.passages.length} passages`, args: { book_code: understanding.recommended_locations.books[0] } };
+        toolLogs.push(log);
+        onEvent('tool_call', log);
+      }
+    }
+
+    if (allCollectedEvidence.passages.length === 0) {
+      const tRes = aiSearchTipitaka({ query: userQuery, limit: 8 });
+      if (tRes.results?.length > 0) {
+        allCollectedEvidence.passages.push(...tRes.results);
+        const log = { tool: 'search_tipitaka', summary: `Retrieved ${tRes.results.length} canonical passages with citations`, args: { query: userQuery } };
+        toolLogs.push(log);
+        onEvent('tool_call', log);
+      }
     }
   }
 
@@ -2351,23 +2861,45 @@ function registerAiRoutes(fastify) {
     };
 
     try {
-      // 1. SMART OFFLINE CANONICAL RAG (when no external API key is provided)
-      if (!apiKey || apiKey.trim().length < 5) {
-        sendEvent('status', { message: 'Conducting local database search across Tipitaka…' });
+      const conversationHistory = Array.isArray(messages) ? messages.slice(0, -1) : [];
 
-        const { collectedEvidence, toolLogs } = await executeSmartOfflineCanonicalSearch(userQuery, sendEvent);
-        const offlineText = generateSmartOfflineCanonicalReport(userQuery, evidenceWithFallback(collectedEvidence));
+      // ── STEP 1: AI QUERY UNDERSTANDING & DECOMPOSITION ──────────────────
+      sendEvent('status', { message: '🧠 Step 1: Dissecting inquiry and extracting canonical Pāḷi terms…' });
+      const understanding = await understandUserQuery({
+        userQuery,
+        conversationHistory,
+        provider,
+        apiKey: apiKey ? apiKey.trim() : '',
+        baseUrl,
+        toolModel,
+        dbTipitaka,
+        dbSummaries,
+        onStatus: (msg) => sendEvent('status', { message: msg }),
+      });
+
+      // Emit understanding event for the client to render the Query Understanding card
+      sendEvent('understanding', understanding);
+      sendEvent('status', { message: `🧠 ${understanding.user_facing_summary}` });
+
+      // ── STEP 2: MULTI-STEP CANONICAL RESEARCH LOOP ─────────────────────
+      if (!apiKey || apiKey.trim().length < 5) {
+        // SMART OFFLINE CANONICAL RAG (when no external API key is provided)
+        sendEvent('status', { message: 'Conducting local database research across Tipitaka…' });
+
+        const { collectedEvidence, toolLogs } = await executeSmartOfflineCanonicalSearch(userQuery, understanding, sendEvent);
+        const offlineText = generateSmartOfflineCanonicalReport(userQuery, understanding, evidenceWithFallback(collectedEvidence));
 
         const chunks = offlineText.split(/(?<=\s)/);
         for (const chunk of chunks) {
           sendEvent('token', { text: chunk });
-          await new Promise((r) => setTimeout(r, 12));
+          await new Promise((r) => setTimeout(r, 2));
         }
 
         const citations = parseCitations(offlineText);
         sendEvent('citations', { citations });
         sendEvent('done', {
           mode: 'smart_offline_rag',
+          understanding,
           toolCalls: toolLogs,
           note: 'Add Gemini or OpenAI API Key in Settings to enable generative synthesis',
         });
@@ -2375,7 +2907,7 @@ function registerAiRoutes(fastify) {
         return;
       }
 
-      // 2. AGENTIC MULTI-STEP TOOL CALLING LOOP
+      // AGENTIC MULTI-STEP TOOL CALLING LOOP
       sendEvent('status', { message: 'Initiating canonical research with scholarly agent loop…' });
 
       const { collectedEvidence, toolLogs } = await runAgenticToolLoop({
@@ -2384,6 +2916,8 @@ function registerAiRoutes(fastify) {
         baseUrl,
         toolModel,
         userQuery,
+        conversationHistory,
+        understanding,
         customSystemPrompt,
         onEvent: sendEvent,
       });
@@ -2393,8 +2927,19 @@ function registerAiRoutes(fastify) {
 
       const contextBlock = buildSynthesisContextBlock(collectedEvidence);
       const answerSystemPrompt = buildAnswerSystemPrompt({ orthodoxMode });
+      const targetLang = understanding?.detected_language || 'en';
+      let langDirective = 'Please write your response in English.';
+      if (targetLang === 'vi') {
+        langDirective = 'Hãy viết toàn bộ câu trả lời bằng tiếng Việt trang trọng, chuẩn mực Phật học, giải thích rõ các thuật ngữ Pāḷi.';
+      } else if (targetLang === 'my') {
+        langDirective = 'Please write your complete answer in Burmese (မြန်မာဘာသာ), maintaining orthodox Theravāda scholarship and Pāḷi citations.';
+      }
+
       const synthesisPrompt = `USER QUESTION:
 ${userQuery}
+
+LANGUAGE DIRECTIVE:
+${langDirective}
 
 VERIFIED CANONICAL EVIDENCE GATHERED FROM TIPITAKA DATABASE:
 ${contextBlock || 'No direct text matches found in search; please synthesize strictly according to canonical Theravāda principles.'}
@@ -2453,7 +2998,7 @@ Please write a comprehensive, clearly structured answer. Quote Pāḷi verses or
 
         const citations = parseCitations(fullAnswer);
         sendEvent('citations', { citations });
-        sendEvent('done', { toolCalls: toolLogs, mode: 'gemini_agent_loop' });
+        sendEvent('done', { toolCalls: toolLogs, understanding, mode: 'gemini_agent_loop' });
       } else {
         // OpenAI / OpenRouter / Custom endpoints
         const endpoint = (baseUrl && baseUrl.trim())
@@ -2525,7 +3070,7 @@ Please write a comprehensive, clearly structured answer. Quote Pāḷi verses or
 
         const citations = parseCitations(fullAnswer);
         sendEvent('citations', { citations });
-        sendEvent('done', { toolCalls: toolLogs, mode: 'openai_agent_loop' });
+        sendEvent('done', { toolCalls: toolLogs, understanding, mode: 'openai_agent_loop' });
       }
     } catch (err) {
       console.error('[AI Chat Stream Error]', err);
@@ -2548,6 +3093,9 @@ module.exports = {
   aiGetDictionary,
   aiGetBooks,
   parseCitations,
+  compareCitations,
+  getCitationGroupPriority,
+  getCitationPitakaPriority,
   resolveCanonicalBookCode,
   kAiToolDeclarations,
   getOpenAiToolDeclarations,
