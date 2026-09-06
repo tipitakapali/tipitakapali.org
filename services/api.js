@@ -589,26 +589,102 @@ export async function fetchAvailableTranslations() {
   }, 60 * 60 * 1000);
 }
 
+// Book-level cache for static per-book-per-lang translation JSON
+// (export_static_translations.py). One file covers every chapter of a book,
+// so it is cached keyed by book+lang — not by chapter. The pending map
+// dedupes concurrent chapter reads of the same book (reader buffers adjacent
+// chapters). Same pattern as fetchMatStaticMap above.
+const transStaticCache = new Map();
+const transStaticPending = new Map();
+const TRANS_STATIC_TTL = 24 * 60 * 60 * 1000;
+
+async function fetchBookTranslationStatic(cleanCode, lang) {
+  const key = `trans_static_${cleanCode}_${lang}`;
+  if (ENABLE_CLIENT_CACHE) {
+    const cached = transStaticCache.get(key);
+    if (cached && Date.now() - cached.timestamp < TRANS_STATIC_TTL) {
+      return cached.data;
+    }
+    if (transStaticPending.has(key)) {
+      return transStaticPending.get(key);
+    }
+  }
+  const promise = (async () => {
+    try {
+      // Same-host .json url: edge-cached static JSON on Cloudflare Pages.
+      // Requires the dashboard URL Rewrite rule (README §4, Rule 4) that
+      // strips the ".json" suffix first — otherwise the _redirects
+      // :lang placeholder binds "en.json" and rewrites to "en.json.json"
+      // (404). In local dev this 404s at the VPS rewrite and the caller
+      // falls back to VPS.
+      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/translation/${encodeURIComponent(lang)}.json`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (ENABLE_CLIENT_CACHE) {
+        transStaticCache.set(key, { data, timestamp: Date.now() });
+      }
+      return data;
+    } catch (_) {
+      return null;
+    } finally {
+      transStaticPending.delete(key);
+    }
+  })();
+  if (ENABLE_CLIENT_CACHE) {
+    transStaticPending.set(key, promise);
+  }
+  return promise;
+}
+
 export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = []) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
 
-  const langs = Array.isArray(requestedLangs) ? requestedLangs.filter(Boolean).join(',') : (requestedLangs || '');
-  if (!langs) {
+  const langArr = Array.isArray(requestedLangs)
+    ? requestedLangs.filter(Boolean)
+    : (requestedLangs ? String(requestedLangs).split(',').map((s) => s.trim()).filter(Boolean) : []);
+  if (langArr.length === 0) {
     return { book_code: cleanCode, chapter_index: chapterIndex, languages: [], translations: {} };
   }
 
-  const cacheKey = `trans_${cleanCode}_ch${chapterIndex}_${langs}`;
-  const base = getApiBase();
+  const translations = {};
+  const missing = [];
+  await Promise.all(langArr.map(async (lang) => {
+    try {
+      const bookData = await fetchBookTranslationStatic(cleanCode, lang);
+      const chapMap = bookData?.chapters?.[String(chapterIndex)];
+      if (chapMap) {
+        translations[lang] = chapMap;
+      } else {
+        missing.push(lang);
+      }
+    } catch (_) {
+      missing.push(lang);
+    }
+  }));
 
-  return cachedFetch(
-    cacheKey,
-    async () => {
-      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}`);
-      if (!res.ok) throw new Error(`Failed to load translations for ${cleanCode} ch ${chapterIndex}`);
-      return res.json();
-    },
-    60 * 60 * 1000
-  );
+  // VPS fallback for langs/chapters missing from the static export
+  // (also covers local dev, where the static file 404s at the API rewrite).
+  if (missing.length > 0) {
+    const langs = missing.join(',');
+    const cacheKey = `trans_${cleanCode}_ch${chapterIndex}_${langs}`;
+    const base = getApiBase();
+    try {
+      const data = await cachedFetch(
+        cacheKey,
+        async () => {
+          const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}`);
+          if (!res.ok) throw new Error(`Failed to load translations for ${cleanCode} ch ${chapterIndex}`);
+          return res.json();
+        },
+        60 * 60 * 1000
+      );
+      Object.assign(translations, data.translations || {});
+    } catch (e) {
+      if (Object.keys(translations).length === 0) throw e;
+    }
+  }
+
+  return { book_code: cleanCode, chapter_index: chapterIndex, languages: langArr, translations };
 }
