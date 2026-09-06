@@ -666,7 +666,7 @@ export default function AiChatView({ initialQuery = null }) {
             {/* Inspiration & Data Credit — Vīmaṃsa feature in the ePitaka app, powered by summaries.db */}
             <div className="flex flex-col items-center gap-1.5 text-[11px] text-[var(--text-muted)] leading-relaxed">
               <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5">
-                Ani Assistant is inspired by and powered by the summaries.db database of{' '}
+                Ani Assistant is inspired by and buit on the summaries.db database of{' '}
                 <a
                   href="https://epitaka.org/about"
                   target="_blank"
