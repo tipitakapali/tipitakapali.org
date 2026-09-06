@@ -816,7 +816,7 @@ export default function LanguageMenu() {
                       className="p-3.5 rounded-r-xl border-l-[4px] transition-all shadow-xs"
                       style={{
                         borderLeftColor: formatCssColor(activeBorder),
-                        backgroundColor: formatCssColor(activeBg) || 'var(--bg-secondary)',
+                        backgroundColor: formatCssColor(activeBg) || 'transparent',
                         color: formatCssColor(activeText) || 'var(--text-primary)',
                       }}
                     >

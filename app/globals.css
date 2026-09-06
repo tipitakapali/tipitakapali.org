@@ -745,7 +745,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-block {
   border-left: 2px solid var(--accent);
-  background: var(--bg-secondary);
+  background: transparent; /* Same as Pāḷi text background by default */
   border-radius: 0 0.5rem 0.5rem 0;
   padding: 0.5rem 0.85rem;
   margin-bottom: 0.5rem;
