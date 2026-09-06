@@ -39,26 +39,40 @@ const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v1';
 
 const STARTER_PROMPTS = [
   {
-    title: 'Four Noble Truths',
-    desc: 'The Buddha’s first teaching — suffering, its origin, cessation & the path',
+    title: 'What are the Four Noble Truths?',
     query: 'Explain the Four Noble Truths (cattāri ariyasaccāni) as taught in the Dhammacakkappavattana Sutta (SN 56.11), with canonical definitions of each truth.',
   },
   {
-    title: 'Mahāsatipaṭṭhāna',
-    desc: 'The four foundations of mindfulness from DN 22',
+    title: 'What is Mahāsatipaṭṭhāna?',
     query: 'Explain the four foundations of mindfulness (satipaṭṭhāna) — body, feelings, mind and dhammas — as taught in the Mahāsatipaṭṭhāna Sutta (DN 22).',
   },
   {
-    title: 'Ānāpānasati',
-    desc: 'Mindfulness of breathing — the sixteen steps from MN 118',
-    query: 'Explain mindfulness of breathing (ānāpānasati) and its sixteen steps as taught in the Ānāpānasati Sutta (MN 118).',
-  },
-  {
-    title: 'Sīla',
-    desc: 'Virtue and moral conduct — the foundation of the gradual training',
+    title: 'What is Sīla?',
     query: 'What is sīla (virtue, moral conduct) in the Pāli Canon? Explain its role as the foundation of the gradual training (anupubbasikkhā) with key canonical passages.',
   },
+  {
+    title: 'Tìm giúp tôi bài kinh có tên giống như mật hoàn hay bánh mật?',
+    query: 'Tìm giúp tôi bài kinh có tên giống như mật hoàn hay bánh mật? Cho biết tên Pāḷi, số hiệu bài kinh và tóm tắt nội dung chính với trích dẫn canonical.',
+  },
+  {
+    title: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ?',
+    query: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ။ ပါဠိအမည်၊ သုတ်အမှတ်နှင့် အဓိကအကြောင်းအရာ အကျဉ်းကို canonical ကိုးကားချက်များနှင့်အတူ ဖော်ပြပေးပါ။',
+  },
 ];
+
+function AniIcon({ size = 14, className = '' }) {
+  return (
+    <img
+      src="/ani-tipitakapali-org.svg"
+      alt="Ani"
+      width={size}
+      height={size}
+      className={`shrink-0 inline-block object-contain ${className}`}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    />
+  );
+}
 
 function getToolMeta(toolName) {
   switch (toolName) {
@@ -279,6 +293,13 @@ export default function AiChatView({ initialQuery = null }) {
     const query = (textToSend || inputQuery).trim();
     if (!query || isGenerating) return;
 
+    // Without API key, do not answer — prompt to configure instead.
+    const keyCheck = getStoredAiSettings();
+    if (!keyCheck.apiKey?.trim()) {
+      setIsSettingsOpen(true);
+      return;
+    }
+
     setInputQuery('');
     const userMsgId = `usr_${Date.now()}`;
     const assistantMsgId = `ast_${Date.now()}`;
@@ -481,8 +502,8 @@ export default function AiChatView({ initialQuery = null }) {
       {/* ── Chat Header Toolbar ────────────────────────────────────────── */}
       <header className="px-3 sm:px-5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shrink-0">
-            <Bot size={18} />
+          <div className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center shrink-0 overflow-hidden">
+            <img src="/ani-tipitakapali-org.svg" alt="Ani" className="w-7 h-7 object-contain" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -623,9 +644,9 @@ export default function AiChatView({ initialQuery = null }) {
       <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-6">
         {/* Welcome Empty State */}
         {messages.length === 0 && (
-          <div className="max-w-2xl mx-auto pt-4 sm:pt-6 pb-8 sm:pb-12 space-y-8 animate-fade-in text-center">
-            <div className="flex flex-col items-center gap-3">
-              <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
+          <div className="max-w-2xl mx-auto pt-1 sm:pt-2 pb-4 sm:pb-6 space-y-4 animate-fade-in text-center">
+            <div className="flex flex-col items-center gap-1.5">
+              <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
                 Ask{' '}
                 <span className="text-violet-600 dark:text-violet-400">Ani</span>
@@ -634,7 +655,17 @@ export default function AiChatView({ initialQuery = null }) {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-                Your dedicated AI companion for studying the Tipiṭaka. <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
+                Your dedicated AI companion for studying the Tipiṭaka. Ani Assistant is inspired by and built on the summaries.db database of{' '}
+                <a
+                  href="https://epitaka.org/about"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 font-semibold text-violet-600 dark:text-violet-400 hover:underline transition cursor-pointer"
+                  title="About the E-Piṭaka project"
+                >
+                  Vīmaṃsa
+                  <ExternalLink size={10} className="shrink-0" />
+                </a>
               </p>
             </div>
 
@@ -655,46 +686,26 @@ export default function AiChatView({ initialQuery = null }) {
               </div>
             )}
 
-            {/* Starter Suggestion Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+            {/* Starter Suggestions — 4 simple lines */}
+            <div className="flex flex-col gap-1.5 text-left">
               {STARTER_PROMPTS.map((p, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSendMessage(p.query)}
-                  className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-violet-500/60 hover:shadow-md transition text-left group cursor-pointer flex flex-col justify-between"
+                  className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-violet-500/60 transition text-left group cursor-pointer flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] group-hover:text-violet-600 dark:group-hover:text-violet-400"
                 >
-                  <div>
-                    <h3 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-violet-600 dark:group-hover:text-violet-400 transition flex items-center gap-1.5">
-                      <Sparkles size={12} className="text-violet-500" />
-                      {p.title}
-                    </h3>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">
-                      {p.desc}
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 mt-2 opacity-0 group-hover:opacity-100 transition">
-                    Ask Ani →
-                  </span>
+                  <Sparkles size={12} className="text-violet-500 shrink-0" />
+                  <span className="flex-1 truncate">{p.title}</span>
+                  <span className="text-violet-600 dark:text-violet-400 opacity-0 group-hover:opacity-100 transition shrink-0">→</span>
                 </button>
               ))}
             </div>
 
-            {/* Inspiration & Data Credit — Vīmaṃsa feature in the ePitaka app, powered by summaries.db */}
+            {/* Accuracy disclaimer — bottom of welcome screen */}
             <div className="flex flex-col items-center gap-1.5 text-[11px] text-[var(--text-muted)] leading-relaxed">
               <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5">
-                Ani Assistant is inspired by and built on the summaries.db database of{' '}
-                <a
-                  href="https://epitaka.org/about"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 font-semibold text-violet-600 dark:text-violet-400 hover:underline transition cursor-pointer"
-                  title="About the E-Piṭaka project"
-                >
-                  Vīmaṃsa{' '}
-                  <ExternalLink size={10} className="shrink-0" />
-                </a>
-                in the ePitaka app · reimplemented similar features for this web app.
+                <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
               </span>
             </div>
 
@@ -717,7 +728,7 @@ export default function AiChatView({ initialQuery = null }) {
                   <span>You</span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
-                    <Bot size={14} className="shrink-0 inline-block" />
+                    <AniIcon size={14} />
                     <span>Ani</span>
                   </span>
                 )}
@@ -873,6 +884,22 @@ export default function AiChatView({ initialQuery = null }) {
       {/* ── Input Box & Controls Footer ────────────────────────────────── */}
       <footer className="p-3 sm:p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] shrink-0">
         <div className="max-w-3xl mx-auto">
+          {/* No-API-key notice at bottom of answer screen */}
+          {!aiSettings.apiKey && messages.length > 0 && (
+            <div className="mb-2 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
+              <div>
+                <span className="font-bold">Note: </span>
+                This is just a RANDOM demo. Please add your free Google Gemini API Key in Settings to enable REAL functionality.
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
+              >
+                Configure key
+              </button>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -923,10 +950,10 @@ export default function AiChatView({ initialQuery = null }) {
             )}
           </form>
 
-          {/* Micro Footer Notice */}
+          {/* Micro Footer Notice — accuracy disclaimer at bottom of answer screen */}
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-2 mt-1.5">
             <span>
-              Citations link directly to CST paragraphs. Shift+Enter for new line.
+              <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
             </span>
             <span className="font-mono">
               Model: {aiSettings.answerModel}

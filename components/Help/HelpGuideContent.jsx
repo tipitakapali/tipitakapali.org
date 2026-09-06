@@ -28,6 +28,7 @@ export const HELP_SECTIONS = [
   { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookSearch },
   { id: 'topic-velthuis', label: 'Velthuis & 17 Pāḷi Scripts', icon: Keyboard },
   { id: 'topic-mat', label: 'MAT Cross-Navigation', icon: Layers },
+  { id: 'topic-ani', label: 'Ani AI Nissaya Assistant', icon: Sparkles },
   { id: 'topic-shortcuts', label: 'Shortcuts & Page Editions', icon: Sliders },
   { id: 'topic-attributions', label: 'Attributions, License & Credits', icon: ShieldCheck },
 ];
@@ -567,6 +568,70 @@ export default function HelpGuideContent({ showTabBar = true }) {
           </div>
           <p className="text-[11.5px]">
             While reading any paragraph, click the <strong>MAT</strong> button in the bottom floating toolbar. The reader displays linked commentary and sub-commentary books and jumps straight to the corresponding paragraph.
+          </p>
+        </div>
+      </section>
+
+      {/* 5b. Ani AI Nissaya Assistant */}
+      <section id="topic-ani" className="scroll-mt-14 space-y-3 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} className="text-[var(--accent)]" />
+          <h3 className="font-bold text-sm text-[var(--text-primary)]">
+            Ani AI Nissaya Assistant <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400">Beta</span>
+          </h3>
+        </div>
+        <p className="text-[12px] text-[var(--text-secondary)]">
+          <strong>Ani (AI Nissaya)</strong> is your dedicated AI companion for studying the Tipiṭaka — ask about suttas, Pāḷi terms, Vinaya, or Abhidhamma. Open it with the <strong>Ani</strong> button in the top header, or directly via <code className="font-mono text-[var(--accent)]">?tab=ai</code>.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11.5px]">
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Free Gemini API Key Required</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold">Setup</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Ani needs your own free Google Gemini API key: open <strong>Settings (gear icon) → AI Configuration & API Keys</strong> and save it. Without a key Ani does not answer and instead opens the Configure prompt.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>RAG Mode vs Knowledge Mode</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">RAG default</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              <strong>RAG Mode</strong> (default) verifies answers against the canonical Tipiṭaka database; <strong>Knowledge Mode</strong> answers from the model alone. Tap the mode badge in the chat header to change it in Settings.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Canonical Research & Citations</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold">Verified</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Answers stream with a collapsible <strong>Canonical Research</strong> card (sutta search, passage fetch, Aṭṭhakathā/Ṭīkā review, DPD lexicon). <strong>Sources</strong> chips at each answer open a passage preview and jump straight into the Reader.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)] flex items-center justify-between">
+              <span>Threads, Models & Starters</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold">Custom</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Keep several conversations with history, new/clear-all controls, copy & retry per message, one-tap starter questions (English, Vietnamese, Myanmar), and configurable tool/answer Gemini models with auto-discovery.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-1.5 text-[11.5px] text-[var(--text-primary)]">
+          <div className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+            <span>⚠️ Ani Can Make Mistakes</span>
+          </div>
+          <p className="text-[11px] text-[var(--text-secondary)]">
+            Ani is inspired by and built on the <strong>summaries.db</strong> database of <a href="https://epitaka.org/about" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline font-semibold inline-flex items-center gap-0.5">Vīmaṃsa <ExternalLink size={10} /></a> in the ePitaka app. Always verify important doctrinal points against the original Pāḷi text.
           </p>
         </div>
       </section>
