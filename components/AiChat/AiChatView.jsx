@@ -623,7 +623,7 @@ export default function AiChatView({ initialQuery = null }) {
       <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-6">
         {/* Welcome Empty State */}
         {messages.length === 0 && (
-          <div className="max-w-2xl mx-auto py-8 sm:py-12 space-y-8 animate-fade-in text-center">
+          <div className="max-w-2xl mx-auto pt-4 sm:pt-6 pb-8 sm:pb-12 space-y-8 animate-fade-in text-center">
             <div className="flex flex-col items-center gap-3">
               <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
@@ -637,6 +637,23 @@ export default function AiChatView({ initialQuery = null }) {
                 Your dedicated AI companion for studying the Tipiṭaka. <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
               </p>
             </div>
+
+            {/* API Key Notice */}
+            {!aiSettings.apiKey && (
+              <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
+                <div>
+                  <span className="font-bold">Note: </span>
+                  Add your free Google Gemini API Key in Settings to enable full functionality. Local canonical search is active.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
+                >
+                  Configure Key
+                </button>
+              </div>
+            )}
 
             {/* Starter Suggestion Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
@@ -666,7 +683,7 @@ export default function AiChatView({ initialQuery = null }) {
             {/* Inspiration & Data Credit — Vīmaṃsa feature in the ePitaka app, powered by summaries.db */}
             <div className="flex flex-col items-center gap-1.5 text-[11px] text-[var(--text-muted)] leading-relaxed">
               <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5">
-                Ani Assistant is inspired by and buit on the summaries.db database of{' '}
+                Ani Assistant is inspired by and built on the summaries.db database of{' '}
                 <a
                   href="https://epitaka.org/about"
                   target="_blank"
@@ -681,21 +698,6 @@ export default function AiChatView({ initialQuery = null }) {
               </span>
             </div>
 
-            {!aiSettings.apiKey && (
-              <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
-                <div>
-                  <span className="font-bold">Tip: </span>
-                  Add your free Google Gemini API Key in Settings to enable deep generative synthesis. Local canonical search is active.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
-                >
-                  Configure Key
-                </button>
-              </div>
-            )}
           </div>
         )}
 
