@@ -79,6 +79,8 @@
   --highlight-border: #ffeeba;
   --tab-inactive-bg: #eae8dc;
   --font-reader: "Gentium Plus", "Times Ext Roman", "Doulos SIL", "EB Garamond", Georgia, serif;
+  /* Roman (Latin) reader font — never overridden by a Pali script choice */
+  --font-roman: "Gentium Plus", "Times Ext Roman", "Doulos SIL", "EB Garamond", Georgia, serif;
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --sidebar-width: 360px;
   --header-height: 52px;
@@ -374,10 +376,10 @@
 
 /* Font Families */
 
-[data-font="gentium"] { --font-reader: "Gentium Plus", serif; }
-[data-font="garamond"] { --font-reader: "EB Garamond", serif; }
-[data-font="serif"] { --font-reader: Georgia, serif; }
-[data-font="system"] { --font-reader: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+[data-font="gentium"] { --font-reader: "Gentium Plus", serif; --font-roman: "Gentium Plus", serif; }
+[data-font="garamond"] { --font-reader: "EB Garamond", serif; --font-roman: "EB Garamond", serif; }
+[data-font="serif"] { --font-reader: Georgia, serif; --font-roman: Georgia, serif; }
+[data-font="system"] { --font-reader: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; --font-roman: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
 /* Tree Density */
 [data-density="compact"] .tree-row { padding: 3px 5px !important; font-size: 13.5px !important; }

@@ -155,6 +155,30 @@
 }
 
 
+/* Roman-script translations (English, German, Portuguese) always keep the user's
+   Roman reader font — even when a non-Roman Pāḷi script (e.g. Thai) is active,
+   so they never inherit the Pāḷi script font. */
+.reader-trans-block[data-trans-lang="en"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="english"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="de"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="german"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="pt"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="portuguese"] .reader-trans-content,
+.result-snippet[data-trans-lang="en"],
+.result-snippet[data-trans-lang="english"],
+.result-snippet[data-trans-lang="de"],
+.result-snippet[data-trans-lang="german"],
+.result-snippet[data-trans-lang="pt"],
+.result-snippet[data-trans-lang="portuguese"],
+.result-snippet[data-trans-lang="en"] *,
+.result-snippet[data-trans-lang="english"] *,
+.result-snippet[data-trans-lang="de"] *,
+.result-snippet[data-trans-lang="german"] *,
+.result-snippet[data-trans-lang="pt"] *,
+.result-snippet[data-trans-lang="portuguese"] * {
+  font-family: var(--font-roman);
+}
+
 /* Noto Serif (Vietnamese + Pali Roman diacritics) */
 @font-face {
   font-family: "Noto Serif";
