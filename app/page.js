@@ -369,7 +369,7 @@ export function MainAppContent({ params: rawParams }) {
               </div>
             )}
           </div>
-          {!isAiTab && <Footer />}
+          {!isAiTab && activeTab?.bookCode && <Footer />}
         </div>
         <DictionaryModal />
       </div>

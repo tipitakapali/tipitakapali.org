@@ -961,7 +961,7 @@ export default function AiChatView({ initialQuery = null }) {
         {/* Message Stream */}
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
-          const isExpanded = expandedToolCalls[msg.id] ?? Boolean(msg.isStreaming);
+          const isExpanded = expandedToolCalls[msg.id] ?? false;
 
           return (
             <div
@@ -1048,9 +1048,6 @@ export default function AiChatView({ initialQuery = null }) {
                                       {paramDesc}
                                     </span>
                                   )}
-                                </div>
-                                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 break-words">
-                                  {tc.summary || (tc.args ? JSON.stringify(tc.args) : tc.tool)}
                                 </div>
                               </div>
                             </div>

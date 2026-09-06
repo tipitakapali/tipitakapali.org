@@ -25,19 +25,19 @@ export const TRANSLATIONS = [
   { id: 'english', label: 'English', flag: '🇬🇧', desc: 'English Translation • 1.28M sentences', color: '#2563eb' },
   { id: 'vietnamese', label: 'Tiếng Việt', flag: '🇻🇳', desc: 'Bản dịch Tiếng Việt • 1.28M câu', color: '#dc2626' },
   { id: 'myanmar', label: 'မြန်မာ', flag: '🇲🇲', desc: 'မြန်မာဘာသာပြန် • 1.28M စာကြောင်း', color: '#059669' },
-  { id: 'my_nissaya', label: 'မြန်မာ နိဿယ', flag: '🇲🇲', desc: 'Myanmar Nissaya • 570K စာကြောင်း', color: '#0d9488' },
+  { id: 'my_nissaya', label: 'မြန်မာ နိဿယ', flag: '🇲🇲', desc: 'Myanmar Nissaya • 570K စာကြောင်း', color: '#4d7c0f' },
   { id: 'sinhala', label: 'සිංහල', flag: '🇱🇰', desc: 'සිංහල පරිවර්තනය • 1.21M වාක්‍ය', color: '#d97706' },
-  { id: 'chinese', label: '中文', flag: '🇨🇳', desc: '中文翻译 • 1.27M 句', color: '#e11d48' },
+  { id: 'chinese', label: '中文', flag: '🇨🇳', desc: '中文翻译 • 1.27M 句', color: '#9f1239' },
   { id: 'khmer', label: 'ភាសាខ្មែរ', flag: '🇰🇭', desc: 'ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ', color: '#0891b2' },
   { id: 'thai', label: 'ไทย', flag: '🇹🇭', desc: 'ฉบับแปลภาษาไทย • 1.27M ประโยค', color: '#7c3aed' },
-  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'ການແປພາສາລາວ • 420K ປະໂຫຍກ', color: '#ea580c' },
+  { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'ການແປພາສາລາວ • 420K ປະໂຫຍກ', color: '#115e59' },
   { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்', color: '#c2410c' },
-  { id: 'hindi', label: 'हिन्दी', flag: '🇮🇳', desc: 'हिन्दी अनुवाद • 410K वाक्य', color: '#ca8a04' },
+  { id: 'hindi', label: 'हिन्दी', flag: '🇮🇳', desc: 'हिन्दी अनुवाद • 410K वाक्य', color: '#6b21a8' },
   { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'Deutsche Übersetzung • 1.28M Sätze', color: '#475569' },
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
-  { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#16a34a' },
-  { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений', color: '#0284c7' },
-  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-', color: '#4f46e5' },
+  { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#0c4a6e' },
+  { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений', color: '#eab308' },
+  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-', color: '#6b7280' },
 ];
 
 const BG_PALETTE = [
@@ -506,7 +506,7 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('all')}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/35 hover:bg-[var(--accent)] hover:text-white transition cursor-pointer shadow-2xs"
+                      className="px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent)] hover:text-white transition cursor-pointer shadow-2xs"
                       title="Randomize harmonious background, text, and border colors for all enabled languages matching current theme"
                       aria-label="Randomize all translation colors"
                     >
@@ -516,7 +516,7 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('bg')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
                       title="Randomize harmonious background colors for enabled languages matching current theme"
                       aria-label="Randomize background colors"
                     >
@@ -525,7 +525,7 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('text')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
                       title="Randomize readable text colors for enabled languages matching current theme"
                       aria-label="Randomize text colors"
                     >
@@ -534,7 +534,7 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={() => handleApplyThemeAwareColors('border')}
-                      className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] border border-[var(--border-color)] transition cursor-pointer"
+                      className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] border border-[var(--accent-border)] transition cursor-pointer"
                       title="Randomize distinct left border colors for enabled languages"
                       aria-label="Randomize border colors"
                     >
@@ -543,7 +543,7 @@ export default function LanguageMenu() {
                     <button
                       type="button"
                       onClick={handleResetEnabledColors}
-                      className="p-1 rounded-md text-[10px] text-[var(--text-muted)] hover:text-rose-600 hover:bg-rose-500/10 border border-[var(--border-color)] transition cursor-pointer"
+                      className="p-1 rounded-md text-[10px] font-bold text-[var(--accent)] hover:text-rose-600 hover:bg-rose-500/10 border border-[var(--accent-border)] transition cursor-pointer"
                       title="Reset colors for all enabled languages to default"
                       aria-label="Reset translation colors to default"
                     >
@@ -604,10 +604,10 @@ export default function LanguageMenu() {
                           <button
                             type="button"
                             onClick={() => setColorPickerTarget(trans)}
-                            className={`p-1 rounded-md transition cursor-pointer border ${
+                            className={`p-1 rounded-md transition cursor-pointer border font-bold ${
                               hasCustomColors
-                                ? 'text-[var(--accent)] bg-[var(--accent)]/15 border-[var(--accent)]/40 shadow-2xs'
-                                : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-secondary)] border-[var(--border-color)]'
+                                ? 'text-[var(--accent)] bg-[var(--accent-light)] border-[var(--accent-border)] shadow-2xs'
+                                : 'text-[var(--accent)] hover:bg-[var(--accent-light)] border-[var(--accent-border)]'
                             }`}
                             title={`Color: Customize colors for ${trans.label}`}
                             aria-label={`Customize colors for ${trans.label}`}
@@ -619,7 +619,7 @@ export default function LanguageMenu() {
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'top')}
                             disabled={isFirst}
-                            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--border-color)]"
+                            className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move to top"
                             aria-label="Move translation to top"
                           >
@@ -630,7 +630,7 @@ export default function LanguageMenu() {
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'up')}
                             disabled={isFirst}
-                            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--border-color)]"
+                            className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move up"
                             aria-label="Move translation up"
                           >
@@ -641,7 +641,7 @@ export default function LanguageMenu() {
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'down')}
                             disabled={isLast}
-                            className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--border-color)]"
+                            className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move down"
                             aria-label="Move translation down"
                           >
@@ -810,21 +810,9 @@ export default function LanguageMenu() {
                         className="text-xs leading-relaxed"
                         style={{
                           color: formatCssColor(activeText) || 'inherit',
-                          fontFamily:
-                            colorPickerTarget.id === 'vietnamese'
-                              ? '"Be Vietnam Pro", "Noto Serif", "Literata", serif'
-                              : colorPickerTarget.id === 'myanmar' || colorPickerTarget.id === 'my_nissaya'
-                              ? '"Pyidaungsu", Myanmar Text, sans-serif'
-                              : 'inherit',
                         }}
                       >
-                        {colorPickerTarget.id === 'pali'
-                          ? 'Namo tassa bhagavato arahato sammāsambuddhassa. Evaṃ me sutaṃ—ekaṃ samayaṃ bhagavā...'
-                          : colorPickerTarget.id === 'vietnamese'
-                          ? 'Tôi từng nghe như vầy: Một thời Thế Tôn du hành trên đại đạo giữa Rājagaha và Nālandā (ā, ī, ū, ṭ, ḍ, ṇ, ṅ, ñ, ḷ, ṃ)...'
-                          : colorPickerTarget.id === 'myanmar' || colorPickerTarget.id === 'my_nissaya'
-                          ? 'မြတ်စွာဘုရား၊ အရဟန္တ၊ သမ္မာသမ္ဗုဒ္ဓမြတ်စွာဘုရားအား ရှိခိုးပါ၏။ ဧဝံ မေ သုတံ—ဧကံ သမယံ ဘဂဝါ...'
-                          : 'Thus have I heard. On one occasion the Blessed One was travelling along the highway between Rājagaha and Nālandā...'}
+                        Namo tassa bhagavato arahato sammāsambuddhassa
                       </p>
                     </div>
                   </div>

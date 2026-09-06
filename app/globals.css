@@ -780,7 +780,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-block[data-trans-lang="zh"],
 .reader-trans-block[data-trans-lang="chinese"] {
-  border-left-color: #e11d48; /* Rose Crimson */
+  border-left-color: #9f1239; /* Deep Rose (dark vs Vietnamese bright red) */
 }
 
 .reader-trans-block[data-trans-lang="km"],
@@ -795,7 +795,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-block[data-trans-lang="lo"],
 .reader-trans-block[data-trans-lang="lao"] {
-  border-left-color: #ea580c; /* Vivid Orange */
+  border-left-color: #115e59; /* Dark Teal (dark vs Khmer bright cyan) */
 }
 
 .reader-trans-block[data-trans-lang="ta"],
@@ -805,7 +805,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-block[data-trans-lang="hi"],
 .reader-trans-block[data-trans-lang="hindi"] {
-  border-left-color: #ca8a04; /* Marigold Gold */
+  border-left-color: #6b21a8; /* Deep Purple (dark vs Thai vivid violet) */
 }
 
 .reader-trans-block[data-trans-lang="de"],
@@ -820,21 +820,21 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 
 .reader-trans-block[data-trans-lang="pt"],
 .reader-trans-block[data-trans-lang="portuguese"] {
-  border-left-color: #16a34a; /* Emerald */
+  border-left-color: #0c4a6e; /* Dark Navy (darkest blue vs English vivid blue) */
 }
 
 .reader-trans-block[data-trans-lang="ru"],
 .reader-trans-block[data-trans-lang="russian"] {
-  border-left-color: #0284c7; /* Sky Blue */
+  border-left-color: #eab308; /* Golden Yellow (bright vs Sinhala amber) */
 }
 
 .reader-trans-block[data-trans-lang="my_nissaya"] {
-  border-left-color: #0d9488; /* Dark Teal */
+  border-left-color: #4d7c0f; /* Olive (yellow-green vs Myanmar blue-green) */
 }
 
 .reader-trans-block[data-trans-lang="ko"],
 .reader-trans-block[data-trans-lang="korean"] {
-  border-left-color: #4f46e5; /* Indigo */
+  border-left-color: #6b7280; /* Neutral Gray (mid vs German dark slate) */
 }
 
 .reader-trans-block[data-trans-lang="pali"],

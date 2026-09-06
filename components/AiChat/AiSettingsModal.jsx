@@ -368,6 +368,25 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
             </p>
           </div>
 
+          {/* Free key notice */}
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-900 dark:text-emerald-200 flex items-start gap-2">
+            <Key size={15} className="shrink-0 mt-px text-emerald-600 dark:text-emerald-400" />
+            <p className="text-[11px] leading-relaxed">
+              <span className="font-bold">Free key: </span>
+              You can obtain a free key at{' '}
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline hover:opacity-80 inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300"
+              >
+                Google AI Studio
+                <ExternalLink size={10} />
+              </a>
+              , then paste it below.
+            </p>
+          </div>
+
 
           {/* Provider Selection */}
           <div className="space-y-1.5">
