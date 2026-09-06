@@ -2254,6 +2254,11 @@ main.content-area {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* The app measures and re-positions scrollTop itself (jumps + settle watchers).
+     Disable the browser's overflow anchoring, which silently shifts scrollTop
+     when lazy chapters/translations stream in above the viewport and makes
+     measured paragraph jumps land in the wrong place. */
+  overflow-anchor: none;
 }
 
 .content-header {

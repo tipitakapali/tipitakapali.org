@@ -517,14 +517,29 @@ const ChapterBlock = memo(function ChapterBlock({
       return;
     }
 
+    // Expose the translation fetch state on the chapter block so the reader's
+    // post-jump settle watcher knows whether this chapter can still grow:
+    // rows above a jump target expand when the payload lands, shifting it.
+    blockRef.current?.removeAttribute('data-trans-settled');
+    blockRef.current?.setAttribute('data-trans-loading', '1');
+
     fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch)
       .then((data) => {
-        if (isMounted && data?.translations) {
+        if (!isMounted) return;
+        blockRef.current?.removeAttribute('data-trans-loading');
+        blockRef.current?.setAttribute('data-trans-settled', '1');
+        if (data?.translations) {
           setTranslations(data.translations);
         }
       })
       .catch((err) => {
         console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
+        if (isMounted) {
+          // Treat a failed fetch as final (rows stay Pāḷi-only) so watchers
+          // don't wait forever for a payload that will never arrive.
+          blockRef.current?.removeAttribute('data-trans-loading');
+          blockRef.current?.setAttribute('data-trans-settled', '1');
+        }
       });
 
     return () => {
@@ -1199,6 +1214,15 @@ export default function ReaderView() {
 
     const attemptScroll = () => {
       if (!containerRef.current) return;
+      const DBG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dbgjump');
+      const dbg = (msg) => {
+        if (!DBG) return;
+        try {
+          if (!window.__jumpDbg) window.__jumpDbg = [];
+          window.__jumpDbg.push(`${Date.now()}: ${msg}`);
+        } catch (e) {}
+      };
+      dbg(`attempt start retries=${retries}`);
 
       // ── Paragraph-jump settle watcher ──────────────────────────────────
       // Re-resolve the paragraph target the jump scrolled to (same flavour:
@@ -1279,69 +1303,204 @@ export default function ReaderView() {
         return null;
       };
 
+      // ── Translation-settle gate ────────────────────────────────────────
+      // Returns true only once the content above the jump anchor can no longer
+      // grow on its own. With translation layers enabled, each chapter streams
+      // its payload lazily (`data-trans-loading` while a fetch is in flight,
+      // `data-trans-settled` once it has landed/errored). While the target
+      // chapter's own payload is pending, its rows above the target paragraph
+      // expand when it lands; while any content chapter above the anchor is
+      // still loading, the anchor itself can be pushed down. The settle watcher
+      // must not declare stability until those conditions clear.
+      const hasTransLayers = orderedLayers.some((l) => l.type === 'trans');
+      const areaTranslationSettled = (hostChapterEl, { includeHost = true } = {}) => {
+        if (!hasTransLayers) return true;
+        const container = containerRef.current;
+        if (!container) return true;
+        if (includeHost && hostChapterEl && hostChapterEl.getAttribute('data-trans-settled') !== '1') {
+          return false;
+        }
+        const targetIdx = hostChapterEl ? Number(hostChapterEl.getAttribute('data-chapter')) : null;
+        if (targetIdx === null || Number.isNaN(targetIdx)) return true;
+        const chapterEls = container.querySelectorAll('[data-chapter]');
+        for (const chEl of chapterEls) {
+          const idx = Number(chEl.getAttribute('data-chapter'));
+          if (Number.isNaN(idx) || idx >= targetIdx) continue; // only chapters above the anchor
+          if (chEl.classList.contains('chapter-placeholder')) continue; // no content yet → cannot grow
+          if (chEl.getAttribute('data-trans-loading') === '1') return false;
+        }
+        return true;
+      };
+
       // Arm a guarded settle watcher after a paragraph jump. Translation batches
       // streaming in later can shift the target; re-verify until stable (two
-      // consecutive in-tolerance reads, so a wave landing between ticks can't
-      // fake a settle). Stands down on manual scroll, stability, bottom-clamp,
-      // timeout, or a newer jump superseding it.
+      // consecutive in-tolerance reads once the surrounding content has finished
+      // streaming, so a wave landing between ticks can't fake a settle). Stands
+      // down on manual scroll, stability, bottom-clamp, timeout, or a newer jump
+      // superseding it.
       const armParaJumpWatcher = (jumpKey, jumpOffset) => {
         clearTimeout(paraJumpRef.current.timer);
+        dbg(`ARM para key=${jumpKey} offset=${Math.round(jumpOffset)}`);
         const state = {
           key: jumpKey,
           lastOffset: jumpOffset,
           timer: null,
-          deadline: Date.now() + 6000,
+          deadline: Date.now() + 30000, // payloads can stream several seconds after a deep jump
           stableCount: 0,
+          lastScrollHeight: null,
         };
         paraJumpRef.current = state;
         const TOL = 24;
-        const GAP = 700;
+        const GAP = 600;
         const tick = () => {
           const cur = paraJumpRef.current;
-          if (!cur || cur.key !== jumpKey) return; // superseded
+          if (!cur || cur.key !== jumpKey) { dbg('tick superseded'); return; } // superseded
           const container = containerRef.current;
           if (!container) {
+            dbg('exit no-container');
             paraJumpRef.current.key = null;
             return;
           }
           if (Date.now() > cur.deadline) {
+            dbg('exit deadline');
             paraJumpRef.current.key = null;
             return;
           }
           // Bottom-clamped targets can never reach top-60 — stand down.
           if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+            dbg('exit bottom-clamp');
             paraJumpRef.current.key = null;
             return;
           }
           const target = resolveParaTarget();
           if (!target) {
+            dbg('tick no-target');
             cur.timer = setTimeout(tick, GAP);
             return;
           }
+          const hostChapter = target.closest ? target.closest('[data-chapter]') : null;
+          const areaSettled = areaTranslationSettled(hostChapter);
+          const hostSettledAttr = hostChapter?.getAttribute('data-trans-settled') || null;
           const cRect = container.getBoundingClientRect();
           const rRect = target.getBoundingClientRect();
-          if (Math.abs(rRect.top - cRect.top - 60) <= TOL) {
-            cur.stableCount += 1;
-            if (cur.stableCount >= 2) paraJumpRef.current.key = null;
-            else cur.timer = setTimeout(tick, GAP);
+          const drift = Math.round((rRect.top - cRect.top - 60) * 10) / 10;
+          if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
+            cur.stableCount = 0;
+            // Target drifted and the user hasn't touched the scroll: correct instantly.
+            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
+              dbg(`exit user-scroll drift=${drift} scrollTop=${Math.round(container.scrollTop)} lastOffset=${Math.round(cur.lastOffset)}`);
+              paraJumpRef.current.key = null;
+              return;
+            }
+            const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+            dbg(`CORRECT drift=${drift} fresh=${Math.round(fresh)} areaSettled=${areaSettled} hostSettled=${hostSettledAttr} scrollTop=${Math.round(container.scrollTop)}`);
+            smartScrollTo(container, fresh, { scrollMotion: 'instant' });
+            if (settings.pulseAnimation) {
+              target.classList.remove('pulse-highlight');
+              void target.offsetWidth;
+              target.classList.add('pulse-highlight');
+            }
+            saveTabScroll(activeTab.bookCode, fresh);
+            cur.lastOffset = fresh;
+            cur.lastScrollHeight = container.scrollHeight;
+            cur.timer = setTimeout(tick, GAP);
             return;
           }
-          cur.stableCount = 0;
-          // Target drifted and the user hasn't touched the scroll: correct instantly.
-          if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
-            paraJumpRef.current.key = null;
+          // In tolerance, but the layout may still be growing above the anchor
+          // (payloads in flight, chapters inserting) — hold, don't settle yet.
+          const layoutChanged =
+            cur.lastScrollHeight !== null && container.scrollHeight !== cur.lastScrollHeight;
+          cur.lastScrollHeight = container.scrollHeight;
+          if (!areaSettled || layoutChanged) {
+            dbg(`HOLD drift=${drift} areaSettled=${areaSettled} hostSettled=${hostSettledAttr} layoutChanged=${layoutChanged} stable=${cur.stableCount}`);
+            cur.stableCount = 0;
+            cur.timer = setTimeout(tick, GAP);
             return;
           }
-          const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
-          smartScrollTo(container, fresh, { scrollMotion: 'instant' });
-          if (settings.pulseAnimation) {
-            target.classList.remove('pulse-highlight');
-            void target.offsetWidth;
-            target.classList.add('pulse-highlight');
+          cur.stableCount += 1;
+          dbg(`stable x${cur.stableCount} drift=${drift}`);
+          if (cur.stableCount >= 2) { dbg('exit stable'); paraJumpRef.current.key = null; }
+          else cur.timer = setTimeout(tick, GAP);
+        };
+        // First check after any in-flight smooth animation has finished (max ~450ms).
+        state.timer = setTimeout(tick, 900);
+      };
+
+      // Chapter-jump settle watcher (sidebar chapter clicks / chapter-only
+      // intents). Shares the same guarded settle behaviour as paragraph jumps so
+      // both scroll the same way: re-verify the anchor while translation batches
+      // stream in above/below it, correct once the content has settled, and only
+      // stand down after two consecutive stable reads. Manual scroll, timeout,
+      // bottom-clamp or a newer jump supersede it.
+      const armChapterJumpWatcher = (jumpKey, jumpOffset, chapIdx) => {
+        clearTimeout(chapterJumpRef.current.timer);
+        const state = {
+          key: jumpKey,
+          lastOffset: jumpOffset,
+          timer: null,
+          deadline: Date.now() + 30000,
+          stableCount: 0,
+          lastScrollHeight: null,
+        };
+        chapterJumpRef.current = state;
+        const TOL = 24;
+        const GAP = 600;
+        const tick = () => {
+          const cur = chapterJumpRef.current;
+          if (!cur || cur.key !== jumpKey) return; // superseded
+          const container = containerRef.current;
+          if (!container) {
+            chapterJumpRef.current.key = null;
+            return;
           }
-          saveTabScroll(activeTab.bookCode, fresh);
-          cur.lastOffset = fresh;
-          cur.timer = setTimeout(tick, GAP);
+          if (Date.now() > cur.deadline) {
+            chapterJumpRef.current.key = null;
+            return;
+          }
+          const el =
+            container.querySelector(`#chap-${chapIdx}`) ||
+            container.querySelector(`[data-chapter="${chapIdx}"]`);
+          if (!el) {
+            chapterJumpRef.current.key = null;
+            return;
+          }
+          // Bottom-clamped targets can never reach top-60 — stand down.
+          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+            chapterJumpRef.current.key = null;
+            return;
+          }
+          const areaSettled = areaTranslationSettled(el, { includeHost: false });
+          const cRect = container.getBoundingClientRect();
+          const rRect = el.getBoundingClientRect();
+          if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
+            cur.stableCount = 0;
+            // User scrolled meanwhile (or a smooth animation is still running):
+            // never yank — just stand down.
+            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
+              chapterJumpRef.current.key = null;
+              return;
+            }
+            const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+            smartScrollTo(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
+            saveTabScroll(activeTab.bookCode, fresh);
+            cur.lastOffset = fresh;
+            cur.lastScrollHeight = container.scrollHeight;
+            cur.timer = setTimeout(tick, GAP);
+            return;
+          }
+          // In tolerance, but content may still be growing above the anchor
+          // (payloads in flight, chapters inserting) — hold, don't settle yet.
+          const layoutChanged =
+            cur.lastScrollHeight !== null && container.scrollHeight !== cur.lastScrollHeight;
+          cur.lastScrollHeight = container.scrollHeight;
+          if (!areaSettled || layoutChanged) {
+            cur.stableCount = 0;
+            cur.timer = setTimeout(tick, GAP);
+            return;
+          }
+          cur.stableCount += 1;
+          if (cur.stableCount >= 2) chapterJumpRef.current.key = null;
+          else cur.timer = setTimeout(tick, GAP);
         };
         // First check after any in-flight smooth animation has finished (max ~450ms).
         state.timer = setTimeout(tick, 900);
@@ -1366,6 +1525,7 @@ export default function ReaderView() {
             findElement(`pindex-${paraIndex}`);
 
           if (el) {
+            dbg(`case1 el found pindex=${paraIndex} scrollTop=${Math.round(containerRef.current.scrollTop)}`);
             let targetEl = null;
             if (isTransTarget) {
               const row = el.closest('.reader-para-row') || el;
@@ -1399,6 +1559,7 @@ export default function ReaderView() {
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = containerRef.current.scrollTop;
               const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+              dbg(`case1 scroll offset=${Math.round(offset)} scrollTopBefore=${Math.round(currentScroll)}`);
               smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -1667,40 +1828,13 @@ export default function ReaderView() {
 
           saveTabScroll(activeTab.bookCode, offset);
 
-          // Drift correction (Fix 2): lazy translations streaming into chapters above
-          // this one can shift it after we measured (the scroll journey itself triggers
-          // those loads via the 800px observer margin). One guarded re-verify shortly
-          // after; manual scrolling cancels it via the mount listener above.
-          const jumpKey = `${activeTab.bookCode}:${chapterIdx}`;
-          clearTimeout(chapterJumpRef.current.timer);
-          chapterJumpRef.current = { key: jumpKey, lastOffset: offset, timer: null };
-          chapterJumpRef.current.timer = setTimeout(() => {
-            const cur = chapterJumpRef.current;
-            const container = containerRef.current;
-            if (cur.key !== jumpKey || !container) return;
-            const el =
-              container.querySelector(`#chap-${chapterIdx}`) ||
-              container.querySelector(`[data-chapter="${chapterIdx}"]`);
-            if (!el) {
-              chapterJumpRef.current.key = null;
-              return;
-            }
-            // User scrolled meanwhile (or a smooth animation is still running):
-            // never yank — just stand down.
-            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
-              chapterJumpRef.current.key = null;
-              return;
-            }
-            const cRect = container.getBoundingClientRect();
-            const rRect = el.getBoundingClientRect();
-            if (Math.abs(rRect.top - cRect.top - 60) > 12) {
-              const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
-              smartScrollTo(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
-              saveTabScroll(activeTab.bookCode, fresh);
-              chapterJumpRef.current.lastOffset = fresh;
-            }
-            chapterJumpRef.current.key = null;
-          }, 750);
+          // Drift correction: lazy translations streaming into chapters above this
+          // one can shift it after we measured (the scroll journey itself triggers
+          // those loads via the 800px observer margin). A guarded settle watcher
+          // re-verifies the landing until the surrounding content has stopped
+          // streaming; manual scrolling cancels it via the mount listener above.
+          const jumpKey = `${activeTab.bookCode}:ch${chapterIdx}`;
+          armChapterJumpWatcher(jumpKey, offset, chapterIdx);
 
           clearTargetScrollIntent();
           return;
@@ -1711,6 +1845,7 @@ export default function ReaderView() {
       if (retries < maxRetries) {
         timerId = setTimeout(attemptScroll, 50);
       } else {
+        dbg('attempt maxRetries exhausted — gave up');
         clearTargetScrollIntent();
       }
     };
@@ -1727,6 +1862,7 @@ export default function ReaderView() {
     clearTargetScrollIntent,
     setActiveParaNum,
     searchHighlight,
+    orderedLayers,
     settings?.scrollMotion,
   ]);
 

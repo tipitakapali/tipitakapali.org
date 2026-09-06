@@ -1,16 +1,83 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, BookOpen, ExternalLink, Globe, Loader2, Quote } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
 import { getApiBase } from '../../services/api';
+import { TRANSLATIONS } from '../LanguageMenu';
+
+// Translation language key → canonical DB lang code (subset used by the quick view)
+const TRANS_ID_TO_CODE = {
+  english: 'en',
+  vietnamese: 'vi',
+  myanmar: 'my',
+  my_nissaya: 'my_nissaya',
+  sinhala: 'si',
+  chinese: 'zh',
+  khmer: 'km',
+  thai: 'th',
+  lao: 'lo',
+  tamil: 'ta',
+  hindi: 'hi',
+  german: 'de',
+  japanese: 'ja',
+  korean: 'ko',
+  portuguese: 'pt',
+  russian: 'ru',
+};
+
+// Localized “Translation” heading per language code (mirrors LanguageMenu descriptions)
+const LANG_HEADERS = {
+  en: 'English Translation',
+  vi: 'Bản dịch Tiếng Việt',
+  my: 'မြန်မာဘာသာပြန်',
+  my_nissaya: 'Myanmar Nissaya',
+  si: 'සිංහල පරිවර්තනය',
+  zh: '中文翻译',
+  km: 'ការបកប្រែជាភាសាខ្មែរ',
+  th: 'ฉบับแปลภาษาไทย',
+  lo: 'ການແປພາສາລາວ',
+  ta: 'தமிழ் மொழிபெயர்ப்பு',
+  hi: 'हिन्दी अनुवाद',
+  de: 'Deutsche Übersetzung',
+  ja: '日本語訳',
+  ko: '한국어 번역',
+  pt: 'Tradução em Português',
+  ru: 'Русский перевод',
+};
+
+// Language id → colour used by the language menu (for the heading accent)
+const TRANS_ID_COLOR = Object.fromEntries(
+  TRANSLATIONS.filter((t) => t.id !== 'pali').map((t) => [t.id, t.color])
+);
 
 export default function CitationQuickviewModal({ isOpen, citation, onClose, onOpenInReader }) {
   const { settings } = useThemeSettings();
   const [loading, setLoading] = useState(false);
   const [passageData, setPassageData] = useState(null);
   const [error, setError] = useState(null);
+
+  // Pāḷi + the next two enabled translation languages, in the user's order
+  const previewLangs = useMemo(() => {
+    const order = Array.isArray(settings?.translationOrder) && settings.translationOrder.length > 0
+      ? settings.translationOrder
+      : TRANSLATIONS.map((t) => t.id);
+    const langs = [];
+    for (const id of order) {
+      if (id === 'pali' || !TRANS_ID_TO_CODE[id]) continue;
+      if (settings?.translations?.[id] && !langs.some((l) => l.id === id)) {
+        langs.push({
+          id,
+          code: TRANS_ID_TO_CODE[id],
+          label: LANG_HEADERS[TRANS_ID_TO_CODE[id]] || id,
+          color: TRANS_ID_COLOR[id],
+        });
+        if (langs.length >= 2) break;
+      }
+    }
+    return langs;
+  }, [settings?.translationOrder, settings?.translations]);
 
   useEffect(() => {
     if (!isOpen || !citation) {
@@ -25,7 +92,8 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
 
     const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd } = citation;
     const endPara = paraEnd !== null && paraEnd !== undefined ? paraEnd : paraIndex;
-    const url = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=en,vi`;
+    const langsParam = previewLangs.map((l) => l.code).join(',');
+    const url = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=${encodeURIComponent(langsParam)}`;
 
     fetch(url)
       .then((res) => {
@@ -40,16 +108,16 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
           } else {
             const first = data.passages[0];
             const combinedPali = data.passages.map((p) => p.pali).filter(Boolean).join('\n\n');
-            const combinedEn = data.passages.map((p) => p.translations?.en).filter(Boolean).join('\n\n');
-            const combinedVi = data.passages.map((p) => p.translations?.vi).filter(Boolean).join('\n\n');
+            const translations = {};
+            for (const l of previewLangs) {
+              const texts = data.passages.map((p) => p.translations?.[l.code]).filter(Boolean);
+              if (texts.length > 0) translations[l.code] = texts.join('\n\n');
+            }
             setPassageData({
               ...first,
               para_num: `${first.para_num || paraIndex}–${data.passages[data.passages.length - 1].para_num || endPara}`,
               pali: combinedPali,
-              translations: {
-                en: combinedEn || null,
-                vi: combinedVi || null,
-              },
+              translations,
             });
           }
         } else {
@@ -67,7 +135,7 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
     return () => {
       isMounted = false;
     };
-  }, [isOpen, citation]);
+  }, [isOpen, citation, previewLangs]);
 
   if (!isOpen || !citation) return null;
 
@@ -164,32 +232,26 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                 />
               </div>
 
-              {/* English Translation */}
-              {passageData.translations?.en && (
-                <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                    <Globe size={13} />
-                    English Translation
-                  </div>
+              {/* Next two enabled translation languages (Pāḷi is always shown above) */}
+              {previewLangs.map((lang) =>
+                passageData.translations?.[lang.code] ? (
                   <div
-                    className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]"
-                    dangerouslySetInnerHTML={{ __html: passageData.translations.en }}
-                  />
-                </div>
-              )}
-
-              {/* Vietnamese Translation */}
-              {passageData.translations?.vi && (
-                <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                    <Globe size={13} />
-                    Bản dịch Tiếng Việt
+                    key={lang.code}
+                    className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2"
+                  >
+                    <div
+                      className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"
+                      style={{ color: lang.color }}
+                    >
+                      <Globe size={13} />
+                      {lang.label}
+                    </div>
+                    <div
+                      className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]"
+                      dangerouslySetInnerHTML={{ __html: passageData.translations[lang.code] }}
+                    />
                   </div>
-                  <div
-                    className="text-sm sm:text-[14.5px] leading-relaxed text-[var(--text-primary)]"
-                    dangerouslySetInnerHTML={{ __html: passageData.translations.vi }}
-                  />
-                </div>
+                ) : null
               )}
             </>
           )}
