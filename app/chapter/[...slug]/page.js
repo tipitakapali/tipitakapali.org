@@ -29,6 +29,7 @@ export async function generateMetadata({ params }) {
   const scriptSplit = splitScriptCode(bookCode);
   bookCode = scriptSplit.bookCode;
   const scriptId = scriptSplit.scriptId;
+  const scriptPrefix = scriptSplit.prefix;
 
   const chapSuffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) {
@@ -36,10 +37,18 @@ export async function generateMetadata({ params }) {
     if (!chapterParam) chapterParam = parseInt(chapSuffixMatch[2], 10) + 1;
   }
 
+  // Canonical points at the pre-rendered /book/* page: /chapter/* serves only
+  // the SPA shell (no static SEO file), and ?l= translation variants must
+  // consolidate to the Pāḷi book URL. Without this, pages inherit '/'.
+  const canonicalPath = bookCode
+    ? `/book/${scriptPrefix ? `${scriptPrefix}.` : ''}${bookCode}`
+    : '/';
+
   if (!bookCode) {
     return {
       title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
       description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+      alternates: { canonical: canonicalPath },
     };
   }
 
@@ -60,7 +69,8 @@ export async function generateMetadata({ params }) {
         return {
           title,
           description,
-          openGraph: { title, description },
+          alternates: { canonical: canonicalPath },
+          openGraph: { title, description, url: canonicalPath },
           twitter: { title, description },
         };
       }
@@ -72,6 +82,7 @@ export async function generateMetadata({ params }) {
   return {
     title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
     description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+    alternates: { canonical: canonicalPath },
   };
 }
 
