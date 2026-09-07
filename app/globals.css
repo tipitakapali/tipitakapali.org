@@ -589,6 +589,17 @@ body.no-indent .reader-container .hangnum { text-indent: 0 !important; padding-l
   margin-left: 0;
 }
 
+/* Keep gap between left border and text for gatha translations.
+   The generic Pali rule `.reader-container .gatha1` (padding-left: 0) otherwise
+   overrides `.reader-trans-block` padding (higher specificity 0,2,0 vs 0,1,0),
+   leaving border-left touching the verse text. */
+.reader-container .reader-trans-block.gatha1,
+.reader-container .reader-trans-block.gatha2,
+.reader-container .reader-trans-block.gatha3,
+.reader-container .reader-trans-block.gathalast {
+  padding-left: 0.85rem;
+}
+
 .reader-container .reader-trans-block.reader-trans-heading-block,
 .reader-container .reader-trans-block.book,
 .reader-container .reader-trans-block.chapter,
