@@ -124,12 +124,12 @@ export default function WelcomeView() {
           </div>
         </button>
 
-        {/* 3. AI-assisted Translations */}
+        {/* 3. AI Translations */}
         <button
           onClick={openLanguageMenu}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !min-h-0"
-          title={`AI-assisted Translations — ${AVAILABLE_TRANSLATION_COUNT} languages available • Click to open language menu`}
-          aria-label={`AI-assisted Translations (${AVAILABLE_TRANSLATION_COUNT} languages available)`}
+          title={`AI Translations — ${AVAILABLE_TRANSLATION_COUNT} languages available • Click to open language menu`}
+          aria-label={`AI Translations (${AVAILABLE_TRANSLATION_COUNT} languages available)`}
         >
           {/* Badge showing number of currently available translation languages (excluding Pāḷi) */}
           <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md border-2 border-[var(--bg-primary)]">
@@ -141,7 +141,7 @@ export default function WelcomeView() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-emerald-600 dark:group-hover:!text-emerald-400 transition truncate">
-                AI-assisted Translations
+                AI Translations
               </h3>
               <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
                 {AVAILABLE_TRANSLATION_COUNT} Lang
@@ -172,7 +172,7 @@ export default function WelcomeView() {
         >
           <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-violet-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md border-2 border-[var(--bg-primary)]">AI</span>
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:scale-105 transition shrink-0">
-            <img src="/ani-tipitakapali-org.svg" alt="Ani" className="w-5 h-5 object-contain" />
+            <img src="/ani-tipitakapali-org.svg" alt="Ani" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1 pr-6">
             <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-violet-600 transition flex items-center gap-1 truncate">
