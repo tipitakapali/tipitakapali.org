@@ -93,9 +93,9 @@ function getToolMeta(toolName) {
     case 'get_dictionary_batch':
       return { label: 'DPD Pāli Lexicon', icon: Bookmark, color: 'text-cyan-500 dark:text-cyan-400' };
     case 'final_answer':
-      return { label: 'Synthesis', icon: Sparkles, color: 'text-violet-500 dark:text-violet-400' };
+      return { label: 'Synthesis', icon: Sparkles, color: 'text-[var(--accent)]' };
     default:
-      return { label: toolName || 'Tool Execution', icon: Bot, color: 'text-violet-500 dark:text-violet-400' };
+      return { label: toolName || 'Tool Execution', icon: Bot, color: 'text-[var(--accent)]' };
   }
 }
 
@@ -212,17 +212,17 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
   const strategy = understanding.initial_search_strategy || [];
 
   return (
-    <div className="mb-3 rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 overflow-hidden text-xs transition">
+    <div className="ai-step-card ai-step-indigo mb-3 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-light)] overflow-hidden text-xs transition">
       <button
         type="button"
         onClick={() => setIsExpanded((v) => !v)}
-        className="w-full px-3 py-2 flex items-center justify-between text-indigo-700 dark:text-indigo-300 font-semibold hover:bg-indigo-500/10 transition cursor-pointer text-left"
+        className="w-full px-3 py-2 flex items-center justify-between text-[var(--accent)] font-semibold hover:bg-[var(--accent-light)] transition cursor-pointer text-left"
       >
         <span className="flex items-center gap-1.5 flex-wrap min-w-0">
-          <Brain size={14} className="text-indigo-500 shrink-0" />
+          <Brain size={14} className="text-[var(--accent)] shrink-0" />
           <span className="font-bold">Step 1: Query Understanding</span>
           {understanding.intent && (
-            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-[10px] text-indigo-800 dark:text-indigo-200 border border-indigo-500/20 font-medium">
+            <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent-light)] text-[10px] text-[var(--accent)] border border-[var(--accent-border)] font-medium">
               {formatIntentLabel(understanding.intent)}
             </span>
           )}
@@ -237,13 +237,13 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
             </span>
           )}
           {isStreaming && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 animate-pulse font-normal">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--accent-light)] text-[var(--accent)] animate-pulse font-normal">
               <Loader2 size={10} className="animate-spin" />
               Analyzing
             </span>
           )}
         </span>
-        <span className="shrink-0 ml-1 text-indigo-500">
+        <span className="shrink-0 ml-1 text-[var(--accent)]">
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
       </button>
@@ -257,9 +257,9 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
 
       {/* Expanded detailed breakdown */}
       {isExpanded && (
-        <div className="p-3 pt-1 space-y-2 border-t border-indigo-500/15 text-[11px] text-[var(--text-secondary)]">
+        <div className="p-3 pt-1 space-y-2 border-t border-[var(--accent-border)] text-[11px] text-[var(--text-secondary)]">
           {understanding.user_facing_summary && (
-            <div className="text-[11.5px] text-[var(--text-primary)] font-medium leading-relaxed bg-[var(--bg-card)]/60 p-2 rounded-lg border border-indigo-500/10">
+            <div className="text-[11.5px] text-[var(--text-primary)] font-medium leading-relaxed bg-[var(--bg-card)]/60 p-2 rounded-lg border border-[var(--accent-border)]">
               {understanding.user_facing_summary}
             </div>
           )}
@@ -321,10 +321,10 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
               <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
                 Formulated Research Strategy:
               </span>
-              <div className="space-y-0.5 bg-[var(--bg-card)]/40 p-2 rounded-lg border border-indigo-500/10">
+              <div className="space-y-0.5 bg-[var(--bg-card)]/40 p-2 rounded-lg border border-[var(--accent-border)]">
                 {strategy.map((st, sIdx) => (
                   <div key={sIdx} className="flex items-start gap-1.5 text-[10.5px]">
-                    <span className="text-indigo-500 font-bold shrink-0">{sIdx + 1}.</span>
+                    <span className="text-[var(--accent)] font-bold shrink-0">{sIdx + 1}.</span>
                     <span>{st}</span>
                   </div>
                 ))}
@@ -786,12 +786,13 @@ export default function AiChatView({ initialQuery = null }) {
               <h2 className="font-bold text-xs sm:text-sm text-[var(--text-primary)] truncate max-w-[200px] sm:max-w-[340px]">
                 {activeThread?.title || 'Ani (AI Nissaya)'}
               </h2>
-              <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
+              <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-[var(--accent-light)] border border-[var(--accent-border)] text-[var(--accent)] shrink-0">
                 Beta
               </span>
               {/* RAG Mode indicator badge */}
               <span
                 onClick={() => setIsSettingsOpen(true)}
+                data-ai-mode-badge
                 className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer flex items-center gap-1 transition ${
                   aiSettings.groundRAGMode !== false
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
@@ -818,8 +819,8 @@ export default function AiChatView({ initialQuery = null }) {
               onClick={() => setIsThreadMenuOpen((v) => !v)}
               className={`p-1.5 rounded-lg transition cursor-pointer border ${
                 isThreadMenuOpen
-                  ? 'border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-400'
-                  : 'border-transparent text-[var(--text-secondary)] hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10'
+                  ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)]'
               }`}
               title="Recent chats"
               aria-label="Recent chats"
@@ -830,7 +831,7 @@ export default function AiChatView({ initialQuery = null }) {
             {isThreadMenuOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-64 max-w-[80vw] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-left">
                 <div className="px-3 py-2 border-b border-[var(--border-color)]/60 flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                  <History size={12} className="text-violet-500" />
+                  <History size={12} className="text-[var(--accent)]" />
                   <span>Recent chats</span>
                 </div>
                 <div className="max-h-64 overflow-y-auto p-1">
@@ -848,7 +849,7 @@ export default function AiChatView({ initialQuery = null }) {
                       }}
                       className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs cursor-pointer transition ${
                         t.id === activeThreadId
-                          ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300 font-semibold'
+                          ? 'bg-[var(--accent-light)] text-[var(--accent)] font-semibold'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                       title={t.title}
@@ -885,10 +886,10 @@ export default function AiChatView({ initialQuery = null }) {
           <button
             type="button"
             onClick={handleNewThread}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-violet-500 hover:text-violet-600 dark:hover:text-violet-400 text-xs font-semibold text-[var(--text-secondary)] transition cursor-pointer shadow-2xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-xs font-semibold text-[var(--text-secondary)] transition cursor-pointer shadow-2xs"
             title="Ask Ani (+)"
           >
-            <Plus size={13} className="text-violet-500" />
+            <Plus size={13} className="text-[var(--accent)]" />
             <span className="hidden sm:inline">New</span>
           </button>
 
@@ -908,7 +909,7 @@ export default function AiChatView({ initialQuery = null }) {
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-500/10 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition cursor-pointer"
             title="AI Configuration & API Keys"
           >
             <Settings size={16} />
@@ -929,8 +930,8 @@ export default function AiChatView({ initialQuery = null }) {
               <img src="/ani-tipitakapali-org.svg" alt="Ani mascot" className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
                 Ask{' '}
-                <span className="text-violet-600 dark:text-violet-400">Ani</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-400">
+                <span className="text-[var(--accent)]">Ani</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--accent-light)] border border-[var(--accent-border)] text-[var(--accent)]">
                   Beta
                 </span>
               </h1>
@@ -940,7 +941,7 @@ export default function AiChatView({ initialQuery = null }) {
                   href="https://epitaka.org/about"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 font-semibold text-violet-600 dark:text-violet-400 hover:underline transition cursor-pointer"
+                  className="inline-flex items-center gap-0.5 font-semibold text-[var(--accent)] hover:underline transition cursor-pointer"
                   title="About the E-Piṭaka project"
                 >
                   Vīmaṃsa
@@ -951,15 +952,15 @@ export default function AiChatView({ initialQuery = null }) {
 
             {/* API Key Notice */}
             {!aiSettings.apiKey && (
-              <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
+              <div className="p-3.5 rounded-xl bg-[var(--accent-light)] border border-[var(--accent-border)] text-xs text-[var(--text-primary)] flex items-center justify-between gap-3 text-left">
                 <div>
-                  <span className="font-bold">Privacy Note: </span>
+                  <span className="font-bold text-[var(--accent)]">Privacy Note: </span>
                   Ani runs directly in your browser with Zero-Key-Escape privacy. Add your free Google Gemini API key in Settings to ask questions.
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] font-semibold text-[11px] hover:brightness-95 transition shrink-0 cursor-pointer"
                 >
                   Configure Key
                 </button>
@@ -973,11 +974,11 @@ export default function AiChatView({ initialQuery = null }) {
                   key={idx}
                   type="button"
                   onClick={() => handleSendMessage(p.query)}
-                  className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-violet-500/60 transition text-left group cursor-pointer flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] group-hover:text-violet-600 dark:group-hover:text-violet-400"
+                  className="px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent-border)] transition text-left group cursor-pointer flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)]"
                 >
-                  <Sparkles size={12} className="text-violet-500 shrink-0" />
+                  <Sparkles size={12} className="text-[var(--accent)] shrink-0" />
                   <span className="flex-1 truncate">{p.title}</span>
-                  <span className="text-violet-600 dark:text-violet-400 opacity-0 group-hover:opacity-100 transition shrink-0">→</span>
+                  <span className="text-[var(--accent)] opacity-0 group-hover:opacity-100 transition shrink-0">→</span>
                 </button>
               ))}
             </div>
@@ -985,7 +986,7 @@ export default function AiChatView({ initialQuery = null }) {
             {/* Accuracy disclaimer — bottom of welcome screen */}
             <div className="flex flex-col items-center gap-1.5 text-[11px] text-[var(--text-muted)] leading-relaxed">
               <span className="inline-flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5">
-                <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
+                <span className="text-[var(--accent)] font-semibold">Ani</span> can make mistakes. Please verify important info.
               </span>
             </div>
 
@@ -1007,7 +1008,7 @@ export default function AiChatView({ initialQuery = null }) {
                 {isUser ? (
                   <span>You</span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
+                  <span className="flex items-center gap-1.5 text-[var(--accent)]">
                     <AniIcon size={14} />
                     <span>Ani</span>
                   </span>
@@ -1022,7 +1023,7 @@ export default function AiChatView({ initialQuery = null }) {
               <div
                 className={`w-full rounded-2xl p-4 sm:p-5 shadow-2xs leading-relaxed ${
                   isUser
-                    ? 'bg-violet-600/10 text-[var(--text-primary)] border border-violet-500/20 rounded-tr-xs'
+                    ? 'bg-[var(--accent-light)] text-[var(--text-primary)] border border-[var(--accent-border)] rounded-tr-xs'
                     : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-tl-xs'
                 }`}
               >
@@ -1036,21 +1037,21 @@ export default function AiChatView({ initialQuery = null }) {
 
                 {/* Step 2: Collapsible Research / Tool Calling card for Assistant */}
                 {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
-                  <div className="mb-4 rounded-xl border border-violet-500/20 bg-violet-500/5 overflow-hidden text-xs">
+                  <div className="ai-step-card ai-step-violet mb-4 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-light)] overflow-hidden text-xs">
                     <button
                       type="button"
                       onClick={() =>
                         setExpandedToolCalls((prev) => ({ ...prev, [msg.id]: !isExpanded }))
                       }
-                      className="w-full px-3 py-2 flex items-center justify-between text-violet-700 dark:text-violet-300 font-semibold hover:bg-violet-500/10 transition cursor-pointer"
+                      className="w-full px-3 py-2 flex items-center justify-between text-[var(--accent)] font-semibold hover:bg-[var(--accent-light)] transition cursor-pointer"
                     >
                       <span className="flex items-center gap-1.5">
-                        <BookOpen size={13} className="text-violet-500 shrink-0" />
+                        <BookOpen size={13} className="text-[var(--accent)] shrink-0" />
                         <span>
                           Step 2: Canonical Research ({msg.toolCalls.length} step{msg.toolCalls.length > 1 ? 's' : ''})
                         </span>
                         {msg.isStreaming && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-300 animate-pulse font-normal">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--accent-light)] text-[var(--accent)] animate-pulse font-normal">
                             <Loader2 size={10} className="animate-spin" />
                             Researching...
                           </span>
@@ -1059,7 +1060,7 @@ export default function AiChatView({ initialQuery = null }) {
                       {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                     {isExpanded && (
-                      <div className="p-3 pt-1 space-y-1.5 border-t border-violet-500/15 text-[11px] text-[var(--text-secondary)]">
+                      <div className="p-3 pt-1 space-y-1.5 border-t border-[var(--accent-border)] text-[11px] text-[var(--text-secondary)]">
                         {msg.toolCalls.map((tc, idx) => {
                           const meta = getToolMeta(tc.tool);
                           const IconComp = meta.icon;
@@ -1072,7 +1073,7 @@ export default function AiChatView({ initialQuery = null }) {
                             : '';
 
                           return (
-                            <div key={idx} className="flex items-start gap-2 bg-[var(--bg-card)]/60 p-2 rounded-lg border border-violet-500/10">
+                            <div key={idx} className="flex items-start gap-2 bg-[var(--bg-card)]/60 p-2 rounded-lg border border-[var(--accent-border)]">
                               <IconComp size={13} className={`mt-0.5 shrink-0 ${meta.color}`} />
                               <div className="flex-1 min-w-0">
                                 <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
@@ -1104,7 +1105,7 @@ export default function AiChatView({ initialQuery = null }) {
                 {/* Citations Bar (interactive source chips at message bottom) */}
                 {!isUser && msg.citations && msg.citations.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-[var(--border-color)]/70 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1 mr-1">
+                    <span className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-wider flex items-center gap-1 mr-1">
                       <Quote size={11} />
                       Sources ({msg.citations.length}):
                     </span>
@@ -1119,7 +1120,7 @@ export default function AiChatView({ initialQuery = null }) {
                           key={cIdx}
                           type="button"
                           onClick={() => handleCitationClick(cite)}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-violet-500 hover:text-violet-600 transition cursor-pointer select-none text-[var(--text-secondary)]"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer select-none text-[var(--text-secondary)]"
                           title={`[${tierLabel}] Click to preview passage ${cite.ref || `${cite.bookCode} §${cite.paraIndex}`}`}
                         >
                           <span>{cite.ref || `${cite.bookCode} §${cite.paraIndex}`}</span>
@@ -1164,7 +1165,7 @@ export default function AiChatView({ initialQuery = null }) {
 
         {/* Live Generating & Status Indicator */}
         {isGenerating && statusMessage && (
-          <div className="max-w-3xl mx-auto w-full flex items-center gap-2 text-xs text-violet-600 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3.5 py-2 rounded-xl animate-pulse">
+          <div className="max-w-3xl mx-auto w-full flex items-center gap-2 text-xs text-[var(--accent)] bg-[var(--accent-light)] border border-[var(--accent-border)] px-3.5 py-2 rounded-xl animate-pulse">
             <Loader2 size={14} className="animate-spin shrink-0" />
             <span>{statusMessage}</span>
           </div>
@@ -1178,15 +1179,15 @@ export default function AiChatView({ initialQuery = null }) {
         <div className="max-w-3xl mx-auto">
           {/* No-API-key notice at bottom of answer screen */}
           {!aiSettings.apiKey && messages.length > 0 && (
-            <div className="mb-2 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
+            <div className="mb-2 p-2.5 rounded-xl bg-[var(--accent-light)] border border-[var(--accent-border)] text-[11px] text-[var(--text-primary)] flex items-center justify-between gap-3 text-left">
               <div>
-                <span className="font-bold">Privacy Note: </span>
+                <span className="font-bold text-[var(--accent)]">Privacy Note: </span>
                 Zero-Key-Escape active. Please configure your API key in Settings to continue asking Ani.
               </div>
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
-                className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] font-semibold text-[11px] hover:brightness-95 transition shrink-0 cursor-pointer"
               >
                 Configure Key
               </button>
@@ -1197,7 +1198,7 @@ export default function AiChatView({ initialQuery = null }) {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="relative flex items-end gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] focus-within:border-violet-500 rounded-2xl p-1.5 sm:p-2 shadow-sm transition"
+            className="relative flex items-end gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] focus-within:border-[var(--accent)] rounded-2xl p-1.5 sm:p-2 shadow-sm transition"
           >
             <textarea
               ref={textareaRef}
@@ -1245,10 +1246,10 @@ export default function AiChatView({ initialQuery = null }) {
           {/* Micro Footer Notice — accuracy disclaimer at bottom of answer screen */}
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-2 mt-1.5">
             <span>
-              <span className="text-violet-600 dark:text-violet-400 font-semibold">Ani</span> can make mistakes. Please verify important info.
+              <span className="text-[var(--accent)] font-semibold">Ani</span> can make mistakes. Please verify important info.
             </span>
             <span
-              className="font-mono cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 hover:underline transition"
+              className="font-mono cursor-pointer hover:text-[var(--accent)] hover:underline transition"
               onClick={() => setIsSettingsOpen(true)}
               title="Open Ani AI settings"
               role="button"

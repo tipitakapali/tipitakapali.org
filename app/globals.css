@@ -759,6 +759,42 @@ body.hide-trans-borders .reader-trans-block {
   border-left-color: transparent !important;
 }
 
+/* Ani semantic legend chips under Dusk & OLED.
+   NOTE: Tailwind `dark:` variants only fire on data-theme="dark", so without
+   these overrides the light-mode chip colors render (too dark/blurry) on
+   Dusk/OLED backgrounds. Values mirror the chips' own dark: variants. */
+[data-theme="dusk"] .ai-step-indigo .text-amber-800,
+[data-theme="oled"] .ai-step-indigo .text-amber-800 {
+  color: #fde68a;
+}
+[data-theme="dusk"] .ai-step-indigo .text-cyan-800,
+[data-theme="oled"] .ai-step-indigo .text-cyan-800 {
+  color: #a5f3fc;
+}
+[data-theme="dusk"] .ai-step-indigo .text-emerald-700,
+[data-theme="oled"] .ai-step-indigo .text-emerald-700,
+[data-theme="dusk"] .ai-step-indigo .text-emerald-800,
+[data-theme="oled"] .ai-step-indigo .text-emerald-800 {
+  color: #a7f3d0;
+}
+[data-theme="dusk"] .ai-step-indigo .text-violet-800,
+[data-theme="oled"] .ai-step-indigo .text-violet-800 {
+  color: #ddd6fe;
+}
+[data-theme="dusk"] .ai-markdown code.text-amber-700,
+[data-theme="oled"] .ai-markdown code.text-amber-700 {
+  color: #fcd34d;
+}
+/* RAG/Knowledge header badge (same dark: gap as the chips above) */
+[data-theme="dusk"] [data-ai-mode-badge].text-amber-700,
+[data-theme="oled"] [data-ai-mode-badge].text-amber-700 {
+  color: #fcd34d;
+}
+[data-theme="dusk"] [data-ai-mode-badge].text-emerald-700,
+[data-theme="oled"] [data-ai-mode-badge].text-emerald-700 {
+  color: #6ee7b7;
+}
+
 .reader-trans-block:hover {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }

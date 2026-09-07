@@ -312,10 +312,10 @@ export default function AiMarkdown({ content, onCitationClick }) {
               });
             }
           }}
-          className="ai-citation-chip inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/25 hover:bg-violet-500/20 hover:border-violet-500/50 hover:scale-105 active:scale-95 transition cursor-pointer select-none align-baseline shadow-2xs"
+          className="ai-citation-chip inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent-light)] hover:border-[var(--accent-border)] hover:scale-105 active:scale-95 transition cursor-pointer select-none align-baseline shadow-2xs"
           title={`Click to preview passage ${displayLabel}`}
         >
-          <Quote size={11} className="text-violet-500 shrink-0" />
+          <Quote size={11} className="text-[var(--accent)] shrink-0" />
           <span>{displayLabel}</span>
         </button>
       );
@@ -408,7 +408,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
             if (level === 2) {
               return (
                 <h2 key={`h_${bIdx}`} className="text-base sm:text-lg font-bold text-[var(--accent)] mt-3 mb-1.5 flex items-center gap-1.5">
-                  <BookOpen size={16} className="text-violet-500 shrink-0" />
+                  <BookOpen size={16} className="text-[var(--accent)] shrink-0" />
                   <span>{renderInline(title)}</span>
                 </h2>
               );
@@ -432,7 +432,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
           return (
             <blockquote
               key={`q_${bIdx}`}
-              className="my-2.5 pl-3.5 sm:pl-4 py-1.5 border-l-3 border-violet-500 bg-violet-500/5 dark:bg-violet-500/10 rounded-r-lg text-sm sm:text-[14.5px] italic text-[var(--text-primary)]"
+              className="my-2.5 pl-3.5 sm:pl-4 py-1.5 border-l-3 border-[var(--accent)] bg-[var(--accent-light)] rounded-r-lg text-sm sm:text-[14.5px] italic text-[var(--text-primary)]"
             >
               {block.lines.map((line, lIdx) => (
                 <div key={`ql_${lIdx}`} className="leading-relaxed">
@@ -484,7 +484,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
             >
               <table className="w-full border-collapse text-xs sm:text-[13px] leading-relaxed min-w-[520px]">
                 <thead>
-                  <tr className="bg-violet-500/10 dark:bg-violet-500/15">
+                  <tr className="bg-[var(--accent-light)]">
                     {table.header.map((cell, cIdx) => (
                       <th
                         key={`th_${cIdx}`}
