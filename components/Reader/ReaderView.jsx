@@ -277,7 +277,7 @@ function injectTranslationsIntoHtml(
                 paliBorder ? `border-left: 1.5px solid ${paliBorder}` : 'border-left: none',
                 paliBg ? `background-color: ${paliBg}` : '',
                 paliText ? `color: ${paliText}` : '',
-                (paliBorder || paliBg) ? 'padding: 0.5rem 0.85rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 0.5rem;' : '',
+                (paliBorder || paliBg) ? 'padding: 0.5rem 0.85rem; border-radius: 8px; margin-bottom: 0.5rem;' : '',
               ].filter(Boolean).join('; ');
 
               const topBlockClasses = [

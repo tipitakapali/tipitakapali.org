@@ -822,7 +822,7 @@ export default function LanguageMenu() {
                       Live Preview
                     </span>
                     <div
-                      className="p-3.5 rounded-r-xl border-l-[1.5px] transition-all shadow-xs"
+                      className="p-3.5 rounded-lg border-l-[1.5px] transition-all shadow-xs"
                       style={{
                         borderLeftColor: formatCssColor(activeBorder),
                         backgroundColor: formatCssColor(activeBg) || 'transparent',
