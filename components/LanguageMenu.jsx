@@ -37,8 +37,14 @@ export const TRANSLATIONS = [
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#0c4a6e' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений', color: '#eab308' },
-  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • -coming soon-', color: '#6b7280' },
+  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • Coming soon (Not available yet)', color: '#6b7280', disabled: true },
 ];
+
+export const AVAILABLE_TRANSLATIONS = TRANSLATIONS.filter(
+  (t) => t.id !== 'pali' && !t.disabled && t.id !== 'korean'
+);
+
+export const AVAILABLE_TRANSLATION_COUNT = AVAILABLE_TRANSLATIONS.length;
 
 const BG_PALETTE = [
   { name: 'Default', value: '' },
@@ -176,8 +182,10 @@ export function toValidHex(colorStr, fallback = '#8b2500') {
 }
 
 export default function LanguageMenu() {
-  const { settings, updateSetting } = useThemeSettings();
-  const [isOpen, setIsOpen] = useState(false);
+  const { settings, updateSetting, isLanguageMenuOpen, setIsLanguageMenuOpen } = useThemeSettings();
+  const [localIsOpen, setLocalIsOpen] = useState(false);
+  const isOpen = isLanguageMenuOpen !== undefined ? isLanguageMenuOpen : localIsOpen;
+  const setIsOpen = setIsLanguageMenuOpen || setLocalIsOpen;
 
   // AI translation disclaimer popup state
   const [disclaimerModalOpen, setDisclaimerModalOpen] = useState(false);
@@ -228,7 +236,7 @@ export default function LanguageMenu() {
 
   const activeCount = useMemo(() => {
     const current = settings.translations || {};
-    return TRANSLATIONS.filter((t) => (t.id === 'pali' ? current.pali !== false : Boolean(current[t.id]))).length;
+    return TRANSLATIONS.filter((t) => !t.disabled && t.id !== 'korean' && (t.id === 'pali' ? current.pali !== false : Boolean(current[t.id]))).length;
   }, [settings.translations]);
 
   const translationOrder = useMemo(() => {
@@ -298,17 +306,26 @@ export default function LanguageMenu() {
   const translationDisplayMode = settings.translationDisplayMode || 'stack';
 
   const applyToggleTranslation = (tId) => {
+    if (tId === 'korean') return;
+    const item = TRANSLATIONS.find((t) => t.id === tId);
+    if (item?.disabled) return;
+
     const current = settings.translations || {};
     const isPali = tId === 'pali';
     const isCurrentlyChecked = isPali ? current.pali !== false : Boolean(current[tId]);
     const updated = {
       ...current,
       [tId]: !isCurrentlyChecked,
+      korean: false,
     };
     updateSetting('translations', updated);
   };
 
   const handleToggleTranslation = (tId) => {
+    if (tId === 'korean') return;
+    const item = TRANSLATIONS.find((t) => t.id === tId);
+    if (item?.disabled) return;
+
     const current = settings.translations || {};
     const isPali = tId === 'pali';
     const isCurrentlyChecked = isPali ? current.pali !== false : Boolean(current[tId]);
@@ -460,9 +477,14 @@ export default function LanguageMenu() {
               {/* Section 3: Multi-Translation Layers (including Pāḷi) */}
               <div className="pt-3 border-t border-[var(--border-color)]">
                 <div className="mb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    Translations &amp; Display Order
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      AI-assisted Translations &amp; Display Order
+                    </span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      {AVAILABLE_TRANSLATION_COUNT} available
+                    </span>
+                  </div>
                   <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
                     Use ⤒ ▲ ▼ to reorder translations.
                   </p>
@@ -584,10 +606,12 @@ export default function LanguageMenu() {
 
                 <div className="space-y-1.5">
                   {orderedTranslations.map((trans, idx) => {
+                    const isDisabled = Boolean(trans.disabled || trans.id === 'korean');
                     const isChecked =
-                      trans.id === 'pali'
+                      !isDisabled &&
+                      (trans.id === 'pali'
                         ? settings.translations?.pali !== false
-                        : Boolean(settings.translations?.[trans.id]);
+                        : Boolean(settings.translations?.[trans.id]));
                     const isFirst = idx === 0;
                     const isLast = idx === orderedTranslations.length - 1;
                     const isOnlyActive = isChecked && activeCount <= 1;
@@ -600,7 +624,9 @@ export default function LanguageMenu() {
                       <div
                         key={trans.id}
                         className={`px-3 py-2 rounded-xl border flex items-center justify-between gap-2.5 transition select-none ${
-                          isChecked
+                          isDisabled
+                            ? 'bg-[var(--bg-secondary)]/30 border-[var(--border-color)]/40 opacity-55 cursor-not-allowed'
+                            : isChecked
                             ? 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-xs'
                             : 'bg-[var(--bg-secondary)]/50 border-[var(--border-color)]/60 opacity-75'
                         }`}
@@ -609,39 +635,57 @@ export default function LanguageMenu() {
                         {settings.showTranslationBorders !== false && (
                           <span
                             className="w-1 self-stretch rounded-full shrink-0"
-                            style={{ backgroundColor: formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color }}
+                            style={{ backgroundColor: isDisabled ? '#9ca3af' : (formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color) }}
                             title={`Color: ${trans.label}`}
                           />
                         )}
 
-                        <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+                        <label
+                          className={`flex items-center gap-2.5 min-w-0 flex-1 ${
+                            isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        >
                           <span className="text-base shrink-0">{trans.flag}</span>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold truncate text-[var(--text-primary)]">
-                              {trans.label}
+                            <div className="text-xs font-semibold truncate text-[var(--text-primary)] flex items-center gap-1.5">
+                              <span>{trans.label}</span>
+                              {isDisabled && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                  Coming Soon
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-[var(--text-muted)] truncate">{trans.desc}</div>
                           </div>
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            disabled={isOnlyActive}
-                            onChange={() => handleToggleTranslation(trans.id)}
+                            disabled={isDisabled || isOnlyActive}
+                            onChange={() => !isDisabled && handleToggleTranslation(trans.id)}
                             className="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed shrink-0"
-                            title={isOnlyActive ? 'At least one language layer must remain active' : undefined}
+                            title={
+                              isDisabled
+                                ? 'Not available yet — Coming soon'
+                                : isOnlyActive
+                                ? 'At least one language layer must remain active'
+                                : undefined
+                            }
                           />
                         </label>
                         <div className="flex items-center gap-1 shrink-0">
                           {/* Task 3: Color Customization Palette Button */}
                           <button
                             type="button"
-                            onClick={() => setColorPickerTarget(trans)}
+                            onClick={() => !isDisabled && setColorPickerTarget(trans)}
+                            disabled={isDisabled}
                             className={`p-1 rounded-md transition cursor-pointer border font-bold ${
-                              hasCustomColors
+                              isDisabled
+                                ? 'opacity-20 pointer-events-none border-transparent text-gray-400'
+                                : hasCustomColors
                                 ? 'text-[var(--accent)] bg-[var(--accent-light)] border-[var(--accent-border)] shadow-2xs'
                                 : 'text-[var(--accent)] hover:bg-[var(--accent-light)] border-[var(--accent-border)]'
                             }`}
-                            title={`Color: Customize colors for ${trans.label}`}
+                            title={isDisabled ? 'Not available' : `Color: Customize colors for ${trans.label}`}
                             aria-label={`Customize colors for ${trans.label}`}
                           >
                             <Palette size={13} />
@@ -650,7 +694,7 @@ export default function LanguageMenu() {
                           <button
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'top')}
-                            disabled={isFirst}
+                            disabled={isFirst || isDisabled}
                             className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move to top"
                             aria-label="Move translation to top"
@@ -661,7 +705,7 @@ export default function LanguageMenu() {
                           <button
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'up')}
-                            disabled={isFirst}
+                            disabled={isFirst || isDisabled}
                             className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move up"
                             aria-label="Move translation up"
@@ -672,7 +716,7 @@ export default function LanguageMenu() {
                           <button
                             type="button"
                             onClick={() => handleMoveTranslation(trans.id, 'down')}
-                            disabled={isLast}
+                            disabled={isLast || isDisabled}
                             className="p-1 rounded-md font-bold text-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-20 disabled:pointer-events-none transition cursor-pointer border border-[var(--accent-border)]"
                             title="Move down"
                             aria-label="Move translation down"

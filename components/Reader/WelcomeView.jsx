@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, BookSearch, PanelLeft, History, Bookmark, Sparkles, Bot } from 'lucide-react';
+import { Search, BookSearch, PanelLeft, History, Sparkles, Languages } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useDictionary } from '../../context/DictionaryContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
 import { typeVelthuis } from '../../services/transliterate';
+import { AVAILABLE_TRANSLATION_COUNT } from '../LanguageMenu';
 
 export default function WelcomeView() {
-  const { recentHistory, bookmarks, setIsHistoryOpen, setIsBookmarkOpen, setIsSidebarOpen, openBook, openAiChatTab } = useTabs();
-  const { settings, setIsZenMode } = useThemeSettings();
+  const { recentHistory, setIsHistoryOpen, setIsSidebarOpen, openBook, openAiChatTab } = useTabs();
+  const { settings, setIsZenMode, openLanguageMenu } = useThemeSettings();
   const { openDictionary } = useDictionary();
   const [dictQuery, setDictQuery] = useState('');
 
@@ -123,24 +124,42 @@ export default function WelcomeView() {
           </div>
         </button>
 
-        {/* 3. Saved bookmarks */}
+        {/* 3. AI-assisted Translations */}
         <button
-          onClick={() => setIsBookmarkOpen(true)}
+          onClick={openLanguageMenu}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !min-h-0"
+          title={`AI-assisted Translations — ${AVAILABLE_TRANSLATION_COUNT} languages available • Click to open language menu`}
+          aria-label={`AI-assisted Translations (${AVAILABLE_TRANSLATION_COUNT} languages available)`}
         >
-          {bookmarks.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md border-2 border-[var(--bg-primary)]">
-              {bookmarks.length > 99 ? '99+' : bookmarks.length}
-            </span>
-          )}
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition shrink-0">
-            <Bookmark size={16} />
+          {/* Badge showing number of currently available translation languages (excluding Pāḷi) */}
+          <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md border-2 border-[var(--bg-primary)]">
+            {AVAILABLE_TRANSLATION_COUNT}
+          </span>
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition shrink-0">
+            <Languages size={17} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-amber-600 transition truncate">Saved bookmarks</h3>
-            <p className="!text-[11px] !leading-tight !truncate">
-              {bookmarks.length ? `${bookmarks.length} saved` : 'Bookmark paragraphs'}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-emerald-600 dark:group-hover:!text-emerald-400 transition truncate">
+                AI-assisted Translations
+              </h3>
+              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                {AVAILABLE_TRANSLATION_COUNT} Lang
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] !leading-tight text-[var(--text-muted)] truncate">
+              <span className="inline-flex items-center gap-1 shrink-0" title="English, Tiếng Việt, မြန်မာ, Deutsch">
+                <span className="text-xs leading-none" title="English">🇬🇧</span>
+                <span className="text-xs leading-none" title="Tiếng Việt">🇻🇳</span>
+                <span className="text-xs leading-none" title="မြန်မာ">🇲🇲</span>
+                <span className="text-xs leading-none" title="Deutsch">🇩🇪</span>
+                <span className="text-xs leading-none opacity-80" title="සිංහල">🇱🇰</span>
+                <span className="text-xs leading-none opacity-80" title="中文">🇨🇳</span>
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)] opacity-80 truncate">
+                +{AVAILABLE_TRANSLATION_COUNT - 6} more
+              </span>
+            </div>
           </div>
         </button>
 
@@ -148,10 +167,12 @@ export default function WelcomeView() {
         <button
           onClick={() => openAiChatTab()}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !bg-gradient-to-br from-[var(--bg-card)] to-[var(--accent-light)]/40 !min-h-0"
+          title="Study with Ani (AI Nissaya) — Your Tipiṭaka Study Companion"
+          aria-label="Ani (AI Nissaya)"
         >
           <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-violet-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md border-2 border-[var(--bg-primary)]">AI</span>
           <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-600 dark:text-violet-400 group-hover:scale-105 transition shrink-0">
-            <Bot size={18} />
+            <img src="/ani-tipitakapali-org.svg" alt="Ani" className="w-5 h-5 object-contain" />
           </div>
           <div className="min-w-0 flex-1 pr-6">
             <h3 className="!mb-0 !text-[13px] !leading-tight !text-[var(--text-primary)] group-hover:!text-violet-600 transition flex items-center gap-1 truncate">

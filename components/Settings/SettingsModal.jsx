@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Type,
@@ -103,6 +103,18 @@ export default function SettingsModal() {
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeSettingsModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSettingsOpen, closeSettingsModal]);
 
   if (!isSettingsOpen) return null;
 

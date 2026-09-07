@@ -104,6 +104,7 @@ export function ThemeSettingsProvider({ children }) {
   const [settings, setSettingsState] = useState(DEFAULT_SETTINGS);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -146,8 +147,9 @@ export function ThemeSettingsProvider({ children }) {
             merged.translationColors && typeof merged.translationColors === 'object'
               ? merged.translationColors
               : {};
-          // Ensure translations object has all keys and pali defaults to true
+          // Ensure translations object has all keys, korean is disabled, and pali defaults to true
           merged.translations = { ...prev.translations, ...(parsed.translations || {}) };
+          merged.translations.korean = false;
           if (merged.translations.pali === undefined) {
             merged.translations.pali = true;
           }
@@ -170,7 +172,11 @@ export function ThemeSettingsProvider({ children }) {
 
   const updateSetting = (key, value) => {
     setSettingsState((prev) => {
-      const updated = { ...prev, [key]: value };
+      let finalVal = value;
+      if (key === 'translations' && value && typeof value === 'object') {
+        finalVal = { ...value, korean: false };
+      }
+      const updated = { ...prev, [key]: finalVal };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -182,7 +188,11 @@ export function ThemeSettingsProvider({ children }) {
 
   const updateSettings = (newObj) => {
     setSettingsState((prev) => {
-      const updated = { ...prev, ...newObj };
+      const sanitized = { ...newObj };
+      if (sanitized.translations && typeof sanitized.translations === 'object') {
+        sanitized.translations = { ...sanitized.translations, korean: false };
+      }
+      const updated = { ...prev, ...sanitized };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -205,6 +215,9 @@ export function ThemeSettingsProvider({ children }) {
 
   const openSettingsModal = () => setIsSettingsOpen(true);
   const closeSettingsModal = () => setIsSettingsOpen(false);
+
+  const openLanguageMenu = () => setIsLanguageMenuOpen(true);
+  const closeLanguageMenu = () => setIsLanguageMenuOpen(false);
 
   // Apply CSS Variables & Attributes to Root
   useEffect(() => {
@@ -280,6 +293,10 @@ export function ThemeSettingsProvider({ children }) {
         setIsZenMode,
         openSettingsModal,
         closeSettingsModal,
+        isLanguageMenuOpen,
+        setIsLanguageMenuOpen,
+        openLanguageMenu,
+        closeLanguageMenu,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, History, Trash2, Search, ExternalLink, Clock } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -10,6 +10,18 @@ export default function HistoryModal({ isOpen, onClose }) {
   const { recentHistory, clearHistory, openBook, closeAllTabs } = useTabs();
   const { settings } = useThemeSettings();
   const [filterText, setFilterText] = useState('');
+
+  // Close on Escape key press (matching Search modal behavior)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

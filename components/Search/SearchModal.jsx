@@ -137,7 +137,7 @@ const DEFAULT_FTS_DATABASES = [
   { id: 'fts_translation_ja.db', key: 'ja', label: '日本語', flag: '🇯🇵' },
   { id: 'fts_translation_pt.db', key: 'pt', label: 'Português', flag: '🇵🇹' },
   { id: 'fts_translation_ru.db', key: 'ru', label: 'Русский', flag: '🇷🇺' },
-  { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷' },
+  { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷', disabled: true },
 ];
 
 export function resolveDbFromLangParam(param, databases = DEFAULT_FTS_DATABASES) {
@@ -194,8 +194,8 @@ export default function SearchModal() {
   const [ftsDatabases, setFtsDatabases] = useState(DEFAULT_FTS_DATABASES);
   const isPaliDb = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
 
-  // All available FTS databases from server or fallback defaults
-  const displayedDatabases = ftsDatabases && ftsDatabases.length > 0 ? ftsDatabases : DEFAULT_FTS_DATABASES;
+  // All available FTS databases from server or fallback defaults (excluding disabled placeholders)
+  const displayedDatabases = (ftsDatabases && ftsDatabases.length > 0 ? ftsDatabases : DEFAULT_FTS_DATABASES).filter((d) => !d.disabled);
 
   // Search Filter and Sort Controls (Default: Piṭaka Sort, Any Distance, All MAT, All Piṭakas)
   const [matFilter, setMatFilter] = useState('all');
