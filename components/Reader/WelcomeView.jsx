@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, BookSearch, PanelLeft, History, Sparkles, Languages } from 'lucide-react';
+import { Search, BookSearch, PanelLeft, History, Sparkles, Languages, Info, ArrowRightLeft } from 'lucide-react';
 import { useTabs } from '../../context/TabContext';
 import { useDictionary } from '../../context/DictionaryContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
@@ -255,6 +255,30 @@ export default function WelcomeView() {
               alt="Download for Desktop"
               className="h-[38px] sm:h-[40px] w-auto object-contain block"
             />
+          </a>
+        </div>
+
+        {/* About & Standalone Tools — beneath the store badges (theme-aware accent pills) */}
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <a
+            href="/info"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] shadow-sm transition-all duration-200 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md active:scale-95"
+            title="About TipiṭakaPali.org — features & full user guide"
+          >
+            <Info size={13} className="shrink-0 text-[var(--accent)] transition-transform duration-200 group-hover:scale-110" />
+            <span>About & Guide</span>
+          </a>
+          <a
+            href="/pali-script-converter"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group inline-flex items-center gap-1.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] shadow-sm transition-all duration-200 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md active:scale-95"
+            title="Pāḷi Script Converter — convert text across 17 scripts, fully offline"
+          >
+            <ArrowRightLeft size={13} className="shrink-0 text-[var(--accent)] transition-transform duration-200 group-hover:scale-110" />
+            <span>Pāḷi Script Converter</span>
           </a>
         </div>
       </div>
