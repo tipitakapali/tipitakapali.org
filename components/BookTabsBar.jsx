@@ -263,8 +263,8 @@ export default function BookTabsBar() {
       <button
         className="new-tab-btn flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer shrink-0"
         onClick={() => setIsHistoryOpen(true)}
-        title="Recent Books"
-        aria-label="Recent Books"
+        title="Recent opened books"
+        aria-label="Recent opened books"
       >
         <History size={14} className="text-[var(--accent)]" />
         {recentHistory.length > 0 && (

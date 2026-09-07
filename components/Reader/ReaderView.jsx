@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, History } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
 import BookTocView from './BookTocView';
@@ -1001,6 +1001,7 @@ export default function ReaderView() {
     saveTabPosition,
     searchHighlight,
     openBook,
+    setIsHistoryOpen,
   } = useTabs();
 
   const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
@@ -2664,6 +2665,16 @@ export default function ReaderView() {
             ) : (
               <Bookmark size={14} />
             )}
+          </button>
+
+          {/* Recent Opened Books Button in Breadcrumb Header */}
+          <button
+            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+            onClick={() => setIsHistoryOpen(true)}
+            title="Recent opened books"
+            aria-label="Recent opened books"
+          >
+            <History size={14} />
           </button>
         </div>
       </div>

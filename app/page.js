@@ -11,13 +11,15 @@ import Footer from '../components/Footer';
 import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
 import DictionaryModal from '../components/DictionaryModal';
+import BookmarkModal from '../components/BookmarkModal';
+import HistoryModal from '../components/HistoryModal';
 import NotFound from './not-found';
 import { useTabs, normalizeLangCode } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openAiChatTab, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound } = useTabs();
+  const { openBook, openAiChatTab, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound, isBookmarkOpen, setIsBookmarkOpen, isHistoryOpen, setIsHistoryOpen } = useTabs();
   const { settings, isZenMode, setIsZenMode } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
@@ -377,6 +379,8 @@ export function MainAppContent({ params: rawParams }) {
 
       <SearchModal />
       <SettingsModal />
+      <BookmarkModal isOpen={isBookmarkOpen} onClose={() => setIsBookmarkOpen(false)} />
+      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </div>
   );
 }

@@ -17,8 +17,6 @@ import {
 
 
 import BookTocModal from './BookTocModal';
-import BookmarkModal from './BookmarkModal';
-import HistoryModal from './HistoryModal';
 import MatJumpModal from './MatJumpModal';
 import GoToModal from './GoToModal';
 import { useTabs } from '../context/TabContext';
@@ -35,10 +33,6 @@ export default function Footer() {
     closeGoToModal,
     goToInitialTab,
     goToInitialEdition,
-    isHistoryOpen,
-    setIsHistoryOpen,
-    isBookmarkOpen,
-    setIsBookmarkOpen,
     isHeaderVisible,
     isSidebarOpen,
     setIsSidebarOpen,
@@ -362,8 +356,6 @@ export default function Footer() {
         initialEdition={goToInitialEdition}
       />
       <BookTocModal isOpen={isTocOpen} onClose={() => setIsTocOpen(false)} />
-      <BookmarkModal isOpen={isBookmarkOpen} onClose={() => setIsBookmarkOpen(false)} />
-      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </>
   );
 }
