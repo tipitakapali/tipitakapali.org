@@ -188,7 +188,7 @@ export function TabProvider({ children }) {
   const [activeBookCode, setActiveBookCode] = useState(null);
   const [activeParaNum, setActiveParaNum] = useState(null);
   const [loadingBook, setLoadingBook] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
@@ -1446,7 +1446,7 @@ export function TabProvider({ children }) {
     updateUrlParams({ book: null, chapter: null, q: null, search: null });
     persistTabs([], null);
     setIsZenMode(false);
-    setIsSidebarOpen(true);
+    setIsSidebarOpen(false);
     if (typeof document !== 'undefined') {
       document.body.classList.remove('zen-mode');
     }
