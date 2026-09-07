@@ -2206,6 +2206,13 @@ export default function ReaderView() {
   }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord]);
 
   const handleReaderDoubleClick = useCallback((e) => {
+    // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
+    if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
+
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
     const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
       ? settings.dictLookupTrigger

@@ -472,6 +472,12 @@ export function DictionaryProvider({ children }) {
 
   // Open dictionary with word (or just open)
   const openDictionary = useCallback((word = '', initialTab = null) => {
+    // Ignore ghost click lookups if dictionary was closed moments ago
+    if (word && typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
     setIsOpen(true);
     if (initialTab) {
       setDictTab(initialTab);
@@ -482,6 +488,9 @@ export function DictionaryProvider({ children }) {
   }, [performLookup, setDictTab]);
 
   const closeDictionary = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.__tipitaka_dict_just_closed = Date.now();
+    }
     setIsOpen(false);
   }, []);
 
@@ -489,7 +498,7 @@ export function DictionaryProvider({ children }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
+        closeDictionary();
         return;
       }
       const tag = e.target.tagName?.toLowerCase();

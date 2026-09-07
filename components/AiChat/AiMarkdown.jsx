@@ -80,6 +80,13 @@ export default function AiMarkdown({ content, onCitationClick }) {
   const { settings } = useThemeSettings();
 
   const lookupWordAtPoint = useCallback((e) => {
+    // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
+    if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
+
     // Never hijack citation chips, links, or buttons.
     if (e.target?.closest?.('button, a, input, textarea')) return;
     // Don't hijack text selection (copy flow).
@@ -99,6 +106,11 @@ export default function AiMarkdown({ content, onCitationClick }) {
   }, [openDictionary]);
 
   const handleClick = useCallback((e) => {
+    if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
     const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
       ? settings.dictLookupTrigger
@@ -108,6 +120,11 @@ export default function AiMarkdown({ content, onCitationClick }) {
   }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, lookupWordAtPoint]);
 
   const handleDoubleClick = useCallback((e) => {
+    if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
+      if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
+        return;
+      }
+    }
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
     const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
       ? settings.dictLookupTrigger
