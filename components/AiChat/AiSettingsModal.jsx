@@ -8,7 +8,7 @@ export const DEFAULT_AI_SETTINGS = {
   provider: 'gemini',
   apiKey: '',
   toolModel: 'gemini-flash-lite-latest',
-  answerModel: 'gemini-flash-latest',
+  answerModel: 'gemini-flash-lite-latest',
   baseUrl: '',
   orthodoxMode: true,
   customSystemPrompt: '',
@@ -21,7 +21,21 @@ export function getStoredAiSettings() {
   try {
     const raw = localStorage.getItem(AI_STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_AI_SETTINGS, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      // Migrate legacy gemini-flash-latest default to gemini-flash-lite-latest
+      if (parsed.answerModel === 'gemini-flash-latest') {
+        parsed.answerModel = 'gemini-flash-lite-latest';
+      }
+      // Migrate particular gemini tool model to alias gemini-flash-lite-latest
+      if (
+        parsed.provider === 'gemini' &&
+        parsed.toolModel &&
+        parsed.toolModel !== 'gemini-flash-lite-latest' &&
+        (/flash-lite/i.test(parsed.toolModel) || parsed.toolModel.startsWith('gemini-2.'))
+      ) {
+        parsed.toolModel = 'gemini-flash-lite-latest';
+      }
+      return { ...DEFAULT_AI_SETTINGS, ...parsed };
     }
   } catch (e) {}
   return DEFAULT_AI_SETTINGS;
@@ -54,21 +68,23 @@ function compareGeminiModels(a, b) {
   return a.id.localeCompare(b.id);
 }
 
-// From a fetched Gemini model list, pick the latest flash-lite (for tool calls)
-// and the second-latest full flash (for answers — the newest flash rollout is
-// skipped in favour of a proven one), falling back to the newest model.
+// From a fetched Gemini model list, pick the latest flash-lite (for both tool calls and answers),
+// falling back to the newest available model.
 export function pickLatestGeminiModels(models) {
   const capable = (models || []).filter((m) => m && m.id);
   const sorted = [...capable].sort(compareGeminiModels);
   const lite = sorted.filter((m) => /flash/i.test(m.id) && /lite/i.test(m.id));
   const flash = sorted.filter((m) => /flash/i.test(m.id) && !/lite/i.test(m.id));
+  const nonLite = sorted.filter((m) => !/lite/i.test(m.id));
   const latestLite = lite[0] || null;
   const latestFlash = flash[0] || null;
+  const latestModel = nonLite[0] || sorted[0] || null;
   return {
-    toolPick: latestLite || latestFlash || sorted[0] || null,
-    answerPick: flash[1] || latestFlash || latestLite || sorted[0] || null,
+    toolPick: { id: 'gemini-flash-lite-latest', displayName: 'Gemini Flash Lite (Latest Alias)' },
+    answerPick: latestLite || latestFlash || sorted[0] || null,
     latestLite,
     latestFlash,
+    latestModel,
   };
 }
 
@@ -226,25 +242,30 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
           displayName: m.displayName || '',
         }))
         .filter((m) => m.id && !seen.has(m.id) && (seen.add(m.id), true));
-      setGeminiModels(list);
+      const aliases = [
+        { id: 'gemini-flash-lite-latest', displayName: 'gemini-flash-lite-latest (Latest Flash Lite Alias • Recommended)' },
+        { id: 'gemini-flash-latest', displayName: 'gemini-flash-latest (Latest Flash Alias)' },
+      ];
+      const fullList = [...aliases.filter((a) => !seen.has(a.id)), ...list];
+      setGeminiModels(fullList);
       fetchedKeyRef.current = key;
       const { toolPick, answerPick } = pickLatestGeminiModels(list);
-      if (autoApply && (toolPick || answerPick)) {
+      if (autoApply) {
         setConfig((prev) => ({
           ...prev,
-          toolModel: toolPick ? toolPick.id : prev.toolModel,
+          toolModel: 'gemini-flash-lite-latest',
           answerModel: answerPick ? answerPick.id : prev.answerModel,
         }));
         setModelsAutoNote(
-          `Auto-selected${toolPick ? ` • tool → ${toolPick.id} (latest lite)` : ''}${
-            answerPick ? ` • answer → ${answerPick.id} (2nd-latest flash)` : ''
+          `Auto-selected • tool → gemini-flash-lite-latest (alias)${
+            answerPick ? ` • answer → ${answerPick.id}` : ''
           }`
         );
       }
       setModelsStatus('success');
       setModelsMessage(
         list.length
-          ? `${list.length} models loaded — tool uses latest flash-lite, answer uses 2nd-latest flash.`
+          ? `${list.length} models loaded — tool uses alias gemini-flash-lite-latest, answer uses ${answerPick?.id || 'latest flash-lite'}.`
           : 'No generateContent-capable models returned for this key.'
       );
     } catch (err) {
@@ -271,7 +292,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
 
   // Latest models currently available (from the fetched Gemini list) for display
   // under each model field.
-  const { latestLite, latestFlash } = pickLatestGeminiModels(
+  const { latestLite, latestFlash, latestModel } = pickLatestGeminiModels(
     config.provider === 'gemini' ? geminiModels : []
   );
 
@@ -407,7 +428,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                     ? 'google/gemini-2.0-flash-001'
                     : 'local-model';
                 const defaultAnswerModel =
-                  pid === 'gemini' ? 'gemini-flash-latest' : defaultToolModel;
+                  pid === 'gemini' ? 'gemini-flash-lite-latest' : defaultToolModel;
                 setConfig({
                   ...config,
                   provider: pid,
@@ -451,7 +472,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
             <p className="text-[10.5px] text-[var(--text-muted)]">
-              Your API key is stored securely in your browser's localStorage and never shared.
+              🔒 <strong>Zero-Key-Escape:</strong> Your API key is stored strictly in your browser's localStorage and never leaves your browser.
             </p>
           </div>
 
@@ -495,7 +516,16 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                 placeholder="e.g. gemini-flash-lite-latest"
               />
               <p className="text-[10px] text-[var(--text-muted)]">
-                {latestLite ? `Latest available: ${latestLite.id}` : 'Suggested: latest flash-lite'}
+                <span>Alias: </span>
+                <button
+                  type="button"
+                  onClick={() => setConfig((prev) => ({ ...prev, toolModel: 'gemini-flash-lite-latest' }))}
+                  className="font-mono text-violet-600 dark:text-violet-400 hover:underline cursor-pointer"
+                  title="Click to set Tool Model to alias gemini-flash-lite-latest"
+                >
+                  gemini-flash-lite-latest
+                </button>
+                {latestLite && <span className="text-[var(--text-muted)]"> (resolves to {latestLite.id})</span>}
               </p>
             </div>
             <div className="space-y-1.5">
@@ -506,12 +536,24 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                 value={config.answerModel}
                 onChange={(v) => setConfig({ ...config, answerModel: v })}
                 models={config.provider === 'gemini' ? geminiModels : []}
-                placeholder="e.g. gemini-flash-latest"
+                placeholder="e.g. gemini-flash-lite-latest"
               />
               <p className="text-[10px] text-[var(--text-muted)]">
-                {latestFlash
-                  ? `Latest available: ${latestFlash.id} (answer uses 2nd-latest)`
-                  : 'Suggested: 2nd-latest flash'}
+                {latestModel ? (
+                  <>
+                    <span>Latest available: </span>
+                    <button
+                      type="button"
+                      onClick={() => setConfig((prev) => ({ ...prev, answerModel: latestModel.id }))}
+                      className="font-mono text-violet-600 dark:text-violet-400 hover:underline cursor-pointer"
+                      title={`Click to set Answer Model to ${latestModel.id}`}
+                    >
+                      {latestModel.id}
+                    </button>
+                  </>
+                ) : (
+                  'Suggested: latest flash-lite'
+                )}
               </p>
             </div>
           </div>

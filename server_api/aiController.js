@@ -2827,6 +2827,13 @@ function registerAiRoutes(fastify) {
   });
 
   fastify.post('/api/ai/tool-call', async (req) => {
+    // ZERO KEY ESCAPE: Tool execution is strictly local SQLite queries and never accepts or requires an API key.
+    if (req.body && typeof req.body === 'object') {
+      if ('apiKey' in req.body) delete req.body.apiKey;
+      if (req.body.args && typeof req.body.args === 'object' && 'apiKey' in req.body.args) {
+        delete req.body.args.apiKey;
+      }
+    }
     const { name, args } = req.body || {};
     if (!name) return { success: false, error: 'Missing tool name' };
     return executeAiTool(name, args || {});
@@ -2835,12 +2842,28 @@ function registerAiRoutes(fastify) {
   // ── Streaming Chat Endpoint (SSE) ──────────────────────────────────────
   fastify.post('/api/ai/chat', async (req, reply) => {
     const body = req.body || {};
+
+    // ZERO KEY ESCAPE POLICY:
+    // Reject any client attempts to send their user API key to the backend server.
+    // The browser client executes the LLM reasoning loop directly against Google/OpenAI.
+    if (body.apiKey && body.apiKey !== process.env.GEMINI_API_KEY) {
+      return reply.code(400).send({
+        error: 'Zero-Key-Escape policy active: Client API keys must never escape to the backend server. Ani executes AI requests directly from your browser.',
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return reply.code(400).send({
+        error: 'Backend LLM chat is disabled. Please configure your API key in Ani Settings in your browser.',
+      });
+    }
+
     const {
       messages = [],
       apiKey = process.env.GEMINI_API_KEY || '',
       provider = 'gemini',
       toolModel = 'gemini-flash-lite-latest',
-      answerModel = 'gemini-flash-latest',
+      answerModel = 'gemini-flash-lite-latest',
       orthodoxMode = true,
       customSystemPrompt = '',
       baseUrl = '',

@@ -30,6 +30,7 @@ import {
 import AiMarkdown from './AiMarkdown';
 import AiSettingsModal, { getStoredAiSettings, DEFAULT_AI_SETTINGS } from './AiSettingsModal';
 import CitationQuickviewModal from './CitationQuickviewModal';
+import { runClientAiAgent } from '../../services/aiClientAgent';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
@@ -361,6 +362,7 @@ export default function AiChatView({ initialQuery = null }) {
   const isNearBottomRef = useRef(true);
   const threadScrollMapRef = useRef({});
   const isAutoScrollingRef = useRef(false);
+  const pendingQueryRef = useRef(null);
 
   // Prefill initialQuery if provided
   useEffect(() => {
@@ -576,6 +578,20 @@ export default function AiChatView({ initialQuery = null }) {
     const query = (textToSend || inputQuery).trim();
     if (!query || isGenerating) return;
 
+    const currentSettings = getStoredAiSettings();
+    const hasKey = Boolean(
+      (currentSettings?.apiKey && currentSettings.apiKey.trim().length >= 5) ||
+      (currentSettings?.provider === 'custom' && currentSettings?.baseUrl?.trim())
+    );
+
+    if (!hasKey) {
+      // Do not give answer! Preserve query and show configure key screen
+      pendingQueryRef.current = query;
+      setInputQuery(query);
+      setIsSettingsOpen(true);
+      return;
+    }
+
     setInputQuery('');
     const userMsgId = `usr_${Date.now()}`;
     const assistantMsgId = `ast_${Date.now()}`;
@@ -613,111 +629,77 @@ export default function AiChatView({ initialQuery = null }) {
       updateThreadTitle(activeThreadId, query);
     }
 
-    // Prepare API call
-    const currentSettings = getStoredAiSettings();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    const history = nextMessages
+      .filter((m) => m.id !== assistantMsgId)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    let accumulatedContent = '';
+    let receivedUnderstanding = null;
+    const toolCalls = [];
+    let citations = [];
+
     try {
-      const payload = {
-        messages: nextMessages
-          .filter((m) => m.id !== assistantMsgId)
-          .map((m) => ({ role: m.role, content: m.content })),
-        apiKey: currentSettings.apiKey || '',
-        provider: currentSettings.provider || 'gemini',
-        toolModel: currentSettings.toolModel || 'gemini-flash-lite-latest',
-        answerModel: currentSettings.answerModel || 'gemini-flash-latest',
-        orthodoxMode: currentSettings.orthodoxMode !== false,
-        customSystemPrompt: currentSettings.customSystemPrompt || '',
-        baseUrl: currentSettings.baseUrl || '',
-      };
-
-      const response = await fetch(`${getApiBase()}/api/ai/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      await runClientAiAgent({
+        userQuery: query,
+        conversationHistory: history,
+        aiSettings: currentSettings,
         signal: abortController.signal,
+        onStatus: (msg) => {
+          setStatusMessage(msg);
+        },
+        onUnderstanding: (und) => {
+          receivedUnderstanding = und;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, understanding: und } : m
+            )
+          );
+        },
+        onToolCall: (tc) => {
+          toolCalls.push(tc);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, toolCalls: [...toolCalls] } : m
+            )
+          );
+        },
+        onToken: (tok) => {
+          accumulatedContent += tok;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, content: accumulatedContent, toolCalls: [...toolCalls] }
+                : m
+            )
+          );
+          if (isNearBottomRef.current) {
+            scrollToBottom('smooth');
+          }
+        },
+        onCitations: (cites) => {
+          citations = cites;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, citations: cites } : m
+            )
+          );
+        },
+        onDone: () => {},
+        onError: (err) => {
+          const errorText = `\n\n> ⚠️ **Investigation Error:** ${err.message || 'Unable to connect to AI provider.'} Please check your settings.`;
+          accumulatedContent += errorText;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, content: accumulatedContent, isStreaming: false, isError: true }
+                : m
+            )
+          );
+        },
       });
-
-      if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let accumulatedContent = '';
-      let receivedUnderstanding = null;
-      const toolCalls = [];
-      let citations = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        let currentEvent = 'message';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('event: ')) {
-            currentEvent = trimmed.substring(7).trim();
-            continue;
-          }
-          if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.substring(6).trim();
-            try {
-              const data = JSON.parse(dataStr);
-              if (currentEvent === 'status') {
-                setStatusMessage(data.message || '');
-              } else if (currentEvent === 'understanding') {
-                receivedUnderstanding = data;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId ? { ...m, understanding: data } : m
-                  )
-                );
-              } else if (currentEvent === 'tool_call') {
-                toolCalls.push(data);
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId ? { ...m, toolCalls: [...toolCalls] } : m
-                  )
-                );
-              } else if (currentEvent === 'token') {
-                accumulatedContent += data.text || '';
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId
-                      ? { ...m, content: accumulatedContent, toolCalls: [...toolCalls] }
-                      : m
-                  )
-                );
-              } else if (currentEvent === 'citations') {
-                citations = data.citations || [];
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId ? { ...m, citations } : m
-                  )
-                );
-              } else if (currentEvent === 'done') {
-                if (data.understanding && !receivedUnderstanding) {
-                  receivedUnderstanding = data.understanding;
-                }
-              } else if (currentEvent === 'error') {
-                accumulatedContent += `\n\n> ⚠️ **Error:** ${data.message || 'Generation failed'}`;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMsgId ? { ...m, content: accumulatedContent } : m
-                  )
-                );
-              }
-            } catch (err) {}
-          }
-        }
-      }
 
       // Finalize message
       const finalizedMessages = nextMessages.map((m) =>
@@ -971,8 +953,8 @@ export default function AiChatView({ initialQuery = null }) {
             {!aiSettings.apiKey && (
               <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
                 <div>
-                  <span className="font-bold">Note: </span>
-                  Add your free Google Gemini API Key in Settings to enable full functionality. Local canonical search is active.
+                  <span className="font-bold">Privacy Note: </span>
+                  Ani runs directly in your browser with Zero-Key-Escape privacy. Add your free Google Gemini API key in Settings to ask questions.
                 </div>
                 <button
                   type="button"
@@ -1198,15 +1180,15 @@ export default function AiChatView({ initialQuery = null }) {
           {!aiSettings.apiKey && messages.length > 0 && (
             <div className="mb-2 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-900 dark:text-violet-200 flex items-center justify-between gap-3 text-left">
               <div>
-                <span className="font-bold">Note: </span>
-                Local canonical research is active. Add your free Google Gemini API Key in Settings to enable deep generative synthesis.
+                <span className="font-bold">Privacy Note: </span>
+                Zero-Key-Escape active. Please configure your API key in Settings to continue asking Ani.
               </div>
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
                 className="px-3 py-1.5 rounded-lg bg-violet-600 text-white font-semibold text-[11px] hover:bg-violet-700 transition shrink-0 cursor-pointer"
               >
-                Configure key
+                Configure Key
               </button>
             </div>
           )}
@@ -1288,7 +1270,20 @@ export default function AiChatView({ initialQuery = null }) {
       <AiSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onSave={(newSettings) => setAiSettings(newSettings)}
+        onSave={(newSettings) => {
+          setAiSettings(newSettings);
+          const hasNewKey = Boolean(
+            (newSettings?.apiKey && newSettings.apiKey.trim().length >= 5) ||
+            (newSettings?.provider === 'custom' && newSettings?.baseUrl?.trim())
+          );
+          if (hasNewKey && pendingQueryRef.current) {
+            const q = pendingQueryRef.current;
+            pendingQueryRef.current = null;
+            setTimeout(() => {
+              handleSendMessage(q);
+            }, 120);
+          }
+        }}
       />
 
       {/* ── Citation Quickview Sheet / Modal ───────────────────────────── */}
