@@ -274,7 +274,7 @@ function injectTranslationsIntoHtml(
           if (isPaliTop) {
             if (hasCustomPali) {
               const paliBlockStyles = [
-                paliBorder ? `border-left: 2px solid ${paliBorder}` : 'border-left: none',
+                paliBorder ? `border-left: 1.5px solid ${paliBorder}` : 'border-left: none',
                 paliBg ? `background-color: ${paliBg}` : '',
                 paliText ? `color: ${paliText}` : '',
                 (paliBorder || paliBg) ? 'padding: 0.5rem 0.85rem; border-radius: 0 0.5rem 0.5rem 0; margin-bottom: 0.5rem;' : '',
@@ -306,9 +306,9 @@ function injectTranslationsIntoHtml(
           } else {
             // Task 2: If Pali text is not in position top, add border-left to it as other translation languages
             // Task 3: Dynamically apply custom colors (background, text color, border-left color)
-            const borderValue = paliBorder || 'var(--accent, #8b2500)';
+            const borderValue = paliBorder || 'color-mix(in srgb, var(--accent, #8b2500) 30%, transparent)';
             const paliBlockStyles = [
-              `border-left: 2px solid ${borderValue}`,
+              `border-left: 1.5px solid ${borderValue}`,
               paliBg ? `background-color: ${paliBg}` : '',
               paliText ? `color: ${paliText}` : '',
             ].filter(Boolean).join('; ');

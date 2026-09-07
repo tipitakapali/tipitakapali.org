@@ -746,7 +746,7 @@ body.no-indent .reader-container .reader-trans-content.hangnum {
 }
 
 .reader-trans-block {
-  border-left: 2px solid var(--accent);
+  border-left: 1.5px solid color-mix(in srgb, var(--accent) 30%, transparent);
   background: transparent; /* Same as Pāḷi text background by default */
   border-radius: 0 0.5rem 0.5rem 0;
   padding: 0.5rem 0.85rem;
@@ -766,86 +766,86 @@ body.hide-trans-borders .reader-trans-block {
 /* Language-specific left border accent colors (Task 5) */
 .reader-trans-block[data-trans-lang="en"],
 .reader-trans-block[data-trans-lang="english"] {
-  border-left-color: #2563eb; /* Royal Blue */
+  border-left-color: color-mix(in srgb, #2563eb 30%, transparent); /* Royal Blue */
 }
 
 .reader-trans-block[data-trans-lang="vi"],
 .reader-trans-block[data-trans-lang="vietnamese"] {
-  border-left-color: #dc2626; /* Crimson Red */
+  border-left-color: color-mix(in srgb, #dc2626 30%, transparent); /* Crimson Red */
 }
 
 .reader-trans-block[data-trans-lang="my"],
 .reader-trans-block[data-trans-lang="myanmar"] {
-  border-left-color: #059669; /* Jade Green */
+  border-left-color: color-mix(in srgb, #059669 30%, transparent); /* Jade Green */
 }
 
 .reader-trans-block[data-trans-lang="si"],
 .reader-trans-block[data-trans-lang="sinhala"] {
-  border-left-color: #d97706; /* Saffron Amber */
+  border-left-color: color-mix(in srgb, #d97706 30%, transparent); /* Saffron Amber */
 }
 
 .reader-trans-block[data-trans-lang="zh"],
 .reader-trans-block[data-trans-lang="chinese"] {
-  border-left-color: #9f1239; /* Deep Rose (dark vs Vietnamese bright red) */
+  border-left-color: color-mix(in srgb, #9f1239 30%, transparent); /* Deep Rose (dark vs Vietnamese bright red) */
 }
 
 .reader-trans-block[data-trans-lang="km"],
 .reader-trans-block[data-trans-lang="khmer"] {
-  border-left-color: #0891b2; /* Deep Cyan */
+  border-left-color: color-mix(in srgb, #0891b2 30%, transparent); /* Deep Cyan */
 }
 
 .reader-trans-block[data-trans-lang="th"],
 .reader-trans-block[data-trans-lang="thai"] {
-  border-left-color: #7c3aed; /* Violet / Purple */
+  border-left-color: color-mix(in srgb, #7c3aed 30%, transparent); /* Violet / Purple */
 }
 
 .reader-trans-block[data-trans-lang="lo"],
 .reader-trans-block[data-trans-lang="lao"] {
-  border-left-color: #115e59; /* Dark Teal (dark vs Khmer bright cyan) */
+  border-left-color: color-mix(in srgb, #115e59 30%, transparent); /* Dark Teal (dark vs Khmer bright cyan) */
 }
 
 .reader-trans-block[data-trans-lang="ta"],
 .reader-trans-block[data-trans-lang="tamil"] {
-  border-left-color: #c2410c; /* Deep Rust */
+  border-left-color: color-mix(in srgb, #c2410c 30%, transparent); /* Deep Rust */
 }
 
 .reader-trans-block[data-trans-lang="hi"],
 .reader-trans-block[data-trans-lang="hindi"] {
-  border-left-color: #6b21a8; /* Deep Purple (dark vs Thai vivid violet) */
+  border-left-color: color-mix(in srgb, #6b21a8 30%, transparent); /* Deep Purple (dark vs Thai vivid violet) */
 }
 
 .reader-trans-block[data-trans-lang="de"],
 .reader-trans-block[data-trans-lang="german"] {
-  border-left-color: #475569; /* Slate */
+  border-left-color: color-mix(in srgb, #475569 30%, transparent); /* Slate */
 }
 
 .reader-trans-block[data-trans-lang="ja"],
 .reader-trans-block[data-trans-lang="japanese"] {
-  border-left-color: #db2777; /* Cherry Pink */
+  border-left-color: color-mix(in srgb, #db2777 30%, transparent); /* Cherry Pink */
 }
 
 .reader-trans-block[data-trans-lang="pt"],
 .reader-trans-block[data-trans-lang="portuguese"] {
-  border-left-color: #0c4a6e; /* Dark Navy (darkest blue vs English vivid blue) */
+  border-left-color: color-mix(in srgb, #0c4a6e 30%, transparent); /* Dark Navy (darkest blue vs English vivid blue) */
 }
 
 .reader-trans-block[data-trans-lang="ru"],
 .reader-trans-block[data-trans-lang="russian"] {
-  border-left-color: #eab308; /* Golden Yellow (bright vs Sinhala amber) */
+  border-left-color: color-mix(in srgb, #eab308 30%, transparent); /* Golden Yellow (bright vs Sinhala amber) */
 }
 
 .reader-trans-block[data-trans-lang="my_nissaya"] {
-  border-left-color: #4d7c0f; /* Olive (yellow-green vs Myanmar blue-green) */
+  border-left-color: color-mix(in srgb, #4d7c0f 30%, transparent); /* Olive (yellow-green vs Myanmar blue-green) */
 }
 
 .reader-trans-block[data-trans-lang="ko"],
 .reader-trans-block[data-trans-lang="korean"] {
-  border-left-color: #6b7280; /* Neutral Gray (mid vs German dark slate) */
+  border-left-color: color-mix(in srgb, #6b7280 30%, transparent); /* Neutral Gray (mid vs German dark slate) */
 }
 
 .reader-trans-block[data-trans-lang="pali"],
 .reader-trans-block.reader-pali-trans-block {
-  border-left-color: var(--accent); /* Original Pali Accent */
+  border-left-color: color-mix(in srgb, var(--accent) 30%, transparent); /* Original Pali Accent */
 }
 
 /* Side-by-side layouts (Pāḷi - Translation / Translation - Pāḷi): Pāḷi gets its
@@ -864,7 +864,7 @@ body.hide-trans-borders .reader-trans-block {
 }
 
 .reader-trans-block.reader-pali-top-block.has-custom-border {
-  border-left: 2px solid var(--accent);
+  border-left: 1.5px solid var(--accent);
   padding: 0.5rem 0.85rem;
   border-radius: 0 0.5rem 0.5rem 0;
   margin-bottom: 0.5rem;

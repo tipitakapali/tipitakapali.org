@@ -457,63 +457,6 @@ export default function LanguageMenu() {
                 </select>
               </div>
 
-              {/* Section 2: Translation Display Mode */}
-              <div className="pt-3 border-t border-[var(--border-color)]">
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
-                  Translation Display Mode
-                </span>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDisplayModeChange('side')}
-                    aria-label="Pāḷi on the left, Translation on the right"
-                    title="Pāḷi on the left, Translation on the right"
-                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
-                      translationDisplayMode === 'side'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                      <Columns2 size={14} className="shrink-0" />
-                      Pāḷi - Translation
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDisplayModeChange('stack')}
-                    aria-label="Translation below Pāḷi (vertical)"
-                    title="Translation below Pāḷi (vertical)"
-                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
-                      translationDisplayMode === 'stack'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                      <Rows3 size={14} className="shrink-0" />
-                      Vertical
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDisplayModeChange('side_rev')}
-                    aria-label="Translation on the left, Pāḷi on the right"
-                    title="Translation on the left, Pāḷi on the right"
-                    className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
-                      translationDisplayMode === 'side_rev'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
-                    }`}
-                  >
-                    <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                      <Columns2 size={14} className="shrink-0 scale-x-[-1]" />
-                      Translation - Pāḷi
-                    </span>
-                  </button>
-                </div>
-              </div>
-
               {/* Section 3: Multi-Translation Layers (including Pāḷi) */}
               <div className="pt-3 border-t border-[var(--border-color)]">
                 <div className="mb-2">
@@ -521,8 +464,58 @@ export default function LanguageMenu() {
                     Translations &amp; Display Order
                   </span>
                   <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
-                    Toggle the checkbox to enable/disable a language. Use ⤒ ▲ ▼ to reorder layers. Pāḷi text can be moved or disabled if you wish to read translations only.
+                    Use ⤒ ▲ ▼ to reorder translations.
                   </p>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayModeChange('side')}
+                      aria-label="Pāḷi on the left, Translation on the right"
+                      title="Pāḷi on the left, Translation on the right"
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                        translationDisplayMode === 'side'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                        <Columns2 size={14} className="shrink-0" />
+                        Pāḷi - Translation
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayModeChange('stack')}
+                      aria-label="Translation below Pāḷi (vertical)"
+                      title="Translation below Pāḷi (vertical)"
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                        translationDisplayMode === 'stack'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                        <Rows3 size={14} className="shrink-0" />
+                        Vertical
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayModeChange('side_rev')}
+                      aria-label="Translation on the left, Pāḷi on the right"
+                      title="Translation on the left, Pāḷi on the right"
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                        translationDisplayMode === 'side_rev'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                        <Columns2 size={14} className="shrink-0 scale-x-[-1]" />
+                        Translation - Pāḷi
+                      </span>
+                    </button>
+                  </div>
                   <label className="flex items-center gap-2.5 px-3 py-2 mt-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] cursor-pointer">
                     <input
                       type="checkbox"
@@ -829,7 +822,7 @@ export default function LanguageMenu() {
                       Live Preview
                     </span>
                     <div
-                      className="p-3.5 rounded-r-xl border-l-[4px] transition-all shadow-xs"
+                      className="p-3.5 rounded-r-xl border-l-[1.5px] transition-all shadow-xs"
                       style={{
                         borderLeftColor: formatCssColor(activeBorder),
                         backgroundColor: formatCssColor(activeBg) || 'transparent',
