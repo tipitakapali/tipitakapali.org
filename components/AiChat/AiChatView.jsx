@@ -793,14 +793,14 @@ export default function AiChatView({ initialQuery = null }) {
               <span
                 onClick={() => setIsSettingsOpen(true)}
                 className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer flex items-center gap-1 transition ${
-                  aiSettings.orthodoxMode !== false
+                  aiSettings.groundRAGMode !== false
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
                     : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20'
                 }`}
                 title="Click to toggle between RAG Mode & Knowledge Mode"
               >
                 <ShieldCheck size={10} />
-                <span>{aiSettings.orthodoxMode !== false ? 'RAG Mode' : 'Knowledge'}</span>
+                <span>{aiSettings.groundRAGMode !== false ? 'RAG Mode' : 'Knowledge'}</span>
               </span>
             </div>
             <p className="text-[10.5px] text-[var(--text-muted)] truncate hidden sm:block">

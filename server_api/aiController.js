@@ -574,7 +574,7 @@ You have up to 6 iterations. Use them with deep scholarly discipline:
 - Never rely solely on summaries — always confirm with the actual canonical text.
 
 ### Phase 3: Commentarial Depth (Aṭṭhakathā & Ṭīkā)
-- When orthodox Theravāda doctrinal clarification is needed, call get_commentaries on the key Mūla paragraph.
+- When groundRAG Theravāda doctrinal clarification is needed, call get_commentaries on the key Mūla paragraph.
 - Examine Buddhaghosa's commentaries and Dhammapāla's sub-commentaries.
 
 ### Phase 4: Linguistic Etymology (DPD)
@@ -583,8 +583,8 @@ You have up to 6 iterations. Use them with deep scholarly discipline:
 ### Phase 5: Synthesis Trigger
 - Once you have sufficient canonical and commentarial evidence directly answering the inquiry, call final_answer(summary).`;
 
-function buildAnswerSystemPrompt({ orthodoxMode = true }) {
-  const grounding = orthodoxMode
+function buildAnswerSystemPrompt({ groundRAGMode = true }) {
+  const grounding = groundRAGMode
     ? `## RAG Mode Rules (Strict Grounding)
 1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}].
 2. Answer the user's question using ONLY the canonical passages, commentaries, and dictionary definitions returned by the research tools.
@@ -2864,7 +2864,7 @@ function registerAiRoutes(fastify) {
       provider = 'gemini',
       toolModel = 'gemini-flash-lite-latest',
       answerModel = 'gemini-flash-lite-latest',
-      orthodoxMode = true,
+      groundRAGMode = true,
       customSystemPrompt = '',
       baseUrl = '',
     } = body;
@@ -2949,13 +2949,13 @@ function registerAiRoutes(fastify) {
       sendEvent('status', { message: 'Synthesizing authoritative response with canonical citations…' });
 
       const contextBlock = buildSynthesisContextBlock(collectedEvidence);
-      const answerSystemPrompt = buildAnswerSystemPrompt({ orthodoxMode });
+      const answerSystemPrompt = buildAnswerSystemPrompt({ groundRAGMode });
       const targetLang = understanding?.detected_language || 'en';
       let langDirective = 'Please write your response in English.';
       if (targetLang === 'vi') {
         langDirective = 'Hãy viết toàn bộ câu trả lời bằng tiếng Việt trang trọng, chuẩn mực Phật học, giải thích rõ các thuật ngữ Pāḷi.';
       } else if (targetLang === 'my') {
-        langDirective = 'Please write your complete answer in Burmese (မြန်မာဘာသာ), maintaining orthodox Theravāda scholarship and Pāḷi citations.';
+        langDirective = 'Please write your complete answer in Burmese (မြန်မာဘာသာ), maintaining groundRAG Theravāda scholarship and Pāḷi citations.';
       }
 
       const synthesisPrompt = `USER QUESTION:

@@ -194,7 +194,7 @@ export const kAiToolDeclarations = [
     name: "get_commentaries",
     description:
       "Retrieve corresponding Aṭṭhakathā (ancient commentary) and Ṭīkā (sub-commentary) explanations " +
-      "for a given Mūla (root) paragraph. Essential for doctrinal explanations, orthodox Theravada views, and term clarification.",
+      "for a given Mūla (root) paragraph. Essential for doctrinal explanations, groundRAG Theravada views, and term clarification.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -319,8 +319,8 @@ Your duty is to systematically investigate the Dhamma through precise canonical 
 5. Clarify key terms and roots with get_dictionary.
 6. Once sufficient authentic evidence is gathered, call final_answer(summary).`;
 
-function buildAnswerSystemPrompt({ orthodoxMode = true }) {
-  const grounding = orthodoxMode
+function buildAnswerSystemPrompt({ groundRAGMode = true }) {
+  const grounding = groundRAGMode
     ? `## RAG Mode Rules (Strict Grounding)
 1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}].
 2. Answer the user's question using the canonical passages, commentaries, and dictionary definitions gathered during research.
@@ -518,7 +518,7 @@ export async function runClientAiAgent({
   const provider = aiSettings?.provider || "gemini";
   const toolModel = aiSettings?.toolModel || "gemini-flash-lite-latest";
   const answerModel = aiSettings?.answerModel || "gemini-flash-lite-latest";
-  const orthodoxMode = aiSettings?.orthodoxMode !== false;
+  const groundRAGMode = aiSettings?.groundRAGMode !== false;
   const customSystemPrompt = aiSettings?.customSystemPrompt || "";
   const baseUrl = aiSettings?.baseUrl || "";
 
@@ -844,7 +844,7 @@ Execute research systematically. Search sections, read exact paragraphs with get
     // ── STEP 3: STREAMING CANONICAL SYNTHESIS ─────────────────────────────
     onStatus("Step 3: Synthesizing verified answer with authentic canonical citations…");
 
-    const answerSysPrompt = buildAnswerSystemPrompt({ orthodoxMode });
+    const answerSysPrompt = buildAnswerSystemPrompt({ groundRAGMode });
     let evidenceContext = "## RETRIEVED CANONICAL EVIDENCE FOR SYNTHESIS:\n\n";
 
     if (allCollectedEvidence.sections.length > 0) {

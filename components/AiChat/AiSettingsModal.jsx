@@ -10,11 +10,11 @@ export const DEFAULT_AI_SETTINGS = {
   toolModel: 'gemini-flash-lite-latest',
   answerModel: 'gemini-flash-lite-latest',
   baseUrl: '',
-  orthodoxMode: true,
+  groundRAGMode: true,
   customSystemPrompt: '',
 };
 
-export const AI_STORAGE_KEY = 'tipitaka_ai_settings_v1';
+export const AI_STORAGE_KEY = 'tipitaka_ai_settings_v2';
 
 export function getStoredAiSettings() {
   if (typeof window === 'undefined') return DEFAULT_AI_SETTINGS;
@@ -594,25 +594,25 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
           <div className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-start justify-between gap-3">
             <div className="space-y-0.5">
               <div className="font-bold flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
-                <ShieldCheck size={14} className={config.orthodoxMode ? 'text-emerald-500' : 'text-[var(--text-muted)]'} />
+                <ShieldCheck size={14} className={config.groundRAGMode ? 'text-emerald-500' : 'text-[var(--text-muted)]'} />
                 <span>RAG Mode (Strict Canonical Grounding)</span>
               </div>
               <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                {config.orthodoxMode
+                {config.groundRAGMode
                   ? 'Active: Answers strictly use ONLY retrieved passages and commentaries found in the Chaṭṭha Saṅgāyana Tipiṭaka. Every claim must have a citation.'
                   : 'Disabled: Knowledge mode active. The AI may supplement canonical quotes with broader Buddhist philosophical knowledge.'}
               </p>
             </div>
             <button
               type="button"
-              onClick={() => setConfig({ ...config, orthodoxMode: !config.orthodoxMode })}
+              onClick={() => setConfig({ ...config, groundRAGMode: !config.groundRAGMode })}
               className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-0.5 ${
-                config.orthodoxMode ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-700'
+                config.groundRAGMode ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-gray-700'
               }`}
             >
               <span
                 className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  config.orthodoxMode ? 'translate-x-5' : 'translate-x-0'
+                  config.groundRAGMode ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
