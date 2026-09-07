@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   Send,
   Square,
@@ -356,7 +356,18 @@ export default function AiChatView({ initialQuery = null }) {
 
   const abortControllerRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
+  const isNearBottomRef = useRef(true);
+  const threadScrollMapRef = useRef({});
+  const isAutoScrollingRef = useRef(false);
+
+  // Prefill initialQuery if provided
+  useEffect(() => {
+    if (initialQuery && !inputQuery) {
+      setInputQuery(initialQuery);
+    }
+  }, [initialQuery]);
 
   // 1. Initialize settings & load threads
   useEffect(() => {
@@ -413,16 +424,49 @@ export default function AiChatView({ initialQuery = null }) {
     }
   }, [activeThreadId]);
 
-  // 3. Auto-scroll to bottom
+  // 3. Container-scoped scroll handling (NEVER call scrollIntoView which scrolls the entire window/page!)
   const scrollToBottom = useCallback((behavior = 'smooth') => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    isAutoScrollingRef.current = true;
+    if (behavior === 'smooth') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
     }
+    setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, behavior === 'smooth' ? 300 : 50);
   }, []);
 
+  const handleMessagesScroll = useCallback((e) => {
+    const el = e.target;
+    if (!el) return;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceToBottom <= 120;
+    if (activeThreadId && !isAutoScrollingRef.current) {
+      threadScrollMapRef.current[activeThreadId] = el.scrollTop;
+    }
+  }, [activeThreadId]);
+
+  // Restore thread scroll position synchronously before paint without page scrolling
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el || !activeThreadId) return;
+    const savedPos = threadScrollMapRef.current[activeThreadId];
+    if (savedPos !== undefined) {
+      el.scrollTop = savedPos;
+    } else if (messages.length > 0) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [activeThreadId, messages]);
+
+  // Auto-scroll only during live generation if user was already near the bottom
   useEffect(() => {
-    scrollToBottom('smooth');
-  }, [messages, isGenerating, statusMessage, scrollToBottom]);
+    if (isGenerating && isNearBottomRef.current) {
+      scrollToBottom('smooth');
+    }
+  }, [isGenerating, statusMessage, scrollToBottom]);
 
   // 4. Save messages to localStorage helper
   const saveThreadMessages = (threadId, newMessages) => {
@@ -558,6 +602,10 @@ export default function AiChatView({ initialQuery = null }) {
     setMessages(nextMessages);
     setIsGenerating(true);
     setStatusMessage('Consulting Tipiṭaka database…');
+    isNearBottomRef.current = true;
+    requestAnimationFrame(() => {
+      scrollToBottom('smooth');
+    });
 
     // Title thread if it was default
     const currentThread = threads.find((t) => t.id === activeThreadId);
@@ -887,7 +935,11 @@ export default function AiChatView({ initialQuery = null }) {
       </header>
 
       {/* ── Messages Scroll Area ───────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-6">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+        className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-6"
+      >
         {/* Welcome Empty State */}
         {messages.length === 0 && (
           <div className="max-w-2xl mx-auto pt-1 sm:pt-2 pb-4 sm:pb-6 space-y-4 animate-fade-in text-center">

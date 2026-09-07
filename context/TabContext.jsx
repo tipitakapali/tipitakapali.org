@@ -213,6 +213,7 @@ export function TabProvider({ children }) {
   const isSidebarOpenRef = useRef(isSidebarOpen);
 
   const tabScrollMemoryRef = useRef({});
+  const scrollPersistTimerRef = useRef(null);
   // bookCode -> URL script prefix (e.g. 'si') for tabs opened via script-prefixed URLs,
   // so updateUrlParams keeps the prefix in the address bar (deep-links stay script-specific)
   const tabScriptPrefixRef = useRef({});
@@ -588,6 +589,7 @@ export function TabProvider({ children }) {
 
       if (existingIndex !== -1) {
         setActiveBookCode('ai_chat');
+        setTargetScrollIntent(null);
         setTreeSelectedNode(null);
         setSearchHighlight(null);
         persistTabs(currentTabs, 'ai_chat');
@@ -606,6 +608,7 @@ export function TabProvider({ children }) {
       const nextTabs = [...currentTabs, aiTab];
       setOpenTabs(nextTabs);
       setActiveBookCode('ai_chat');
+      setTargetScrollIntent(null);
       setTreeSelectedNode(null);
       setSearchHighlight(null);
       persistTabs(nextTabs, 'ai_chat');
@@ -1237,6 +1240,15 @@ export function TabProvider({ children }) {
   // Switch tabs smoothly with instant scroll position restoration
   const switchTab = useCallback(
     (bookCode) => {
+      // Flush any debounced scroll persist immediately before switching
+      if (scrollPersistTimerRef.current) {
+        clearTimeout(scrollPersistTimerRef.current);
+        scrollPersistTimerRef.current = null;
+        try {
+          localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+        } catch (e) {}
+      }
+
       setActiveBookCode(bookCode);
       setTargetScrollIntent(null);
 
@@ -1578,13 +1590,16 @@ export function TabProvider({ children }) {
   );
 
   const saveTabScroll = useCallback((bookCode, scrollTop) => {
-
-    if (bookCode) {
-      tabScrollMemoryRef.current[bookCode] = scrollTop;
+    if (!bookCode) return;
+    tabScrollMemoryRef.current[bookCode] = scrollTop;
+    if (scrollPersistTimerRef.current) {
+      clearTimeout(scrollPersistTimerRef.current);
+    }
+    scrollPersistTimerRef.current = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
       } catch (e) {}
-    }
+    }, 250);
   }, []);
 
   const getSavedScroll = useCallback((bookCode) => {

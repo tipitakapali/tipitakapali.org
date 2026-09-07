@@ -1049,6 +1049,8 @@ export default function ReaderView() {
   const scrollAccDeltaRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
   const prevBookCodeRef = useRef(null);
+  const restoredContainerRef = useRef(null);
+  const restoredBookCodeRef = useRef(null);
   const clickedWordsByBookRef = useRef({});
 
   // Chapter-jump settle tracking (sidebar chapter clicks): lazy translations streaming
@@ -1127,18 +1129,44 @@ export default function ReaderView() {
 
   // Synchronously restore scroll position BEFORE browser paint (Zero jumping / bouncing!)
   useLayoutEffect(() => {
-    if (!containerRef.current || !activeTab) return;
+    if (!containerRef.current || !activeTab?.bookCode || activeTab.bookCode === 'ai_chat') return;
 
-    if (prevBookCodeRef.current !== activeTab.bookCode) {
+    const container = containerRef.current;
+    const needsRestore =
+      restoredContainerRef.current !== container ||
+      restoredBookCodeRef.current !== activeTab.bookCode;
+
+    if (needsRestore) {
+      restoredContainerRef.current = container;
+      restoredBookCodeRef.current = activeTab.bookCode;
       prevBookCodeRef.current = activeTab.bookCode;
 
       if (!targetScrollIntent) {
         const savedScroll = getSavedScroll(activeTab.bookCode);
-        // Instant synchronous scroll (no smooth animation)
-        containerRef.current.scrollTop = savedScroll;
+        if (savedScroll > 0) {
+          container.scrollTop = savedScroll;
+          // Safeguard: re-verify in next frame in case DOM layout / fonts reflowed
+          requestAnimationFrame(() => {
+            if (containerRef.current && !targetScrollIntent && restoredBookCodeRef.current === activeTab.bookCode) {
+              if (Math.abs(containerRef.current.scrollTop - savedScroll) > 5) {
+                containerRef.current.scrollTop = savedScroll;
+              }
+            }
+          });
+        }
       }
     }
   }, [activeTab?.bookCode, getSavedScroll, targetScrollIntent]);
+
+  // Synchronously save scroll position on unmount or tab switch, and reset restoration flag on unmount
+  useEffect(() => {
+    return () => {
+      if (containerRef.current && activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
+        saveTabScroll(activeTab.bookCode, containerRef.current.scrollTop);
+      }
+      restoredContainerRef.current = null;
+    };
+  }, [activeTab?.bookCode, saveTabScroll]);
 
   // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
@@ -1918,12 +1946,16 @@ export default function ReaderView() {
     (e) => {
       const top = e.target.scrollTop;
 
+      // Immediately update memory scroll on every scroll event (no lag, no lost scroll)
+      if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
+        saveTabScroll(activeTab.bookCode, top);
+      }
+
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
       scrollTimeoutRef.current = setTimeout(() => {
         if (activeTab && containerRef.current) {
-          saveTabScroll(activeTab.bookCode, top);
 
           // Detect active paragraph in reading viewport
           const container = containerRef.current;
