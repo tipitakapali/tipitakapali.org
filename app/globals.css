@@ -2812,8 +2812,9 @@ footer.app-footer.hidden-footer,
 
 .footer-nav-btn span {
   line-height: 1;
-  display: inline-flex;
-  align-items: center;
+  /* NOTE: do not set display here — unlayered CSS beats Tailwind utilities,
+     so display:inline-flex would override the responsive `hidden` classes
+     on footer labels and force horizontal overflow on phones. */
 }
 
 .footer-nav-btn:hover:not(:disabled) {
@@ -3383,8 +3384,9 @@ footer.app-footer.hidden-footer,
     flex-shrink: 0;
   }
   .footer-nav-btn {
-    padding: 2px 4px;
+    padding: 4px 10px;
     font-size: 11px;
+    min-width: 40px;
   }
 }
 

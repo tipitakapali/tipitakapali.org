@@ -51,15 +51,15 @@ export default function Footer() {
 
   return (
     <>
-      <footer className={`app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-transparent px-2 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border ${
+      <footer className={`app-footer w-full max-w-full overflow-x-auto overflow-y-hidden h-[46px] sm:h-[48px] bg-transparent px-1 sm:px-4 flex items-center justify-center shrink-0 z-40 text-xs select-none box-border ${
         isHidden ? 'hidden-footer' : ''
       }`}>
         {/* Navigation Buttons Group */}
-        <div className="footer-nav-group mx-auto flex items-center justify-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div className="footer-nav-group mx-auto flex items-center justify-center gap-1 sm:gap-2.5 shrink-0">
           {/* Text Size Button */}
           <button
             onClick={() => setIsFontSizeOpen(true)}
-            className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
+            className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
               isFontSizeOpen ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
             }`}
             title="Adjust Text Size"
@@ -101,7 +101,7 @@ export default function Footer() {
               setIsMatModalOpen(true);
             }}
             disabled={!activeTab}
-            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Jump to Connected Mūla, Aṭṭhakathā, Ṭīkā"
           >
             <Layers size={13} className="text-[var(--accent)] shrink-0" />
@@ -117,7 +117,7 @@ export default function Footer() {
           <button
             onClick={() => openGoToModal('para')}
             disabled={!activeTab}
-            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Go to Paragraph or Page Number"
           >
             <Navigation size={13} className="text-[var(--accent)] shrink-0" />
@@ -128,7 +128,7 @@ export default function Footer() {
           <button
             onClick={() => setIsTocOpen(true)}
             disabled={!activeTab}
-            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Open Book Table of Contents"
           >
             <ListTree size={14} className="text-[var(--accent)] shrink-0" />
@@ -140,7 +140,7 @@ export default function Footer() {
             <button
               onClick={startReadAloud}
               disabled={!activeTab}
-              className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
+              className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
                 isTtsActive ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
               }`}
               title="Read Aloud (text to speech)"
@@ -159,7 +159,7 @@ export default function Footer() {
                 document.body.classList.add('zen-mode');
               }
             }}
-            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
+            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
             title="Enter Eka Mode (Distraction-free reading)"
           >
             <Maximize2 size={13} className="text-[var(--accent)] shrink-0" />
