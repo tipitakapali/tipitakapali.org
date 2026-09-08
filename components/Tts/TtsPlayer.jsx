@@ -352,7 +352,7 @@ export default function TtsPlayer() {
               ) : current ? (
                 <>
                   <div className="text-[11px] font-bold text-[var(--text-primary)] truncate">
-                    ¶{current.para} · {current.langLabel}
+                    {current.para} · {current.langLabel}
                   </div>
                   <div className="text-[10px] font-mono text-[var(--text-muted)]">
                     {current.index + 1}/{current.total}
@@ -376,14 +376,16 @@ export default function TtsPlayer() {
             >
               <Settings size={15} />
             </button>
-            <button
-              onClick={stop}
-              className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition cursor-pointer"
-              title="Close player"
-              aria-label="Close player"
-            >
-              <X size={15} />
-            </button>
+            {!showSettings && (
+              <button
+                onClick={stop}
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition cursor-pointer"
+                title="Close player"
+                aria-label="Close player"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
           {showSettings && <SettingsPanel />}
         </div>
