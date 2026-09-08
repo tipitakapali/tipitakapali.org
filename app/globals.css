@@ -770,6 +770,18 @@ body.hide-trans-borders .reader-trans-block {
   border-left-color: transparent !important;
 }
 
+/* Read Aloud (TTS) active-block highlight + follow */
+.reader-trans-block.tts-speaking {
+  border-left-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reader-trans-block.tts-speaking {
+    transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+}
+
 /* Ani semantic legend chips under Dusk & OLED.
    NOTE: Tailwind `dark:` variants only fire on data-theme="dark", so without
    these overrides the light-mode chip colors render (too dark/blurry) on

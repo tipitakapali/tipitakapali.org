@@ -13,7 +13,9 @@ import {
   Maximize2,
   AlignLeft,
   AlignJustify,
+  Volume2,
 } from 'lucide-react';
+import { useTts } from '../context/TtsContext';
 
 
 import BookTocModal from './BookTocModal';
@@ -38,6 +40,7 @@ export default function Footer() {
     setIsSidebarOpen,
   } = useTabs();
   const { settings, updateSetting, updateSettings, setIsZenMode } = useThemeSettings();
+  const { startReadAloud, isActive: isTtsActive, isSupported: isTtsSupported } = useTts();
 
 
   const [isFontSizeOpen, setIsFontSizeOpen] = useState(false);
@@ -131,6 +134,21 @@ export default function Footer() {
             <ListTree size={14} className="text-[var(--accent)] shrink-0" />
             <span>Toc</span>
           </button>
+
+          {/* Read Aloud (TTS) */}
+          {isTtsSupported && (
+            <button
+              onClick={startReadAloud}
+              disabled={!activeTab}
+              className={`footer-nav-btn inline-flex items-center justify-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0 ${
+                isTtsActive ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-light)]' : ''
+              }`}
+              title="Read Aloud (text to speech)"
+            >
+              <Volume2 size={14} className="text-[var(--accent)] shrink-0" />
+              <span>Read</span>
+            </button>
+          )}
 
           {/* Eka Mode / Expand Button */}
           <button

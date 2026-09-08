@@ -2,6 +2,7 @@ import './globals.css';
 import './pali-fonts.css';
 import { ThemeSettingsProvider } from '../context/ThemeSettingsContext';
 import { TabProvider } from '../context/TabContext';
+import { TtsProvider } from '../context/TtsContext';
 import { DictionaryProvider } from '../context/DictionaryContext';
 import WebMcpRegistration from '../components/WebMcpRegistration';
 
@@ -152,9 +153,11 @@ export default function RootLayout({ children }) {
         <WebMcpRegistration />
         <ThemeSettingsProvider>
           <TabProvider>
-            <DictionaryProvider>
-              {children}
-            </DictionaryProvider>
+            <TtsProvider>
+              <DictionaryProvider>
+                {children}
+              </DictionaryProvider>
+            </TtsProvider>
           </TabProvider>
         </ThemeSettingsProvider>
       </body>

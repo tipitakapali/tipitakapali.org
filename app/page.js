@@ -11,6 +11,7 @@ import Footer from '../components/Footer';
 import SearchModal from '../components/Search/SearchModal';
 import SettingsModal from '../components/Settings/SettingsModal';
 import DictionaryModal from '../components/DictionaryModal';
+import TtsPlayer from '../components/Tts/TtsPlayer';
 import BookmarkModal from '../components/BookmarkModal';
 import HistoryModal from '../components/HistoryModal';
 import NotFound from './not-found';
@@ -379,6 +380,7 @@ export function MainAppContent({ params: rawParams }) {
 
       <SearchModal />
       <SettingsModal />
+      <TtsPlayer />
       <BookmarkModal isOpen={isBookmarkOpen} onClose={() => setIsBookmarkOpen(false)} />
       <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </div>
