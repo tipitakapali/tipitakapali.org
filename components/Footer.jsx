@@ -65,7 +65,7 @@ export default function Footer() {
             title="Adjust Text Size"
           >
             <Type size={13} className="text-[var(--accent)] shrink-0" />
-            <span>Size</span>
+            <span className="hidden min-[560px]:inline">Size</span>
           </button>
 
           {/* MAT Button */}
@@ -105,7 +105,7 @@ export default function Footer() {
             title="Jump to Connected Mūla, Aṭṭhakathā, Ṭīkā"
           >
             <Layers size={13} className="text-[var(--accent)] shrink-0" />
-            <span>MAT</span>
+            <span className="hidden min-[560px]:inline">MAT</span>
             {activeParaNum && (
               <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--accent-light)] text-[var(--accent)] font-mono font-bold leading-none inline-flex items-center">
                 {activeParaNum}
@@ -121,7 +121,7 @@ export default function Footer() {
             title="Go to Paragraph or Page Number"
           >
             <Navigation size={13} className="text-[var(--accent)] shrink-0" />
-            <span>Go</span>
+            <span className="hidden min-[560px]:inline">Go</span>
           </button>
 
           {/* Book Toc */}
@@ -132,7 +132,7 @@ export default function Footer() {
             title="Open Book Table of Contents"
           >
             <ListTree size={14} className="text-[var(--accent)] shrink-0" />
-            <span>Toc</span>
+            <span className="hidden min-[560px]:inline">Toc</span>
           </button>
 
           {/* Read Aloud (TTS) */}
@@ -146,7 +146,7 @@ export default function Footer() {
               title="Read Aloud (text to speech)"
             >
               <Volume2 size={14} className="text-[var(--accent)] shrink-0" />
-              <span>Read</span>
+              <span className="hidden min-[560px]:inline">Read</span>
             </button>
           )}
 
@@ -163,7 +163,7 @@ export default function Footer() {
             title="Enter Eka Mode (Distraction-free reading)"
           >
             <Maximize2 size={13} className="text-[var(--accent)] shrink-0" />
-            <span>Eka</span>
+            <span className="hidden min-[560px]:inline">Eka</span>
           </button>
         </div>
       </footer>
