@@ -45,6 +45,10 @@ const STARTER_PROMPTS = [
     query: 'Explain the Four Noble Truths (cattāri ariyasaccāni) as taught in the Dhammacakkappavattana Sutta (SN 56.11), with canonical definitions of each truth.',
   },
   {
+    title: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ?',
+    query: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ။ ပါဠိအမည်၊ သုတ်အမှတ်နှင့် အဓိကအကြောင်းအရာ အကျဉ်းကို canonical ကိုးကားချက်များနှင့်အတူ ဖော်ပြပေးပါ။',
+  },
+  {
     title: 'What is Mahāsatipaṭṭhāna?',
     query: 'Explain the four foundations of mindfulness (satipaṭṭhāna) — body, feelings, mind and dhammas — as taught in the Mahāsatipaṭṭhāna Sutta (DN 22).',
   },
@@ -57,8 +61,8 @@ const STARTER_PROMPTS = [
     query: 'Tìm giúp tôi bài kinh có tên giống như mật hoàn hay bánh mật? Cho biết tên Pāḷi, số hiệu bài kinh và tóm tắt nội dung chính với trích dẫn canonical.',
   },
   {
-    title: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ?',
-    query: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ။ ပါဠိအမည်၊ သုတ်အမှတ်နှင့် အဓိကအကြောင်းအရာ အကျဉ်းကို canonical ကိုးကားချက်များနှင့်အတူ ဖော်ပြပေးပါ။',
+    title: 'Detailed Pāḷi grammar analysis: "Sattāhaṃ sannivatto kātabbo"',
+    query: 'Detailed Pāḷi grammar analysis: "Sattāhaṃ sannivatto kātabbo"',
   },
 ];
 
@@ -801,7 +805,7 @@ export default function AiChatView({ initialQuery = null }) {
                 title="Click to toggle between RAG Mode & Knowledge Mode"
               >
                 <ShieldCheck size={10} />
-                <span>{aiSettings.groundRAGMode !== false ? 'RAG Mode' : 'Knowledge'}</span>
+                <span>{aiSettings.groundRAGMode !== false ? 'RAG' : 'Knowledge'}</span>
               </span>
             </div>
             <p className="text-[10.5px] text-[var(--text-muted)] truncate hidden sm:block">
@@ -1216,7 +1220,7 @@ export default function AiChatView({ initialQuery = null }) {
                   handleSendMessage();
                 }
               }}
-              placeholder="Ask Ani about suttas, Pāḷi terms, Vinaya, or Abhidhamma…"
+              placeholder="Ask Ani about Pāḷi grammar, or finding suttas..."
               disabled={isGenerating}
               className="flex-1 bg-transparent py-1.5 px-2.5 text-xs sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 leading-relaxed"
             />
