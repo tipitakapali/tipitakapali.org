@@ -111,6 +111,7 @@ function SettingsPanel() {
             setRate(1);
             setPitch(1);
             setVolume(1);
+            setFollow(true);
           }}
           className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
           title="Reset speed, pitch and volume to defaults"
