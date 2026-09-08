@@ -99,6 +99,7 @@ function SettingsPanel() {
     follow,
     setFollow,
     setShowSettings,
+    resetVoices,
   } = useTts();
 
   const listed = enabledLangIds.length > 0 ? enabledLangIds : ttsLangs;
@@ -112,9 +113,10 @@ function SettingsPanel() {
             setPitch(1);
             setVolume(1);
             setFollow(true);
+            resetVoices();
           }}
           className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
-          title="Reset speed, pitch and volume to defaults"
+          title="Reset voices to Auto and speed, pitch, volume and follow to defaults"
         >
           Reset
         </button>

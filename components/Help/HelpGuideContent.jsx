@@ -14,6 +14,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Mail,
+  Volume2,
   Sliders,
   Filter,
   Languages,
@@ -28,6 +29,7 @@ export const HELP_SECTIONS = [
   { id: 'topic-dict', label: 'Integrated Dictionaries', icon: BookSearch },
   { id: 'topic-velthuis', label: 'Velthuis & 17 Pāḷi Scripts', icon: Keyboard },
   { id: 'topic-mat', label: 'MAT Cross-Navigation', icon: Layers },
+  { id: 'topic-tts', label: 'Read Aloud (Text-to-Speech)', icon: Volume2 },
   { id: 'topic-ani', label: 'Ani AI Nissaya Assistant', icon: Sparkles },
   { id: 'topic-shortcuts', label: 'Shortcuts & Page Editions', icon: Sliders },
   { id: 'topic-attributions', label: 'Attributions, License & Credits', icon: ShieldCheck },
@@ -572,7 +574,50 @@ export default function HelpGuideContent({ showTabBar = true }) {
         </div>
       </section>
 
-      {/* 5b. Ani AI Nissaya Assistant */}
+      {/* 5b. Read Aloud (Text-to-Speech) */}
+      <section id="topic-tts" className="scroll-mt-14 space-y-3 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
+        <div className="flex items-center gap-2">
+          <Volume2 size={16} className="text-[var(--accent)]" />
+          <h3 className="font-bold text-sm text-[var(--text-primary)]">
+            Read Aloud (Text-to-Speech)
+          </h3>
+        </div>
+        <p className="text-[12px] text-[var(--text-secondary)]">
+          Listen to the translations while reading: tap the <strong>Read</strong> button in the bottom footer (right after <strong>Toc</strong>). Reading starts at the paragraph currently at the top of your screen and continues paragraph by paragraph, automatically moving into the next chapter when one ends.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11.5px]">
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)]">Language selection</div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Only enabled translation languages are spoken (Pāḷi speech is not supported). With one translation enabled it reads straight away; with two or more, pick which languages to hear the first time — the choice is remembered and asked again whenever the enabled languages change.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)]">Player controls</div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              The floating mini-player offers play/pause, stop, previous/next paragraph, and a settings gear. The paragraph being read is highlighted and followed with auto-scroll (toggleable).
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)]">Voices, speed & pitch</div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              In settings, choose a voice per language (Auto picks the best match, preferring Google male voices), enable/disable languages with the “Read aloud:” checkboxes, and adjust speed, pitch, volume and follow-along. Changes apply instantly to what is playing. <strong>Reset</strong> restores voices to Auto and all other settings to defaults; <strong>Done</strong> closes the panel.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
+            <div className="font-bold text-[var(--text-primary)]">Device voices</div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Speech uses your device and browser voices. If a language has no voice installed (e.g. Myanmar on some phones), the system default voice is used and a hint is shown — install the voice in your system text-to-speech settings (Android: Settings → Language → Text-to-speech → Google TTS voices).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5c. Ani AI Nissaya Assistant */}
       <section id="topic-ani" className="scroll-mt-14 space-y-3 bg-[var(--bg-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-color)] transition duration-300">
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-[var(--accent)]" />

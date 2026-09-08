@@ -589,6 +589,16 @@ export function TtsProvider({ children }) {
     reSpeakCurrent();
   }, [reSpeakCurrent]);
 
+  // Reset all per-language voices to Auto (best match).
+  const resetVoices = useCallback(() => {
+    prefsRef.current.voices = {};
+    setTtsVoices({});
+    try {
+      localStorage.setItem(LS_KEYS.VOICES, JSON.stringify({}));
+    } catch {}
+    reSpeakCurrent();
+  }, [reSpeakCurrent]);
+
   const setRate = useCallback((v) => {
     const n = Math.min(2, Math.max(0.5, Number(v) || 1));
     prefsRef.current.rate = n;
@@ -659,6 +669,7 @@ export function TtsProvider({ children }) {
     prevPara: () => jumpPara(-1),
     toggleTtsLang,
     setVoiceForLang,
+    resetVoices,
     setRate,
     setPitch,
     setVolume,
