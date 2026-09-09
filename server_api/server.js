@@ -7,6 +7,7 @@ const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
 const { initAiController, registerAiRoutes } = require('./aiController');
+const { initLogEngine, registerLogRoutes, logAsync, closeLogDb } = require('./logEngine');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
@@ -306,6 +307,9 @@ const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'warn',
   },
+  // trustProxy -> req.ip reflects the real client IP from X-Forwarded-For set by
+  // the api.tipitakapali.org reverse proxy (needed for accurate visitor logs).
+  trustProxy: true,
   keepAliveTimeout: 75000,
   maxRequestsPerSocket: 0,
 });
@@ -330,6 +334,32 @@ async function main() {
     }
   }
 
+  // Visitor logging: open logs.db, serve GET /log, and record every API request
+  // (non-blocking, see logAsync -> setImmediate). Skips itself, health checks and
+  // static assets so the log only contains real visitors.
+  initLogEngine();
+  registerLogRoutes(fastify);
+
+  fastify.addHook('onResponse', (req, reply) => {
+    const url = req.url || '';
+    if (
+      req.method === 'OPTIONS' ||
+      url === '/' ||
+      url.startsWith('/log') ||
+      url.startsWith('/api/health') ||
+      /\.(ico|png|jpe?g|gif|svg|webp|css|js|mjs|woff2?|ttf|map|html?)$/i.test(url)
+    ) {
+      return;
+    }
+    const payload = { url, status: reply.statusCode, ...(req.query || {}) };
+    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+      for (const key of Object.keys(req.body).slice(0, 8)) {
+        payload[key] = req.body[key];
+      }
+    }
+    logAsync(payload, req.ip, reply.statusCode >= 400 ? 'Error' : 'OK');
+  });
+
   fastify.get('/', async (req, reply) => {
     return {
       name: 'Chaṭṭha Saṅgāyana Tipiṭaka Fastify API',
@@ -348,6 +378,7 @@ async function main() {
         'GET /api/mat',
         'GET /api/search?q=...',
         'GET /api/health',
+        'GET /log?filter=day|week|hour&timezone=Europe/Berlin (live visitor log)',
       ],
     };
   });
@@ -1432,6 +1463,7 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
       if (dictEngine && typeof dictEngine.closeDatabases === 'function') {
         dictEngine.closeDatabases();
       }
+      closeLogDb();
     } catch (e) {}
     process.exit(0);
   };

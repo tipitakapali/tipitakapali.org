@@ -56,6 +56,7 @@ module.exports = {
         PORT: 8400,
         HOST: '0.0.0.0',
         LOG_LEVEL: 'warn',
+	IPINFO_TOKEN:"20c2565b67da0e",
       },
       env_development: {
         NODE_ENV: 'development',
