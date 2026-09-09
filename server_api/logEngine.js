@@ -218,13 +218,16 @@ function registerLogRoutes(fastify) {
       </html>
 
     `;
-      reply.type('text/html').send(html);
+      // Return the string instead of reply.send(...) + nulling the local afterwards.
+      // Fastify serves handler-returned values (& its own JSON endpoints) through a
+      // working compression path; an explicitly `send()`n string combined with late
+      // `html = null` triggered an empty gzip body through @fastify/compress's stream
+      // pipeline, which is what broke /log in production (200 with 0 bytes).
+      reply.type('text/html');
+      return html;
     } catch (err) {
       reply.status(500).send(`Error fetching logs: ${err.message}`);
     }
-    rows = null;
-    logItems = null;
-    html = null;
   });
 }
 
