@@ -820,6 +820,15 @@ def clean_stale_translations(target_dirs: list, langs: list, clean_all: bool = F
                             cleaned += 1
                         except OSError:
                             pass
+                    # Nissaya langs ship no sentence payloads — clean stale
+                    # files from previous exports so they don't linger.
+                    sent_file = trans_dir / f"{lang}.sentences.json"
+                    if sent_file.exists():
+                        try:
+                            sent_file.unlink()
+                            cleaned += 1
+                        except OSError:
+                            pass
             try:
                 if trans_dir.exists() and not any(trans_dir.iterdir()):
                     trans_dir.rmdir()
@@ -839,6 +848,8 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
                               (sentence mode; only paras that have sentences).
     The .sentences.json name reuses the existing _redirects
     `/api/book/:code/translation/:lang` rewrite (no new routing rules needed).
+    Nissaya langs (*_nissaya) are paragraph-only: no sentence files are
+    written, and any stale ones are removed (see the per-book write below).
     """
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
@@ -885,12 +896,24 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
         n_chapters += len(chapters)
         n_bytes += len(json_str.encode('utf-8'))
 
-        if has_sentences:
+        # Nissaya translations render as full paragraphs only — word-by-word
+        # interlinear, sentence display doesn't apply, and the split payloads
+        # are far too large for static hosting (some exceed Cloudflare Pages'
+        # 25 MiB asset limit). Ship the paragraph file only and drop any
+        # stale sentence file from previous exports.
+        if has_sentences and not lang.lower().endswith('_nissaya'):
             sent_payload = {"book_code": book_code, "lang": lang, "chapters": sent_chapters}
             sent_file = target_api_dir / 'book' / book_code / 'translation' / f"{lang}.sentences.json"
             sent_str = json.dumps(sent_payload, ensure_ascii=False, separators=(',', ':'))
             sent_file.write_text(sent_str, encoding='utf-8')
             n_bytes += len(sent_str.encode('utf-8'))
+        elif has_sentences:
+            sent_file = target_api_dir / 'book' / book_code / 'translation' / f"{lang}.sentences.json"
+            try:
+                if sent_file.exists():
+                    sent_file.unlink()
+            except OSError:
+                pass
 
     conn.close()
     return n_books, n_chapters, n_bytes

@@ -696,6 +696,14 @@ async function fetchBookTranslationSentencesStatic(cleanCode, lang) {
   return promise;
 }
 
+// Nissaya translations are word-by-word interlinear renderings: sentence
+// display doesn't apply, and their split payloads are far too large for
+// static hosting (export_static_cloudflare.py ships no sentence files for
+// them). They always load and render as full paragraphs.
+function isNissayaLang(lang) {
+  return /_nissaya$/i.test(String(lang || '').trim());
+}
+
 export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = [], options = {}) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -714,9 +722,13 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
   // Sentence mode: use ONLY the sentence files (no full <lang>.json
   // download). Paragraph mode: use ONLY the full files. A lang falls back
   // to the other kind solely when its own kind is entirely unavailable.
+  // Nissaya langs are excluded from the sentence path entirely — they are
+  // paragraph-only (see isNissayaLang), so they flow into the fullLangs
+  // fetch below and render as paragraphs even in sentence mode.
   if (options.sentences) {
     const noSentFile = [];
-    await Promise.all(langArr.map(async (lang) => {
+    const sentenceLangs = langArr.filter((l) => !isNissayaLang(l));
+    await Promise.all(sentenceLangs.map(async (lang) => {
       try {
         const bookData = await fetchBookTranslationSentencesStatic(cleanCode, lang);
         const chapMap = bookData?.chapters?.[String(chapterIndex)];
