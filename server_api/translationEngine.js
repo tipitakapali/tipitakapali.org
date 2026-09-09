@@ -174,7 +174,7 @@ class TranslationEngine {
     return list;
   }
 
-  getChapterTranslations(bookCode, chapterIndex, requestedLangs = []) {
+  getChapterTranslations(bookCode, chapterIndex, requestedLangs = [], includeSentences = false) {
     let cleanCode = (bookCode || '').replace('.xml', '');
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
     if (chapSuffixMatch) {
@@ -192,6 +192,7 @@ class TranslationEngine {
       languages: langCodes,
       translations: {},
     };
+    if (includeSentences) result.sentences = {};
 
     for (const code of langCodes) {
       const entry = this.databases.get(code);
@@ -200,10 +201,18 @@ class TranslationEngine {
       try {
         const rows = entry.stmtChapter.all(cleanCode, cIdx);
         const paraMap = {};
+        const sentMap = {};
         for (const r of rows) {
           paraMap[r.para_index] = r.translation;
+          if (includeSentences && r.sentences_json) {
+            try {
+              const parsed = JSON.parse(r.sentences_json);
+              if (Array.isArray(parsed) && parsed.length > 0) sentMap[r.para_index] = parsed;
+            } catch (_) {}
+          }
         }
         result.translations[code] = paraMap;
+        if (includeSentences) result.sentences[code] = sentMap;
       } catch (err) {
         console.warn(`[TranslationEngine] Error fetching chapter for ${code}:`, err.message);
       }

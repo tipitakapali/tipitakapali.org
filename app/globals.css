@@ -950,6 +950,70 @@ body.hide-trans-borders .reader-trans-block {
   margin-bottom: 0 !important;
 }
 
+/* Paired sentence rows (epitaka-style 1 Pāḷi vs 1 translation per line):
+   one shared line gutter, Pāḷi cell first, translation cells stacked below. */
+.reader-sent-pairs {
+  display: flex;
+  flex-direction: column;
+}
+.reader-sent-pairs .sent-paranum {
+  margin-bottom: 2px;
+}
+.sent-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+.sent-pair:last-child {
+  border-bottom: none;
+}
+/* Gutter line numbers are hidden in the vertical paired layout — each
+   sentence cell keeps its own context without the extra badge. */
+.sent-pair-num {
+  display: none;
+}
+.sent-pair-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.sent-pair-pali {
+  text-align: var(--reader-text-align, justify);
+}
+.sent-pair .reader-trans-block {
+  margin-bottom: 0;
+}
+
+/* Sentence display mode: each sentence on its own numbered line, while
+   paragraph grouping stays para-by-para. Pāḷi splits come from the
+   precomputed pali_sentences map (epitakaDB segmentation, shared line
+   numbers with translation line_ids); translation splits come from
+   sentences_json. */
+.reader-trans-content .trans-sent,
+.reader-container .pali-sent {
+  display: block;
+  margin: 0.15em 0;
+}
+.reader-trans-content .trans-sent-num,
+.reader-container .pali-sent-num {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-right: 0.5em;
+  font-size: 0.72em;
+  font-family: var(--font-ui);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-align: center;
+  vertical-align: 1px;
+  background: var(--bg-secondary);
+  user-select: none;
+}
+
 .reader-trans-empty {
   min-height: 0;
   margin: 0;

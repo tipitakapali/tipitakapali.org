@@ -4,13 +4,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Languages,
   X,
-  Globe,
   Sparkles,
   ChevronUp,
   ChevronDown,
-  ChevronsUp,
   Rows3,
-  Columns2,
+  ListOrdered,
+  Feather,
+  SquareText,
+  BetweenVerticalStart,
+  ArrowUpToLine,
   ExternalLink,
   AlertTriangle,
   Palette,
@@ -304,6 +306,7 @@ export default function LanguageMenu() {
   }, [translationOrder]);
 
   const translationDisplayMode = settings.translationDisplayMode || 'stack';
+  const translationGranularity = settings.translationGranularity || 'para';
 
   const applyToggleTranslation = (tId) => {
     if (tId === 'korean') return;
@@ -420,22 +423,6 @@ export default function LanguageMenu() {
             className="w-full max-w-md bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh] text-[var(--text-primary)] animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-[var(--accent)]">
-                <Globe size={18} />
-                <span>Pāḷi Script & Translation Language</span>
-              </div>
-              <button
-                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
-                onClick={() => setIsOpen(false)}
-                title="Close (Esc)"
-                aria-label="Close language modal"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
             {/* Modal Body */}
             <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain">
               {/* Section 1: Pali Script Selection */}
@@ -443,8 +430,9 @@ export default function LanguageMenu() {
                 <div className="flex items-center justify-between mb-1.5">
                   <label
                     htmlFor="paliScriptSelect"
-                    className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
+                    className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
                   >
+                    <Feather size={12} className="shrink-0" />
                     Pāḷi Script ({PALI_SCRIPTS_LIST.length} scripts)
                   </label>
                   <a
@@ -478,15 +466,16 @@ export default function LanguageMenu() {
               <div className="pt-3 border-t border-[var(--border-color)]">
                 <div className="mb-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      AI-assisted Translations &amp; Display Order
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      <Languages size={12} className="shrink-0" />
+                      Translation Display Settings
                     </span>
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       {AVAILABLE_TRANSLATION_COUNT} available
                     </span>
                   </div>
                   <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
-                    Use ⤒ ▲ ▼ to reorder translations.
+                    Pāḷi vs Translation layout
                   </p>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <button
@@ -501,8 +490,9 @@ export default function LanguageMenu() {
                       }`}
                     >
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                        <Columns2 size={14} className="shrink-0" />
-                        Pāḷi - Translation
+                        Pāḷi
+                        <BetweenVerticalStart size={14} className="shrink-0" />
+                        Translation
                       </span>
                     </button>
                     <button
@@ -517,8 +507,8 @@ export default function LanguageMenu() {
                       }`}
                     >
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                        <Rows3 size={14} className="shrink-0" />
-                        Vertical
+                        <SquareText size={14} className="shrink-0" />
+                        Stacked
                       </span>
                     </button>
                     <button
@@ -533,11 +523,52 @@ export default function LanguageMenu() {
                       }`}
                     >
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
-                        <Columns2 size={14} className="shrink-0 scale-x-[-1]" />
-                        Translation - Pāḷi
+                        Translation
+                        <BetweenVerticalStart size={14} className="shrink-0 scale-x-[-1]" />
+                        Pāḷi
                       </span>
                     </button>
                   </div>
+                  <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
+                    Show translation unit
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSetting('translationGranularity', 'para')}
+                      aria-label="Show translations paragraph by paragraph"
+                      title="Show translations paragraph by paragraph"
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                        translationGranularity === 'para'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                        <Rows3 size={14} className="shrink-0" />
+                        As Paragraph
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSetting('translationGranularity', 'sentence')}
+                      aria-label="Show Pāḷi and translations sentence by sentence"
+                      title="Show Pāḷi and translations sentence by sentence"
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
+                        translationGranularity === 'sentence'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
+                        <ListOrdered size={14} className="shrink-0" />
+                        As Sentence
+                      </span>
+                    </button>
+                  </div>
+                  <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
+                    Random Colors Background Text Border
+                  </p>
                   <label className="flex items-center gap-2.5 px-3 py-2 mt-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] cursor-pointer">
                     <input
                       type="checkbox"
@@ -547,8 +578,7 @@ export default function LanguageMenu() {
                       aria-label="Show translation left border colors"
                     />
                     <span className="min-w-0">
-                      <span className="block text-xs font-semibold text-[var(--text-primary)]">Show left border colors for translations</span>
-                      <span className="block text-[10px] text-[var(--text-muted)]">Turn off to hide the colored language indicator border in the reader</span>
+                    <span className="block text-xs font-semibold text-[var(--text-primary)]">Show left border colors for translations</span>
                     </span>
                   </label>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -602,6 +632,9 @@ export default function LanguageMenu() {
                       <span>Reset</span>
                     </button>
                   </div>
+                  <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal text-right">
+                    To reorder translations: use ⤒ ▲ ▼ buttons
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -699,7 +732,7 @@ export default function LanguageMenu() {
                             title="Move to top"
                             aria-label="Move translation to top"
                           >
-                            <ChevronsUp size={13} />
+                            <ArrowUpToLine size={13} />
                           </button>
                           {/* Move Up */}
                           <button
@@ -732,7 +765,21 @@ export default function LanguageMenu() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex justify-end shrink-0">
+            <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  updateSetting('translationDisplayMode', 'stack');
+                  updateSetting('translationGranularity', 'para');
+                  updateSetting('showTranslationBorders', true);
+                  handleResetEnabledColors();
+                }}
+                className="px-4 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-bold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5"
+                title="Reset to defaults: Stacked layout, paragraph unit, borders on, default colors"
+              >
+                <RotateCcw size={12} />
+                Restore default
+              </button>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}

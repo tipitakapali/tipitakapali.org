@@ -93,6 +93,7 @@ const DEFAULT_SETTINGS = {
   },
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
   translationDisplayMode: 'stack', // 'stack' (Vertical) | 'side' (Pali left) | 'side_rev' (Translation left)
+  translationGranularity: 'para', // 'para' (paragraph) | 'sentence' (sentence lines)
   translationColors: {},
   showTranslationBorders: true,
   translationFontSize: null, // null = same size as Pāḷi (fontSize)
@@ -142,6 +143,9 @@ export function ThemeSettingsProvider({ children }) {
 
           if (!['stack', 'side', 'side_rev'].includes(merged.translationDisplayMode)) {
             merged.translationDisplayMode = 'stack';
+          }
+          if (!['para', 'sentence'].includes(merged.translationGranularity)) {
+            merged.translationGranularity = 'para';
           }
           merged.translationColors =
             merged.translationColors && typeof merged.translationColors === 'object'

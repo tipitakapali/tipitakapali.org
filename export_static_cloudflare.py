@@ -109,6 +109,30 @@ def clean_tree(data):
             return data[0]['children']
     return data
 
+def load_pali_sentences_db(web_app_dir):
+    """Open the prebuilt Pāḷi sentence store (build_pali_sentences_db.py).
+
+    Returns (conn, {book_code: {chapter: {para_index: [{line, text}]}}})
+    with the whole table read once — far cheaper than per-book queries.
+    Line numbers align with translation line_ids by construction.
+    """
+    import sqlite3 as _sqlite3
+    db_path = web_app_dir / 'server_api' / 'db' / 'pali_sentences.db'
+    if not db_path.exists():
+        log_warn(f"pali_sentences.db not found at {db_path} — skipping Pāḷi sentence export (run server_api/build_pali_sentences_db.py)")
+        return None, {}
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    books = {}
+    for r in conn.execute(
+        'SELECT book_code, chapter_index, para_index, line_id, sentence FROM pali_sentences '
+        'ORDER BY book_code, chapter_index, para_index, line_id'
+    ):
+        chmap = books.setdefault(r['book_code'], {})
+        pmap = chmap.setdefault(str(r['chapter_index']), {})
+        pmap.setdefault(str(r['para_index']), []).append({'line': r['line_id'], 'text': r['sentence']})
+    return conn, books
+
 def write_json_multiformat(base_dir: Path, relative_path_no_ext: str, data):
     """
     Writes data as a single {path}.json file.
@@ -173,6 +197,11 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
             log_info(f"Loaded {len(book_mat_catalog)} entries from book_mat.json")
         except Exception as e:
             log_warn(f"Could not parse book_mat.json {book_mat_path}: {e}")
+
+    # Pāḷi sentence splits for sentence display mode (epitaka segmentation).
+    pali_sent_conn, pali_sent_books = load_pali_sentences_db(Path(catalog_path).parent.parent)
+    if pali_sent_books:
+        log_info(f"Loaded Pāḷi sentences for {len(pali_sent_books)} books")
 
     # 1. Export Navigation Tree
     log_info("Exporting navigation tree (/api/tree)...")
@@ -369,6 +398,27 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
         except Exception as e:
             pass
 
+        # Export book-specific Pāḷi sentence splits (/api/book/{code}/pali_sentences)
+        # Sentence display mode payload: chapters -> para_index -> [{line, text}],
+        # from the prebuilt pali_sentences.db (epitaka segmentation; line numbers
+        # align with translation line_ids). Same payload as VPS /api/book/:code/pali_sentences.
+        try:
+            sent_chapters = pali_sent_books.get(clean_code)
+            if sent_chapters:
+                write_json_multiformat(target_api_dir, f"book/{clean_code}/pali_sentences", {
+                    "book_code": clean_code,
+                    "chapters": sent_chapters
+                })
+            else:
+                stale_sent_file = target_api_dir / 'book' / clean_code / 'pali_sentences.json'
+                try:
+                    if stale_sent_file.exists():
+                        stale_sent_file.unlink()
+                except OSError:
+                    pass
+        except Exception as e:
+            pass
+
         # Export book-specific canon paragraphs with GUIDs (/api/book/{code}/paragraphs)
         # Opt-in only (--with-paragraphs): nothing in services/api.js fetches this;
         # it is an LLM/GUID dump (~140MB unique, ~280MB with legacy dup).
@@ -461,6 +511,11 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                     log_warn(f"Could not remove orphan book export dir {stale_dir.name}: {e}")
 
     conn.close()
+    if pali_sent_conn:
+        try:
+            pali_sent_conn.close()
+        except Exception:
+            pass
     elapsed = time.time() - start_time
     log_success(f"Exported {len(all_books)} books and {total_chapters_exported} chapters into static JSON ({elapsed:.2f}s)!")
 
@@ -584,6 +639,7 @@ def generate_cloudflare_redirects(dist_dir: Path):
 /api/book/:code/mat                    /api/book/:code/mat.json                   200
 /api/book/:code/mat_chapter_map        /api/book/:code/mat_chapter_map.json       200
 /api/book/:code/mat_para_map           /api/book/:code/mat_para_map.json          200
+/api/book/:code/pali_sentences          /api/book/:code/pali_sentences.json         200
 /api/book/:code/paragraphs             /api/book/:code/paragraphs.json            200
 /api/book/:code/translation/:lang      /api/book/:code/translation/:lang.json     200
 /api/book/:code                        /api/book/:code.json                       200
@@ -775,7 +831,15 @@ def clean_stale_translations(target_dirs: list, langs: list, clean_all: bool = F
 
 
 def export_lang(db_path: Path, lang: str, target_api_dir: Path):
-    """Export one language from SQLite DB to per-book JSON files."""
+    """Export one language from SQLite DB to per-book JSON files.
+
+    Writes two files per book:
+      {lang}.json           — chapters -> para_index -> translation (paragraph mode)
+      {lang}.sentences.json — chapters -> para_index -> [{line_id, translation}]
+                              (sentence mode; only paras that have sentences).
+    The .sentences.json name reuses the existing _redirects
+    `/api/book/:code/translation/:lang` rewrite (no new routing rules needed).
+    """
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
 
@@ -789,13 +853,24 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
 
     for book_code in books:
         chapters = {}
-        for ch_idx, para_idx, translation in cur.execute(
-            "SELECT chapter_index, para_index, translation FROM paragraph_translations "
+        sent_chapters = {}
+        has_sentences = False
+        for ch_idx, para_idx, translation, sentences_json in cur.execute(
+            "SELECT chapter_index, para_index, translation, sentences_json FROM paragraph_translations "
             "WHERE book_code = ? ORDER BY chapter_index, para_index",
             (book_code,)
         ):
             ch = chapters.setdefault(str(ch_idx), {})
             ch[str(para_idx)] = translation
+            if sentences_json:
+                try:
+                    sents = json.loads(sentences_json)
+                except Exception:
+                    sents = None
+                if isinstance(sents, list) and len(sents) > 0:
+                    sch = sent_chapters.setdefault(str(ch_idx), {})
+                    sch[str(para_idx)] = sents
+                    has_sentences = True
 
         if not chapters:
             continue
@@ -809,6 +884,13 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
         n_books += 1
         n_chapters += len(chapters)
         n_bytes += len(json_str.encode('utf-8'))
+
+        if has_sentences:
+            sent_payload = {"book_code": book_code, "lang": lang, "chapters": sent_chapters}
+            sent_file = target_api_dir / 'book' / book_code / 'translation' / f"{lang}.sentences.json"
+            sent_str = json.dumps(sent_payload, ensure_ascii=False, separators=(',', ':'))
+            sent_file.write_text(sent_str, encoding='utf-8')
+            n_bytes += len(sent_str.encode('utf-8'))
 
     conn.close()
     return n_books, n_chapters, n_bytes

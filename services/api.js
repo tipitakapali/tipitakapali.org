@@ -636,7 +636,67 @@ async function fetchBookTranslationStatic(cleanCode, lang) {
   return promise;
 }
 
-export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = []) {
+// Pāḷi sentence splits for sentence display mode (generated with the
+// epitaka splitter). Static per-book pali_sentences.json first, VPS
+// /api/book/:code/pali_sentences fallback (also covers local dev).
+// Book-level cached; only fetched on demand in sentence mode.
+export async function fetchPaliSentences(bookCode) {
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+  const cacheKey = `pali_sent_${cleanCode}`;
+
+  return cachedFetch(cacheKey, async () => {
+    try {
+      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/pali_sentences.json`);
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    try {
+      const base = getApiBase();
+      const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/pali_sentences`);
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    return null;
+  }, 24 * 60 * 60 * 1000);
+}
+
+// Sentence-split payload for sentence display mode. Static per-book file
+// `<lang>.sentences.json` (written by export_static_cloudflare.py) first,
+// VPS `?sentences=1` fallback (also covers local dev). Same book+lang cache
+// pattern as fetchBookTranslationStatic; only fetched on demand.
+async function fetchBookTranslationSentencesStatic(cleanCode, lang) {
+  const key = `trans_sent_static_${cleanCode}_${lang}`;
+  if (ENABLE_CLIENT_CACHE) {
+    const cached = transStaticCache.get(key);
+    if (cached && Date.now() - cached.timestamp < TRANS_STATIC_TTL) {
+      return cached.data;
+    }
+    if (transStaticPending.has(key)) {
+      return transStaticPending.get(key);
+    }
+  }
+  const promise = (async () => {
+    try {
+      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/translation/${encodeURIComponent(lang)}.sentences.json`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (ENABLE_CLIENT_CACHE) {
+        transStaticCache.set(key, { data, timestamp: Date.now() });
+      }
+      return data;
+    } catch (_) {
+      return null;
+    } finally {
+      transStaticPending.delete(key);
+    }
+  })();
+  if (ENABLE_CLIENT_CACHE) {
+    transStaticPending.set(key, promise);
+  }
+  return promise;
+}
+
+export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = [], options = {}) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
@@ -649,8 +709,51 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
   }
 
   const translations = {};
+  const sentences = {};
+
+  // Sentence mode: use ONLY the sentence files (no full <lang>.json
+  // download). Paragraph mode: use ONLY the full files. A lang falls back
+  // to the other kind solely when its own kind is entirely unavailable.
+  if (options.sentences) {
+    const noSentFile = [];
+    await Promise.all(langArr.map(async (lang) => {
+      try {
+        const bookData = await fetchBookTranslationSentencesStatic(cleanCode, lang);
+        const chapMap = bookData?.chapters?.[String(chapterIndex)];
+        if (chapMap) {
+          sentences[lang] = chapMap;
+        } else {
+          noSentFile.push(lang);
+        }
+      } catch (_) {
+        noSentFile.push(lang);
+      }
+    }));
+    if (noSentFile.length > 0) {
+      const langs = noSentFile.join(',');
+      const cacheKey = `trans_sent_${cleanCode}_ch${chapterIndex}_${langs}`;
+      const base = getApiBase();
+      try {
+        const data = await cachedFetch(
+          cacheKey,
+          async () => {
+            const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}&sentences=1`);
+            if (!res.ok) throw new Error(`Failed to load translation sentences for ${cleanCode} ch ${chapterIndex}`);
+            return res.json();
+          },
+          60 * 60 * 1000
+        );
+        Object.assign(sentences, data.sentences || {});
+        // VPS also ships full text alongside sentences: keep it so paras
+        // without splits still render (no extra download).
+        Object.assign(translations, data.translations || {});
+      } catch (_) {}
+    }
+  }
+
+  const fullLangs = options.sentences ? langArr.filter((l) => !sentences[l]) : langArr;
   const missing = [];
-  await Promise.all(langArr.map(async (lang) => {
+  await Promise.all(fullLangs.map(async (lang) => {
     try {
       const bookData = await fetchBookTranslationStatic(cleanCode, lang);
       const chapMap = bookData?.chapters?.[String(chapterIndex)];
@@ -674,17 +777,20 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
       const data = await cachedFetch(
         cacheKey,
         async () => {
-          const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}`);
+          const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/translation?lang=${encodeURIComponent(langs)}${options.sentences ? '&sentences=1' : ''}`);
           if (!res.ok) throw new Error(`Failed to load translations for ${cleanCode} ch ${chapterIndex}`);
           return res.json();
         },
         60 * 60 * 1000
       );
       Object.assign(translations, data.translations || {});
+      if (options.sentences && data.sentences) Object.assign(sentences, data.sentences);
     } catch (e) {
-      if (Object.keys(translations).length === 0) throw e;
+      if (Object.keys(translations).length === 0 && Object.keys(sentences).length === 0) throw e;
     }
   }
 
-  return { book_code: cleanCode, chapter_index: chapterIndex, languages: langArr, translations };
+  const result = { book_code: cleanCode, chapter_index: chapterIndex, languages: langArr, translations };
+  if (options.sentences) result.sentences = sentences;
+  return result;
 }

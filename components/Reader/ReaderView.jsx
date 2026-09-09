@@ -12,7 +12,7 @@ import { useDictionary } from '../../context/DictionaryContext';
 
 import { transliterateHtml, convertPaliScript, highlightHtmlText, highlightTranslationText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
-import { fetchChapterTranslations } from '../../services/api';
+import { fetchChapterTranslations, fetchPaliSentences } from '../../services/api';
 
 const TRANSLATION_METAS = {
   en: { label: 'English', flag: '🇬🇧' },
@@ -167,6 +167,95 @@ function formatTranslationContent(text, lang) {
   return formatInlineTags(text);
 }
 
+// Pāḷi sentence lines for sentence display mode. Replaces the inside of
+// prose <p data-para data-pindex> elements with numbered sentence spans
+// from the precomputed pali_sentences map (epitaka.db segmentation, shared
+// line numbers with translation line_ids), keeping the leading
+// paragraph-number element. Falls back to the original paragraph when the
+// map has no (or a single) split.
+function injectPaliSentencesIntoHtml(html, paliSentMap) {
+  if (!html || !paliSentMap) return html;
+  // NOTE: keyed by data-pindex (para_index), NOT data-para — some paragraphs
+  // (e.g. s0201m.mul ch0 p7) carry no data-para attribute at all.
+  return html.replace(/(<p\b[^>]*>)([\s\S]*?)(<\/p>)/gi, (full, open, inner, close) => {
+    const pidxMatch = open.match(/\bdata-pindex="(\d+)"/i);
+    if (!pidxMatch) return full;
+    const cls = (open.match(/\bclass="([^"]*)"/i) || [])[1] || '';
+    if (!/\b(bodytext|indent|hangnum|unindented)\b/i.test(cls)) return full;
+    const sents = paliSentMap[pidxMatch[1]] || paliSentMap[Number(pidxMatch[1])];
+    if (!Array.isArray(sents) || sents.length <= 1) return full;
+    let prefix = '';
+    const numMatch = inner.match(
+      /^(\s*<strong\b[^>]*\bparanum\b[^>]*>[\s\S]*?<\/strong>\s*(?:<span\b[^>]*\bdot\b[^>]*>[\s\S]*?<\/span>)?\s*\.?\s*)/i
+    );
+    if (numMatch) prefix = numMatch[1];
+    const numbered = sents
+      .map((s) => {
+        const line = s && typeof s === 'object' ? s.line : null;
+        const raw = s && typeof s === 'object' ? s.text : s;
+        // Epitaka text keeps the paragraph number ("1. Evaṃ ...") but the
+        // reader already renders it from the original markup — strip it here
+        // to avoid a duplicated "1 1. ..." lead.
+        const t = formatInlineTags(String(raw || '').trim().replace(/^\d+\s*\.\s*/, ''));
+        if (!t) return '';
+        const lid = line ?? '';
+        return `<span class="pali-sent" data-line="${lid}"><span class="pali-sent-num">${lid}</span><span class="pali-sent-text">${t}</span></span>`;
+      })
+      .filter(Boolean);
+    if (numbered.length === 0) return full;
+    return `${open}${prefix}${numbered.join('')}${close}`;
+  });
+}
+
+// Extract top-level <span class="...">...</span> items with balanced-tag
+// scanning (machine-generated sentence spans may contain nested inline
+// spans, so a flat regex is unsafe). Returns [{line, html}] in order.
+function extractClassSpans(html, cls) {
+  const out = [];
+  if (!html) return out;
+  const openRe = new RegExp(`<span\\b[^>]*\\bclass="[^"]*\\b${cls}\\b[^"]*"[^>]*>`, 'gi');
+  let m;
+  while ((m = openRe.exec(html))) {
+    const lineM = m[0].match(/data-line="([^"]*)"/i);
+    const line = lineM ? lineM[1] : '';
+    let depth = 1;
+    let i = openRe.lastIndex;
+    while (i < html.length && depth > 0) {
+      const lt = html.indexOf('<', i);
+      if (lt === -1) break;
+      const rest = html.slice(lt, lt + 7).toLowerCase();
+      if (rest.startsWith('</span')) {
+        depth--;
+        if (depth === 0) {
+          out.push({ line, html: html.slice(openRe.lastIndex, lt) });
+          i = lt + 7;
+          break;
+        }
+        i = lt + 7;
+      } else if (rest.startsWith('<span') && (html[lt + 5] === ' ' || html[lt + 5] === '>')) {
+        const gt = html.indexOf('>', lt);
+        if (gt !== -1 && html[gt - 1] === '/') {
+          i = gt + 1; // self-closing: no depth change
+        } else {
+          depth++;
+          i = lt + 5;
+        }
+      } else {
+        const gt = html.indexOf('>', lt);
+        i = gt === -1 ? html.length : gt + 1;
+      }
+    }
+    openRe.lastIndex = i;
+  }
+  return out;
+}
+
+// Strip the muted line-number badge from a sentence cell (the pair row
+// shows one shared gutter number instead).
+function stripSentNumBadge(html) {
+  return String(html || '').replace(/<span class="(?:pali|trans)-sent-num"[^>]*>.*?<\/span>/, '');
+}
+
 function injectTranslationsIntoHtml(
   html,
   translations,
@@ -174,7 +263,9 @@ function injectTranslationsIntoHtml(
   isPaliEnabled = true,
   displayMode = 'stack',
   translationColors = {},
-  searchHighlight = null
+  searchHighlight = null,
+  sentenceMode = false,
+  transSentences = null
 ) {
   if (!html) return html;
 
@@ -325,21 +416,52 @@ function injectTranslationsIntoHtml(
         }
       } else if (layer.type === 'trans') {
         const trans = translations[layer.lang]?.[pIndex];
-        if (trans && trans.trim()) {
+        // Sentence mode may carry splits without the full paragraph text
+        // (sentence files only) — splits alone are enough to render.
+        const sentArr =
+          sentenceMode && transSentences ? transSentences[layer.lang]?.[pIndex] : null;
+        const hasSentArr = Array.isArray(sentArr) && sentArr.length > 0;
+        if ((trans && trans.trim()) || hasSentArr) {
           transCount++;
-          let content = formatTranslationContent(trans.trim(), layer.lang);
+          // Task 2: Highlight translation text ONLY if search was specifically in this translation database/language
+          const searchLang = getSearchHighlightLang(searchHighlight);
+          const doTransHL = Boolean(
+            isTargetPara && searchHighlight?.query && searchLang &&
+            (searchLang === layer.lang || searchLang === layer.id)
+          );
+          const highlightTrans = (t) =>
+            doTransHL ? highlightTranslationText(t, searchHighlight.query, layer.lang) : t;
+
+          // Sentence display mode: per-sentence items from sentences_json.
+          // Kept structured for paired 1-vs-1 rows; classic blocks join them.
+          // Single-sentence paras render unchanged (identical to paragraph mode).
+          let sentItems = null;
+          if (hasSentArr) {
+            const built = [];
+            for (const s of sentArr) {
+              const t = formatTranslationContent(String(s?.translation || '').trim(), layer.lang);
+              if (!t) continue;
+              built.push({ line: String(s?.line_id ?? ''), html: highlightTrans(t) });
+            }
+            if (built.length > 0) sentItems = built;
+          }
+
+          let content;
+          if (sentItems && sentItems.length > 1) {
+            content = sentItems
+              .map((it) => `<span class="trans-sent" data-line="${it.line}"><span class="trans-sent-num">${it.line}</span><span class="trans-sent-text">${it.html}</span></span>`)
+              .join('');
+          } else if (sentItems && sentItems.length === 1) {
+            content = sentItems[0].html;
+          } else {
+            content = highlightTrans(formatTranslationContent((trans || '').trim(), layer.lang));
+          }
 
           // If Pali is disabled and this is a numbered paragraph, display standard paragraph number anchor
           if (!isPaliEnabled && !isHeading && transCount === 1 && paraMatch) {
             content = content.replace(/^\s*[\p{Nd}]+[\.၊။\s]+/u, '');
             const pNumDisplay = paranumMatch ? paranumMatch[1] : paraMatch[1];
             content = `<strong class="paranum" id="para-${paraMatch[1]}">${pNumDisplay}</strong>. ` + content;
-          }
-
-          // Task 2: Highlight translation text ONLY if search was specifically in this translation database/language
-          const searchLang = getSearchHighlightLang(searchHighlight);
-          if (isTargetPara && searchHighlight?.query && searchLang && (searchLang === layer.lang || searchLang === layer.id)) {
-            content = highlightTranslationText(content, searchHighlight.query, layer.lang);
           }
 
           // Task 2: Typographic and formatting classes from the original Pali <p> inherited by translation content
@@ -388,6 +510,10 @@ function injectTranslationsIntoHtml(
           renderedItems.push({
             type: 'trans',
             lang: layer.lang,
+            id: layer.id,
+            sentItems,
+            blockStyles,
+            contentStyles,
             html: `
       <div class="${blockClasses}" data-trans-lang="${layer.lang}"${blockStyles ? ` style="${blockStyles}"` : ''}>
         <div class="${contentClasses}"${contentStyles ? ` style="${contentStyles}"` : ''}>${content}</div>
@@ -458,6 +584,78 @@ function injectTranslationsIntoHtml(
       }
     }
 
+    // Paired sentence rows (epitaka-style 1 Pāḷi vs 1 translation per line).
+    // Stack mode only, Pāḷi enabled, prose paragraphs where every layer has
+    // sentence splits. Missing lines render an empty cell so alignment holds.
+    if (!isSideActive && sentenceMode && isPaliEnabled && !isHeading) {
+      const isProse =
+        pClasses.some((c) => /^(bodytext|indent|hangnum|unindented)$/i.test(c)) ||
+        /^(bodytext|indent|hangnum|unindented)$/i.test(paraType || '');
+      const paliItem = renderedItems.find((item) => item.type === 'pali');
+      const transItems = renderedItems.filter((item) => item.type === 'trans');
+      if (
+        isProse && paliItem && transItems.length > 0 &&
+        transItems.every((item) => item.sentItems && item.sentItems.length > 0)
+      ) {
+        const paliLines = extractClassSpans(paliItem.html, 'pali-sent');
+        if (paliLines.length > 1) {
+          const transByLang = transItems.map((item) => ({
+            item,
+            byLine: new Map(item.sentItems.map((s) => [s.line, s.html])),
+          }));
+          const lineOrder = [];
+          const seen = new Set();
+          for (const l of paliLines.map((p) => p.line)) {
+            if (!seen.has(l)) {
+              seen.add(l);
+              lineOrder.push(l);
+            }
+          }
+          for (const { byLine } of transByLang) {
+            for (const l of byLine.keys()) {
+              if (!seen.has(l)) {
+                seen.add(l);
+                lineOrder.push(l);
+              }
+            }
+          }
+          const paliByLine = new Map(paliLines.map((p) => [p.line, p.html]));
+          const numMatch = paliItem.html.match(
+            /<strong\b[^>]*\bparanum\b[^>]*>[\s\S]*?<\/strong>(?:\s*<span\b[^>]*\bdot\b[^>]*>[\s\S]*?<\/span>)?/
+          );
+          const pairs = lineOrder
+            .map((ln) => {
+              const pHtml = paliByLine.get(ln);
+              const cells = transByLang
+                .map(({ item, byLine }) => {
+                  const tHtml = byLine.get(ln);
+                  if (tHtml === undefined) return '';
+                  return `<div class="sent-pair-trans reader-trans-block" data-trans-lang="${item.lang}" data-line="${ln}"${item.blockStyles ? ` style="${item.blockStyles}"` : ''}>` +
+                    `<div class="reader-trans-content"${item.contentStyles ? ` style="${item.contentStyles}"` : ''}>${tHtml}</div></div>`;
+                })
+                .join('');
+              if (pHtml === undefined && !cells) return '';
+              return `<div class="sent-pair" data-line="${ln}">` +
+                `<div class="sent-pair-num">${ln}</div>` +
+                `<div class="sent-pair-body">` +
+                (pHtml !== undefined
+                  ? `<div class="sent-pair-pali" data-line="${ln}">${stripSentNumBadge(pHtml)}</div>`
+                  : '') +
+                cells +
+                `</div></div>`;
+            })
+            .filter(Boolean)
+            .join('');
+          if (pairs) {
+            return `<div class="reader-para-row reader-sent-pairs" ${rowAttrs}>` +
+              (numMatch ? `<div class="sent-paranum">${numMatch[0]}</div>` : '') +
+              pairs +
+              `</div>`;
+          }
+        }
+      }
+    }
+
     // Stack mode or single-layer side mode
     const itemsHtml = renderedItems.map((item) => item.html).join('');
     return `<div class="reader-para-row reader-trans-stack-row" ${rowAttrs}>${itemsHtml}</div>`;
@@ -480,9 +678,12 @@ const ChapterBlock = memo(function ChapterBlock({
   isPaliEnabled = true,
   translationDisplayMode = 'stack',
   translationColors = {},
+  sentenceMode = false,
 }) {
   const blockRef = useRef(null);
   const [translations, setTranslations] = React.useState({});
+  const [transSentences, setTransSentences] = React.useState({});
+  const [paliSentMap, setPaliSentMap] = React.useState(null);
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const activeLangsKey = activeLangs.join(',');
 
@@ -520,7 +721,10 @@ const ChapterBlock = memo(function ChapterBlock({
   // Task 3: Lazy load translations ONLY when chapter is near viewport (or current/target) and active translation languages exist
   useEffect(() => {
     if (!html || !bookCode || !activeLangsKey || (!isNearViewport && !isCurrentOrTarget)) {
-      if (!activeLangsKey) setTranslations({});
+      if (!activeLangsKey) {
+        setTranslations({});
+        setTransSentences({});
+      }
       return;
     }
 
@@ -528,6 +732,7 @@ const ChapterBlock = memo(function ChapterBlock({
     const langsToFetch = activeLangsKey.split(',').filter(Boolean);
     if (langsToFetch.length === 0) {
       setTranslations({});
+      setTransSentences({});
       return;
     }
 
@@ -537,13 +742,16 @@ const ChapterBlock = memo(function ChapterBlock({
     blockRef.current?.removeAttribute('data-trans-settled');
     blockRef.current?.setAttribute('data-trans-loading', '1');
 
-    fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch)
+    fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, { sentences: sentenceMode })
       .then((data) => {
         if (!isMounted) return;
         blockRef.current?.removeAttribute('data-trans-loading');
         blockRef.current?.setAttribute('data-trans-settled', '1');
         if (data?.translations) {
           setTranslations(data.translations);
+        }
+        if (sentenceMode && data?.sentences) {
+          setTransSentences(data.sentences);
         }
       })
       .catch((err) => {
@@ -559,13 +767,37 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => {
       isMounted = false;
     };
-  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget]);
+  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, sentenceMode]);
+
+  // Pāḷi sentence map for sentence display mode (book-level, shared cache).
+  useEffect(() => {
+    if (!sentenceMode || !isPaliEnabled || !html || !bookCode) {
+      if (!sentenceMode) setPaliSentMap(null);
+      return;
+    }
+    let cancelled = false;
+    fetchPaliSentences(bookCode)
+      .then((data) => {
+        if (cancelled) return;
+        const chapMap = data?.chapters?.[String(chapter.chapter_index)];
+        setPaliSentMap(chapMap || null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
 
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
     let processed = html;
     if (paliScript && paliScript !== 'roman') {
       processed = transliterateHtml(processed, paliScript);
+    }
+    // Sentence display mode: Pāḷi sentence lines from the precomputed map
+    // (before search highlighting so marks nest inside the sentences).
+    if (sentenceMode && isPaliEnabled && paliSentMap) {
+      processed = injectPaliSentencesIntoHtml(processed, paliSentMap);
     }
     // Task 2: Only highlight Pāḷi text if search was in Root Pāḷi CST (not in translation database)
     const isPali = isSearchPali(searchHighlight);
@@ -593,7 +825,9 @@ const ChapterBlock = memo(function ChapterBlock({
         isPaliEnabled,
         translationDisplayMode,
         translationColors,
-        highlightSearchTerms ? searchHighlight : null
+        highlightSearchTerms ? searchHighlight : null,
+        sentenceMode,
+        transSentences
       );
     }
     return processed;
@@ -608,6 +842,9 @@ const ChapterBlock = memo(function ChapterBlock({
     isPaliEnabled,
     translationDisplayMode,
     translationColors,
+    sentenceMode,
+    transSentences,
+    paliSentMap,
   ]);
 
   if (displayHtml) {
@@ -2769,6 +3006,7 @@ export default function ReaderView() {
                   isPaliEnabled={isPaliEnabled}
                   translationDisplayMode={settings?.translationDisplayMode || 'stack'}
                   translationColors={settings?.translationColors}
+                  sentenceMode={settings?.translationGranularity === 'sentence'}
                 />
               ))
             ) : (

@@ -229,6 +229,34 @@ function typeVelthuis(uType) {
     .replace(/N\.\./g, 'Ṅ');
 }
 
+// Pāḷi sentence store: prebuilt epitaka segmentation
+// (server_api/db/pali_sentences.db, via build_pali_sentences_db.py).
+// Line numbers align with translation line_ids by construction.
+let paliSentDb = null;
+let stmtGetPaliSentencesDb = null;
+
+function getPaliSentencesDb() {
+  if (stmtGetPaliSentencesDb) return true;
+  const p = resolveDbPath('pali_sentences.db');
+  if (!p) return false;
+  try {
+    paliSentDb = new Database(p, { readonly: true });
+    paliSentDb.exec(`
+      PRAGMA synchronous = NORMAL;
+      PRAGMA temp_store = MEMORY;
+      PRAGMA query_only = 1;
+    `);
+    stmtGetPaliSentencesDb = paliSentDb.prepare(
+      'SELECT chapter_index, para_index, line_id, sentence FROM pali_sentences WHERE book_code = ? ORDER BY chapter_index, para_index, line_id'
+    );
+    console.log(`[Database] Using Pali sentences DB at: ${p}`);
+    return true;
+  } catch (err) {
+    console.warn('[Database] Pali sentences DB error:', err.message);
+    return false;
+  }
+}
+
 // Clean top-level Tipiṭaka root if present
 function cleanTree(data) {
   if (
@@ -694,6 +722,43 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return { error: `No MAT relationship found for '${cleanCode}'` };
   });
 
+  // Per-book Pāḷi sentence splits for sentence display mode. Prebuilt from
+  // epitaka.db segmentation (build_pali_sentences_db.py); line numbers align
+  // with translation line_ids by construction. Static export precomputes the
+  // same payload as pali_sentences.json.
+  const paliSentencesCache = new Map();
+  fastify.get('/api/book/:code/pali_sentences', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    let cleanCode = req.params.code.replace('.xml', '');
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) {
+      cleanCode = chapSuffixMatch[1];
+    }
+    if (paliSentencesCache.has(cleanCode)) return paliSentencesCache.get(cleanCode);
+    if (!getPaliSentencesDb()) {
+      reply.code(500);
+      return { error: 'Pali sentences unavailable' };
+    }
+    try {
+      const chapters = {};
+      const rows = stmtGetPaliSentencesDb.all(cleanCode);
+      for (const r of rows) {
+        const ch = String(r.chapter_index);
+        if (!chapters[ch]) chapters[ch] = {};
+        const key = String(r.para_index);
+        if (!chapters[ch][key]) chapters[ch][key] = [];
+        chapters[ch][key].push({ line: r.line_id, text: r.sentence });
+      }
+      const payload = { book_code: cleanCode, chapters };
+      if (paliSentencesCache.size > 217) paliSentencesCache.clear();
+      paliSentencesCache.set(cleanCode, payload);
+      return payload;
+    } catch (err) {
+      reply.code(404);
+      return { error: `No Pali sentences found for '${cleanCode}'` };
+    }
+  });
+
   // Precomputed Canon-wide MAT Jump Resolver (immutable per DB build: cacheable)
   fastify.get('/api/book/:code/mat_jump', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
@@ -943,6 +1008,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     const chapParam = req.query.chapter !== undefined ? req.query.chapter : (req.query.chapterIndex !== undefined ? req.query.chapterIndex : 0);
     const langsParam = req.query.lang || req.query.langs || 'en';
     const isDetailed = req.query.detailed === 'true' || req.query.detailed === '1';
+    const withSentences = req.query.sentences === 'true' || req.query.sentences === '1';
 
     let requestedLangs = [];
     if (langsParam === 'all') {
@@ -954,7 +1020,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (isDetailed) {
       return translationEngine.getChapterTranslationsDetailed(rawCode, chapParam, requestedLangs);
     }
-    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs);
+    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs, withSentences);
   });
 
   // Chapter-in-path translation convenience alias
@@ -964,6 +1030,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     const chapParam = req.params.chapterIndex;
     const langsParam = req.query.lang || req.query.langs || 'en';
     const isDetailed = req.query.detailed === 'true' || req.query.detailed === '1';
+    const withSentences = req.query.sentences === 'true' || req.query.sentences === '1';
 
     let requestedLangs = [];
     if (langsParam === 'all') {
@@ -975,7 +1042,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (isDetailed) {
       return translationEngine.getChapterTranslationsDetailed(rawCode, chapParam, requestedLangs);
     }
-    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs);
+    return translationEngine.getChapterTranslations(rawCode, chapParam, requestedLangs, withSentences);
   });
 
   // Lookup translation by canonical GUID across languages

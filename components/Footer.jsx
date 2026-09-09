@@ -9,7 +9,6 @@ import {
   Navigation,
   ScrollText,
   Type,
-  X,
   Maximize2,
   AlignLeft,
   AlignJustify,
@@ -187,19 +186,48 @@ export default function Footer() {
                 <div className="p-1 rounded-md bg-[var(--accent-light)] text-[var(--accent)]">
                   <Type size={15} />
                 </div>
-                <span className="font-bold text-xs text-[var(--text-primary)]">Text Size & Typography</span>
+                <span className="font-bold text-xs text-[var(--text-primary)]">Pāḷi and Translations Font-size</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsFontSizeOpen(false)}
-                  className="p-1 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+                  className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition cursor-pointer"
                 >
-                  <X size={15} />
+                  Done
                 </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5">
+              {/* Text Alignment */}
+              <div>
+                <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Text Alignment</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => updateSetting('textAlign', 'left')}
+                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      settings.textAlign === 'left'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
+                    }`}
+                  >
+                    <AlignLeft size={14} />
+                    <span>Left</span>
+                  </button>
+                  <button
+                    onClick={() => updateSetting('textAlign', 'justify')}
+                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      settings.textAlign === 'justify'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
+                    }`}
+                  >
+                    <AlignJustify size={14} />
+                    <span>Justified</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Translation-only settings */}
               <div className="space-y-1.5 rounded-xl border border-violet-500/40 bg-violet-500/5 p-3">
                 <div className="flex items-center justify-between text-[11px] font-bold">
@@ -331,35 +359,6 @@ export default function Footer() {
               >
                 Reset to Defaults (22px)
               </button>
-
-              {/* Text Alignment */}
-              <div>
-                <div className="text-[10px] text-[var(--text-muted)] mb-1.5 font-medium">Text Alignment</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => updateSetting('textAlign', 'left')}
-                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                      settings.textAlign === 'left'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
-                    }`}
-                  >
-                    <AlignLeft size={14} />
-                    <span>Left</span>
-                  </button>
-                  <button
-                    onClick={() => updateSetting('textAlign', 'justify')}
-                    className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                      settings.textAlign === 'justify'
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent-border)]'
-                    }`}
-                  >
-                    <AlignJustify size={14} />
-                    <span>Justified</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
