@@ -623,6 +623,21 @@ function injectTranslationsIntoHtml(
           const numMatch = paliItem.html.match(
             /<strong\b[^>]*\bparanum\b[^>]*>[\s\S]*?<\/strong>(?:\s*<span\b[^>]*\bdot\b[^>]*>[\s\S]*?<\/span>)?/
           );
+          const paliColors = translationColors?.pali || {};
+          const paliBorder = formatCssColor(paliColors.border);
+          const paliBg = formatCssColor(paliColors.bg);
+          const paliText = formatCssColor(paliColors.text);
+          const hasPaliCustom = Boolean(paliBorder || paliBg || paliText);
+          const paliSentStyle = hasPaliCustom
+            ? [
+                paliBorder ? `border-left: 1.5px solid ${paliBorder}` : 'border-left: 1.5px solid color-mix(in srgb, var(--accent, #8b2500) 30%, transparent)',
+                paliBg ? `background-color: ${paliBg}` : '',
+                paliText ? `color: ${paliText}` : '',
+                'padding: 0.5rem 0.85rem; border-radius: 8px;',
+              ]
+                .filter(Boolean)
+                .join('; ')
+            : '';
           const pairs = lineOrder
             .map((ln) => {
               const pHtml = paliByLine.get(ln);
@@ -639,7 +654,7 @@ function injectTranslationsIntoHtml(
                 `<div class="sent-pair-num">${ln}</div>` +
                 `<div class="sent-pair-body">` +
                 (pHtml !== undefined
-                  ? `<div class="sent-pair-pali" data-line="${ln}">${stripSentNumBadge(pHtml)}</div>`
+                  ? `<div class="sent-pair-pali reader-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-line="${ln}">${stripSentNumBadge(pHtml)}</div>`
                   : '') +
                 cells +
                 `</div></div>`;
