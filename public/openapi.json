@@ -57,6 +57,28 @@
       }
     },
     "/api/tree": { "get": { "summary": "Navigation tree (edge static)", "responses": { "200": { "description": "tree json" } } } },
-    "/api/books": { "get": { "summary": "Books catalog", "responses": { "200": { "description": "books" } } } }
+    "/api/books": { "get": { "summary": "Books catalog", "responses": { "200": { "description": "books" } } } },
+    "/api/book/{code}/pali_sentences": {
+      "get": {
+        "operationId": "paliSentences",
+        "summary": "Pāḷi sentences (epitaka shared line_id, 99.7% match with translations)",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" }],
+        "responses": { "200": { "description": "{book_code, chapters: {chapter: {para_index: [{line,text}]}}}" } }
+      }
+    },
+    "/api/ai/sentences": {
+      "get": {
+        "operationId": "aiSentences",
+        "summary": "Sentence-level Pāḷi + aligned translations (shared line_id)",
+        "parameters": [
+          { "name": "book", "in": "query", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" },
+          { "name": "chapter", "in": "query", "schema": { "type": "integer" }, "example": 0 },
+          { "name": "para_index", "in": "query", "schema": { "type": "integer" } },
+          { "name": "line", "in": "query", "schema": { "type": "integer" }, "description": "1-based line_id" },
+          { "name": "langs", "in": "query", "schema": { "type": "string" }, "example": "en" }
+        ],
+        "responses": { "200": { "description": "{pali_sentences:[{line_id,sentence}], translations:{en:[{line_id,translation}]}}" } }
+      }
+    }
   }
 }

@@ -76,6 +76,39 @@ export default function WebMcpRegistration() {
         },
         { signal }
       );
+
+      // 3. Sentence-Level Pāḷi + Translation (shared line_id, 99.7% match)
+      modelContext.registerTool(
+        {
+          name: 'get_sentences',
+          description: 'Get sentence-level Pāḷi and aligned translations with shared line_id for a paragraph (or chapter). Use for precise sentence citations: [book:cX:pY-LZ].',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              book_code: { type: 'string', description: 'Book code (e.g. s0101m.mul)' },
+              chapter_index: { type: 'integer', description: 'Chapter index (0-based)' },
+              para_index: { type: 'integer', description: 'Paragraph index' },
+              langs: { type: 'string', description: 'Comma-separated translation langs (e.g. en,vi)', default: 'en' },
+            },
+            required: ['book_code'],
+          },
+          execute: async ({ book_code, chapter_index, para_index, langs }) => {
+            if (!book_code) return { error: 'book_code is required' };
+            try {
+              const params = new URLSearchParams({ book: book_code });
+              if (chapter_index !== undefined) params.set('chapter', String(chapter_index));
+              if (para_index !== undefined) params.set('para_index', String(para_index));
+              if (langs) params.set('langs', langs);
+              const res = await fetch(`https://api.tipitakapali.org/api/ai/sentences?${params.toString()}`);
+              const data = await res.json();
+              return data;
+            } catch (err) {
+              return { error: err.message };
+            }
+          },
+        },
+        { signal }
+      );
     } catch (e) {
       console.warn('Failed to register WebMCP tools:', e);
     }

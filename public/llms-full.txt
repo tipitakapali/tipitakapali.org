@@ -279,12 +279,20 @@ Users can open any canonical text directly in their preferred script by prefixin
 - Also via edge: `GET {site_url}/api/dict/lookup?w=dhamma&dict=dpd` (proxied, slower)
 - Description: DPD (90k+ entries), PTS PED 2015, Abhidhānappadīpikā, Pāḷi-Sinhala, Sanskrit. `w` accepts Velthuis/`ṁ→ṃ`. No auth, `GET` preferred, `POST {w,dict}` also.
 
-### 7. Inflection Lookup
+### 7. Sentence-Level Pāḷi & Translation APIs (epitaka shared line_id, 99.7% match)
+- Pāḷi Sentences (book-level): `GET https://tipitakapali.org/api/book/{book_code}/pali_sentences` or `GET https://api.tipitakapali.org/api/book/{book_code}/pali_sentences`
+- Example: `GET /api/book/s0101m.mul/pali_sentences` → `{book_code, chapters: {chapter: {para_index: [{line,text}]}}}`
+- Translation Sentences (chapter): `GET https://api.tipitakapali.org/api/book/{book_code}/chapter/{chapter_index}/translation?lang={lang}&sentences=1`
+- Example: `GET /api/book/s0101m.mul/chapter/0/translation?lang=en&sentences=1` → `{sentences: {en: {para_index: [{line_id, translation}]}}}`
+- AI Agent: `GET https://api.tipitakapali.org/api/ai/sentences?book={book_code}&chapter={chapter_index}&para_index={para_index}&langs=en,vi` → sentence-aligned Pāḷi + translations
+- Note: Pāḷi sentences built from `ref/epitaka_app/assets/db/epitaka.db` (`pali_sentences.db`, 1.2M sentences) — same segmentation that produced `translation_*.db`, hence shared `line_id`.
+
+### 8. Inflection Lookup
 - Endpoint: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_{lemma}_1`
 - Example: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1`
 - Description: Declension/conjugation tables. Returns `{word, html}`.
 
-### 8. OpenAPI & AI Plugin
+### 9. OpenAPI & AI Plugin
 - OpenAPI: `GET https://tipitakapali.org/openapi.json` (for ChatGPT/MCP tool import)
 - AI Plugin: `GET https://tipitakapali.org/.well-known/ai-plugin.json`
 - Human Guide (features, shortcuts, dictionaries, scripts): `https://tipitakapali.org/info`

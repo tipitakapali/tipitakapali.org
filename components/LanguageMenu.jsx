@@ -11,7 +11,7 @@ import {
   ListOrdered,
   Feather,
   SquareText,
-  BetweenVerticalStart,
+  Columns2,
   ArrowUpToLine,
   ExternalLink,
   AlertTriangle,
@@ -491,7 +491,7 @@ export default function LanguageMenu() {
                     >
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
                         Pāḷi
-                        <BetweenVerticalStart size={14} className="shrink-0" />
+                        <Columns2 size={14} className="shrink-0" />
                         Translation
                       </span>
                     </button>
@@ -524,7 +524,7 @@ export default function LanguageMenu() {
                     >
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
                         Translation
-                        <BetweenVerticalStart size={14} className="shrink-0 scale-x-[-1]" />
+                        <Columns2 size={14} className="shrink-0 scale-x-[-1]" />
                         Pāḷi
                       </span>
                     </button>

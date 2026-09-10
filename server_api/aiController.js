@@ -483,6 +483,35 @@ const kAiToolDeclarations = [
     },
   },
   {
+    name: 'get_sentences',
+    description:
+      'Get sentence-level Pāḷi (and aligned translations) with shared line numbers for a paragraph or chapter. ' +
+      'Line numbers are shared between Pāḷi and each translation by construction (99.7% per-para count match). ' +
+      'Use for fine-grained citation at sentence granularity — every returned sentence has a line_id.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        book_code: {
+          type: 'STRING',
+          description: 'Book code (e.g. "s0101m.mul", "D-i", "s0502m.mul").',
+        },
+        chapter_index: {
+          type: 'INTEGER',
+          description: 'Chapter index (0-based).',
+        },
+        para_index: {
+          type: 'INTEGER',
+          description: 'Paragraph index (0-based global para_position). Optional: when omitted returns up to 40 sentences in the chapter.',
+        },
+        line_id: {
+          type: 'INTEGER',
+          description: 'Optional single sentence number (1-based line_id) to fetch one sentence. Requires para_index.',
+        },
+      },
+      required: ['book_code'],
+    },
+  },
+  {
     name: 'get_books',
     description: 'Get list of available books in the Chaṭṭha Saṅgāyana Tipiṭaka with their codes, titles, and nikayas.',
     parameters: { type: 'OBJECT', properties: {} },
@@ -553,8 +582,9 @@ Your duty is to systematically investigate the Dhamma through precise canonical 
 8. get_paragraph_content_batch(ranges) — Read multiple passages across suttas in parallel.
 9. get_commentaries(book_code, chapter_index, para_num, para_index) — Retrieve corresponding Aṭṭhakathā and Ṭīkā explanations and text.
 10. get_dictionary(word) / get_dictionary_batch(words) — DPD dictionary definitions, etymology, and grammatical roots.
-11. get_books() — List of books, nikāyas, and their codes.
-12. final_answer(summary) — Finalize research once you have gathered sufficient canonical evidence.
+ 11. get_sentences(book_code, chapter_index, para_index, line_id) — Sentence-level Pāḷi and aligned translations with shared line numbers (99.7% match). Use for precise sentence citation: [book:cX:pY-LZ] (e.g. [s0201m.mul:c0:p7-L2]).
+ 12. get_books() — List of books, nikāyas, and their codes.
+ 13. final_answer(summary) — Finalize research once you have gathered sufficient canonical evidence.
 
 ## Strategic Research Workflow (DeepCoder & Vīmaṃsā Multi-Step Loop)
 You have up to 6 iterations. Use them with deep scholarly discipline:
@@ -586,17 +616,17 @@ You have up to 6 iterations. Use them with deep scholarly discipline:
 function buildAnswerSystemPrompt({ groundRAGMode = true }) {
   const grounding = groundRAGMode
     ? `## RAG Mode Rules (Strict Grounding)
-1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}].
+1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{para}-L{line}] for sentence precision (e.g. [s0201m.mul:c0:p7-L2]).
 2. Answer the user's question using ONLY the canonical passages, commentaries, and dictionary definitions returned by the research tools.
-3. Quote Pāḷi verses or phrases EXACTLY as written in the sources (use Markdown blockquotes); provide clear English translations following each quote.
+3. Quote Pāḷi verses or phrases EXACTLY as written in the sources (use Markdown blockquotes); provide clear English translations following each quote. When quoting a single sentence, use get_sentences for exact Pāḷi + translation alignment (shared line_id, 99.7% match).
 4. If the retrieved sources do not fully answer the question, state this with complete honesty rather than speculating.
 5. Explain technical Pāḷi terms on first mention with etymological clarity.
-6. Format citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]) so users can click them directly to read the original text.`
+6. Format paragraph citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]); sentence citations as [book_code:c{chapter_index}:p{para_index}-L{line_id}] (e.g. [s0201m.mul:c0:p7-L2]) so users can click them directly to read the original text.`
     : `## Knowledge Mode Rules (Canonical + Contextual Knowledge)
-1. Base your answer primarily on the canonical passages retrieved by the tools, with inline citations [book_code:c{chap}:p{para}].
+1. Base your answer primarily on the canonical passages retrieved by the tools, with inline citations [book_code:c{chap}:p{para}] or sentence citations [book_code:c{chap}:p{para}-L{line}].
 2. You may supplement with your broader knowledge of the Pāḷi Canon, Theravāda Abhidhamma, and historical commentary where sources are partial, but clearly distinguish canonical citations from broader exposition.
-3. Quote Pāḷi accurately, with translation following.
-4. Format citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]) so users can click them to navigate in the reader.`;
+3. Quote Pāḷi accurately, with translation following. For sentence-precise quotes use get_sentences (shared line_id).
+4. Format citations as [book_code:c{chapter_index}:p{para_index}] (e.g. [s0101m.mul:c0:p5]) and sentence citations as [book:cX:pY-LZ] so users can click them to navigate in the reader.`;
 
   return `You are Ani (AI Nissaya), the scholarly Pāḷi Canon companion on tipitakapali.org.
 You have been supplied with verified passages, commentaries, and dictionary entries from the Chaṭṭha Saṅgāyana Tipiṭaka database.
@@ -1212,6 +1242,63 @@ function aiGetSection({ book_code, chapter_index, para_start }) {
   }
 }
 
+function aiGetSentences({ book_code, chapter_index, para_index, line_id, langs = ['en'] }) {
+  if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
+  const targetCode = resolveCanonicalBookCode(book_code);
+  const cIdx = chapter_index !== undefined && chapter_index !== null ? parseInt(chapter_index, 10) : 0;
+  const pIdx = para_index !== undefined && para_index !== null ? parseInt(para_index, 10) : null;
+  const lid = line_id !== undefined && line_id !== null ? parseInt(line_id, 10) : null;
+  const tLangs = Array.isArray(langs) ? langs : String(langs).split(',').map((s) => s.trim()).filter(Boolean);
+  const paliDbPath = (resolveDbPathFn || ((f) => path.join(__dirname, 'db', f)))('pali_sentences.db');
+  let paliSents = [];
+  if (paliDbPath) {
+    try {
+      const pdb = new (require('better-sqlite3'))(paliDbPath, { readonly: true });
+      if (pIdx !== null && lid !== null) {
+        paliSents = pdb.prepare('SELECT line_id, sentence FROM pali_sentences WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ? ORDER BY line_id').all(targetCode, cIdx, pIdx, lid);
+      } else if (pIdx !== null) {
+        paliSents = pdb.prepare('SELECT line_id, sentence FROM pali_sentences WHERE book_code = ? AND chapter_index = ? AND para_index = ? ORDER BY line_id').all(targetCode, cIdx, pIdx);
+      } else {
+        paliSents = pdb.prepare('SELECT line_id, sentence, para_index FROM pali_sentences WHERE book_code = ? AND chapter_index = ? ORDER BY para_index, line_id LIMIT 40').all(targetCode, cIdx);
+      }
+      pdb.close();
+    } catch {}
+  }
+  // Fallback: derive sentences from paragraph_translations when pali DB missing for a para.
+  if (paliSents.length === 0 && pIdx !== null) {
+    try {
+      const row = dbTipitaka.prepare('SELECT pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(targetCode, cIdx, pIdx);
+      if (row && row.pali_text) paliSents = [{ line_id: 1, sentence: row.pali_text, para_index: pIdx }];
+    } catch {}
+  }
+  const translations = {};
+  for (const lang of tLangs) {
+    const tdb = getTranslationDb(lang);
+    if (!tdb) continue;
+    try {
+      if (pIdx !== null && lid !== null) {
+        const r = tdb.prepare('SELECT translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ?').get(targetCode, cIdx, pIdx, lid);
+        translations[lang] = r ? [{ line_id: lid, translation: r.translation }] : [];
+      } else if (pIdx !== null) {
+        const rows = tdb.prepare('SELECT line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? ORDER BY line_id').all(targetCode, cIdx, pIdx);
+        translations[lang] = rows;
+      } else {
+        const rows = tdb.prepare('SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? ORDER BY para_index, line_id LIMIT 80').all(targetCode, cIdx);
+        translations[lang] = rows;
+      }
+    } catch {}
+  }
+  return {
+    success: true,
+    book_code: targetCode,
+    chapter_index: cIdx,
+    para_index: pIdx,
+    count: paliSents.length,
+    pali_sentences: paliSents,
+    translations,
+  };
+}
+
 function aiGetParagraphContent({
   book_code,
   chapter_index,
@@ -1726,6 +1813,14 @@ async function executeAiTool(name, args = {}) {
       }
       return { success: true, count: allPassages.length, passages: allPassages };
     }
+    case 'get_sentences':
+      return aiGetSentences({
+        book_code: args.book_code,
+        chapter_index: args.chapter_index,
+        para_index: args.para_index,
+        line_id: args.line_id,
+        langs: args.langs,
+      });
     case 'get_commentaries': {
       const pNum = args.para_num ?? args.para_number ?? (args.para_index !== undefined ? String(args.para_index) : undefined);
       return aiGetCommentaries({
@@ -1851,8 +1946,8 @@ function compareCitations(a, b) {
 
 function parseCitations(text) {
   if (!text) return [];
-  // Supports [book:c{chap}:p{para}], [book:c{chap}:p{start}-{end}], [book:{para}], and [book:c{chap}:p{para}:l{line}]
-  const regex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–](\d+))?(?::(\d+))?\]/g;
+  // Supports [book:c{chap}:p{para}], [book:c{chap}:p{start}-{end}], [book:{para}], [book:c{chap}:p{para}:L{line}] and [book:c{chap}:p{para}-L{line}]
+  const regex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–]L?(\d+))?(?::L?(\d+))?\]/g;
   const seen = new Set();
   const citations = [];
   let match;
@@ -1863,8 +1958,13 @@ function parseCitations(text) {
     const hasExplicitChap = match[2] !== undefined;
     let chapIdx = hasExplicitChap ? parseInt(match[2], 10) : 0;
     let paraIdx = parseInt(match[3], 10);
-    const paraEnd = match[4] ? parseInt(match[4], 10) : null;
-    const lineId = match[5] ? parseInt(match[5], 10) : null;
+    let paraEnd = match[4] ? parseInt(match[4], 10) : null;
+    let lineId = match[5] ? parseInt(match[5], 10) : null;
+    // Sentence-level citation [book:cX:pY-LZ] uses dash-L; promote to lineId
+    if (/-L\d+/i.test(rawTag) && !lineId && paraEnd !== null) {
+      lineId = paraEnd;
+      paraEnd = null;
+    }
 
     let bookTitle = rawBook;
     let chapterTitle = '';
@@ -2018,6 +2118,20 @@ function formatCompactToolResponse(toolName, result) {
           word: e.word,
           definition: (e.definition || '').slice(0, 300),
         })),
+      };
+    case 'get_sentences':
+      return {
+        count: result.count || 0,
+        book_code: result.book_code,
+        chapter_index: result.chapter_index,
+        para_index: result.para_index,
+        pali_sentences: (result.pali_sentences || []).slice(0, 8).map((s) => ({
+          line_id: s.line_id,
+          text: (s.sentence || s.text || '').slice(0, 300),
+        })),
+        translations: Object.fromEntries(
+          Object.entries(result.translations || {}).map(([k, v]) => [k, v.slice(0, 4).map((t) => ({ line_id: t.line_id, text: (t.translation || '').slice(0, 300) }))])
+        ),
       };
     case 'get_section':
       return {
@@ -2333,6 +2447,7 @@ Execute this strategy systematically. Start by discovering sections or matching 
   const allCollectedEvidence = {
     sections: [],
     passages: [],
+    sentences: [],
     commentaries: [],
     dictionaries: [],
   };
@@ -2443,6 +2558,8 @@ Execute this strategy systematically. Start by discovering sections or matching 
           allCollectedEvidence.passages.push(...resObj.results);
         } else if ((spec.name === 'get_paragraph_content' || spec.name === 'get_paragraph_content_batch') && resObj.passages) {
           allCollectedEvidence.passages.push(...resObj.passages);
+        } else if (spec.name === 'get_sentences' && resObj.pali_sentences) {
+          allCollectedEvidence.sentences.push(resObj);
         } else if (spec.name === 'get_commentaries' && (resObj.atthakatha || resObj.tika)) {
           allCollectedEvidence.commentaries.push(resObj);
         } else if ((spec.name === 'get_dictionary' || spec.name === 'get_dictionary_batch') && resObj.entries) {
@@ -2587,6 +2704,8 @@ Execute this strategy systematically. Start by discovering sections or matching 
           allCollectedEvidence.passages.push(...resObj.results);
         } else if ((spec.name === 'get_paragraph_content' || spec.name === 'get_paragraph_content_batch') && resObj.passages) {
           allCollectedEvidence.passages.push(...resObj.passages);
+        } else if (spec.name === 'get_sentences' && resObj.pali_sentences) {
+          allCollectedEvidence.sentences.push(resObj);
         } else if (spec.name === 'get_commentaries' && (resObj.atthakatha || resObj.tika)) {
           allCollectedEvidence.commentaries.push(resObj);
         } else if ((spec.name === 'get_dictionary' || spec.name === 'get_dictionary_batch') && resObj.entries) {
@@ -2684,6 +2803,23 @@ function buildSynthesisContextBlock(evidence) {
     }
   }
 
+  // 1b. Sentence-Level Evidence (99.7% Pāḷi↔translation line alignment)
+  if (evidence.sentences && evidence.sentences.length > 0) {
+    block += `### SENTENCE-LEVEL ALIGNED EVIDENCE (Pāḷi ↔ translations, shared line_id):\n\n`;
+    for (let i = 0; i < Math.min(evidence.sentences.length, 6); i++) {
+      const s = evidence.sentences[i];
+      block += `[Sentence Source ${i + 1}] ${s.book_code} c${s.chapter_index} p${s.para_index}\n`;
+      for (const ps of (s.pali_sentences || []).slice(0, 6)) {
+        block += `  L${ps.line_id}: ${ps.sentence || ps.text}\n`;
+        for (const [lang, trs] of Object.entries(s.translations || {})) {
+          const tr = trs.find((t) => t.line_id === ps.line_id);
+          if (tr) block += `    → [${lang}] L${tr.line_id}: ${tr.translation}\n`;
+        }
+      }
+      block += `Citations: ${(s.pali_sentences || []).map((ps) => `[${s.book_code}:c${s.chapter_index}:p${s.para_index}-L${ps.line_id}]`).join(' ')}\n\n`;
+    }
+  }
+
   // 2. Commentaries (Aṭṭhakathā & Ṭīkā)
   if (evidence.commentaries && evidence.commentaries.length > 0) {
     block += `### COMMENTARIAL EXPOSITIONS (AṬṬHAKATHĀ & ṬĪKĀ):\n\n`;
@@ -2730,7 +2866,7 @@ function buildSynthesisContextBlock(evidence) {
 }
 
 function evidenceWithFallback(ev) {
-  return ev || { sections: [], passages: [], commentaries: [], dictionaries: [] };
+  return ev || { sections: [], passages: [], sentences: [], commentaries: [], dictionaries: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2820,6 +2956,15 @@ function registerAiRoutes(fastify) {
   fastify.post('/api/ai/dictionary_batch', async (req) => {
     const body = req.body || {};
     return executeAiTool('get_dictionary_batch', body);
+  });
+
+  fastify.get('/api/ai/sentences', async (req) => {
+    const book = req.query.book || req.query.book_code || '';
+    const chap = req.query.chapter !== undefined ? parseInt(req.query.chapter, 10) : undefined;
+    const pidx = req.query.para_index !== undefined ? parseInt(req.query.para_index, 10) : undefined;
+    const lid = req.query.line !== undefined ? parseInt(req.query.line, 10) : undefined;
+    const langs = req.query.langs ? req.query.langs.split(',') : ['en'];
+    return aiGetSentences({ book_code: book, chapter_index: chap, para_index: pidx, line_id: lid, langs });
   });
 
   fastify.get('/api/ai/books', async () => {

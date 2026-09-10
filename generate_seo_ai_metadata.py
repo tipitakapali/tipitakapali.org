@@ -306,9 +306,12 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 - Chapter HTML: `GET {site_url}/api/book/[book_code]/chapter/[chapter_index]`
 - Book Table of Contents: `GET {site_url}/api/book/[book_code]/toc`
 - Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET {site_url}/api/mat`
+- Pāḷi Sentences (epitaka segmentation, shared line_id): `GET {site_url}/api/book/[book_code]/pali_sentences` → `{{chapters: {{chapter: {{para_index: [{{line,text}}]}}}}}}`
+- Translation Sentences: `GET {site_url}/api/book/[book_code]/translation/[lang].sentences.json` (static) or `GET {api_url}/api/book/[book_code]/chapter/[chapter_index]/translation?lang=[lang]&sentences=1` (VPS)
 
-## AI Tool-Use: Canonical Dictionary & Search (Direct VPS — no Worker hop)
+## AI Tool-Use: Canonical Dictionary, Search & Sentences (Direct VPS — no Worker hop)
 > Canonical base for AI agents: `{api_url}` (CORS `*`, `Cache-Control: public, max-age=86400`)
+> Sentence-level note: Pāḷi sentences (`pali_sentences.db`, 1.2M sentences, 217 books) and translation sentences share `line_id` per paragraph by construction — **99.7% per-para line-count match**. Use `get_sentences` tool for precise sentence citations: `[book:c{{chapter}}:p{{para}}-L{{line}}]`.
 
 - **DPD Primary Lookup (recommended first):** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd`
   - Example live: `curl "{api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd"` → `{{word, counts:{{dpd:2}}, dpd:[{{word,html}}]}}`
@@ -396,12 +399,20 @@ def generate_llms_full_txt(site_url, books, catalog):
         "- Also via edge: `GET {site_url}/api/dict/lookup?w=dhamma&dict=dpd` (proxied, slower)",
         "- Description: DPD (90k+ entries), PTS PED 2015, Abhidhānappadīpikā, Pāḷi-Sinhala, Sanskrit. `w` accepts Velthuis/`ṁ→ṃ`. No auth, `GET` preferred, `POST {w,dict}` also.",
         "",
-        "### 7. Inflection Lookup",
+        "### 7. Sentence-Level Pāḷi & Translation APIs (epitaka shared line_id, 99.7% match)",
+        f"- Pāḷi Sentences (book-level): `GET {site_url}/api/book/{{book_code}}/pali_sentences` or `GET https://api.tipitakapali.org/api/book/{{book_code}}/pali_sentences`",
+        "- Example: `GET /api/book/s0101m.mul/pali_sentences` → `{book_code, chapters: {chapter: {para_index: [{line,text}]}}}`",
+        f"- Translation Sentences (chapter): `GET https://api.tipitakapali.org/api/book/{{book_code}}/chapter/{{chapter_index}}/translation?lang={{lang}}&sentences=1`",
+        "- Example: `GET /api/book/s0101m.mul/chapter/0/translation?lang=en&sentences=1` → `{sentences: {en: {para_index: [{line_id, translation}]}}}`",
+        f"- AI Agent: `GET https://api.tipitakapali.org/api/ai/sentences?book={{book_code}}&chapter={{chapter_index}}&para_index={{para_index}}&langs=en,vi` → sentence-aligned Pāḷi + translations",
+        "- Note: Pāḷi sentences built from `ref/epitaka_app/assets/db/epitaka.db` (`pali_sentences.db`, 1.2M sentences) — same segmentation that produced `translation_*.db`, hence shared `line_id`.",
+        "",
+        "### 8. Inflection Lookup",
         f"- Endpoint: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_{{lemma}}_1`",
         "- Example: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1`",
         "- Description: Declension/conjugation tables. Returns `{word, html}`.",
         "",
-        "### 8. OpenAPI & AI Plugin",
+        "### 9. OpenAPI & AI Plugin",
         f"- OpenAPI: `GET {site_url}/openapi.json` (for ChatGPT/MCP tool import)",
         f"- AI Plugin: `GET {site_url}/.well-known/ai-plugin.json`",
         f"- Human Guide (features, shortcuts, dictionaries, scripts): `{site_url}/info`",

@@ -54,9 +54,12 @@
 - Chapter HTML: `GET https://tipitakapali.org/api/book/[book_code]/chapter/[chapter_index]`
 - Book Table of Contents: `GET https://tipitakapali.org/api/book/[book_code]/toc`
 - Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET https://tipitakapali.org/api/mat`
+- Pāḷi Sentences (epitaka segmentation, shared line_id): `GET https://tipitakapali.org/api/book/[book_code]/pali_sentences` → `{chapters: {chapter: {para_index: [{line,text}]}}}`
+- Translation Sentences: `GET https://tipitakapali.org/api/book/[book_code]/translation/[lang].sentences.json` (static) or `GET https://api.tipitakapali.org/api/book/[book_code]/chapter/[chapter_index]/translation?lang=[lang]&sentences=1` (VPS)
 
-## AI Tool-Use: Canonical Dictionary & Search (Direct VPS — no Worker hop)
+## AI Tool-Use: Canonical Dictionary, Search & Sentences (Direct VPS — no Worker hop)
 > Canonical base for AI agents: `https://api.tipitakapali.org` (CORS `*`, `Cache-Control: public, max-age=86400`)
+> Sentence-level note: Pāḷi sentences (`pali_sentences.db`, 1.2M sentences, 217 books) and translation sentences share `line_id` per paragraph by construction — **99.7% per-para line-count match**. Use `get_sentences` tool for precise sentence citations: `[book:c{chapter}:p{para}-L{line}]`.
 
 - **DPD Primary Lookup (recommended first):** `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd`
   - Example live: `curl "https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd"` → `{word, counts:{dpd:2}, dpd:[{word,html}]}`

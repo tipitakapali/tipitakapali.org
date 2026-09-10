@@ -69,6 +69,20 @@
           },
           "required": ["book_code", "chapter_index"]
         }
+      },
+      {
+        "name": "get_sentences",
+        "description": "Sentence-level Pāḷi and aligned translations with shared line_id (99.7% match). Use for precise citations [book:cX:pY-LZ].",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "book_code": { "type": "string", "description": "Book code (e.g. s0101m.mul)" },
+            "chapter_index": { "type": "integer", "description": "Chapter index (0-based)" },
+            "para_index": { "type": "integer", "description": "Paragraph index" },
+            "langs": { "type": "string", "description": "Comma-separated langs (e.g. en,vi)", "default": "en" }
+          },
+          "required": ["book_code"]
+        }
       }
     ],
     "resources": [
