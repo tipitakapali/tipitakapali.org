@@ -798,8 +798,11 @@ const ChapterBlock = memo(function ChapterBlock({
   const [paliSentMap, setPaliSentMap] = React.useState(null);
   const [isTransLoading, setIsTransLoading] = React.useState(false);
   const [isPaliSentLoading, setIsPaliSentLoading] = React.useState(false);
+  const [transFetchedKey, setTransFetchedKey] = React.useState(null);
+  const [paliSentFetched, setPaliSentFetched] = React.useState(false);
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const activeLangsKey = activeLangs.join(',');
+  const activeLangsKeyWithMode = activeLangsKey ? `${activeLangsKey}:${sentenceMode ? 'sent' : 'para'}` : '';
 
   useEffect(() => {
     if (isCurrentOrTarget) {
@@ -838,6 +841,7 @@ const ChapterBlock = memo(function ChapterBlock({
       if (!activeLangsKey) {
         setTranslations({});
         setTransSentences({});
+        setTransFetchedKey('');
         setIsTransLoading(false);
       }
       return;
@@ -848,6 +852,7 @@ const ChapterBlock = memo(function ChapterBlock({
     if (langsToFetch.length === 0) {
       setTranslations({});
       setTransSentences({});
+      setTransFetchedKey(activeLangsKeyWithMode);
       setIsTransLoading(false);
       return;
     }
@@ -862,23 +867,19 @@ const ChapterBlock = memo(function ChapterBlock({
     fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, { sentences: sentenceMode })
       .then((data) => {
         if (!isMounted) return;
-        blockRef.current?.removeAttribute('data-trans-loading');
-        blockRef.current?.setAttribute('data-trans-settled', '1');
         if (data?.translations) {
           setTranslations(data.translations);
         }
         if (sentenceMode && data?.sentences) {
           setTransSentences(data.sentences);
         }
+        setTransFetchedKey(activeLangsKeyWithMode);
         setIsTransLoading(false);
       })
       .catch((err) => {
         console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
         if (isMounted) {
-          // Treat a failed fetch as final (rows stay Pāḷi-only) so watchers
-          // don't wait forever for a payload that will never arrive.
-          blockRef.current?.removeAttribute('data-trans-loading');
-          blockRef.current?.setAttribute('data-trans-settled', '1');
+          setTransFetchedKey(activeLangsKeyWithMode);
           setIsTransLoading(false);
         }
       });
@@ -886,12 +887,13 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => {
       isMounted = false;
     };
-  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, sentenceMode]);
+  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, sentenceMode, activeLangsKeyWithMode]);
 
   // Pāḷi sentence map for sentence display mode (book-level, shared cache).
   useEffect(() => {
     if (!sentenceMode || !isPaliEnabled || !html || !bookCode) {
       if (!sentenceMode) setPaliSentMap(null);
+      setPaliSentFetched(true);
       setIsPaliSentLoading(false);
       return;
     }
@@ -902,10 +904,14 @@ const ChapterBlock = memo(function ChapterBlock({
         if (cancelled) return;
         const chapMap = data?.chapters?.[String(chapter.chapter_index)];
         setPaliSentMap(chapMap || null);
+        setPaliSentFetched(true);
         setIsPaliSentLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setIsPaliSentLoading(false);
+        if (!cancelled) {
+          setPaliSentFetched(true);
+          setIsPaliSentLoading(false);
+        }
       });
     return () => {
       cancelled = true;
@@ -913,11 +919,32 @@ const ChapterBlock = memo(function ChapterBlock({
   }, [sentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
 
   const hasActiveTrans = activeLangs.length > 0;
-  const hasTransData = Object.keys(translations).length > 0;
-  const hasSentenceData = !sentenceMode || (Boolean(paliSentMap) && Object.keys(transSentences).length > 0);
+  const transFetchPending = isTransLoading || transFetchedKey !== activeLangsKeyWithMode;
+  const paliSentFetchPending = sentenceMode && isPaliEnabled && (isPaliSentLoading || !paliSentFetched);
   const isTransPending =
     hasActiveTrans &&
-    (isTransLoading || isPaliSentLoading || !hasTransData || (sentenceMode && !hasSentenceData));
+    (isNearViewport || isCurrentOrTarget) &&
+    (transFetchPending || paliSentFetchPending);
+
+  // Keep data-trans-loading and data-trans-settled DOM attributes strictly in sync with isTransPending
+  useEffect(() => {
+    if (!blockRef.current) return;
+    if (hasActiveTrans) {
+      if (isTransPending) {
+        blockRef.current.setAttribute('data-trans-loading', '1');
+        blockRef.current.removeAttribute('data-trans-settled');
+      } else if (transFetchedKey === activeLangsKeyWithMode) {
+        blockRef.current.removeAttribute('data-trans-loading');
+        blockRef.current.setAttribute('data-trans-settled', '1');
+      } else {
+        blockRef.current.removeAttribute('data-trans-loading');
+        blockRef.current.removeAttribute('data-trans-settled');
+      }
+    } else {
+      blockRef.current.removeAttribute('data-trans-loading');
+      blockRef.current.removeAttribute('data-trans-settled');
+    }
+  }, [isTransPending, hasActiveTrans, transFetchedKey, activeLangsKeyWithMode]);
 
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
@@ -984,6 +1011,7 @@ const ChapterBlock = memo(function ChapterBlock({
           ref={blockRef}
           id={`chap-${chapter.chapter_index}`}
           data-chapter={chapter.chapter_index}
+          data-trans-loading="1"
           className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300"
         >
           <div className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text-primary)]">
@@ -1005,6 +1033,8 @@ const ChapterBlock = memo(function ChapterBlock({
         ref={blockRef}
         id={`chap-${chapter.chapter_index}`}
         data-chapter={chapter.chapter_index}
+        data-trans-loading={hasActiveTrans && isTransPending ? '1' : undefined}
+        data-trans-settled={hasActiveTrans && !isTransPending && transFetchedKey === activeLangsKeyWithMode ? '1' : undefined}
         className="chapter-content-block"
       >
         {isTransPending && (
@@ -1443,6 +1473,7 @@ export default function ReaderView() {
     }
     return langs;
   }, [orderedLayers]);
+  const sentenceMode = settings?.translationGranularity === 'sentence';
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -1482,14 +1513,18 @@ export default function ReaderView() {
     if (container) {
       container.addEventListener('wheel', cancelJump, { passive: true });
       container.addEventListener('touchstart', cancelJump, { passive: true });
+      container.addEventListener('mousedown', cancelJump, { passive: true });
     }
+    window.addEventListener('keydown', cancelJump, { passive: true });
     return () => {
       clearTimeout(chapterJumpRef.current.timer);
       clearTimeout(paraJumpRef.current.timer);
       if (container) {
         container.removeEventListener('wheel', cancelJump);
         container.removeEventListener('touchstart', cancelJump);
+        container.removeEventListener('mousedown', cancelJump);
       }
+      window.removeEventListener('keydown', cancelJump);
     };
   }, [clearTargetScrollIntent]);
 
@@ -1571,6 +1606,7 @@ export default function ReaderView() {
   // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
+    console.log('[ReaderView targetScrollIntent triggered]', targetScrollIntent);
 
     const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db } = targetScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
@@ -1708,6 +1744,76 @@ export default function ReaderView() {
           return pickTransOrRow(row, chapterEl || container);
         }
 
+        if (page && pageSystem) {
+          const cleanP = String(page).trim();
+          const ed = String(pageSystem).toUpperCase();
+          const chapterEl =
+            chapterIdx !== undefined && chapterIdx !== null
+              ? container.querySelector(`[data-chapter="${chapterIdx}"]`)
+              : null;
+          if (
+            chapterIdx !== undefined &&
+            chapterIdx !== null &&
+            (!chapterEl || chapterEl.classList.contains('chapter-placeholder'))
+          ) {
+            return null;
+          }
+          const scope = chapterEl || container;
+          let pbEl = null;
+
+          if (cleanP.includes('.')) {
+            const parts = cleanP.split('.');
+            const vol = parseInt(parts[0], 10);
+            const num = parseInt(parts[1], 10);
+            if (!isNaN(vol) && !isNaN(num)) {
+              const padded = `${vol}.${String(num).padStart(4, '0')}`;
+              pbEl =
+                scope.querySelector(`[id="${ed}${padded}"]`) ||
+                scope.querySelector(`[id="${ed}${cleanP}"]`) ||
+                scope.querySelector(`[data-ed="${ed}"][data-page="${padded}"]`) ||
+                scope.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+            }
+          } else {
+            const num = parseInt(cleanP, 10);
+            if (!isNaN(num)) {
+              const paddedNum = String(num).padStart(4, '0');
+              const knownAnchor =
+                activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
+              if (knownAnchor) {
+                pbEl = scope.querySelector(`[id="${knownAnchor}"]`);
+              }
+              if (!pbEl) {
+                pbEl =
+                  scope.querySelector(`[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
+                  scope.querySelector(`[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
+                  scope.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+              }
+            }
+          }
+
+          if (!pbEl) {
+            const targetPara = paraNum || activeTab?.page_to_para?.[ed]?.[cleanP];
+            if (targetPara !== undefined && targetPara !== null && targetPara !== '') {
+              const pClean = String(targetPara).trim();
+              pbEl =
+                scope.querySelector(`[id="para-${pClean}"]`) ||
+                scope.querySelector(`[id="para${pClean}"]`) ||
+                scope.querySelector(`[data-para="${pClean}"]`) ||
+                scope.querySelector(`[data-pindex="${pClean}"]`);
+            }
+          }
+
+          if (!pbEl) return null;
+
+          const targetEl =
+            (sentenceMode && pbEl.closest('.sent-pair')) ||
+            (pbEl.getClientRects().length > 0
+              ? pbEl
+              : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl);
+
+          return visible(targetEl);
+        }
+
         if (paraNum) {
           const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
           const activeSub =
@@ -1812,11 +1918,6 @@ export default function ReaderView() {
           const rRect = target.getBoundingClientRect();
           if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
             cur.stableCount = 0;
-            // Target drifted and the user hasn't touched the scroll: correct instantly.
-            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
-              paraJumpRef.current.key = null;
-              return;
-            }
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
             smartScrollTo(container, fresh, { scrollMotion: 'instant' });
             if (settings.pulseAnimation) {
@@ -1896,12 +1997,6 @@ export default function ReaderView() {
           const rRect = el.getBoundingClientRect();
           if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
             cur.stableCount = 0;
-            // User scrolled meanwhile (or a smooth animation is still running):
-            // never yank — just stand down.
-            if (Math.abs(container.scrollTop - cur.lastOffset) > 8) {
-              chapterJumpRef.current.key = null;
-              return;
-            }
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
             smartScrollTo(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
             saveTabScroll(activeTab.bookCode, fresh);
@@ -2001,8 +2096,110 @@ export default function ReaderView() {
         }
       }
 
-      // 2. Target paragraph by number (Bookmarks, History, MAT, and GoTo)
-      if (paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '')) {
+      // 2. Target page break (GoTo Page)
+      if (page && pageSystem) {
+        const cleanP = String(page).trim();
+        const ed = String(pageSystem).toUpperCase();
+
+        // Ensure the target chapter containing this page is loaded
+        const targetChap = (chapterIdx !== undefined && chapterIdx !== null)
+          ? chapterIdx
+          : activeTab?.page_to_chapter?.[ed]?.[cleanP];
+        if (targetChap !== undefined && targetChap !== null) {
+          if (!activeTab.loadedChapters?.[targetChap] && !activeTab.loadingChapters?.[targetChap]) {
+            loadChapter(activeTab.bookCode, targetChap);
+            bufferAdjacentChapters(activeTab.bookCode, targetChap);
+          }
+        }
+
+        let pbEl = null;
+
+        // Direct ID lookup (e.g. V0.0023, P3.0045, V3.0440, V1.0023)
+        if (cleanP.includes('.')) {
+          const parts = cleanP.split('.');
+          const vol = parseInt(parts[0], 10);
+          const num = parseInt(parts[1], 10);
+          if (!isNaN(vol) && !isNaN(num)) {
+            const padded = `${vol}.${String(num).padStart(4, '0')}`;
+            pbEl =
+              findElement(`${ed}${padded}`) ||
+              findElement(`${ed}${cleanP}`) ||
+              findElement(null, `[data-ed="${ed}"][data-page="${padded}"]`) ||
+              findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
+          }
+        } else {
+          const num = parseInt(cleanP, 10);
+          if (!isNaN(num)) {
+            const paddedNum = String(num).padStart(4, '0');
+            const knownAnchor =
+              activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
+            if (knownAnchor) {
+              pbEl = findElement(knownAnchor);
+            }
+            if (!pbEl) {
+              pbEl =
+                findElement(null, `[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
+            }
+          }
+        }
+
+        // Robust fallback: resolve page to target paragraph number via targetParaNum or page_to_para
+        if (!pbEl) {
+          const targetPara = paraNum || activeTab?.page_to_para?.[ed]?.[cleanP];
+          if (targetPara !== undefined && targetPara !== null && targetPara !== '') {
+            const pClean = String(targetPara).trim();
+            pbEl =
+              findElement(`para-${pClean}`) ||
+              findElement(`para${pClean}`) ||
+              findElement(null, `[data-para="${CSS.escape(pClean)}"]`) ||
+              findElement(null, `[data-pindex="${CSS.escape(pClean)}"]`);
+          }
+        }
+
+        console.log('[ReaderView attemptScroll check]', { retries, page, pageSystem, chapterIdx, pbEl: Boolean(pbEl) });
+        if (pbEl) {
+          const hostChapter = pbEl.closest ? pbEl.closest('[data-chapter]') : null;
+          const isSettled = areaTranslationSettled(hostChapter);
+          console.log('[ReaderView attemptScroll pbEl found]', { retries, hostChapter: hostChapter?.getAttribute('data-chapter'), isSettled });
+          if (isSettled || retries >= maxRetries - 5) {
+            // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph or sentence card
+            const targetEl =
+              (sentenceMode && pbEl.closest('.sent-pair')) ||
+              (pbEl.getClientRects().length > 0
+                ? pbEl
+                : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl);
+
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const rect = targetEl.getBoundingClientRect();
+            const currentScroll = containerRef.current.scrollTop;
+            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+            if (settings.pulseAnimation) {
+              targetEl.classList.remove('pulse-highlight');
+              void targetEl.offsetWidth;
+              targetEl.classList.add('pulse-highlight');
+            }
+            const foundPNum =
+              targetEl.getAttribute?.('data-para') ||
+              targetEl.closest?.('[data-para]')?.getAttribute?.('data-para') ||
+              pbEl.getAttribute?.('data-para');
+            if (foundPNum) setActiveParaNum(foundPNum);
+            saveTabScroll(activeTab.bookCode, offset);
+            armParaJumpWatcher(
+              `${activeTab.bookCode}:page:${ed}:${cleanP}:${Date.now()}`,
+              offset
+            );
+            clearTargetScrollIntent();
+            return;
+          }
+        }
+      }
+
+      // 3. Target paragraph by number (Bookmarks, History, MAT, and GoTo)
+      if (paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '') && !(page && pageSystem)) {
         const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
         const targetInt = parseInt(cleanPara, 10);
 
@@ -2125,89 +2322,6 @@ export default function ReaderView() {
         }
       }
 
-      // 2. Target page break
-      if (page && pageSystem) {
-        const cleanP = String(page).trim();
-        const ed = String(pageSystem).toUpperCase();
-        let pbEl = null;
-
-        // Direct ID lookup (e.g. V0.0023, P3.0045, V3.0440, V1.0023)
-        if (cleanP.includes('.')) {
-          const parts = cleanP.split('.');
-          const vol = parseInt(parts[0], 10);
-          const num = parseInt(parts[1], 10);
-          if (!isNaN(vol) && !isNaN(num)) {
-            const padded = `${vol}.${String(num).padStart(4, '0')}`;
-            pbEl =
-              findElement(`${ed}${padded}`) ||
-              findElement(`${ed}${cleanP}`) ||
-              findElement(null, `[data-ed="${ed}"][data-page="${padded}"]`) ||
-              findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
-          }
-        } else {
-          const num = parseInt(cleanP, 10);
-          if (!isNaN(num)) {
-            const paddedNum = String(num).padStart(4, '0');
-            const knownAnchor =
-              activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
-            if (knownAnchor) {
-              pbEl = findElement(knownAnchor);
-            }
-            if (!pbEl) {
-              pbEl =
-                findElement(null, `[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
-                findElement(null, `[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
-                findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`);
-            }
-          }
-        }
-
-        // Robust fallback: resolve page to target paragraph number via targetParaNum or page_to_para
-        if (!pbEl) {
-          const targetPara = paraNum || activeTab?.page_to_para?.[ed]?.[cleanP];
-          if (targetPara !== undefined && targetPara !== null && targetPara !== '') {
-            const pClean = String(targetPara).trim();
-            pbEl =
-              findElement(`para-${pClean}`) ||
-              findElement(`para${pClean}`) ||
-              findElement(null, `[data-para="${CSS.escape(pClean)}"]`) ||
-              findElement(null, `[data-pindex="${CSS.escape(pClean)}"]`);
-          }
-        }
-
-        if (pbEl) {
-          // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph or sentence card
-          const targetEl =
-            pbEl.getClientRects().length > 0
-              ? pbEl
-              : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl;
-
-          const containerRect = containerRef.current.getBoundingClientRect();
-          const rect = targetEl.getBoundingClientRect();
-          const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
-
-          if (settings.pulseAnimation) {
-            targetEl.classList.remove('pulse-highlight');
-            void targetEl.offsetWidth;
-            targetEl.classList.add('pulse-highlight');
-          }
-          const foundPNum =
-            targetEl.getAttribute?.('data-para') ||
-            targetEl.closest?.('[data-para]')?.getAttribute?.('data-para') ||
-            pbEl.getAttribute?.('data-para');
-          if (foundPNum) setActiveParaNum(foundPNum);
-          saveTabScroll(activeTab.bookCode, offset);
-          armParaJumpWatcher(
-            `${activeTab.bookCode}:page:${ed}:${cleanP}:${Date.now()}`,
-            offset
-          );
-          clearTargetScrollIntent();
-          return;
-        }
-      }
-
       // 4. Target chapter header
       if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '') && !page) {
         if (chapterIdx === 0) {
@@ -2302,6 +2416,7 @@ export default function ReaderView() {
     setActiveParaNum,
     searchHighlight,
     orderedLayers,
+    sentenceMode,
     settings?.scrollMotion,
   ]);
 
