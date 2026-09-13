@@ -45,20 +45,20 @@ const STARTER_PROMPTS = [
     query: 'Explain the Four Noble Truths (cattāri ariyasaccāni) as taught in the Dhammacakkappavattana Sutta (SN 56.11), with canonical definitions of each truth.',
   },
   {
-    title: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ?',
-    query: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ။ ပါဠိအမည်၊ သုတ်အမှတ်နှင့် အဓိကအကြောင်းအရာ အကျဉ်းကို canonical ကိုးကားချက်များနှင့်အတူ ဖော်ပြပေးပါ။',
-  },
-  {
     title: 'What is Mahāsatipaṭṭhāna?',
     query: 'Explain the four foundations of mindfulness (satipaṭṭhāna) — body, feelings, mind and dhammas — as taught in the Mahāsatipaṭṭhāna Sutta (DN 22).',
   },
   {
-    title: 'What is Sīla?',
-    query: 'What is sīla (virtue, moral conduct) in the Pāli Canon? Explain its role as the foundation of the gradual training (anupubbasikkhā) with key canonical passages.',
+    title: 'Dependent Origination (Paṭiccasamuppāda)',
+    query: 'Explain the twelve links of Dependent Origination (paṭiccasamuppāda) in forward and reverse order with authentic canonical citations.',
   },
   {
     title: 'Tìm giúp tôi bài kinh có tên giống như mật hoàn hay bánh mật?',
     query: 'Tìm giúp tôi bài kinh có tên giống như mật hoàn hay bánh mật? Cho biết tên Pāḷi, số hiệu bài kinh và tóm tắt nội dung chính với trích dẫn canonical.',
+  },
+  {
+    title: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ?',
+    query: 'ပျားလုံး သို့မဟုတ် ပျားမုန့်ကဲ့သို့ အမည်ရှိသော သုတ်ကို ရှာပေးပါ။ ပါဠိအမည်၊ သုတ်အမှတ်နှင့် အဓိကအကြောင်းအရာ အကျဉ်းကို canonical ကိုးကားချက်များနှင့်အတူ ဖော်ပြပေးပါ။',
   },
   {
     title: 'Detailed Pāḷi grammar analysis: "Sattāhaṃ sannivatto kātabbo"',
@@ -91,6 +91,8 @@ function getToolMeta(toolName) {
     case 'get_paragraph_content':
     case 'get_paragraph_content_batch':
       return { label: 'Passage Fetch', icon: BookOpen, color: 'text-emerald-500 dark:text-emerald-400' };
+    case 'get_sentences':
+      return { label: 'Sentence Translation Alignment', icon: FileText, color: 'text-sky-500 dark:text-sky-400' };
     case 'get_commentaries':
       return { label: 'Aṭṭhakathā & Ṭīkā Review', icon: FileText, color: 'text-purple-500 dark:text-purple-400' };
     case 'get_dictionary':
@@ -177,7 +179,11 @@ function compareCitations(a, b) {
 
   const paraA = a.paraIndex ?? 0;
   const paraB = b.paraIndex ?? 0;
-  return paraA - paraB;
+  if (paraA !== paraB) return paraA - paraB;
+
+  const lineA = a.lineId ?? 0;
+  const lineB = b.lineId ?? 0;
+  return lineA - lineB;
 }
 
 function sortCitations(citations) {
@@ -752,11 +758,12 @@ export default function AiChatView({ initialQuery = null }) {
     setSelectedCitation(citation);
   };
 
-  const handleOpenInReader = (bookCode, chapterIndex, paraIndex, paraNum) => {
+  const handleOpenInReader = (bookCode, chapterIndex, paraIndex, paraNum, lineId) => {
     openBook(bookCode, {
       targetChapterIdx: chapterIndex,
       targetParaIndex: paraIndex,
       targetParaNum: paraNum,
+      targetLineId: lineId,
     });
   };
 
@@ -1000,12 +1007,12 @@ export default function AiChatView({ initialQuery = null }) {
         {/* Message Stream */}
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
-          const isExpanded = expandedToolCalls[msg.id] ?? false;
+          const isExpanded = expandedToolCalls[msg.id] ?? Boolean(msg.isStreaming);
 
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-3xl mx-auto w-full`}
+              className={`ai-chat-message ${isUser ? 'ai-chat-user' : 'ai-chat-assistant'} flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-3xl mx-auto w-full`}
             >
               {/* Message Header */}
               <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] font-semibold text-[var(--text-muted)]">
@@ -1025,7 +1032,7 @@ export default function AiChatView({ initialQuery = null }) {
 
               {/* Message Bubble */}
               <div
-                className={`w-full rounded-2xl p-4 sm:p-5 shadow-2xs leading-relaxed ${
+                className={`ai-chat-bubble ${isUser ? 'ai-chat-bubble-user' : 'ai-chat-bubble-assistant'} w-full rounded-2xl p-4 sm:p-5 shadow-2xs leading-relaxed ${
                   isUser
                     ? 'bg-[var(--accent-light)] text-[var(--text-primary)] border border-[var(--accent-border)] rounded-tr-xs'
                     : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-tl-xs'
@@ -1047,13 +1054,24 @@ export default function AiChatView({ initialQuery = null }) {
                       onClick={() =>
                         setExpandedToolCalls((prev) => ({ ...prev, [msg.id]: !isExpanded }))
                       }
-                      className="w-full px-3 py-2 flex items-center justify-between text-[var(--accent)] font-semibold hover:bg-[var(--accent-light)] transition cursor-pointer"
+                      className="w-full px-3 py-2 flex items-center justify-between text-[var(--accent)] font-semibold hover:bg-[var(--accent-light)] transition cursor-pointer text-left"
                     >
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5 flex-wrap min-w-0">
                         <BookOpen size={13} className="text-[var(--accent)] shrink-0" />
-                        <span>
+                        <span className="font-bold">
                           Step 2: Canonical Research ({msg.toolCalls.length} step{msg.toolCalls.length > 1 ? 's' : ''})
                         </span>
+                        {Array.from(new Set(msg.toolCalls.map((t) => t.tool))).map((tName) => {
+                          const meta = getToolMeta(tName);
+                          return (
+                            <span
+                              key={tName}
+                              className="px-1.5 py-0.5 rounded-full bg-[var(--bg-card)] text-[10px] text-[var(--accent)] border border-[var(--accent-border)] font-medium"
+                            >
+                              {meta.label} ({tName})
+                            </span>
+                          );
+                        })}
                         {msg.isStreaming && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--accent-light)] text-[var(--accent)] animate-pulse font-normal">
                             <Loader2 size={10} className="animate-spin" />
@@ -1061,7 +1079,9 @@ export default function AiChatView({ initialQuery = null }) {
                           </span>
                         )}
                       </span>
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      <span className="shrink-0 ml-1 text-[var(--accent)]">
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </span>
                     </button>
                     {isExpanded && (
                       <div className="p-3 pt-1 space-y-1.5 border-t border-[var(--accent-border)] text-[11px] text-[var(--text-secondary)]">
@@ -1071,17 +1091,22 @@ export default function AiChatView({ initialQuery = null }) {
                           const paramDesc = tc.args?.query
                             ? `"${tc.args.query}"`
                             : tc.args?.book_code
-                            ? `${tc.args.book_code}${tc.args.para_start ? ` §${tc.args.para_start}` : tc.args.para_number ? ` §${tc.args.para_number}` : ''}`
+                            ? `${tc.args.book_code}${tc.args.para_index !== undefined ? ` §${tc.args.para_index}` : tc.args.para_start ? ` §${tc.args.para_start}` : tc.args.para_number ? ` §${tc.args.para_number}` : ''}${tc.args.line_id ? `:L${tc.args.line_id}` : ''}`
+                            : tc.args?.word
+                            ? `"${tc.args.word}"`
                             : tc.args?.terms
                             ? `[${tc.args.terms.join(', ')}]`
-                            : '';
+                            : tc.summary || '';
 
                           return (
-                            <div key={idx} className="flex items-start gap-2 bg-[var(--bg-card)]/60 p-2 rounded-lg border border-[var(--accent-border)]">
+                            <div key={idx} className="ai-tool-log-item flex items-start gap-2 bg-[var(--bg-card)]/60 p-2 rounded-lg border border-[var(--accent-border)]" data-tool={tc.tool}>
                               <IconComp size={13} className={`mt-0.5 shrink-0 ${meta.color}`} />
                               <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                                <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5 flex-wrap">
                                   <span>{meta.label}</span>
+                                  <code className="text-[10px] px-1 py-0.2 rounded bg-[var(--bg-secondary)] text-[var(--text-muted)] font-mono">
+                                    {tc.tool}
+                                  </code>
                                   {paramDesc && (
                                     <span className="text-[10px] text-[var(--text-muted)] font-mono truncate max-w-[260px] sm:max-w-[360px]">
                                       {paramDesc}

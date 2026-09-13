@@ -37,7 +37,7 @@ export function MainAppContent({ params: rawParams }) {
       };
     }
 
-    if (activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat') {
+    if (activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat' || activeBookCode === 'ai_chat') {
       return {
         pageTitle: 'Ani Assistant | Tipiṭaka Pāḷi',
         pageDesc: 'AI-powered Dhamma study companion for the Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon.',
@@ -87,6 +87,7 @@ export function MainAppContent({ params: rawParams }) {
     activeTab?.currentChapterIdx,
     activeTab?.chapters,
     activeTab?.nikaya,
+    activeBookCode,
     settings?.paliScript,
   ]);
 
@@ -111,14 +112,31 @@ export function MainAppContent({ params: rawParams }) {
     document.title = pageTitle;
     setMetaDesc(pageDesc);
 
-    // Re-assert title after React 19 / Next.js layout metadata reconciliation pass
-    const timer = setTimeout(() => {
-      if (document.title !== pageTitle) {
-        document.title = pageTitle;
-      }
-    }, 100);
+    // Re-assert title after React 19 / Next.js layout metadata reconciliation passes
+    const timers = [
+      setTimeout(() => {
+        if (document.title !== pageTitle) {
+          document.title = pageTitle;
+        }
+      }, 100),
+      setTimeout(() => {
+        if (document.title !== pageTitle) {
+          document.title = pageTitle;
+        }
+      }, 400),
+      setTimeout(() => {
+        if (document.title !== pageTitle) {
+          document.title = pageTitle;
+        }
+      }, 1200),
+      setTimeout(() => {
+        if (document.title !== pageTitle) {
+          document.title = pageTitle;
+        }
+      }, 2500),
+    ];
 
-    return () => clearTimeout(timer);
+    return () => timers.forEach(t => clearTimeout(t));
   }, [pageTitle, pageDesc]);
 
   // Listen for dynamic hash navigation (e.g. user changes URL hash or clicks an anchor link)
@@ -301,7 +319,7 @@ export function MainAppContent({ params: rawParams }) {
     <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <title>{pageTitle}</title>
       <Header />
-      <div className="flex flex-1 min-h-0 overflow-hidden relative w-full max-w-full">
+      <div className="app-main-flex flex flex-1 min-h-0 overflow-hidden overflow-x-clip relative w-full max-w-full" style={{ overflowX: 'clip' }}>
         <NavigationTree />
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-full" style={{ order: 10 }}>
           <BookTabsBar />

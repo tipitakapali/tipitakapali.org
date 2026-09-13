@@ -582,6 +582,7 @@ export function TabProvider({ children }) {
       setIsZenMode(false);
       if (typeof document !== 'undefined') {
         document.body.classList.remove('zen-mode');
+        document.title = 'Ani Assistant | Tipiṭaka Pāḷi';
       }
 
       const currentTabs = openTabsRef.current;
@@ -616,6 +617,12 @@ export function TabProvider({ children }) {
     },
     [persistTabs, setIsZenMode, updateUrlParams]
   );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__openAiChatTab = openAiChatTab;
+    }
+  }, [openAiChatTab]);
 
   const openBook = useCallback(
     async (bookCode, options = {}) => {
@@ -864,6 +871,7 @@ export function TabProvider({ children }) {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            lineId: options.targetLineId || null,
             subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
@@ -1168,6 +1176,7 @@ export function TabProvider({ children }) {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
             paraNum: rawParaNum,
+            lineId: options.targetLineId || null,
             subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,

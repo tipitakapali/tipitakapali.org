@@ -1608,7 +1608,7 @@ export default function ReaderView() {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
     console.log('[ReaderView targetScrollIntent triggered]', targetScrollIntent);
 
-    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db } = targetScrollIntent;
+    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = targetScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
     const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
 
@@ -1741,6 +1741,13 @@ export default function ReaderView() {
             scope.querySelector(`[id="pindex-${paraIndex}"]`);
           if (!el) return null;
           const row = (el.closest && el.closest('.reader-para-row')) || el;
+          if (lineId) {
+            const sentLineEl =
+              row?.querySelector?.(`[data-line="${lineId}"]`) ||
+              row?.querySelector?.(`.sent-pair[data-line="${lineId}"]`) ||
+              row?.querySelector?.(`.pali-sent[data-line="${lineId}"]`);
+            if (visible(sentLineEl)) return sentLineEl;
+          }
           return pickTransOrRow(row, chapterEl || container);
         }
 
@@ -1804,6 +1811,18 @@ export default function ReaderView() {
           }
 
           if (!pbEl) return null;
+
+          const hostChapter = pbEl.closest ? pbEl.closest('[data-chapter]') : null;
+          if (sentenceMode && hasTransLayers) {
+            const sentPair = pbEl.closest('.sent-pair');
+            if (sentPair) {
+              return visible(sentPair);
+            }
+            // Hold off fallback while host chapter translations are actively loading
+            if (hostChapter?.getAttribute('data-trans-loading') === '1') {
+              return null;
+            }
+          }
 
           const targetEl =
             (sentenceMode && pbEl.closest('.sent-pair')) ||
@@ -1916,7 +1935,8 @@ export default function ReaderView() {
           const areaSettled = areaTranslationSettled(hostChapter);
           const cRect = container.getBoundingClientRect();
           const rRect = target.getBoundingClientRect();
-          if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
+          const diff = Math.abs(rRect.top - cRect.top - 60);
+          if (diff > TOL) {
             cur.stableCount = 0;
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
             smartScrollTo(container, fresh, { scrollMotion: 'instant' });
@@ -1942,8 +1962,11 @@ export default function ReaderView() {
             return;
           }
           cur.stableCount += 1;
-          if (cur.stableCount >= 2) paraJumpRef.current.key = null;
-          else cur.timer = setTimeout(tick, GAP);
+          if (cur.stableCount >= 2) {
+            paraJumpRef.current.key = null;
+          } else {
+            cur.timer = setTimeout(tick, GAP);
+          }
         };
         // First check after any in-flight smooth animation has finished (max ~450ms).
         state.timer = setTimeout(tick, 900);
@@ -2070,6 +2093,18 @@ export default function ReaderView() {
               targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
             }
 
+            // Target specific sentence line if lineId is specified
+            if (lineId) {
+              const row = el.closest('.reader-para-row') || el;
+              const sentLineEl =
+                row?.querySelector?.(`[data-line="${lineId}"]`) ||
+                row?.querySelector?.(`.sent-pair[data-line="${lineId}"]`) ||
+                row?.querySelector?.(`.pali-sent[data-line="${lineId}"]`);
+              if (sentLineEl && sentLineEl.getClientRects().length > 0) {
+                targetEl = sentLineEl;
+              }
+            }
+
             if (targetEl) {
               const containerRect = containerRef.current.getBoundingClientRect();
               const rect = targetEl.getBoundingClientRect();
@@ -2158,12 +2193,16 @@ export default function ReaderView() {
           }
         }
 
-        console.log('[ReaderView attemptScroll check]', { retries, page, pageSystem, chapterIdx, pbEl: Boolean(pbEl) });
         if (pbEl) {
           const hostChapter = pbEl.closest ? pbEl.closest('[data-chapter]') : null;
-          const isSettled = areaTranslationSettled(hostChapter);
-          console.log('[ReaderView attemptScroll pbEl found]', { retries, hostChapter: hostChapter?.getAttribute('data-chapter'), isSettled });
-          if (isSettled || retries >= maxRetries - 5) {
+          const hostTransLoading = hostChapter?.getAttribute('data-trans-loading') === '1';
+          const hasSentPair = Boolean(sentenceMode && pbEl.closest('.sent-pair'));
+
+          // In sentence mode with translations active, wait until the target .sent-pair is rendered
+          // in the host chapter before executing the jump, unless timeout is reached.
+          const isSentenceWaiting = sentenceMode && hasTransLayers && !hasSentPair && hostTransLoading;
+
+          if (!isSentenceWaiting || retries >= maxRetries) {
             // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph or sentence card
             const targetEl =
               (sentenceMode && pbEl.closest('.sent-pair')) ||
@@ -2396,7 +2435,11 @@ export default function ReaderView() {
       }
 
       retries++;
-      if (retries < maxRetries) {
+      const isWaitingForContent =
+        (sentenceMode && hasTransLayers) ||
+        Boolean(activeTab.loadingChapters?.[chapterIdx]);
+      const effectiveMaxRetries = isWaitingForContent ? 300 : maxRetries;
+      if (retries < effectiveMaxRetries) {
         timerId = setTimeout(attemptScroll, 50);
       } else {
         clearTargetScrollIntent();

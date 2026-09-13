@@ -2,7 +2,7 @@
 const isExport = process.env.NEXT_EXPORT === 'true' || process.env.STATIC_EXPORT === 'true';
 
 const nextConfig = {
-  allowedDevOrigins: ['85.190.97.158'],
+  allowedDevOrigins: ['localhost', '127.0.0.1', 'localhost:3000', '127.0.0.1:3000', '85.190.97.158', '85.190.97.158:3000'],
   reactStrictMode: true,
   images: {
     unoptimized: true,

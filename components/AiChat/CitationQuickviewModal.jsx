@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, BookOpen, ExternalLink, Globe, Loader2, Quote } from 'lucide-react';
+import { X, BookOpen, ExternalLink, Globe, Loader2, Quote, Sparkles } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
 import { getApiBase } from '../../services/api';
@@ -56,6 +56,7 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
   const { settings } = useThemeSettings();
   const [loading, setLoading] = useState(false);
   const [passageData, setPassageData] = useState(null);
+  const [citedSentence, setCitedSentence] = useState(null);
   const [error, setError] = useState(null);
 
   // Pāḷi + the next two enabled translation languages, in the user's order
@@ -76,12 +77,21 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
         if (langs.length >= 2) break;
       }
     }
+    if (langs.length === 0) {
+      langs.push({
+        id: 'english',
+        code: 'en',
+        label: LANG_HEADERS['en'] || 'English Translation',
+        color: TRANS_ID_COLOR['english'] || '#3b82f6',
+      });
+    }
     return langs;
   }, [settings?.translationOrder, settings?.translations]);
 
   useEffect(() => {
     if (!isOpen || !citation) {
       setPassageData(null);
+      setCitedSentence(null);
       setError(null);
       return;
     }
@@ -89,38 +99,63 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
     let isMounted = true;
     setLoading(true);
     setError(null);
+    setCitedSentence(null);
 
-    const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd } = citation;
+    const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd, lineId } = citation;
     const endPara = paraEnd !== null && paraEnd !== undefined ? paraEnd : paraIndex;
     const langsParam = previewLangs.map((l) => l.code).join(',');
-    const url = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=${encodeURIComponent(langsParam)}`;
+    const paraUrl = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=${encodeURIComponent(langsParam)}`;
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load passage (${res.status})`);
-        return res.json();
-      })
-      .then((data) => {
+    const fetchParaPromise = fetch(paraUrl).then((res) => {
+      if (!res.ok) throw new Error(`Failed to load passage (${res.status})`);
+      return res.json();
+    });
+
+    const fetchSentencePromise = lineId
+      ? fetch(`${getApiBase()}/api/ai/sentences?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&para_index=${paraIndex}&langs=${encodeURIComponent(langsParam)}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null);
+
+    Promise.all([fetchParaPromise, fetchSentencePromise])
+      .then(([paraResult, sentenceResult]) => {
         if (!isMounted) return;
-        if (data.success && data.passages && data.passages.length > 0) {
-          if (data.passages.length === 1) {
-            setPassageData(data.passages[0]);
+
+        if (sentenceResult?.success && sentenceResult.pali_sentences && lineId) {
+          const targetPali = sentenceResult.pali_sentences.find((s) => s.line_id === lineId);
+          if (targetPali) {
+            const transMap = {};
+            for (const l of previewLangs) {
+              const tr = (sentenceResult.translations?.[l.code] || []).find((t) => t.line_id === lineId);
+              if (tr) transMap[l.code] = tr.translation;
+            }
+            setCitedSentence({
+              lineId,
+              pali: targetPali.sentence || targetPali.text,
+              translations: transMap,
+            });
+          }
+        }
+
+        if (paraResult.success && paraResult.passages && paraResult.passages.length > 0) {
+          if (paraResult.passages.length === 1) {
+            setPassageData(paraResult.passages[0]);
           } else {
-            const first = data.passages[0];
-            const combinedPali = data.passages.map((p) => p.pali).filter(Boolean).join('\n\n');
+            const first = paraResult.passages[0];
+            const combinedPali = paraResult.passages.map((p) => p.pali).filter(Boolean).join('\n\n');
             const translations = {};
             for (const l of previewLangs) {
-              const texts = data.passages.map((p) => p.translations?.[l.code]).filter(Boolean);
+              const texts = paraResult.passages.map((p) => p.translations?.[l.code]).filter(Boolean);
               if (texts.length > 0) translations[l.code] = texts.join('\n\n');
             }
             setPassageData({
               ...first,
-              para_num: `${first.para_num || paraIndex}–${data.passages[data.passages.length - 1].para_num || endPara}`,
+              para_num: `${first.para_num || paraIndex}–${paraResult.passages[paraResult.passages.length - 1].para_num || endPara}`,
               pali: combinedPali,
               translations,
             });
           }
-        } else {
+        } else if (!lineId) {
           setError('Passage content not found in local database.');
         }
       })
@@ -139,7 +174,7 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
 
   if (!isOpen || !citation) return null;
 
-  const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd, ref = '' } = citation;
+  const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd, lineId, ref = '' } = citation;
   const bookTitle = passageData?.book_title || bookCode;
   const chapterTitle = passageData?.chapter_title || `Chapter ${chapterIndex + 1}`;
   const paraNum = passageData?.para_num || (paraEnd ? `${paraIndex}–${paraEnd}` : (paraIndex + 1));
@@ -149,9 +184,14 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
     ? transliterateHtml(passageData.pali, settings?.paliScript)
     : '';
 
+  const displayCitedPali = citedSentence?.pali
+    ? transliterateHtml(citedSentence.pali, settings?.paliScript)
+    : '';
+
+  const effectiveChap = passageData?.chapter_index !== undefined ? passageData.chapter_index : chapterIndex;
   const handleOpenReader = () => {
     if (onOpenInReader) {
-      onOpenInReader(bookCode, chapterIndex, paraIndex, paraNum);
+      onOpenInReader(bookCode, effectiveChap, paraIndex, paraNum, lineId);
     }
     if (onClose) onClose();
   };
@@ -177,11 +217,11 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                   {convertPaliScript(bookTitle, settings?.paliScript)}
                 </h3>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/20 text-white/90">
-                  §{paraNum}
+                  §{paraNum}{lineId ? `:L${lineId}` : ''}
                 </span>
               </div>
               <p className="text-xs text-white/80 truncate">
-                {chapterTitle} • {ref || `${bookCode}:c${chapterIndex}:p${paraIndex}`}
+                {chapterTitle} • {ref || `${bookCode}:c${chapterIndex}:p${paraIndex}${lineId ? `-L${lineId}` : ''}`}
               </p>
             </div>
           </div>
@@ -208,15 +248,59 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
               <p className="font-semibold mb-1">Notice</p>
               <p>{error}</p>
               <p className="mt-2 text-[11px] text-[var(--text-muted)]">
-                Citation target: <code>{ref || `${bookCode}:c${chapterIndex}:p${paraIndex}`}</code>
+                Citation target: <code>{ref || `${bookCode}:c${chapterIndex}:p${paraIndex}${lineId ? `-L${lineId}` : ''}`}</code>
               </p>
             </div>
           )}
 
-          {!loading && !error && passageData && (
+          {!loading && !error && (
             <>
-              {/* Pāḷi Text Card */}
-              <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2">
+              {/* Prominent Cited Sentence Card (Line-Level Alignment) */}
+              {citedSentence && (
+                <div className="p-4 rounded-xl bg-violet-500/10 border border-violet-500/30 shadow-xs space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-violet-600 dark:text-violet-400" />
+                      Cited Sentence
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-violet-500/20 text-violet-800 dark:text-violet-200 font-mono text-[11px]">
+                      Line {lineId}
+                    </span>
+                  </div>
+                  <div
+                    className="text-sm sm:text-[15px] font-medium leading-relaxed font-serif text-[var(--text-primary)]"
+                    dangerouslySetInnerHTML={{ __html: displayCitedPali }}
+                  />
+                  {previewLangs.map((lang) =>
+                    citedSentence.translations?.[lang.code] ? (
+                      <div
+                        key={`cite_sent_${lang.code}`}
+                        className="pt-2 border-t border-violet-500/20 text-xs sm:text-sm text-[var(--text-secondary)] space-y-0.5"
+                      >
+                        <div className="font-semibold text-[11px] uppercase tracking-wider" style={{ color: lang.color }}>
+                          {lang.label}
+                        </div>
+                        <div
+                          className="leading-relaxed text-[var(--text-primary)]"
+                          dangerouslySetInnerHTML={{ __html: citedSentence.translations[lang.code] }}
+                        />
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
+
+              {passageData && citedSentence && (
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] pt-1">
+                  <BookOpen size={12} className="text-violet-500" />
+                  <span>Full Paragraph Context (§{paraNum})</span>
+                </div>
+              )}
+
+              {passageData && (
+                <>
+                  {/* Pāḷi Text Card */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xs space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
                   <span className="flex items-center gap-1.5">
                     <BookOpen size={13} />
@@ -252,6 +336,8 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
                     />
                   </div>
                 ) : null
+              )}
+                </>
               )}
             </>
           )}

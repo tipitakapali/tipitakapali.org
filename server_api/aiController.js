@@ -1242,11 +1242,32 @@ function aiGetSection({ book_code, chapter_index, para_start }) {
   }
 }
 
-function aiGetSentences({ book_code, chapter_index, para_index, line_id, langs = ['en'] }) {
+function aiGetSentences({ book_code, chapter_index, para_index, para_num, line_id, langs = ['en'] }) {
   if (!dbTipitaka) return { success: false, error: 'Database unavailable' };
   const targetCode = resolveCanonicalBookCode(book_code);
-  const cIdx = chapter_index !== undefined && chapter_index !== null ? parseInt(chapter_index, 10) : 0;
-  const pIdx = para_index !== undefined && para_index !== null ? parseInt(para_index, 10) : null;
+  let cIdx = chapter_index !== undefined && chapter_index !== null ? parseInt(chapter_index, 10) : null;
+  let pIdx = para_index !== undefined && para_index !== null ? parseInt(para_index, 10) : null;
+  const pNum = para_num !== undefined && para_num !== null ? String(para_num).replace(/^(?:para-?|p)/i, '').trim() : null;
+
+  // Resolve para_index from printed VRI para_num if needed
+  if (pIdx === null && pNum && dbTipitaka) {
+    try {
+      const row = dbTipitaka.prepare('SELECT chapter_index, para_index FROM canon_paragraphs WHERE book_code = ? AND para_num = ? LIMIT 1').get(targetCode, pNum);
+      if (row) {
+        pIdx = row.para_index;
+        cIdx = row.chapter_index;
+      }
+    } catch {}
+  } else if (pIdx !== null && dbTipitaka) {
+    // Para index is unique per book; always verify and correct chapter index against canon_paragraphs
+    try {
+      const row = dbTipitaka.prepare('SELECT chapter_index FROM canon_paragraphs WHERE book_code = ? AND para_index = ? LIMIT 1').get(targetCode, pIdx);
+      if (row && row.chapter_index !== undefined) {
+        cIdx = row.chapter_index;
+      }
+    } catch {}
+  }
+  if (cIdx === null) cIdx = 0;
   const lid = line_id !== undefined && line_id !== null ? parseInt(line_id, 10) : null;
   const tLangs = Array.isArray(langs) ? langs : String(langs).split(',').map((s) => s.trim()).filter(Boolean);
   const paliDbPath = (resolveDbPathFn || ((f) => path.join(__dirname, 'db', f)))('pali_sentences.db');
@@ -1264,11 +1285,11 @@ function aiGetSentences({ book_code, chapter_index, para_index, line_id, langs =
       pdb.close();
     } catch {}
   }
-  // Fallback: derive sentences from paragraph_translations when pali DB missing for a para.
+  // Fallback: derive sentences from canon_paragraphs when pali DB missing for a para.
   if (paliSents.length === 0 && pIdx !== null) {
     try {
       const row = dbTipitaka.prepare('SELECT pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(targetCode, cIdx, pIdx);
-      if (row && row.pali_text) paliSents = [{ line_id: 1, sentence: row.pali_text, para_index: pIdx }];
+      if (row && row.pali_text) paliSents = [{ line_id: lid || 1, sentence: row.pali_text, para_index: pIdx }];
     } catch {}
   }
   const translations = {};
@@ -1287,6 +1308,16 @@ function aiGetSentences({ book_code, chapter_index, para_index, line_id, langs =
         translations[lang] = rows;
       }
     } catch {}
+
+    // Fallback: if sentence translations are sparse/missing, pull from paragraph_translations
+    if ((!translations[lang] || translations[lang].length === 0) && pIdx !== null) {
+      try {
+        const ptr = tdb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(targetCode, cIdx, pIdx);
+        if (ptr && ptr.translation) {
+          translations[lang] = [{ line_id: lid || 1, translation: ptr.translation }];
+        }
+      } catch {}
+    }
   }
   return {
     success: true,
@@ -1815,10 +1846,11 @@ async function executeAiTool(name, args = {}) {
     }
     case 'get_sentences':
       return aiGetSentences({
-        book_code: args.book_code,
-        chapter_index: args.chapter_index,
-        para_index: args.para_index,
-        line_id: args.line_id,
+        book_code: args.book_code || args.book,
+        chapter_index: args.chapter_index ?? args.chapter,
+        para_index: args.para_index ?? args.para_start ?? args.para ?? args.paragraph,
+        para_num: args.para_num ?? args.para_number,
+        line_id: args.line_id ?? args.line ?? args.sentence_id,
         langs: args.langs,
       });
     case 'get_commentaries': {
@@ -2961,10 +2993,11 @@ function registerAiRoutes(fastify) {
   fastify.get('/api/ai/sentences', async (req) => {
     const book = req.query.book || req.query.book_code || '';
     const chap = req.query.chapter !== undefined ? parseInt(req.query.chapter, 10) : undefined;
-    const pidx = req.query.para_index !== undefined ? parseInt(req.query.para_index, 10) : undefined;
-    const lid = req.query.line !== undefined ? parseInt(req.query.line, 10) : undefined;
-    const langs = req.query.langs ? req.query.langs.split(',') : ['en'];
-    return aiGetSentences({ book_code: book, chapter_index: chap, para_index: pidx, line_id: lid, langs });
+    const pidx = req.query.para_index !== undefined ? parseInt(req.query.para_index, 10) : (req.query.para !== undefined ? parseInt(req.query.para, 10) : undefined);
+    const pnum = req.query.para_num || req.query.pnum || undefined;
+    const lid = req.query.line_id !== undefined ? parseInt(req.query.line_id, 10) : (req.query.line !== undefined ? parseInt(req.query.line, 10) : undefined);
+    const langs = req.query.langs ? req.query.langs.split(',').map((s) => s.trim()).filter(Boolean) : ['en'];
+    return aiGetSentences({ book_code: book, chapter_index: chap, para_index: pidx, para_num: pnum, line_id: lid, langs });
   });
 
   fastify.get('/api/ai/books', async () => {
@@ -2979,9 +3012,10 @@ function registerAiRoutes(fastify) {
         delete req.body.args.apiKey;
       }
     }
-    const { name, args } = req.body || {};
+    const name = req.body?.name || req.body?.tool;
+    const args = req.body?.args || {};
     if (!name) return { success: false, error: 'Missing tool name' };
-    return executeAiTool(name, args || {});
+    return executeAiTool(name, args);
   });
 
   // ── Streaming Chat Endpoint (SSE) ──────────────────────────────────────

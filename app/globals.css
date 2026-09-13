@@ -1460,6 +1460,7 @@ aside.app-sidebar.dock-left {
 
 aside.app-sidebar.dock-left.collapsed {
   margin-left: calc(-1 * var(--sidebar-width, 360px));
+  pointer-events: none;
 }
 
 aside.app-sidebar.dock-right {
@@ -1470,6 +1471,7 @@ aside.app-sidebar.dock-right {
 
 aside.app-sidebar.dock-right.collapsed {
   margin-right: calc(-1 * var(--sidebar-width, 360px));
+  pointer-events: none;
 }
 
 aside.app-sidebar.dock-float {

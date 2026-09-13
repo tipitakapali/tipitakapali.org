@@ -191,6 +191,40 @@ export const kAiToolDeclarations = [
     },
   },
   {
+    name: "get_sentences",
+    description:
+      "Get sentence-level Pāḷi text and aligned translations with shared line numbers (99.7% alignment). " +
+      "Line numbers (line_id) are shared 1-to-1 between Pāḷi and translations. " +
+      "Use this for sentence-level textual analysis, quoting specific verses/sentences, and generating fine-grained citations [book:cX:pY-LZ].",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        book_code: {
+          type: "STRING",
+          description: "Canonical book code (e.g. \"s0101m.mul\", \"s0201m.mul\", \"s0502m.mul\").",
+        },
+        chapter_index: {
+          type: "INTEGER",
+          description: "Chapter index (0-based).",
+        },
+        para_index: {
+          type: "INTEGER",
+          description: "Paragraph index (0-based global para_position).",
+        },
+        line_id: {
+          type: "INTEGER",
+          description: "Optional single sentence number (1-based line_id) to retrieve a specific sentence.",
+        },
+        langs: {
+          type: "ARRAY",
+          description: "Translation languages to retrieve: [\"en\"], [\"vi\"], [\"my\"], etc. Defaults to [\"en\", \"vi\"].",
+          items: { type: "STRING" },
+        },
+      },
+      required: ["book_code"],
+    },
+  },
+  {
     name: "get_commentaries",
     description:
       "Retrieve corresponding Aṭṭhakathā (ancient commentary) and Ṭīkā (sub-commentary) explanations " +
@@ -311,38 +345,43 @@ export function getOpenAiToolDeclarations() {
 const kAiDefaultToolSystemPrompt = `You are Ani (AI Nissaya), the dedicated scholarly AI assistant for the Chaṭṭha Saṅgāyana Tipiṭaka (Pāḷi Canon).
 Your duty is to systematically investigate the Dhamma through precise canonical research using the available database tools.
 
-## Research Strategy
-1. Search sutta titles or vagga outlines using search_sections to identify relevant discourses.
-2. Search terms using search_by_category or search_tipitaka_batch with Pāḷi stems.
-3. Read exact verses and passages using get_paragraph_content or get_paragraph_content_batch.
-4. Consult Buddhaghosa's commentaries and Dhammapāla's sub-commentaries using get_commentaries.
-5. Clarify key terms and roots with get_dictionary.
-6. Once sufficient authentic evidence is gathered, call final_answer(summary).`;
+## Research & Verification Strategy (Deep Canonical Reasoning)
+1. Deconstruct & Plan: Analyze the user's inquiry, identify the core doctrinal concepts and candidate suttas/books.
+2. Section & Sutta Discovery: Search sutta titles or vagga outlines using search_sections to identify relevant discourses.
+3. Term Search: Search terms using search_by_category or search_tipitaka_batch with Pāḷi stems.
+4. Passage & Sentence Retrieval:
+   - Read exact verses and passages using get_paragraph_content or get_paragraph_content_batch.
+   - For granular textual analysis, line-by-line translation comparisons, or quoting specific verses, call get_sentences. Sentence line_id numbers align 1-to-1 between Pāḷi and translation (99.7% match).
+5. Exegesis & Lexicon: Consult Buddhaghosa's commentaries and Dhammapāla's sub-commentaries using get_commentaries, and clarify key roots/etymology with get_dictionary.
+6. Synthesize & Conclude: Once sufficient authentic evidence is gathered, call final_answer(summary).`;
 
 function buildAnswerSystemPrompt({ groundRAGMode = true }) {
   const grounding = groundRAGMode
     ? `## RAG Mode Rules (Strict Grounding)
-1. Every factual claim MUST be supported by an inline citation in the exact format: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}].
-2. Answer the user's question using the canonical passages, commentaries, and dictionary definitions gathered during research.
-3. Quote Pāḷi verses or phrases EXACTLY as written in the sources (use Markdown blockquotes); provide clear translations following each quote.
+1. Every factual claim MUST be supported by an inline citation:
+   - Paragraph citation: [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{start}-{end}]
+   - Sentence-level citation: [book_code:c{chap}:p{para}-L{line}] (e.g. [s0101m.mul:c0:p6-L2])
+2. Answer the user's question using the canonical passages, commentaries, sentence translations, and dictionary definitions gathered during research.
+3. Quote Pāḷi verses or phrases EXACTLY as written in the sources (use Markdown blockquotes); provide clear translations following each quote. For sentence-level precision, present the exact Pāḷi sentence and aligned translation.
 4. If the retrieved sources do not fully answer the question, state this honestly.
 5. Explain technical Pāḷi terms on first mention with etymological clarity.`
     : `## Knowledge Mode Rules (Canonical + Contextual Knowledge)
-1. Base your answer primarily on the canonical passages retrieved by the tools, with inline citations [book_code:c{chap}:p{para}].
+1. Base your answer primarily on the canonical passages and sentence translations retrieved by the tools, with inline citations [book_code:c{chap}:p{para}] or [book_code:c{chap}:p{para}-L{line}].
 2. You may supplement with broader canonical knowledge where helpful, but clearly distinguish citations from broader commentary.
 3. Quote Pāḷi accurately, with translation following.`;
 
   return `You are Ani (AI Nissaya), the scholarly Pāḷi Canon companion on tipitakapali.org.
-You have been supplied with verified passages, commentaries, and dictionary entries from the Chaṭṭha Saṅgāyana Tipiṭaka database.
+You have been supplied with verified passages, sentence translations, commentaries, and dictionary entries from the Chaṭṭha Saṅgāyana Tipiṭaka database.
 
 ## Task
 Write a comprehensive, insightful, and clearly structured answer to the user's question using rich Markdown (headers, bullet points, blockquotes for Pāḷi verses).
 
 ## Citation Format
 All canonical citations MUST appear as clickable chips in square brackets:
-  [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_start}-{para_end}]
+  - Paragraph level: [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_start}-{para_end}]
+  - Sentence level: [book_code:c{chapter_index}:p{para_index}-L{line_id}] (e.g. [s0101m.mul:c0:p6-L2])
 Example:
-  > "Dvayanissito khvāyaṃ, kaccāna, loko yebhuyyena..." [s0302m.mul:c0:p103]
+  > "Atha kho bhagavā ambalaṭṭhikāyaṃ rājāgārake ekarattivāsaṃ upagacchi..." [s0101m.mul:c0:p6-L1]
 
 ${grounding}`;
 }
@@ -397,6 +436,26 @@ function formatCompactToolResponse(toolName, result) {
           translation_en: (p.translations?.en || "").slice(0, 500),
           translation_vi: (p.translations?.vi || "").slice(0, 500),
         })),
+      };
+    case "get_sentences":
+      return {
+        count: result.count || 0,
+        book_code: result.book_code,
+        chapter_index: result.chapter_index,
+        para_index: result.para_index,
+        pali_sentences: (result.pali_sentences || []).slice(0, 25).map((s) => ({
+          line_id: s.line_id,
+          text: (s.sentence || s.text || "").slice(0, 300),
+        })),
+        translations: Object.fromEntries(
+          Object.entries(result.translations || {}).map(([k, v]) => [
+            k,
+            (v || []).slice(0, 25).map((t) => ({
+              line_id: t.line_id,
+              text: (t.translation || "").slice(0, 300),
+            })),
+          ])
+        ),
       };
     case "get_commentaries":
       return {
@@ -467,7 +526,8 @@ async function executeRemoteAiTool(name, args, signal) {
 
 export function parseCitationsFromText(text) {
   if (!text) return [];
-  const regex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–](\d+))?(?::(\d+))?\]/g;
+  // Supports [book:c{chap}:p{para}], [book:c{chap}:p{start}-{end}], [book:{para}], [book:c{chap}:p{para}-L{line}] and [book:c{chap}:p{para}:L{line}]
+  const regex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–]L?(\d+))?(?::L?(\d+))?\]/gi;
   const seen = new Set();
   const citations = [];
   let match;
@@ -477,11 +537,24 @@ export function parseCitationsFromText(text) {
     const hasExplicitChap = match[2] !== undefined;
     const chapIdx = hasExplicitChap ? parseInt(match[2], 10) : 0;
     const paraIdx = parseInt(match[3], 10);
-    const paraEnd = match[4] ? parseInt(match[4], 10) : null;
+    let paraEnd = match[4] ? parseInt(match[4], 10) : null;
+    let lineId = match[5] ? parseInt(match[5], 10) : null;
 
-    const key = `${rawBook}:${chapIdx}:${paraIdx}`;
+    // Sentence-level citation [book:cX:pY-LZ] uses dash-L; promote to lineId
+    if (/-L\d+/i.test(rawTag) && !lineId && paraEnd !== null) {
+      lineId = paraEnd;
+      paraEnd = null;
+    }
+
+    const key = `${rawBook}:${chapIdx}:${paraIdx}:${lineId || ''}:${paraEnd || ''}`;
     if (!seen.has(key)) {
       seen.add(key);
+      const citationRef = lineId
+        ? `[${rawBook} §${paraIdx}:L${lineId}]`
+        : paraEnd
+        ? `[${rawBook} §${paraIdx}–${paraEnd}]`
+        : `[${rawBook} §${paraIdx}]`;
+
       citations.push({
         rawTag,
         rawBook,
@@ -490,7 +563,8 @@ export function parseCitationsFromText(text) {
         chapterIndex: chapIdx,
         paraIndex: paraIdx,
         paraEnd,
-        citationRef: `[${rawBook} §${paraIdx}]`,
+        lineId,
+        citationRef,
       });
     }
   }
@@ -590,6 +664,7 @@ Execute research systematically. Search sections, read exact paragraphs with get
     const allCollectedEvidence = {
       sections: [],
       passages: [],
+      sentences: [],
       commentaries: [],
       dictionaries: [],
     };
@@ -691,13 +766,15 @@ Execute research systematically. Search sections, read exact paragraphs with get
             allCollectedEvidence.passages.push(...resObj.results);
           } else if ((spec.name === "get_paragraph_content" || spec.name === "get_paragraph_content_batch") && resObj.passages) {
             allCollectedEvidence.passages.push(...resObj.passages);
+          } else if (spec.name === "get_sentences" && resObj.pali_sentences) {
+            allCollectedEvidence.sentences.push(resObj);
           } else if (spec.name === "get_commentaries" && (resObj.atthakatha || resObj.tika)) {
             allCollectedEvidence.commentaries.push(resObj);
           } else if ((spec.name === "get_dictionary" || spec.name === "get_dictionary_batch") && resObj.entries) {
             allCollectedEvidence.dictionaries.push(...resObj.entries);
           }
 
-          const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || spec.args?.book_code || "";
+          const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || (spec.args?.book_code ? `${spec.args.book_code}${spec.args.para_index !== undefined ? ` p${spec.args.para_index}` : ''}${spec.args.line_id ? ` L${spec.args.line_id}` : ''}` : "");
           const summary = `${spec.name}${summaryArg ? ` (${summaryArg})` : ""}`;
           const logEntry = { tool: spec.name, summary, args: spec.args };
           toolLogs.push(logEntry);
@@ -816,13 +893,15 @@ Execute research systematically. Search sections, read exact paragraphs with get
             allCollectedEvidence.passages.push(...resObj.results);
           } else if ((spec.name === "get_paragraph_content" || spec.name === "get_paragraph_content_batch") && resObj.passages) {
             allCollectedEvidence.passages.push(...resObj.passages);
+          } else if (spec.name === "get_sentences" && resObj.pali_sentences) {
+            allCollectedEvidence.sentences.push(resObj);
           } else if (spec.name === "get_commentaries" && (resObj.atthakatha || resObj.tika)) {
             allCollectedEvidence.commentaries.push(resObj);
           } else if ((spec.name === "get_dictionary" || spec.name === "get_dictionary_batch") && resObj.entries) {
             allCollectedEvidence.dictionaries.push(...resObj.entries);
           }
 
-          const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || spec.args?.book_code || "";
+          const summaryArg = spec.args?.query || spec.args?.queries?.[0] || spec.args?.word || spec.args?.words?.[0] || (spec.args?.book_code ? `${spec.args.book_code}${spec.args.para_index !== undefined ? ` p${spec.args.para_index}` : ''}${spec.args.line_id ? ` L${spec.args.line_id}` : ''}` : "");
           const summary = `${spec.name}${summaryArg ? ` (${summaryArg})` : ""}`;
           toolLogs.push({ tool: spec.name, summary, args: spec.args });
           onToolCall({ tool: spec.name, summary, args: spec.args });
@@ -866,6 +945,21 @@ Execute research systematically. Search sections, read exact paragraphs with get
       }
     }
 
+    if (allCollectedEvidence.sentences && allCollectedEvidence.sentences.length > 0) {
+      evidenceContext += "### Sentence-Level Aligned Evidence (Pāḷi ↔ Translations, Shared line_id):\n";
+      for (const s of allCollectedEvidence.sentences.slice(0, 6)) {
+        evidenceContext += `#### Sentence Source [${s.book_code}:c${s.chapter_index}:p${s.para_index}]:\n`;
+        for (const ps of (s.pali_sentences || []).slice(0, 25)) {
+          evidenceContext += `- L${ps.line_id}: "${ps.sentence || ps.text}"\n`;
+          for (const [lang, trs] of Object.entries(s.translations || {})) {
+            const tr = (trs || []).find((t) => t.line_id === ps.line_id);
+            if (tr) evidenceContext += `  → [${lang}] L${tr.line_id}: "${tr.translation}"\n`;
+          }
+        }
+        evidenceContext += `Citations: ${(s.pali_sentences || []).map((ps) => `[${s.book_code}:c${s.chapter_index}:p${s.para_index}-L${ps.line_id}]`).join(" ")}\n\n`;
+      }
+    }
+
     if (allCollectedEvidence.commentaries.length > 0) {
       evidenceContext += "### Aṭṭhakathā & Ṭīkā Clarifications:\n";
       for (const c of allCollectedEvidence.commentaries.slice(0, 3)) {
@@ -903,7 +997,7 @@ Execute research systematically. Search sections, read exact paragraphs with get
           {
             role: "user",
             parts: [
-              { text: `${evidenceContext}\n\nUser Inquiry: "${userQuery}"\n\nWrite a complete, structured scholarly explanation citing every passage as [book_code:c{chapter_index}:p{para_index}].` },
+              { text: `${evidenceContext}\n\nUser Inquiry: "${userQuery}"\n\nWrite a complete, structured scholarly explanation citing every passage as [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_index}-L{line_id}].` },
             ],
           },
         ],
@@ -975,7 +1069,7 @@ Execute research systematically. Search sections, read exact paragraphs with get
           messages: [
             { role: "system", content: answerSysPrompt },
             ...conversationHistory.slice(-4),
-            { role: "user", content: `${evidenceContext}\n\nUser Inquiry: "${userQuery}"\n\nWrite a structured scholarly explanation citing every passage as [book_code:c{chapter_index}:p{para_index}].` },
+            { role: "user", content: `${evidenceContext}\n\nUser Inquiry: "${userQuery}"\n\nWrite a structured scholarly explanation citing every passage as [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_index}-L{line_id}].` },
           ],
           stream: true,
           temperature: 0.3,

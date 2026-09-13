@@ -273,8 +273,8 @@ export default function AiMarkdown({ content, onCitationClick }) {
   const renderInline = (text) => {
     if (!text) return null;
 
-    // Pattern for citation tags: [book_code:c{chap}:p{para}], [book_code:c{chap}:p{start}-{end}], or [book_code:{para}]
-    const citationRegex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–](\d+))?(?::(\d+))?\]/g;
+    // Pattern for citation tags: [book_code:c{chap}:p{para}], [book_code:c{chap}:p{start}-{end}], [book_code:{para}], or sentence-level [book_code:c{chap}:p{para}-L{line}] / [book_code:c{chap}:p{para}:L{line}]
+    const citationRegex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–]L?(\d+))?(?::L?(\d+))?\]/gi;
     const parts = [];
     let lastIndex = 0;
     let match;
@@ -289,15 +289,25 @@ export default function AiMarkdown({ content, onCitationClick }) {
       const bookCode = match[1];
       const chapIdx = match[2] !== undefined ? parseInt(match[2], 10) : 0;
       const paraIdx = parseInt(match[3], 10);
-      const paraEnd = match[4] ? parseInt(match[4], 10) : null;
-      const lineId = match[5] ? parseInt(match[5], 10) : null;
+      let paraEnd = match[4] ? parseInt(match[4], 10) : null;
+      let lineId = match[5] ? parseInt(match[5], 10) : null;
+
+      // Sentence-level citation [book:cX:pY-LZ] uses dash-L; promote to lineId
+      if (/-L\d+/i.test(rawTag) && !lineId && paraEnd !== null) {
+        lineId = paraEnd;
+        paraEnd = null;
+      }
 
       // Label to display on the interactive chip
-      const displayLabel = paraEnd ? `${bookCode} §${paraIdx}–${paraEnd}` : `${bookCode} §${paraIdx}`;
+      const displayLabel = lineId
+        ? `${bookCode} §${paraIdx}:L${lineId}`
+        : paraEnd
+        ? `${bookCode} §${paraIdx}–${paraEnd}`
+        : `${bookCode} §${paraIdx}`;
 
       parts.push(
         <button
-          key={`cite_${matchIndex}_${bookCode}_${paraIdx}_${paraEnd || ''}`}
+          key={`cite_${matchIndex}_${bookCode}_${paraIdx}_${lineId || ''}_${paraEnd || ''}`}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
@@ -313,7 +323,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
             }
           }}
           className="ai-citation-chip inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-[var(--accent-light)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent-light)] hover:border-[var(--accent-border)] hover:scale-105 active:scale-95 transition cursor-pointer select-none align-baseline shadow-2xs"
-          title={`Click to preview passage ${displayLabel}`}
+          title={`Click to preview ${lineId ? `sentence line ${lineId}` : 'passage'} ${displayLabel}`}
         >
           <Quote size={11} className="text-[var(--accent)] shrink-0" />
           <span>{displayLabel}</span>

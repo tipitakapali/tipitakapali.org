@@ -81,7 +81,7 @@ export function pickLatestGeminiModels(models) {
   const latestModel = nonLite[0] || sorted[0] || null;
   return {
     toolPick: { id: 'gemini-flash-lite-latest', displayName: 'Gemini Flash Lite (Latest Alias)' },
-    answerPick: latestLite || latestFlash || sorted[0] || null,
+    answerPick: { id: 'gemini-flash-lite-latest', displayName: 'Gemini Flash Lite (Latest Alias)' },
     latestLite,
     latestFlash,
     latestModel,

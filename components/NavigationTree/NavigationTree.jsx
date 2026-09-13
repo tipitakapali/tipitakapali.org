@@ -36,7 +36,6 @@ export default function NavigationTree() {
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [floatPos, setFloatPos] = useState({ x: 80, y: 100, width: 380, height: 600 });
   const [isResizing, setIsResizing] = useState(false);
-
   const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
   const { settings } = useThemeSettings();
   const { isOpen: isDictOpen, closeDictionary } = useDictionary();
@@ -156,15 +155,23 @@ export default function NavigationTree() {
       return changed ? newExpanded : prev;
     });
 
+    if (!isSidebarOpen) return;
+
     setTimeout(() => {
       if (treeContainerRef.current) {
         const activeRow = treeContainerRef.current.querySelector('.tree-row.active-book');
         if (activeRow) {
-          activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          const container = treeContainerRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const rowRect = activeRow.getBoundingClientRect();
+          if (rowRect.top < containerRect.top || rowRect.bottom > containerRect.bottom) {
+            const scrollTop = activeRow.offsetTop - (container.clientHeight / 2) + (activeRow.clientHeight / 2);
+            container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
+          }
         }
       }
     }, 100);
-  }, [treeSelectedNode?.bookCode, treeData]);
+  }, [treeSelectedNode?.bookCode, treeData, isSidebarOpen]);
 
   const handleToggleExpandAll = () => {
     if (hasAnyExpanded) {
@@ -436,6 +443,12 @@ export default function NavigationTree() {
                 className="tree-action-btn tree-action-close p-1 hover:text-[var(--accent)] transition cursor-pointer"
                 onClick={() => {
                   setIsSidebarOpen(false);
+                  if (typeof document !== 'undefined') {
+                    const mainFlex = document.querySelector('.app-main-flex');
+                    if (mainFlex && mainFlex.scrollLeft !== 0) {
+                      mainFlex.scrollLeft = 0;
+                    }
+                  }
                 }}
                 title="Close Sidebar (Ctrl+B)"
                 aria-label="Close Sidebar"
