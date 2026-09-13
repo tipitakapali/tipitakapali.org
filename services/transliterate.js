@@ -286,14 +286,17 @@ export function highlightHtmlText(
 ) {
   if (!html || !query) return html;
   const rawQ = String(query).trim();
-  const isCjk = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQ);
-  if (!isCjk && rawQ.length < 2) return html;
+  if (rawQ.length < 1) return html;
 
-  const minLen = isCjk ? 1 : 2;
+  const minLen = 1;
   const romanQ = convertAnyToRoman(rawQ).trim();
-  const baseTerms = [romanQ, rawQ, ...romanQ.split(/\s+/), ...rawQ.split(/\s+/)].filter(
-    (t) => t && t.trim().length >= minLen
-  );
+  const cleanTerm = (t) => (t || '').replace(/\*/g, '').trim();
+  const baseTerms = [
+    cleanTerm(romanQ),
+    cleanTerm(rawQ),
+    ...romanQ.split(/\s+/).map(cleanTerm),
+    ...rawQ.split(/\s+/).map(cleanTerm),
+  ].filter((t) => t && t.length >= minLen);
   const uniqueTerms = Array.from(new Set(baseTerms));
 
   if (uniqueTerms.length === 0) return html;

@@ -183,51 +183,8 @@ try {
 const { getTranslationEngine } = require('./translationEngine');
 const translationEngine = getTranslationEngine();
 
-// Velthuis input normalization for Pāḷi searches
-function typeVelthuis(uType) {
-  if (!uType) return '';
-  return uType
-    .replace(/aa/g, 'ā')
-    .replace(/ii/g, 'ī')
-    .replace(/uu/g, 'ū')
-    .replace(/m\.\./g, 'ṁ')
-    .replace(/\.m/g, 'ṃ')
-    .replace(/\.n/g, 'ṇ')
-    .replace(/\.d/g, 'ḍ')
-    .replace(/ll\./g, 'ḹ')
-    .replace(/\.l/g, 'ḷ')
-    .replace(/\.h/g, 'ḥ')
-    .replace(/\.r/g, 'ṛ')
-    .replace(/rr\./g, 'ṝ')
-    .replace(/\.s/g, 'ṣ')
-    .replace(/"s/g, 'ś')
-    .replace(/s\.\./g, 'ś')
-    .replace(/\.t/g, 'ṭ')
-    .replace(/~n/g, 'ñ')
-    .replace(/,,n/g, 'ñ')
-    .replace(/"n/g, 'ṅ')
-    .replace(/n\.\./g, 'ṅ')
-    .replace(/AA/g, 'Ā')
-    .replace(/II/g, 'Ī')
-    .replace(/UU/g, 'Ū')
-    .replace(/M\.\./g, 'Ṁ')
-    .replace(/\.M/g, 'Ṃ')
-    .replace(/\.N/g, 'Ṇ')
-    .replace(/\.D/g, 'Ḍ')
-    .replace(/LL\./g, 'Ḹ')
-    .replace(/\.L/g, 'Ḷ')
-    .replace(/\.H/g, 'Ḥ')
-    .replace(/\.R/g, 'Ṛ')
-    .replace(/RR\./g, 'Ṝ')
-    .replace(/\.S/g, 'Ṣ')
-    .replace(/"S/g, 'Ś')
-    .replace(/S\.\./g, 'Ś')
-    .replace(/\.T/g, 'Ṭ')
-    .replace(/~N/g, 'Ñ')
-    .replace(/,,N/g, 'Ñ')
-    .replace(/"N/g, 'Ṅ')
-    .replace(/N\.\./g, 'Ṅ');
-}
+// Pāḷi transliteration and Velthuis input normalization
+const { typeVelthuis, convertAnyToRoman } = require('./transliterate');
 
 // Pāḷi sentence store: prebuilt epitaka segmentation
 // (server_api/db/pali_sentences.db, via build_pali_sentences_db.py).
@@ -1059,6 +1016,55 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return translationEngine.getGuidTranslation(guid, requestedLangs);
   });
 
+// Helper to detect prefix/contains substring search (indicated by leading *)
+function checkIsContainsSearch(cleanText) {
+  if (!cleanText) return false;
+  return /(?:^|\s)\*(\S+)/.test(cleanText);
+}
+
+// Helper to extract clean terms for contains substring search
+function extractContainsTerms(cleanText) {
+  if (!cleanText) return [];
+  return cleanText
+    .split(/\s+/)
+    .map((t) => t.replace(/^\*+/, '').replace(/\*+$/, '').trim())
+    .filter((t) => t.length > 0);
+}
+
+// Helper to highlight matched terms in content for contains search and format snippet
+function highlightContainsSearch(content, terms, snippetLen = 200) {
+  if (!content || !terms || terms.length === 0) return content || '';
+  const escapedTerms = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  let firstIdx = -1;
+  let firstTermLen = 0;
+  for (const term of escapedTerms) {
+    const regex = new RegExp(term, 'gi');
+    const match = regex.exec(content);
+    if (match && (firstIdx === -1 || match.index < firstIdx)) {
+      firstIdx = match.index;
+      firstTermLen = match[0].length;
+    }
+  }
+
+  if (firstIdx < 0) return content.length > snippetLen ? content.slice(0, snippetLen) + '...' : content;
+
+  const halfLen = Math.max(Math.floor(snippetLen / 2), 20);
+  let start = Math.max(0, firstIdx - halfLen);
+  let end = Math.min(content.length, firstIdx + firstTermLen + halfLen);
+
+  let result = content.substring(start, end);
+  if (start > 0) result = '... ' + result;
+  if (end < content.length) result = result + ' ...';
+
+  const sortedTerms = [...escapedTerms].sort((a, b) => b.length - a.length);
+  for (const term of sortedTerms) {
+    const regex = new RegExp(`(${term})`, 'gi');
+    result = result.replace(regex, '<mark>$1</mark>');
+  }
+
+  return result;
+}
+
 // Helper to build FTS5 match query supporting single words, exact phrases, proximity (NEAR), and multi-word AND
 function buildFts5Query(cleanText, distance = 'any') {
   if (!cleanText) return '';
@@ -1074,7 +1080,8 @@ function buildFts5Query(cleanText, distance = 'any') {
   // Single word: e.g. "dhamma"* or "dhamma"
   if (tokens.length === 1) {
     const tok = tokens[0];
-    return tok.endsWith('*') ? `"${tok.slice(0, -1)}"*` : `"${tok}"*`;
+    const cleanTok = tok.replace(/\*/g, '');
+    return tok.endsWith('*') ? `"${tok.slice(0, -1)}"*` : `"${cleanTok}"*`;
   }
 
   // Exact phrase: distance = 1
@@ -1086,18 +1093,40 @@ function buildFts5Query(cleanText, distance = 'any') {
   // Word proximity: distance = 2, 3, 5, 8, 10
   const distNum = parseInt(distance, 10);
   if (!isNaN(distNum) && distNum >= 2 && distNum <= 50) {
-    const terms = tokens.map((t) => `"${t.replace(/\*/g, '')}"`).join(' ');
+    const terms = tokens.map((t) => {
+      const rawT = t.replace(/\*/g, '');
+      return `"${rawT}"*`;
+    }).join(' ');
     return `NEAR(${terms}, ${distNum})`;
   }
 
   // Default: ANY distance (AND across paragraph)
-  return tokens.map((t) => (t.endsWith('*') ? `"${t.slice(0, -1)}"*` : `"${t}"*`)).join(' AND ');
+  return tokens
+    .map((t) => (t.endsWith('*') ? `"${t.slice(0, -1)}"*` : `"${t.replace(/\*/g, '')}"*`))
+    .join(' AND ');
 }
 
 // Helper to construct dynamic SQL WHERE & ORDER BY for full-text search
-function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
-  const whereClauses = ['paragraphs_fts MATCH ?'];
-  const params = [ftsQuery];
+function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat, pitaka, book, sort }) {
+  const whereClauses = [];
+  const params = [];
+
+  if (isContains) {
+    for (const term of containsTerms) {
+      const lower = term.toLowerCase();
+      const cap = lower.charAt(0).toUpperCase() + lower.slice(1);
+      if (lower !== cap) {
+        whereClauses.push("(content LIKE '%' || ? || '%' OR content LIKE '%' || ? || '%')");
+        params.push(lower, cap);
+      } else {
+        whereClauses.push("content LIKE '%' || ? || '%'");
+        params.push(lower);
+      }
+    }
+  } else {
+    whereClauses.push('paragraphs_fts MATCH ?');
+    params.push(ftsQuery);
+  }
 
   // 1. Specific Book Filter
   if (book && book !== 'all') {
@@ -1191,28 +1220,46 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
       rowid ASC
   `;
 
-  if (sort === 'relevance' || sort === 'rank') {
-    orderSql = 'ORDER BY rank ASC';
-  } else if (sort === 'bm25') {
-    orderSql = 'ORDER BY bm25(paragraphs_fts) ASC';
+  if (!isContains) {
+    if (sort === 'relevance' || sort === 'rank') {
+      orderSql = 'ORDER BY rank ASC';
+    } else if (sort === 'bm25') {
+      orderSql = 'ORDER BY bm25(paragraphs_fts) ASC';
+    }
   }
 
   const countSql = `SELECT count(*) as total FROM paragraphs_fts ${whereSql}`;
-  const querySql = `
-    SELECT 
-      rowid,
-      book_code,
-      book_title,
-      nikaya,
-      para_num,
-      para_index,
-      para_rend,
-      snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) as snippet
-    FROM paragraphs_fts 
-    ${whereSql}
-    ${orderSql}
-    LIMIT ? OFFSET ?
-  `;
+  const querySql = isContains
+    ? `
+      SELECT 
+        rowid,
+        book_code,
+        book_title,
+        nikaya,
+        para_num,
+        para_index,
+        para_rend,
+        content
+      FROM paragraphs_fts 
+      ${whereSql}
+      ${orderSql}
+      LIMIT ? OFFSET ?
+    `
+    : `
+      SELECT 
+        rowid,
+        book_code,
+        book_title,
+        nikaya,
+        para_num,
+        para_index,
+        para_rend,
+        snippet(paragraphs_fts, 6, '<mark>', '</mark>', '...', 25) as snippet
+      FROM paragraphs_fts 
+      ${whereSql}
+      ${orderSql}
+      LIMIT ? OFFSET ?
+    `;
 
   return { countSql, querySql, params };
 }
@@ -1269,26 +1316,33 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = Math.max(0, parseInt(req.query.offset || '0', 10));
 
-    const isCjkChar = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery);
-    const minLength = isCjkChar ? 1 : 2;
-
-    if (!rawQuery || rawQuery.length < minLength) {
+    if (!rawQuery || rawQuery.length < 1) {
       return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
     }
 
-    // Auto-normalize Velthuis typing and nigghahita for Pāḷi searches only (all normalized to NFC)
+    // Transliterate 17 Pāḷi scripts & Velthuis typing for Pāḷi searches (all normalized to NFC)
     const cleanQuery = isPali
-      ? typeVelthuis(rawQuery).replace(/ṁ/g, 'ṃ').replace(/Ṁ/g, 'ṃ').trim().normalize('NFC')
+      ? convertAnyToRoman(rawQuery).trim().normalize('NFC')
       : rawQuery;
 
-    // Construct FTS5 match query
-    const ftsMatch = buildFts5Query(cleanQuery, distanceVal);
-    if (!ftsMatch) {
+    const isContains = checkIsContainsSearch(cleanQuery);
+    const containsTerms = isContains ? extractContainsTerms(cleanQuery) : [];
+
+    if (isContains && containsTerms.length === 0) {
+      return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
+    }
+
+    // Construct FTS5 match query if standard search
+    const ftsMatch = !isContains ? buildFts5Query(cleanQuery, distanceVal) : null;
+    if (!isContains && !ftsMatch) {
       return { total: 0, count: 0, db: targetDbName, lang: targetKey, is_translation: !isPali, results: [] };
     }
 
     // In-Memory Search Cache Lookup (< 0.05ms)
-    const cacheKey = `${targetDbName}::${ftsMatch}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${distanceVal}::${limit}::${offset}`;
+    const cacheKey = isContains
+      ? `contains::${targetDbName}::${containsTerms.join('+')}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${limit}::${offset}`
+      : `fts::${targetDbName}::${ftsMatch}::${matFilter}::${pitakaFilter}::${bookFilter || 'all'}::${sortVal}::${distanceVal}::${limit}::${offset}`;
+
     const cachedEntry = searchCache.get(cacheKey);
     if (cachedEntry && Date.now() - cachedEntry.timestamp < SEARCH_CACHE_TTL) {
       searchHits++;
@@ -1301,6 +1355,8 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
     try {
       const { countSql, querySql, params } = buildSearchSql({
         ftsQuery: ftsMatch,
+        isContains,
+        containsTerms,
         mat: matFilter,
         pitaka: pitakaFilter,
         book: bookFilter,
@@ -1312,6 +1368,13 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
 
       const rows = searchDb.prepare(querySql).all(...params, limit, offset);
 
+      if (isContains) {
+        for (const row of rows) {
+          row.snippet = highlightContainsSearch(row.content, containsTerms, 200);
+          delete row.content;
+        }
+      }
+
       if (!isPali) {
         for (const row of rows) {
           row.is_translation = true;
@@ -1322,7 +1385,8 @@ function buildSearchSql({ ftsQuery, mat, pitaka, book, sort }) {
 
       const responseData = {
         query: cleanQuery,
-        ftsQuery: ftsMatch,
+        ftsQuery: isContains ? `*${containsTerms.join(' ')}` : ftsMatch,
+        is_contains: isContains,
         db: targetDbName,
         lang: targetKey,
         is_translation: !isPali,

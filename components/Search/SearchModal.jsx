@@ -79,8 +79,8 @@ export function toLangKey(langOrDb) {
 }
 
 export function getMinSearchLength(str) {
-  if (!str) return 2;
-  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(str) ? 1 : 2;
+  if (!str) return 1;
+  return 1;
 }
 
 const MAT_OPTIONS = [
@@ -158,6 +158,179 @@ export function resolveDbFromLangParam(param, databases = DEFAULT_FTS_DATABASES)
 }
 
 const SEARCH_PREFS_KEY = 'tipitaka_search_prefs_v1';
+
+export const SUPPORTED_CASES = [
+  {
+    no: 1,
+    query: 'buddhaṃ saraṇaṃ gacchāmi',
+    ok: '✅',
+    label: 'Pāḷi with full diacritics',
+    note: (
+      <>
+        Pāḷi <b>with</b> full diacritics
+      </>
+    ),
+  },
+  {
+    no: 2,
+    query: 'buddham saranam gacchami',
+    ok: '✅',
+    label: 'Pāḷi without diacritics',
+    note: (
+      <>
+        Pāḷi <b>without</b> diacritics
+      </>
+    ),
+  },
+  {
+    no: 3,
+    query: 'buddh* saran* gacch*',
+    ok: '✅',
+    label: 'Partial words wildcard',
+    note: (
+      <>
+        <b>Partial</b> words wildcard
+      </>
+    ),
+  },
+  {
+    no: 4,
+    query: 'buddh saran gacch',
+    ok: '✅',
+    label: 'Partial words (auto add *)',
+    note: (
+      <>
+        <b>Partial</b> words (auto add *)
+      </>
+    ),
+  },
+  {
+    no: 5,
+    query: 'bu sa ga',
+    ok: '✅',
+    label: 'Abbreviated (auto add *)',
+    note: (
+      <>
+        <b>Abbreviated</b>, broad results (auto add *)
+      </>
+    ),
+  },
+  {
+    no: 6,
+    query: 'b s g',
+    ok: '✅',
+    label: 'Highly abbreviated',
+    note: (
+      <>
+        <b>Highly abbreviated</b>, broad results
+      </>
+    ),
+  },
+  {
+    no: 7,
+    query: 'e m s e s b b v i m t k p b',
+    ok: '✅',
+    label: 'Long highly abbreviated acronyms',
+    note: (
+      <>
+        <b>Long highly abbreviated acronyms</b>
+      </>
+    ),
+  },
+  {
+    no: 8,
+    query: '*cāyatanaṃ',
+    ok: '✅',
+    label: 'Prefix search',
+    note: (
+      <>
+        <b>Prefix search</b> (prefix <b>*</b>) → matches <code>viññāṇañcāyatanaṃ</code>, <code>ākāsānañcāyatanaṃ</code>, etc.
+      </>
+    ),
+  },
+];
+
+export const SCRIPT_EXAMPLES = [
+  { script: 'Myanmar', sample: 'သာဓု' },
+  { script: 'Sinhala', sample: 'සාධု' },
+  { script: 'Devanagari', sample: 'साधु' },
+  { script: 'Thai', sample: 'สาธุ' },
+  { script: 'Khmer', sample: 'សាធុ' },
+  { script: 'Cyrillic', sample: 'са̄дху' },
+  { script: 'Roman', sample: 'sādhu' },
+];
+
+export function SupportedSearchTable({ onSelectExample, isPaliDb = true }) {
+  if (!isPaliDb) return null;
+  return (
+    <div className="search-help-container my-3 p-3 sm:p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xs max-w-3xl mx-auto text-xs sm:text-sm">
+      <div className="text-center mb-3">
+        <h3 className="font-semibold text-sm sm:text-base text-[var(--accent)]">
+          Examples of supported search input
+        </h3>
+        <p className="text-xs text-[var(--text-secondary)] mt-1">
+          Can search with 17 different Pāḷi scripts (click any example or script to search):
+        </p>
+        <div className="flex flex-wrap justify-center items-center gap-1.5 mt-2">
+          {SCRIPT_EXAMPLES.map((s) => (
+            <button
+              key={s.script}
+              type="button"
+              onClick={() => onSelectExample?.(s.sample)}
+              className="px-2.5 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--accent)] hover:text-white transition font-medium text-xs cursor-pointer shadow-2xs active:scale-95"
+              title={`Search with ${s.script} script: ${s.sample}`}
+            >
+              <span className="font-semibold">{s.sample}</span>
+              <span className="text-[10px] opacity-75 ml-1">({s.script})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-[var(--border-color)]">
+        <table className="w-full text-left border-collapse text-xs sm:text-sm">
+          <thead className="bg-[var(--bg-secondary)] text-[var(--text-primary)] border-b border-[var(--border-color)]">
+            <tr>
+              <th className="p-2 sm:p-2.5 w-10 text-center font-semibold">No.</th>
+              <th className="p-2 sm:p-2.5 font-semibold">Roman Pāḷi — Examples</th>
+              <th className="p-2 sm:p-2.5 w-12 text-center font-semibold">OK</th>
+              <th className="p-2 sm:p-2.5 font-semibold">Notes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-color)] text-[var(--text-secondary)]">
+            {SUPPORTED_CASES.map((item) => (
+              <tr
+                key={item.no}
+                onClick={() => onSelectExample?.(item.query)}
+                className="hover:bg-[var(--bg-hover)] transition cursor-pointer group"
+                title={`Click to search: ${item.query}`}
+              >
+                <td className="p-2 sm:p-2.5 text-center font-mono text-[var(--text-muted)]">
+                  {item.no}
+                </td>
+                <td className="p-2 sm:p-2.5 font-mono text-[var(--accent)] group-hover:underline font-medium">
+                  {item.query}
+                </td>
+                <td className="p-2 sm:p-2.5 text-center select-none text-base">
+                  {item.ok}
+                </td>
+                <td className="p-2 sm:p-2.5 text-[var(--text-primary)]">
+                  {item.note}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 text-[11px] sm:text-xs text-[var(--text-muted)] leading-relaxed border-t border-[var(--border-color)] pt-2.5">
+        <p>
+          <strong className="text-[var(--text-primary)]">Important:</strong> All input must be in <u>Unicode</u>. If you copy and paste from a non-Unicode source, the search may not work. Please retype the keywords in <strong>Unicode</strong>—just a few words are usually enough!
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function SearchModal() {
   const { isSearchOpen, searchInitialQuery, closeSearchModal, openBook, updateUrlParams } =
@@ -482,6 +655,14 @@ export default function SearchModal() {
     }
   };
 
+  const handleSelectExample = (exampleQuery) => {
+    setQuery(exampleQuery);
+    const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
+    const searchQuery = isPali ? convertAnyToRoman(exampleQuery).trim() : exampleQuery.trim();
+    performSearch(searchQuery, 0, selectedDb);
+    inputRef.current?.focus();
+  };
+
   const handleLoadMore = () => {
     if (loading || loadingMore) return;
     const nextOffset = offset + 50;
@@ -716,27 +897,35 @@ export default function SearchModal() {
 
           {error && <div className="search-error">Search error: {error}</div>}
 
-          {!loading && !error && query.trim().length < getMinSearchLength(query.trim()) && (
-            <div className="search-empty-state">
-              Type {getMinSearchLength(query.trim()) > 1 ? '2 or more' : '1 or more'} characters to search {isPaliDb ? 'across all 217 books' : 'in translation database'}...
+          {!loading && !error && query.trim().length === 0 && (
+            <div className="search-empty-container p-1 sm:p-2">
+              <SupportedSearchTable onSelectExample={handleSelectExample} isPaliDb={isPaliDb} />
+              {!isPaliDb && (
+                <div className="search-empty-state">
+                  Type to search across the {displayedDatabases.find((d) => d.id === selectedDb)?.label || selectedDb} translation database...
+                </div>
+              )}
             </div>
           )}
 
-          {!loading && !error && query.trim().length >= getMinSearchLength(query.trim()) && results.length === 0 && (
-            <div className="search-empty-state">
-              No results found for &ldquo;<strong>{query}</strong>&rdquo;
-              {isPaliDb && convertAnyToRoman(query).trim() !== query.trim() && (
-                <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
-                  ({convertAnyToRoman(query).trim()})
-                </span>
-              )}
-              {matFilter !== 'all' || pitakaFilter !== 'all' || distanceFilter !== 'any' ? (
-                <div className="mt-2 text-xs text-[var(--text-muted)]">
-                  (Filters active: {matFilter !== 'all' ? `Group=${matFilter} ` : ''}
-                  {pitakaFilter !== 'all' ? `Piṭaka=${pitakaFilter} ` : ''}
-                  {distanceFilter !== 'any' ? `Distance=${distanceFilter} ` : ''})
-                </div>
-              ) : null}
+          {!loading && !error && query.trim().length > 0 && results.length === 0 && (
+            <div className="search-no-results-container p-1 sm:p-2">
+              <div className="search-empty-state mb-2">
+                No results found for &ldquo;<strong>{query}</strong>&rdquo;
+                {isPaliDb && convertAnyToRoman(query).trim() !== query.trim() && (
+                  <span className="text-[var(--text-muted)] text-xs ml-1 font-mono">
+                    ({convertAnyToRoman(query).trim()})
+                  </span>
+                )}
+                {matFilter !== 'all' || pitakaFilter !== 'all' || distanceFilter !== 'any' ? (
+                  <div className="mt-2 text-xs text-[var(--text-muted)]">
+                    (Filters active: {matFilter !== 'all' ? `Group=${matFilter} ` : ''}
+                    {pitakaFilter !== 'all' ? `Piṭaka=${pitakaFilter} ` : ''}
+                    {distanceFilter !== 'any' ? `Distance=${distanceFilter} ` : ''})
+                  </div>
+                ) : null}
+              </div>
+              <SupportedSearchTable onSelectExample={handleSelectExample} isPaliDb={isPaliDb} />
             </div>
           )}
 
