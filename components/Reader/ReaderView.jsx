@@ -171,8 +171,8 @@ function formatTranslationContent(text, lang) {
 // prose <p data-para data-pindex> elements with numbered sentence spans
 // from the precomputed pali_sentences map (epitaka.db segmentation, shared
 // line numbers with translation line_ids), keeping the leading
-// paragraph-number element. Falls back to the original paragraph when the
-// map has no (or a single) split.
+// paragraph-number element and preserving all page break (<span class="pb">)
+// elements so that edition pagination, page jumps, and indicators work.
 function injectPaliSentencesIntoHtml(html, paliSentMap) {
   if (!html || !paliSentMap) return html;
   // NOTE: keyed by data-pindex (para_index), NOT data-para — some paragraphs
@@ -189,15 +189,112 @@ function injectPaliSentencesIntoHtml(html, paliSentMap) {
       /^(\s*<strong\b[^>]*\bparanum\b[^>]*>[\s\S]*?<\/strong>\s*(?:<span\b[^>]*\bdot\b[^>]*>[\s\S]*?<\/span>)?\s*\.?\s*)/i
     );
     if (numMatch) prefix = numMatch[1];
+
+    // Extract page breaks clustered by adjacency so they are preserved
+    const pbRegex = /<span\b[^>]*\bclass="pb"[^>]*>[\s\S]*?<\/span>/gi;
+    const pbClusters = [];
+    let pbm;
+    while ((pbm = pbRegex.exec(inner))) {
+      const lastCluster = pbClusters[pbClusters.length - 1];
+      if (lastCluster && inner.slice(lastCluster.endIndex, pbm.index).trim() === '') {
+        lastCluster.html += ' ' + pbm[0];
+        lastCluster.endIndex = pbm.index + pbm[0].length;
+        lastCluster.items.push(pbm[0]);
+      } else {
+        pbClusters.push({
+          startIndex: pbm.index,
+          endIndex: pbm.index + pbm[0].length,
+          html: pbm[0],
+          items: [pbm[0]],
+        });
+      }
+    }
+
+    // Map each sentence (from 1 to N) to its approximate character offset in inner
+    const sentOffsets = [0];
+    let searchFrom = 0;
+    for (let i = 1; i < sents.length; i++) {
+      const s = sents[i];
+      const raw = s && typeof s === 'object' ? s.text : s;
+      const sText = String(raw || '').replace(/^\d+\s*\.\s*/, '').trim();
+      const words = sText.split(/\s+/).filter((w) => w.length >= 2).slice(0, 3);
+      if (words.length === 0) {
+        sentOffsets.push(searchFrom);
+        continue;
+      }
+      let foundIdx = -1;
+      let pos = searchFrom;
+      while (pos < inner.length) {
+        const next = inner.indexOf(words[0], pos);
+        if (next === -1) break;
+        const lastOpen = inner.lastIndexOf('<', next);
+        const lastClose = inner.lastIndexOf('>', next);
+        if (lastOpen <= lastClose) {
+          foundIdx = next;
+          break;
+        }
+        pos = next + 1;
+      }
+      if (foundIdx !== -1) {
+        sentOffsets.push(foundIdx);
+        searchFrom = foundIdx;
+      } else {
+        sentOffsets.push(searchFrom);
+      }
+    }
+
+    // Assign each pb cluster to a sentence index
+    const sentPbs = Array.from({ length: sents.length }, () => []);
+    for (const cluster of pbClusters) {
+      let sentIdx = sentOffsets.length - 1;
+      for (let s = 0; s < sentOffsets.length - 1; s++) {
+        if (cluster.startIndex < sentOffsets[s + 1]) {
+          sentIdx = s;
+          break;
+        }
+      }
+      sentPbs[sentIdx].push(cluster);
+    }
+
     const numbered = sents
-      .map((s) => {
+      .map((s, idx) => {
         const line = s && typeof s === 'object' ? s.line : null;
         const raw = s && typeof s === 'object' ? s.text : s;
         // Epitaka text keeps the paragraph number ("1. Evaṃ ...") but the
         // reader already renders it from the original markup — strip it here
         // to avoid a duplicated "1 1. ..." lead.
-        const t = formatInlineTags(String(raw || '').trim().replace(/^\d+\s*\.\s*/, ''));
+        let t = formatInlineTags(String(raw || '').trim().replace(/^\d+\s*\.\s*/, ''));
         if (!t) return '';
+
+        // Inject preserved page breaks into this sentence
+        const curClusters = sentPbs[idx];
+        if (curClusters && curClusters.length > 0) {
+          let pbPrefix = '';
+          for (const cluster of curClusters) {
+            const beforeText = inner
+              .slice(Math.max(0, cluster.startIndex - 40), cluster.startIndex)
+              .replace(/<[^>]+>/g, '')
+              .trim();
+            const lastWordMatch = beforeText.match(/([^\s]+)$/);
+            const lastWord = lastWordMatch ? lastWordMatch[1].replace(/[.,;:!?–—"'\(\)\[\]]/g, '') : '';
+            let inserted = false;
+            if (lastWord && lastWord.length >= 2) {
+              const wordIdx = t.indexOf(lastWord);
+              if (wordIdx !== -1) {
+                const insertPos = wordIdx + lastWord.length;
+                t = t.slice(0, insertPos) + ' ' + cluster.html + t.slice(insertPos);
+                inserted = true;
+              }
+            }
+            if (!inserted) {
+              pbPrefix += (pbPrefix ? ' ' : '') + cluster.html;
+            }
+          }
+          if (pbPrefix) {
+            t = pbPrefix + ' ' + t;
+          }
+        }
+
         const lid = line ?? '';
         return `<span class="pali-sent" data-line="${lid}"><span class="pali-sent-num">${lid}</span><span class="pali-sent-text">${t}</span></span>`;
       })
@@ -699,6 +796,8 @@ const ChapterBlock = memo(function ChapterBlock({
   const [translations, setTranslations] = React.useState({});
   const [transSentences, setTransSentences] = React.useState({});
   const [paliSentMap, setPaliSentMap] = React.useState(null);
+  const [isTransLoading, setIsTransLoading] = React.useState(false);
+  const [isPaliSentLoading, setIsPaliSentLoading] = React.useState(false);
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const activeLangsKey = activeLangs.join(',');
 
@@ -739,6 +838,7 @@ const ChapterBlock = memo(function ChapterBlock({
       if (!activeLangsKey) {
         setTranslations({});
         setTransSentences({});
+        setIsTransLoading(false);
       }
       return;
     }
@@ -748,6 +848,7 @@ const ChapterBlock = memo(function ChapterBlock({
     if (langsToFetch.length === 0) {
       setTranslations({});
       setTransSentences({});
+      setIsTransLoading(false);
       return;
     }
 
@@ -756,6 +857,7 @@ const ChapterBlock = memo(function ChapterBlock({
     // rows above a jump target expand when the payload lands, shifting it.
     blockRef.current?.removeAttribute('data-trans-settled');
     blockRef.current?.setAttribute('data-trans-loading', '1');
+    setIsTransLoading(true);
 
     fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, { sentences: sentenceMode })
       .then((data) => {
@@ -768,6 +870,7 @@ const ChapterBlock = memo(function ChapterBlock({
         if (sentenceMode && data?.sentences) {
           setTransSentences(data.sentences);
         }
+        setIsTransLoading(false);
       })
       .catch((err) => {
         console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
@@ -776,6 +879,7 @@ const ChapterBlock = memo(function ChapterBlock({
           // don't wait forever for a payload that will never arrive.
           blockRef.current?.removeAttribute('data-trans-loading');
           blockRef.current?.setAttribute('data-trans-settled', '1');
+          setIsTransLoading(false);
         }
       });
 
@@ -788,20 +892,32 @@ const ChapterBlock = memo(function ChapterBlock({
   useEffect(() => {
     if (!sentenceMode || !isPaliEnabled || !html || !bookCode) {
       if (!sentenceMode) setPaliSentMap(null);
+      setIsPaliSentLoading(false);
       return;
     }
     let cancelled = false;
+    setIsPaliSentLoading(true);
     fetchPaliSentences(bookCode)
       .then((data) => {
         if (cancelled) return;
         const chapMap = data?.chapters?.[String(chapter.chapter_index)];
         setPaliSentMap(chapMap || null);
+        setIsPaliSentLoading(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsPaliSentLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [sentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
+
+  const hasActiveTrans = activeLangs.length > 0;
+  const hasTransData = Object.keys(translations).length > 0;
+  const hasSentenceData = !sentenceMode || (Boolean(paliSentMap) && Object.keys(transSentences).length > 0);
+  const isTransPending =
+    hasActiveTrans &&
+    (isTransLoading || isPaliSentLoading || !hasTransData || (sentenceMode && !hasSentenceData));
 
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
@@ -825,7 +941,6 @@ const ChapterBlock = memo(function ChapterBlock({
         searchHighlight.paraNum
       );
     }
-    const hasActiveTrans = activeLangs.length > 0;
     const currentPaliColors = translationColors?.pali || {};
     const hasCustomPaliColors = Boolean(
       formatCssColor(currentPaliColors.border) ||
@@ -851,7 +966,7 @@ const ChapterBlock = memo(function ChapterBlock({
     paliScript,
     searchHighlight,
     highlightSearchTerms,
-    activeLangs,
+    hasActiveTrans,
     translations,
     orderedLayers,
     isPaliEnabled,
@@ -863,14 +978,46 @@ const ChapterBlock = memo(function ChapterBlock({
   ]);
 
   if (displayHtml) {
+    if (!isPaliEnabled && isTransPending) {
+      return (
+        <div
+          ref={blockRef}
+          id={`chap-${chapter.chapter_index}`}
+          data-chapter={chapter.chapter_index}
+          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300"
+        >
+          <div className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text-primary)]">
+            <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
+            <span>Loading happiness...</span>
+          </div>
+          <p className="text-xs text-[var(--text-muted)] max-w-md">
+            Preparing {activeLangs.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')} translation for{' '}
+            <span className="font-medium text-[var(--text-secondary)]">
+              {convertPaliScript(capitalizePali(chapter.title), paliScript)}
+            </span>
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div
         ref={blockRef}
         id={`chap-${chapter.chapter_index}`}
         data-chapter={chapter.chapter_index}
         className="chapter-content-block"
-        dangerouslySetInnerHTML={{ __html: displayHtml }}
-      />
+      >
+        {isTransPending && (
+          <div className="reader-trans-pending-banner my-2.5 mx-auto max-w-fit px-3.5 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)] shadow-xs transition-all animate-in fade-in slide-in-from-top-1 duration-200 select-none">
+            <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="text-[var(--text-primary)] font-medium">Loading happiness...</span>
+            <span className="text-[var(--text-muted)] hidden sm:inline">
+              {sentenceMode ? 'Preparing sentence translations' : 'Fetching translations'}
+            </span>
+          </div>
+        )}
+        <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+      </div>
     );
   }
 
@@ -2015,12 +2162,25 @@ export default function ReaderView() {
           }
         }
 
+        // Robust fallback: resolve page to target paragraph number via targetParaNum or page_to_para
+        if (!pbEl) {
+          const targetPara = paraNum || activeTab?.page_to_para?.[ed]?.[cleanP];
+          if (targetPara !== undefined && targetPara !== null && targetPara !== '') {
+            const pClean = String(targetPara).trim();
+            pbEl =
+              findElement(`para-${pClean}`) ||
+              findElement(`para${pClean}`) ||
+              findElement(null, `[data-para="${CSS.escape(pClean)}"]`) ||
+              findElement(null, `[data-pindex="${CSS.escape(pClean)}"]`);
+          }
+        }
+
         if (pbEl) {
-          // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph
+          // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph or sentence card
           const targetEl =
             pbEl.getClientRects().length > 0
               ? pbEl
-              : pbEl.closest('p') || pbEl.parentElement || pbEl;
+              : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl;
 
           const containerRect = containerRef.current.getBoundingClientRect();
           const rect = targetEl.getBoundingClientRect();
@@ -2033,9 +2193,16 @@ export default function ReaderView() {
             void targetEl.offsetWidth;
             targetEl.classList.add('pulse-highlight');
           }
-          const foundPNum = targetEl.getAttribute?.('data-para') || pbEl.getAttribute?.('data-para');
+          const foundPNum =
+            targetEl.getAttribute?.('data-para') ||
+            targetEl.closest?.('[data-para]')?.getAttribute?.('data-para') ||
+            pbEl.getAttribute?.('data-para');
           if (foundPNum) setActiveParaNum(foundPNum);
           saveTabScroll(activeTab.bookCode, offset);
+          armParaJumpWatcher(
+            `${activeTab.bookCode}:page:${ed}:${cleanP}:${Date.now()}`,
+            offset
+          );
           clearTargetScrollIntent();
           return;
         }
@@ -2162,8 +2329,9 @@ export default function ReaderView() {
       }
 
       // If span.pb is hidden with display:none (hide-pb setting), getBoundingClientRect() on pb returns 0.
-      // Measuring the parent paragraph element gives the exact viewport position in both visible and hidden modes!
-      const hostEl = pb.closest('p[data-pindex], .chapter-divider, p') || pb.parentElement || pb;
+      // Measuring the host row element gives the exact viewport position in both visible and hidden modes,
+      // and in both paragraph mode and sentence mode!
+      const hostEl = pb.closest('[data-pindex], .reader-para-row, .sent-pair, p, .chapter-divider') || pb.parentElement || pb;
       const rect = hostEl.getBoundingClientRect();
       if (rect.top <= targetY) {
         pages[ed] = page;
