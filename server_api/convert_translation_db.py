@@ -66,14 +66,16 @@ def load_epitaka_book_map(epi_db_path):
 
 
 def init_target_database(db_path):
-    """Create the target tables and performance pragmas."""
+    """Create the target tables and performance pragmas in a temp database file."""
     if os.path.exists(db_path):
         os.remove(db_path)
     os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
 
     conn = sqlite3.connect(db_path)
+    conn.execute('PRAGMA page_size = 4096')
     conn.execute('PRAGMA synchronous = OFF')
     conn.execute('PRAGMA journal_mode = MEMORY')
+    conn.execute('PRAGMA temp_store = MEMORY')
     conn.execute('PRAGMA cache_size = -65536')
 
     conn.execute('''
@@ -160,7 +162,7 @@ def parse_nissaya_content(content):
 
 
 def convert_language(lang_code, src_db_path, epi_ref_path, tipi_db_path, out_db_path, canon_lookup=None, book_max_chap=None, book_map=None):
-    """Convert a single epitaka_{lang}.db to translation_{lang}.db."""
+    """Convert a single epitaka_{lang}.db to translation_{lang}.db atomically."""
     t0 = time.time()
     if not os.path.exists(src_db_path):
         print(f"[{lang_code}] Source DB not found: {src_db_path}")
@@ -171,10 +173,13 @@ def convert_language(lang_code, src_db_path, epi_ref_path, tipi_db_path, out_db_
     if book_map is None:
         book_map = load_epitaka_book_map(epi_ref_path)
 
+    tmp_db_path = out_db_path + '.tmp'
     print(f"[{lang_code}] Converting {src_db_path} -> {out_db_path}...")
-    out_conn = init_target_database(out_db_path)
+    out_conn = init_target_database(tmp_db_path)
 
-    src_conn = sqlite3.connect(src_db_path)
+    src_conn = sqlite3.connect(f"file:{os.path.abspath(src_db_path)}?mode=ro", uri=True)
+    src_conn.execute('PRAGMA query_only = 1')
+    src_conn.execute('PRAGMA cache_size = -65536')
     src_cur = src_conn.cursor()
 
     is_nissaya = 'nissaya' in lang_code.lower()
@@ -218,11 +223,15 @@ def convert_language(lang_code, src_db_path, epi_ref_path, tipi_db_path, out_db_
         if not current_key or not current_lines:
             return
         bid, pid = current_key
+        if pid < 1:
+            return
         bcode = book_map.get(bid)
         if not bcode:
             return
         distinct_books.add(bcode)
         pindex = pid - 1
+        if pindex < 0:
+            return
         info = canon_lookup.get((bcode, pindex))
         if info:
             cidx, guid, pnum = info
@@ -245,70 +254,171 @@ def convert_language(lang_code, src_db_path, epi_ref_path, tipi_db_path, out_db_
             st_batch.append((bcode, cidx, pindex, lid, t))
         total_paras += 1
 
-    for row in src_cur:
-        bid, pid, lid, raw_text, nid = row
-        raw_text = raw_text.strip()
-        if not raw_text:
-            continue
-        key = (bid, pid)
-        if key != current_key:
-            flush_para()
-            current_key = key
-            current_lines = {}
-
-        if is_nissaya:
-            parsed_text, pairs = parse_nissaya_content(raw_text)
-            if not parsed_text:
+    try:
+        for row in src_cur:
+            bid, pid, lid, raw_text, nid = row
+            try:
+                pid = int(pid)
+            except (ValueError, TypeError):
                 continue
-            is_pri = (nid == primary_nissaya.get(bid))
-            if lid not in current_lines:
-                current_lines[lid] = (parsed_text, pairs, is_pri)
-            elif is_pri and not current_lines[lid][2]:
-                current_lines[lid] = (parsed_text, pairs, True)
-        else:
-            current_lines[lid] = (raw_text, None, True)
+            if pid < 1:
+                continue
 
-        if len(pt_batch) >= 10000:
+            try:
+                lid = int(lid)
+            except (ValueError, TypeError):
+                lid = (max(current_lines.keys()) + 1) if current_lines else 1
+            if lid < 1:
+                continue
+            raw_text = raw_text.strip()
+            if not raw_text:
+                continue
+            key = (bid, pid)
+            if key != current_key:
+                flush_para()
+                current_key = key
+                current_lines = {}
+
+            if is_nissaya:
+                parsed_text, pairs = parse_nissaya_content(raw_text)
+                if not parsed_text:
+                    continue
+                is_pri = (nid == primary_nissaya.get(bid))
+                if lid not in current_lines:
+                    current_lines[lid] = (parsed_text, pairs, is_pri)
+                elif is_pri and not current_lines[lid][2]:
+                    current_lines[lid] = (parsed_text, pairs, True)
+            else:
+                current_lines[lid] = (raw_text, None, True)
+
+            if len(pt_batch) >= 10000:
+                out_conn.executemany('INSERT OR REPLACE INTO paragraph_translations VALUES (?,?,?,?,?,?,?,?)', pt_batch)
+                out_conn.executemany('INSERT OR REPLACE INTO sentence_translations VALUES (?,?,?,?,?)', st_batch)
+                out_conn.commit()
+                pt_batch = []
+                st_batch = []
+
+        flush_para()
+        if pt_batch:
             out_conn.executemany('INSERT OR REPLACE INTO paragraph_translations VALUES (?,?,?,?,?,?,?,?)', pt_batch)
             out_conn.executemany('INSERT OR REPLACE INTO sentence_translations VALUES (?,?,?,?,?)', st_batch)
             out_conn.commit()
-            pt_batch = []
-            st_batch = []
 
-    flush_para()
-    if pt_batch:
-        out_conn.executemany('INSERT OR REPLACE INTO paragraph_translations VALUES (?,?,?,?,?,?,?,?)', pt_batch)
-        out_conn.executemany('INSERT OR REPLACE INTO sentence_translations VALUES (?,?,?,?,?)', st_batch)
+        src_conn.close()
+
+        # Index creation
+        out_conn.execute('CREATE INDEX IF NOT EXISTS idx_pt_book_chap ON paragraph_translations (book_code, chapter_index)')
+        out_conn.execute('CREATE INDEX IF NOT EXISTS idx_pt_book_para ON paragraph_translations (book_code, para_index)')
+        out_conn.execute('CREATE INDEX IF NOT EXISTS idx_pt_guid ON paragraph_translations (guid)')
+        out_conn.execute('CREATE INDEX IF NOT EXISTS idx_st_book_chap ON sentence_translations (book_code, chapter_index)')
+        out_conn.execute('ANALYZE')
+
+        # Metadata
+        meta = LANG_META.get(lang_code, {'id': lang_code, 'name': lang_code.upper(), 'native': lang_code.upper(), 'flag': '🌐'})
+        meta_entries = [
+            ('lang_code', lang_code),
+            ('lang_id', meta['id']),
+            ('name', meta['name']),
+            ('native_name', meta['native']),
+            ('flag', meta['flag']),
+            ('total_sentences', str(total_sentences)),
+            ('total_paragraphs', str(total_paras)),
+            ('total_books', str(len(distinct_books))),
+            ('source_db_mtime', str(int(os.path.getmtime(src_db_path)))),
+            ('converted_at', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
+        ]
+        out_conn.executemany('INSERT OR REPLACE INTO translation_meta VALUES (?, ?)', meta_entries)
         out_conn.commit()
 
-    src_conn.close()
+        # Quick integrity check
+        chk = out_conn.execute('PRAGMA quick_check').fetchone()
+        if chk and chk[0] != 'ok':
+            raise RuntimeError(f"Database quick_check failed: {chk[0]}")
 
-    # Index creation
-    out_conn.execute('CREATE INDEX idx_pt_book_chap ON paragraph_translations (book_code, chapter_index)')
-    out_conn.execute('CREATE INDEX idx_pt_guid ON paragraph_translations (guid)')
-    out_conn.execute('CREATE INDEX idx_st_book_chap ON sentence_translations (book_code, chapter_index)')
+        out_conn.close()
 
-    # Metadata
-    meta = LANG_META.get(lang_code, {'id': lang_code, 'name': lang_code.upper(), 'native': lang_code.upper(), 'flag': '🌐'})
-    meta_entries = [
-        ('lang_code', lang_code),
-        ('lang_id', meta['id']),
-        ('name', meta['name']),
-        ('native_name', meta['native']),
-        ('flag', meta['flag']),
-        ('total_sentences', str(total_sentences)),
-        ('total_paragraphs', str(total_paras)),
-        ('total_books', str(len(distinct_books))),
-        ('converted_at', time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())),
-    ]
-    out_conn.executemany('INSERT OR REPLACE INTO translation_meta VALUES (?, ?)', meta_entries)
-    out_conn.commit()
-    out_conn.close()
+        # Atomic replacement of output database
+        os.replace(tmp_db_path, out_db_path)
+
+    except Exception as e:
+        try:
+            out_conn.close()
+        except Exception:
+            pass
+        if os.path.exists(tmp_db_path):
+            try:
+                os.remove(tmp_db_path)
+            except Exception:
+                pass
+        print(f"[{lang_code}] ERROR converting database: {e}", file=sys.stderr)
+        raise
 
     size_mb = os.path.getsize(out_db_path) / (1024 * 1024)
     elapsed = time.time() - t0
     print(f"[{lang_code}] Success: {total_sentences:,} sentences across {len(distinct_books)} books into {out_db_path} ({size_mb:.1f} MB) in {elapsed:.1f}s")
     return True
+
+
+def show_status(data_dir, output_dir):
+    """Display status comparison between source epitaka_*.db and converted translation_*.db."""
+    print(f"\n{'=' * 96}")
+    print(f"{'Language':20s} | {'Source DB':10s} | {'Source Sentences':16s} | {'Target Sentences':16s} | {'Status':14s}")
+    print(f"{'-' * 96}")
+
+    needs_update_count = 0
+    for lang, meta in LANG_META.items():
+        src_path = os.path.join(data_dir, f'epitaka_{lang}.db')
+        tgt_path = os.path.join(output_dir, f'translation_{lang}.db')
+
+        if not os.path.exists(src_path):
+            print(f"{lang + ' (' + meta['name'] + ')':20s} | {'MISSING':10s} | {'-':16s} | {'-':16s} | {'Source Missing':14s}")
+            continue
+
+        src_size_mb = os.path.getsize(src_path) / (1024 * 1024)
+        src_mtime = os.path.getmtime(src_path)
+
+        # Read source sentence count
+        try:
+            c_src = sqlite3.connect(f'file:{os.path.abspath(src_path)}?mode=ro', uri=True)
+            if 'nissaya' in lang:
+                src_cnt = c_src.execute("SELECT count(*) FROM sentences WHERE content IS NOT NULL AND content != ''").fetchone()[0]
+            else:
+                src_cnt = c_src.execute("SELECT count(*) FROM sentences WHERE translation IS NOT NULL AND translation != ''").fetchone()[0]
+            c_src.close()
+        except Exception:
+            src_cnt = -1
+
+        # Read target sentence count
+        tgt_cnt = None
+        tgt_mtime = 0
+        if os.path.exists(tgt_path):
+            tgt_mtime = os.path.getmtime(tgt_path)
+            try:
+                c_tgt = sqlite3.connect(f'file:{os.path.abspath(tgt_path)}?mode=ro', uri=True)
+                tgt_cnt = c_tgt.execute("SELECT count(*) FROM sentence_translations").fetchone()[0]
+                c_tgt.close()
+            except Exception:
+                tgt_cnt = -1
+
+        if tgt_cnt is None:
+            status = "NEEDS CONVERT"
+            needs_update_count += 1
+        elif src_mtime > tgt_mtime:
+            status = "NEEDS UPDATE"
+            needs_update_count += 1
+        else:
+            status = "UP TO DATE"
+
+        src_cnt_str = f"{src_cnt:,}" if src_cnt >= 0 else "err"
+        tgt_cnt_str = f"{tgt_cnt:,}" if tgt_cnt is not None and tgt_cnt >= 0 else ("missing" if tgt_cnt is None else "err")
+        lang_label = f"{lang} ({meta['name']})"
+        print(f"{lang_label:20s} | {src_size_mb:7.1f} MB | {src_cnt_str:>16s} | {tgt_cnt_str:>16s} | {status:14s}")
+
+    print(f"{'=' * 96}")
+    if needs_update_count > 0:
+        print(f"{needs_update_count} language(s) need conversion or update. Run with --updated to convert them.\n")
+    else:
+        print("All translation databases are up to date.\n")
 
 
 def main():
@@ -318,6 +428,9 @@ def main():
     parser.add_argument('--output-dir', default=os.path.join(os.path.dirname(__file__), 'db'), help="Output directory for translation_*.db files")
     parser.add_argument('--tipi-db', default=os.path.join(os.path.dirname(__file__), 'db', 'tipitaka.db'), help="Path to tipitaka.db")
     parser.add_argument('--epi-db', default='/home/administrator/freebuff_run/data/epitaka.db', help="Path to epitaka.db")
+    parser.add_argument('--status', '--check', action='store_true', dest='status', help="Show status comparison between source and converted DBs")
+    parser.add_argument('--updated', '--only-newer', action='store_true', dest='updated', help="Convert only languages where source is newer than target")
+    parser.add_argument('--force', action='store_true', help="Force conversion even if target is up-to-date")
     args = parser.parse_args()
 
     data_dir = os.path.abspath(args.data_dir)
@@ -325,15 +438,44 @@ def main():
     tipi_db = os.path.abspath(args.tipi_db)
     epi_db = os.path.abspath(args.epi_db)
 
+    # Fallbacks for reference DBs
+    if not os.path.exists(epi_db):
+        alt_epi = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ref', 'epitaka_app', 'assets', 'db', 'epitaka.db')
+        if os.path.exists(alt_epi):
+            epi_db = alt_epi
+
+    if not os.path.exists(tipi_db):
+        alt_tipi = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'server_api', 'db', 'tipitaka.db')
+        if os.path.exists(alt_tipi):
+            tipi_db = alt_tipi
+
+    if args.status:
+        show_status(data_dir, output_dir)
+        return
+
+    if args.updated:
+        langs_to_convert = []
+        for lang in LANG_META.keys():
+            src_db = os.path.join(data_dir, f'epitaka_{lang}.db')
+            out_db = os.path.join(output_dir, f'translation_{lang}.db')
+            if not os.path.exists(src_db):
+                continue
+            if not os.path.exists(out_db) or os.path.getmtime(src_db) > os.path.getmtime(out_db) or args.force:
+                langs_to_convert.append(lang)
+        if not langs_to_convert:
+            print("All databases are up to date with source. Use --force to rebuild.")
+            return
+        langs = langs_to_convert
+        print(f"Databases needing update: {', '.join(langs)}")
+    elif args.lang.lower() == 'all':
+        langs = list(LANG_META.keys())
+    else:
+        langs = [l.strip() for l in args.lang.split(',') if l.strip()]
+
     print(f"Loading canon data from {tipi_db}...")
     canon_lookup, book_max_chap = load_canon_lookup(tipi_db)
     print(f"Loading book mapping from {epi_db}...")
     book_map = load_epitaka_book_map(epi_db)
-
-    if args.lang.lower() == 'all':
-        langs = list(LANG_META.keys())
-    else:
-        langs = [l.strip() for l in args.lang.split(',') if l.strip()]
 
     for lang in langs:
         src_db = os.path.join(data_dir, f'epitaka_{lang}.db')
@@ -348,7 +490,7 @@ def main():
     if os.path.exists(test_db):
         try:
             os.remove(test_db)
-        except:
+        except Exception:
             pass
 
 
