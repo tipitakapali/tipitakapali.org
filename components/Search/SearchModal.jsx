@@ -252,7 +252,7 @@ export const SUPPORTED_CASES = [
 
 export const SCRIPT_EXAMPLES = [
   { script: 'Myanmar', sample: 'သာဓု' },
-  { script: 'Sinhala', sample: 'සාධု' },
+  { script: 'Sinhala', sample: 'සාධු'},
   { script: 'Devanagari', sample: 'साधु' },
   { script: 'Thai', sample: 'สาธุ' },
   { script: 'Khmer', sample: 'សាធុ' },

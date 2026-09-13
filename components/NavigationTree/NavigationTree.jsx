@@ -354,6 +354,8 @@ export default function NavigationTree() {
           width: `${floatPos.width}px`,
           height: `${floatPos.height}px`,
         }
+      : !isSidebarOpen && dockPosition === 'right'
+      ? { width: 0 }
       : {
           width: `${sidebarWidth}px`,
         };

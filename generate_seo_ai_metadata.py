@@ -51,6 +51,25 @@ PALI_SCRIPTS = [
     {"code": "cyrl", "name": "Cyrillic", "native": "кириллица", "desc": "Cyrillic script", "lang": "pi-Cyrl"},
 ]
 
+# 15 supported modern translation languages across the Canon
+TRANSLATION_LANGUAGES = [
+    {"code": "en", "name": "English", "native": "English", "flag": "🇬🇧", "lang": "en", "desc": "English translation • 1.28M sentences"},
+    {"code": "vi", "name": "Vietnamese", "native": "Tiếng Việt", "flag": "🇻🇳", "lang": "vi", "desc": "Bản dịch Tiếng Việt • 1.28M câu"},
+    {"code": "my", "name": "Myanmar / Burmese", "native": "မြန်မာ", "flag": "🇲🇲", "lang": "my", "desc": "မြန်မာဘာသာပြန် • 1.28M စာကြောင်း"},
+    {"code": "my_nissaya", "name": "Myanmar Nissaya", "native": "မြန်မာ နိဿယ", "flag": "🇲🇲", "lang": "my", "desc": "Myanmar Nissaya word-by-word • 570K စာကြောင်း"},
+    {"code": "si", "name": "Sinhala", "native": "සිංහල", "flag": "🇱🇰", "lang": "si", "desc": "සිංහල පරිවර්තනය • 1.21M වාක්‍ය"},
+    {"code": "zh", "name": "Chinese", "native": "中文", "flag": "🇨🇳", "lang": "zh", "desc": "中文翻译 • 1.27M 句"},
+    {"code": "th", "name": "Thai", "native": "ไทย", "flag": "🇹🇭", "lang": "th", "desc": "ฉบับแปลภาษาไทย • 1.27M ประโยค"},
+    {"code": "de", "name": "German", "native": "Deutsch", "flag": "🇩🇪", "lang": "de", "desc": "Deutsche Übersetzung • 1.28M Sätze"},
+    {"code": "ja", "name": "Japanese", "native": "日本語", "flag": "🇯🇵", "lang": "ja", "desc": "日本語訳 • 1.25M 文"},
+    {"code": "pt", "name": "Portuguese", "native": "Português", "flag": "🇵🇹", "lang": "pt", "desc": "Tradução em Português • 1.22M frases"},
+    {"code": "hi", "name": "Hindi", "native": "हिन्दी", "flag": "🇮🇳", "lang": "hi", "desc": "हिन्दी अनुवाद • 410K वाक्य"},
+    {"code": "km", "name": "Khmer", "native": "ភាសាខ្មែរ", "flag": "🇰🇭", "lang": "km", "desc": "ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ"},
+    {"code": "lo", "name": "Lao", "native": "ລາວ", "flag": "🇱🇦", "lang": "lo", "desc": "ການແປພາສາລາວ • 420K ປະໂຫຍກ"},
+    {"code": "ta", "name": "Tamil", "native": "தமிழ்", "flag": "🇮🇳", "lang": "ta", "desc": "தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்"},
+    {"code": "ru", "name": "Russian", "native": "Русский", "flag": "🇷🇺", "lang": "ru", "desc": "Русский перевод • 248K предложений"},
+]
+
 def find_paths():
     script_dir = Path(__file__).resolve().parent
     root_dir = script_dir.parent if (script_dir / 'server_api').exists() else script_dir
@@ -85,7 +104,7 @@ def find_paths():
     }
 
 def generate_sitemap_index_xml(site_url):
-    """Generate official XML Sitemap Index referencing main and all 16 script sitemaps."""
+    """Generate official XML Sitemap Index referencing main, translations, and all 16 script sitemaps."""
     sitemapindex = ET.Element("sitemapindex", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
@@ -94,7 +113,12 @@ def generate_sitemap_index_xml(site_url):
     ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-main.xml"
     ET.SubElement(sitemap_elem, "lastmod").text = now_iso
 
-    # 2. 16 Script Child Sitemaps
+    # 2. Translations Sitemap (15 modern languages across all 217 books)
+    sitemap_elem = ET.SubElement(sitemapindex, "sitemap")
+    ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-translations.xml"
+    ET.SubElement(sitemap_elem, "lastmod").text = now_iso
+
+    # 3. 16 Script Child Sitemaps
     for sc in PALI_SCRIPTS:
         sitemap_elem = ET.SubElement(sitemapindex, "sitemap")
         ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-{sc['code']}.xml"
@@ -157,14 +181,34 @@ def generate_single_sitemap_xml(books, chapters, site_url, script_code=None):
     parsed = minidom.parseString(xml_str)
     return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
 
+def generate_translations_sitemap_xml(books, site_url):
+    """Generate XML sitemap containing all 217 books across the 15 translation languages (3,255 URLs)."""
+    urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    for b in books:
+        clean_code = b['code']
+        for t in TRANSLATION_LANGUAGES:
+            url_elem = ET.SubElement(urlset, "url")
+            ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{clean_code}?l={t['code']}"
+            ET.SubElement(url_elem, "lastmod").text = now_iso
+            ET.SubElement(url_elem, "changefreq").text = "monthly"
+            ET.SubElement(url_elem, "priority").text = "0.8"
+
+    xml_str = ET.tostring(urlset, encoding="utf-8")
+    parsed = minidom.parseString(xml_str)
+    return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
+
 def generate_all_sitemaps(books, chapters, site_url):
-    """Generate all sitemap files: root index + main + 16 script sitemaps."""
+    """Generate all sitemap files: root index + main + translations + 16 script sitemaps."""
     sitemaps = {}
     # 1. Root index
     sitemaps['sitemap.xml'] = generate_sitemap_index_xml(site_url)
     # 2. Main Roman sitemap
     sitemaps['sitemap-main.xml'] = generate_single_sitemap_xml(books, chapters, site_url, script_code=None)
-    # 3. 16 Script sitemaps
+    # 3. Translations sitemap (15 languages across all 217 books)
+    sitemaps['sitemap-translations.xml'] = generate_translations_sitemap_xml(books, site_url)
+    # 4. 16 Script sitemaps
     for sc in PALI_SCRIPTS:
         filename = f"sitemap-{sc['code']}.xml"
         sitemaps[filename] = generate_single_sitemap_xml(books, chapters, site_url, script_code=sc['code'])
@@ -177,7 +221,11 @@ def generate_sitemap_xml(books, chapters, site_url):
 def generate_robots_txt(site_url):
     """Generate SEO and AI crawler friendly robots.txt with all sitemaps declared."""
     api_url = "https://api.tipitakapali.org"
-    sitemap_lines = [f"Sitemap: {site_url}/sitemap.xml", f"Sitemap: {site_url}/sitemap-main.xml"]
+    sitemap_lines = [
+        f"Sitemap: {site_url}/sitemap.xml",
+        f"Sitemap: {site_url}/sitemap-main.xml",
+        f"Sitemap: {site_url}/sitemap-translations.xml",
+    ]
     for sc in PALI_SCRIPTS:
         sitemap_lines.append(f"Sitemap: {site_url}/sitemap-{sc['code']}.xml")
     sitemaps_block = "\n".join(sitemap_lines)
@@ -265,14 +313,20 @@ def generate_llms_txt(site_url, books_count, chapters_count):
         script_rows.append(f"- `{sc['code']}`: **{sc['name']}** ({sc['native']}) → `{site_url}/book/{sc['code']}.s0101m.mul`")
     scripts_list_str = "\n".join(script_rows)
 
+    trans_rows = []
+    for t in TRANSLATION_LANGUAGES:
+        trans_rows.append(f"- `{t['code']}`: **{t['name']}** ({t['native']}) {t['flag']} → `{site_url}/book/s0101m.mul?l={t['code']}` ({t['desc']})")
+    translations_list_str = "\n".join(trans_rows)
+
     return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
-> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries.
+> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries with 15 modern translations.
 
 ## Overview
 - **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
 - **Total Canonical Books**: {books_count} books.
 - **Total Chapters**: {chapters_count:,} chapters across 520,000+ paragraphs.
 - **Languages / Scripts**: Pāḷi in Roman (Latin with full IAST diacritics) + 16 Asian & historic scripts.
+- **Translations Available**: 15 languages (English, Vietnamese, Burmese, Sinhala, Chinese, Thai, German, Japanese, Portuguese, Hindi, Khmer, Lao, Tamil, Russian, Myanmar Nissaya) with 14M+ sentence-aligned translations.
 - **Canonical Piṭakas**:
   1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
   2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
@@ -288,12 +342,16 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 - [OpenAPI for AI Tools]({site_url}/openapi.json)
 - [AI Plugin Manifest]({site_url}/.well-known/ai-plugin.json)
 
-## Reading URLs & Multi-Script Syntax
+## Reading URLs, Translations & Multi-Script Syntax
 - **Default Roman Book**: `{site_url}/book/[book_code]` (e.g. `{site_url}/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
+- **Book with Translation**: `{site_url}/book/[book_code]?l=[lang_code]` (e.g. `{site_url}/book/s0101m.mul?l=en` for English, `{site_url}/book/s0101m.mul?l=vi` for Vietnamese, `{site_url}/book/s0101m.mul?l=my` for Burmese)
 - **Multi-Script Book**: `{site_url}/book/[script_code].[book_code]` (e.g. `{site_url}/book/hi.s0101m.mul` for Devanagari, `{site_url}/book/si.s0101m.mul` for Sinhala, `{site_url}/book/my.s0101m.mul` for Myanmar, `{site_url}/book/thai.s0101m.mul` for Thai)
 - **Default Roman Chapter**: `{site_url}/book/[book_code]/[chapter_number]` (e.g. `{site_url}/book/s0101m.mul/2` for Chapter 2)
-- **Multi-Script Chapter**: `{site_url}/book/[script_code].[book_code]/[chapter_number]` (e.g. `{site_url}/book/hi.s0101m.mul/2` for Devanagari Chapter 2)
+- **Chapter with Translation**: `{site_url}/book/[book_code]/[chapter_number]?l=[lang_code]` (e.g. `{site_url}/book/s0101m.mul/2?l=en`)
 - **Specific Paragraph**: `{site_url}/book/[book_code]#para-[number]` (e.g. `{site_url}/book/s0502m.mul#para-1` for Dhammapada Verse 1)
+
+### Supported 15 Modern Translation Languages (14M+ Aligned Sentences):
+{translations_list_str}
 
 ### Supported 16 Pāḷi Script Codes:
 {scripts_list_str}
@@ -329,7 +387,7 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 """
 
 def generate_llms_full_txt(site_url, books, catalog):
-    """Generate complete /llms-full.txt with 217-book catalog, multi-script patterns, and metadata."""
+    """Generate complete /llms-full.txt with 217-book catalog, translations reference, multi-script patterns, and metadata."""
     script_table_rows = [
         "| Script Code | Script Name | Native | Sample Book URL | Sample Chapter 1 URL |",
         "| :--- | :--- | :--- | :--- | :--- |",
@@ -340,10 +398,24 @@ def generate_llms_full_txt(site_url, books, catalog):
             f"| `{sc['code']}` | {sc['name']} | {sc['native']} | `{site_url}/book/{sc['code']}.s0101m.mul` | `{site_url}/book/{sc['code']}.s0101m.mul/1` |"
         )
 
+    trans_table_rows = [
+        "| Language Code | Language Name | Native | Flag | Coverage / Sentences | Sample Book URL with Translation |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for t in TRANSLATION_LANGUAGES:
+        trans_table_rows.append(
+            f"| `{t['code']}` | {t['name']} | {t['native']} | {t['flag']} | {t['desc']} | `{site_url}/book/s0101m.mul?l={t['code']}` |"
+        )
+
     lines = [
-        "# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog & Multi-Script Reference",
+        "# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog, Translations & Multi-Script Reference",
         f"> Website: {site_url}",
         f"> Total Canonical Books: {len(books)}",
+        "",
+        "## Multilingual Translation Deep-Linking Guide for AI Agents",
+        "Users can open any canonical text with side-by-side / sentence-level translations by appending `?l=[lang_code]`:",
+        "",
+        "\n".join(trans_table_rows),
         "",
         "## Multi-Script Deep-Linking Guide for AI Agents",
         "Users can open any canonical text directly in their preferred script by prefixing the book code:",
@@ -424,7 +496,7 @@ def generate_llms_full_txt(site_url, books, catalog):
 def generate_schema_jsonld(site_url, books):
     """Generate Schema.org JSON-LD structured data for Google Rich Results."""
     api_url = "https://api.tipitakapali.org"
-    lang_list = ["pi", "pi-Latn", "en"] + [sc["lang"] for sc in PALI_SCRIPTS]
+    lang_list = ["pi", "pi-Latn", "en"] + [t["code"] for t in TRANSLATION_LANGUAGES] + [sc["lang"] for sc in PALI_SCRIPTS]
     schema = {
         "@context": "https://schema.org",
         "@graph": [
@@ -434,7 +506,7 @@ def generate_schema_jsonld(site_url, books):
                 "url": f"{site_url}/",
                 "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
                 "alternateName": ["Tipitaka Pali", "CSCD Pali Canon", "VRI Tipitaka"],
-                "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 16 multi-script typography options, DPD dictionary, and full-text search.",
+                "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations, 16 multi-script typography options, DPD dictionary, and full-text search.",
                 "inLanguage": lang_list,
                 "potentialAction": [
                     {
@@ -459,7 +531,7 @@ def generate_schema_jsonld(site_url, books):
                 "@type": "DataCatalog",
                 "@id": f"{site_url}/#catalog",
                 "name": "Chaṭṭha Saṅgāyana Pali Canon Canonical Corpus",
-                "description": "217 books of the Theravada Buddhist Pali Canon including Vinaya, Sutta, and Abhidhamma Pitakas with Atthakatha and Tika commentaries across 16 scripts.",
+                "description": "217 books of the Theravada Buddhist Pali Canon with 15 modern translations across 16 scripts.",
                 "url": f"{site_url}/",
                 "dataset": [
                     {
@@ -517,8 +589,8 @@ def main():
 
     print(f"[*] Loaded {len(books)} books and {len(chapters)} chapters.")
 
-    # 1. Generate all sitemaps (index + main + 16 scripts)
-    print(f"[*] Generating XML Sitemaps (Root Index + Main + 16 Scripts)...")
+    # 1. Generate all sitemaps (index + main + translations + 16 scripts)
+    print(f"[*] Generating XML Sitemaps (Root Index + Main + Translations + 16 Scripts)...")
     sitemaps = generate_all_sitemaps(books, chapters, site_url)
 
     # 2. Generate robots.txt, llms.txt, llms-full.txt, site.jsonld
@@ -570,15 +642,21 @@ def main():
                     (t_dir / '.well-known' / 'ai-plugin.json').write_text(ai_plugin_src.read_text(encoding='utf-8'), encoding='utf-8')
             print(f"[✓] Saved {len(sitemaps) + 4} SEO & AI files into: {t_dir}")
 
-    total_indexed_urls = 1 + len(books) + len(chapters) + len(PALI_SCRIPTS) * (len(books) + len(chapters))
+    total_indexed_urls = (
+        1
+        + len(books)
+        + len(chapters)
+        + len(TRANSLATION_LANGUAGES) * len(books)
+        + len(PALI_SCRIPTS) * (len(books) + len(chapters))
+    )
     print("\n" + "=" * 60)
-    print(" [✓] MULTI-SCRIPT SEO & AI METADATA GENERATION COMPLETE!")
+    print(" [✓] MULTI-SCRIPT & TRANSLATION SEO & AI METADATA COMPLETE!")
     print("=" * 60)
-    print(f" Total Sitemaps    : {len(sitemaps)} (sitemap.xml index + 17 child sitemaps)")
-    print(f" Total Indexed URLs: {total_indexed_urls:,} URLs across 17 scripts")
-    print(f" AI Agent Standards: /llms.txt, /llms-full.txt (16 Pali script codes documented)")
-    print(f" Search Engine Rule: /robots.txt (AI-Enabled with 17 sitemap declarations)")
-    print(f" Structured Data   : /site.jsonld (Schema.org with multi-script language tags)")
+    print(f" Total Sitemaps    : {len(sitemaps)} (sitemap.xml index + main + translations + 16 child sitemaps)")
+    print(f" Total Indexed URLs: {total_indexed_urls:,} URLs across 17 scripts and 15 translation languages")
+    print(f" AI Agent Standards: /llms.txt, /llms-full.txt (15 translations and 16 Pali scripts documented)")
+    print(f" Search Engine Rule: /robots.txt (AI-Enabled with {len(sitemaps)} sitemap declarations)")
+    print(f" Structured Data   : /site.jsonld (Schema.org with 15 translation languages)")
     print("=" * 60 + "\n")
 
 if __name__ == '__main__':

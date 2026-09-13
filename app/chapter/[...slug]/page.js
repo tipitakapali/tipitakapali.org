@@ -4,6 +4,24 @@ import path from 'path';
 import { MainAppContent } from '../../page';
 import { capitalizePali, splitScriptCode, convertPaliScript } from '../../../services/transliterate';
 
+export const TRANSLATION_LANGS = [
+  { code: 'en', name: 'English', native: 'English' },
+  { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+  { code: 'my', name: 'Myanmar / Burmese', native: 'မြန်မာ' },
+  { code: 'my_nissaya', name: 'Myanmar Nissaya', native: 'မြန်မာ နိဿယ' },
+  { code: 'si', name: 'Sinhala', native: 'සිංහල' },
+  { code: 'zh', name: 'Chinese', native: '中文' },
+  { code: 'th', name: 'Thai', native: 'ไทย' },
+  { code: 'de', name: 'German', native: 'Deutsch' },
+  { code: 'ja', name: 'Japanese', native: '日本語' },
+  { code: 'pt', name: 'Portuguese', native: 'Português' },
+  { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+  { code: 'km', name: 'Khmer', native: 'ភាសាខ្មែរ' },
+  { code: 'lo', name: 'Lao', native: 'ລາວ' },
+  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'ru', name: 'Russian', native: 'Русский' },
+];
+
 export async function generateStaticParams() {
   try {
     const catalogPath = path.join(process.cwd(), 'server_api', 'cst_books_catalog.json');
@@ -16,7 +34,6 @@ export async function generateStaticParams() {
   } catch (e) {}
   return [{ slug: ['default'] }];
 }
-
 
 export async function generateMetadata({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
@@ -47,7 +64,7 @@ export async function generateMetadata({ params }) {
   if (!bookCode) {
     return {
       title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-      description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+      description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations, rich typography, multi-script support, and full-text search.',
       alternates: { canonical: canonicalPath },
     };
   }
@@ -65,13 +82,56 @@ export async function generateMetadata({ params }) {
           : 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi';
         const displayTitle = scriptId ? convertPaliScript(bookTitle, scriptId) : bookTitle;
         const title = `${displayTitle} | ${appName}`;
-        const description = `Complete ${displayTitle} (${entry.longNavPath || nikaya}) with rich typography, multi-script support, and full-text search.`;
+        const description = `Read ${displayTitle} (${entry.longNavPath || nikaya}) in original Pāḷi with side-by-side translations in English, Vietnamese, Burmese, Sinhala, Thai, Hindi, German, Japanese, Portuguese, Chinese, Khmer, and sentence analysis.`;
+
+        const keywords = [
+          bookTitle,
+          displayTitle,
+          entry.code,
+          nikaya,
+          entry.pitaka || '',
+          `${bookTitle} translation`,
+          `${bookTitle} English translation`,
+          `${bookTitle} Vietnamese translation`,
+          `${bookTitle} Burmese translation`,
+          `${bookTitle} Sinhala translation`,
+          `${bookTitle} Thai translation`,
+          `${bookTitle} German translation`,
+          'Tipitaka Pali',
+          'Pali Canon',
+          'Theravada',
+          'Digital Pali Dictionary',
+        ].filter(Boolean);
+
+        const languages = {
+          'x-default': `https://tipitakapali.org/book/${bookCode}`,
+          'pi': `https://tipitakapali.org/book/${bookCode}`,
+        };
+        for (const t of TRANSLATION_LANGS) {
+          languages[t.code] = `https://tipitakapali.org/book/${bookCode}?l=${t.code}`;
+        }
+
         return {
           title,
           description,
-          alternates: { canonical: canonicalPath },
-          openGraph: { title, description, url: canonicalPath },
-          twitter: { title, description },
+          keywords,
+          alternates: {
+            canonical: canonicalPath,
+            languages,
+          },
+          openGraph: {
+            title,
+            description,
+            url: canonicalPath,
+            locale: 'pi_IN',
+            alternateLocales: ['en_US', 'vi_VN', 'my_MM', 'th_TH', 'si_LK', 'de_DE', 'ja_JP', 'hi_IN', 'zh_CN', 'pt_PT'],
+            type: 'article',
+          },
+          twitter: {
+            card: 'summary',
+            title,
+            description,
+          },
         };
       }
     }
@@ -81,11 +141,10 @@ export async function generateMetadata({ params }) {
 
   return {
     title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations, rich typography, multi-script support, and full-text search.',
     alternates: { canonical: canonicalPath },
   };
 }
-
 
 export default async function ChapterPage({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
@@ -101,4 +160,3 @@ export default async function ChapterPage({ params }) {
     </Suspense>
   );
 }
-

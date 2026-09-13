@@ -12,7 +12,7 @@ export const metadata = {
     default: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
     template: '%s | Tipiṭaka Pāḷi',
   },
-  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich multi-script typography, Digital Pāḷi Dictionary (DPD), and high-speed full-text search.',
+  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, Digital Pāḷi Dictionary (DPD), and high-speed full-text search.',
   keywords: [
     'Tipitaka',
     'Tipitaka Pali',
@@ -27,6 +27,15 @@ export const metadata = {
     'CSCD',
     'Digital Pali Dictionary',
     'DPD',
+    'Tipitaka translations',
+    'Pali English translation',
+    'Kinh Phật Tiếng Việt',
+    'Pali Tipitaka Myanmar translation',
+    'Pali translation German',
+    'Pali Canon Thai translation',
+    'Sinhala Tipitaka',
+    'Pali Hindi translation',
+    'sentence by sentence translation',
   ],
   authors: [{ name: 'VRI / Chaṭṭha Saṅgāyana Tipiṭaka' }],
   creator: 'Chaṭṭha Saṅgāyana Tipiṭaka',
@@ -41,10 +50,11 @@ export const metadata = {
   },
   openGraph: {
     title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, and full-text search.',
     url: 'https://tipitakapali.org',
     siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka',
     locale: 'pi_IN',
+    alternateLocales: ['en_US', 'vi_VN', 'my_MM', 'th_TH', 'si_LK', 'de_DE', 'ja_JP', 'hi_IN', 'zh_CN', 'pt_PT'],
     type: 'website',
     images: [
       {
@@ -58,7 +68,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, and full-text search.',
     images: ['/android-chrome-512x512.png'],
   },
   robots: {
@@ -104,8 +114,8 @@ const jsonLdWebsite = {
   name: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
   alternateName: ['Tipitaka Pali', 'CSCD Tipitaka', 'VRI Tipitaka'],
   url: 'https://tipitakapali.org/',
-  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with multi-script typography, DPD dictionary, and full-text search.',
-  inLanguage: ['pi', 'en', 'my', 'si', 'th', 'vi'],
+  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), multi-script typography, DPD dictionary, and full-text search.',
+  inLanguage: ['pi', 'en', 'vi', 'my', 'si', 'th', 'hi', 'de', 'ja', 'pt', 'zh', 'km', 'lo', 'ru', 'ta'],
   potentialAction: [
     {
       '@type': 'SearchAction',

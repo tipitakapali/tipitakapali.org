@@ -1,11 +1,12 @@
 # Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
-> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries.
+> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries with 15 modern translations.
 
 ## Overview
 - **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
 - **Total Canonical Books**: 217 books.
 - **Total Chapters**: 2,695 chapters across 520,000+ paragraphs.
 - **Languages / Scripts**: Pāḷi in Roman (Latin with full IAST diacritics) + 16 Asian & historic scripts.
+- **Translations Available**: 15 languages (English, Vietnamese, Burmese, Sinhala, Chinese, Thai, German, Japanese, Portuguese, Hindi, Khmer, Lao, Tamil, Russian, Myanmar Nissaya) with 14M+ sentence-aligned translations.
 - **Canonical Piṭakas**:
   1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
   2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
@@ -21,12 +22,30 @@
 - [OpenAPI for AI Tools](https://tipitakapali.org/openapi.json)
 - [AI Plugin Manifest](https://tipitakapali.org/.well-known/ai-plugin.json)
 
-## Reading URLs & Multi-Script Syntax
+## Reading URLs, Translations & Multi-Script Syntax
 - **Default Roman Book**: `https://tipitakapali.org/book/[book_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
+- **Book with Translation**: `https://tipitakapali.org/book/[book_code]?l=[lang_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul?l=en` for English, `https://tipitakapali.org/book/s0101m.mul?l=vi` for Vietnamese, `https://tipitakapali.org/book/s0101m.mul?l=my` for Burmese)
 - **Multi-Script Book**: `https://tipitakapali.org/book/[script_code].[book_code]` (e.g. `https://tipitakapali.org/book/hi.s0101m.mul` for Devanagari, `https://tipitakapali.org/book/si.s0101m.mul` for Sinhala, `https://tipitakapali.org/book/my.s0101m.mul` for Myanmar, `https://tipitakapali.org/book/thai.s0101m.mul` for Thai)
 - **Default Roman Chapter**: `https://tipitakapali.org/book/[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/s0101m.mul/2` for Chapter 2)
-- **Multi-Script Chapter**: `https://tipitakapali.org/book/[script_code].[book_code]/[chapter_number]` (e.g. `https://tipitakapali.org/book/hi.s0101m.mul/2` for Devanagari Chapter 2)
+- **Chapter with Translation**: `https://tipitakapali.org/book/[book_code]/[chapter_number]?l=[lang_code]` (e.g. `https://tipitakapali.org/book/s0101m.mul/2?l=en`)
 - **Specific Paragraph**: `https://tipitakapali.org/book/[book_code]#para-[number]` (e.g. `https://tipitakapali.org/book/s0502m.mul#para-1` for Dhammapada Verse 1)
+
+### Supported 15 Modern Translation Languages (14M+ Aligned Sentences):
+- `en`: **English** (English) 🇬🇧 → `https://tipitakapali.org/book/s0101m.mul?l=en` (English translation • 1.28M sentences)
+- `vi`: **Vietnamese** (Tiếng Việt) 🇻🇳 → `https://tipitakapali.org/book/s0101m.mul?l=vi` (Bản dịch Tiếng Việt • 1.28M câu)
+- `my`: **Myanmar / Burmese** (မြန်မာ) 🇲🇲 → `https://tipitakapali.org/book/s0101m.mul?l=my` (မြန်မာဘာသာပြန် • 1.28M စာကြောင်း)
+- `my_nissaya`: **Myanmar Nissaya** (မြန်မာ နိဿယ) 🇲🇲 → `https://tipitakapali.org/book/s0101m.mul?l=my_nissaya` (Myanmar Nissaya word-by-word • 570K စာကြောင်း)
+- `si`: **Sinhala** (සිංහල) 🇱🇰 → `https://tipitakapali.org/book/s0101m.mul?l=si` (සිංහල පරිවර්තනය • 1.21M වාක්‍ය)
+- `zh`: **Chinese** (中文) 🇨🇳 → `https://tipitakapali.org/book/s0101m.mul?l=zh` (中文翻译 • 1.27M 句)
+- `th`: **Thai** (ไทย) 🇹🇭 → `https://tipitakapali.org/book/s0101m.mul?l=th` (ฉบับแปลภาษาไทย • 1.27M ประโยค)
+- `de`: **German** (Deutsch) 🇩🇪 → `https://tipitakapali.org/book/s0101m.mul?l=de` (Deutsche Übersetzung • 1.28M Sätze)
+- `ja`: **Japanese** (日本語) 🇯🇵 → `https://tipitakapali.org/book/s0101m.mul?l=ja` (日本語訳 • 1.25M 文)
+- `pt`: **Portuguese** (Português) 🇵🇹 → `https://tipitakapali.org/book/s0101m.mul?l=pt` (Tradução em Português • 1.22M frases)
+- `hi`: **Hindi** (हिन्दी) 🇮🇳 → `https://tipitakapali.org/book/s0101m.mul?l=hi` (हिन्दी अनुवाद • 410K वाक्य)
+- `km`: **Khmer** (ភាសាខ្មែរ) 🇰🇭 → `https://tipitakapali.org/book/s0101m.mul?l=km` (ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ)
+- `lo`: **Lao** (ລາວ) 🇱🇦 → `https://tipitakapali.org/book/s0101m.mul?l=lo` (ການແປພາສາລາວ • 420K ປະໂຫຍກ)
+- `ta`: **Tamil** (தமிழ்) 🇮🇳 → `https://tipitakapali.org/book/s0101m.mul?l=ta` (தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்)
+- `ru`: **Russian** (Русский) 🇷🇺 → `https://tipitakapali.org/book/s0101m.mul?l=ru` (Русский перевод • 248K предложений)
 
 ### Supported 16 Pāḷi Script Codes:
 - `si`: **Sinhala** (සිංහල) → `https://tipitakapali.org/book/si.s0101m.mul`

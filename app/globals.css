@@ -1466,12 +1466,18 @@ aside.app-sidebar.dock-left.collapsed {
 aside.app-sidebar.dock-right {
   order: 99;
   border-left: 1px solid var(--border-color);
-  transition: margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 aside.app-sidebar.dock-right.collapsed {
-  margin-right: calc(-1 * var(--sidebar-width, 360px));
-  pointer-events: none;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  margin-right: 0 !important;
+  border-left: none !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
 }
 
 aside.app-sidebar.dock-float {

@@ -402,11 +402,6 @@ export function TabProvider({ children }) {
           url.searchParams.delete('l');
         }
       }
-
-      // If search query is explicitly removed/cleared and 'l' was not explicitly passed, clear 'l' as well
-      if (paramsToUpdate.q === null && paramsToUpdate.l === undefined) {
-        url.searchParams.delete('l');
-      }
     }
 
     // Always clean up legacy 'db' and 'lang' from URL searchParams
@@ -852,7 +847,8 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
-        const rawLang = options.l || options.lang || options.db || null;
+        const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
+        const rawLang = options.l || options.lang || options.db || currentUrlL || null;
         const normLang = rawLang ? normalizeLangCode(rawLang) : null;
         const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
 
@@ -890,7 +886,7 @@ export function TabProvider({ children }) {
           : currentTabs[existingTabIndex].currentChapterIdx || 0;
 
         const qParam = options.searchQuery || options.highlightQuery || null;
-        const lParam = (qParam && cleanLangCode) ? cleanLangCode : null;
+        const lParam = cleanLangCode || null;
         if (qParam) {
           setSearchHighlight({
             query: qParam,
@@ -1157,7 +1153,8 @@ export function TabProvider({ children }) {
 
 
 
-        const rawLang = options.l || options.lang || options.db || null;
+        const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
+        const rawLang = options.l || options.lang || options.db || currentUrlL || null;
         const normLang = rawLang ? normalizeLangCode(rawLang) : null;
         const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
 
@@ -1197,7 +1194,7 @@ export function TabProvider({ children }) {
         });
 
         const qParam = options.searchQuery || options.highlightQuery || null;
-        const lParam = (qParam && cleanLangCode) ? cleanLangCode : null;
+        const lParam = cleanLangCode || null;
         if (qParam) {
           setSearchHighlight({
             query: qParam,

@@ -1,6 +1,27 @@
-# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog & Multi-Script Reference
+# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog, Translations & Multi-Script Reference
 > Website: https://tipitakapali.org
 > Total Canonical Books: 217
+
+## Multilingual Translation Deep-Linking Guide for AI Agents
+Users can open any canonical text with side-by-side / sentence-level translations by appending `?l=[lang_code]`:
+
+| Language Code | Language Name | Native | Flag | Coverage / Sentences | Sample Book URL with Translation |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `en` | English | English | 🇬🇧 | English translation • 1.28M sentences | `https://tipitakapali.org/book/s0101m.mul?l=en` |
+| `vi` | Vietnamese | Tiếng Việt | 🇻🇳 | Bản dịch Tiếng Việt • 1.28M câu | `https://tipitakapali.org/book/s0101m.mul?l=vi` |
+| `my` | Myanmar / Burmese | မြန်မာ | 🇲🇲 | မြန်မာဘာသာပြန် • 1.28M စာကြောင်း | `https://tipitakapali.org/book/s0101m.mul?l=my` |
+| `my_nissaya` | Myanmar Nissaya | မြန်မာ နိဿယ | 🇲🇲 | Myanmar Nissaya word-by-word • 570K စာကြောင်း | `https://tipitakapali.org/book/s0101m.mul?l=my_nissaya` |
+| `si` | Sinhala | සිංහල | 🇱🇰 | සිංහල පරිවර්තනය • 1.21M වාක්‍ය | `https://tipitakapali.org/book/s0101m.mul?l=si` |
+| `zh` | Chinese | 中文 | 🇨🇳 | 中文翻译 • 1.27M 句 | `https://tipitakapali.org/book/s0101m.mul?l=zh` |
+| `th` | Thai | ไทย | 🇹🇭 | ฉบับแปลภาษาไทย • 1.27M ประโยค | `https://tipitakapali.org/book/s0101m.mul?l=th` |
+| `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/book/s0101m.mul?l=de` |
+| `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/book/s0101m.mul?l=ja` |
+| `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/book/s0101m.mul?l=pt` |
+| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 410K वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
+| `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ | `https://tipitakapali.org/book/s0101m.mul?l=km` |
+| `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 420K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
+| `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/book/s0101m.mul?l=ta` |
+| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 248K предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
 
 ## Multi-Script Deep-Linking Guide for AI Agents
 Users can open any canonical text directly in their preferred script by prefixing the book code:

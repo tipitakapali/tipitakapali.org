@@ -64,6 +64,7 @@ Disallow: /api/search*
 # 4. Sitemaps and AI Entry Points (Root Index, Main, and 16 Scripts)
 Sitemap: https://tipitakapali.org/sitemap.xml
 Sitemap: https://tipitakapali.org/sitemap-main.xml
+Sitemap: https://tipitakapali.org/sitemap-translations.xml
 Sitemap: https://tipitakapali.org/sitemap-si.xml
 Sitemap: https://tipitakapali.org/sitemap-hi.xml
 Sitemap: https://tipitakapali.org/sitemap-thai.xml

@@ -47,7 +47,7 @@ export function MainAppContent({ params: rawParams }) {
     if (!activeTab) {
       return {
         pageTitle: convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript),
-        pageDesc: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with rich typography, multi-script support, and full-text search.',
+        pageDesc: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich typography, multi-script support, and full-text search.',
       };
     }
 
@@ -77,7 +77,7 @@ export function MainAppContent({ params: rawParams }) {
 
     return {
       pageTitle: docTitle,
-      pageDesc: `Complete ${subject} with rich typography, multi-script support, and full-text search.`,
+      pageDesc: `Read ${subject} in original Pāḷi with side-by-side translations in English, Vietnamese, Burmese, and 15 modern languages, rich typography, multi-script support, and full-text search.`,
     };
   }, [
     isNotFound,

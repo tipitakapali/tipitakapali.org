@@ -28,3 +28,25 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
 
+# XML Sitemaps & Search Engine Directives (1 Day Edge Cache + 7 Days SWR)
+/*.xml
+  Content-Type: application/xml; charset=utf-8
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+
+/robots.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+
+
