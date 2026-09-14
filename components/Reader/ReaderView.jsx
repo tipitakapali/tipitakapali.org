@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { Bookmark, BookmarkCheck, History } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
@@ -1005,25 +1005,28 @@ const ChapterBlock = memo(function ChapterBlock({
   ]);
 
   if (displayHtml) {
-    if (!isPaliEnabled && isTransPending) {
+    if (hasActiveTrans && isTransPending) {
       return (
         <div
           ref={blockRef}
           id={`chap-${chapter.chapter_index}`}
           data-chapter={chapter.chapter_index}
           data-trans-loading="1"
-          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300"
+          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[220px]"
         >
-          <div className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text-primary)]">
+          <div className="flex items-center gap-2.5 text-sm sm:text-base font-semibold text-[var(--text-primary)]">
             <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
             <span>Loading happiness...</span>
           </div>
-          <p className="text-xs text-[var(--text-muted)] max-w-md">
-            Preparing {activeLangs.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')} translation for{' '}
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-md">
+            Preparing {activeLangs.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')} translations for{' '}
             <span className="font-medium text-[var(--text-secondary)]">
               {convertPaliScript(capitalizePali(chapter.title), paliScript)}
             </span>
           </p>
+          <div className="text-[11px] text-[var(--text-muted)]/70 italic">
+            {sentenceMode ? 'Sentence-by-sentence alignment in progress…' : 'Everything will appear together once ready'}
+          </div>
         </div>
       );
     }
@@ -1037,15 +1040,6 @@ const ChapterBlock = memo(function ChapterBlock({
         data-trans-settled={hasActiveTrans && !isTransPending && transFetchedKey === activeLangsKeyWithMode ? '1' : undefined}
         className="chapter-content-block"
       >
-        {isTransPending && (
-          <div className="reader-trans-pending-banner my-2.5 mx-auto max-w-fit px-3.5 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)] shadow-xs transition-all animate-in fade-in slide-in-from-top-1 duration-200 select-none">
-            <div className="w-3.5 h-3.5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
-            <span className="text-[var(--text-primary)] font-medium">Loading happiness...</span>
-            <span className="text-[var(--text-muted)] hidden sm:inline">
-              {sentenceMode ? 'Preparing sentence translations' : 'Fetching translations'}
-            </span>
-          </div>
-        )}
         <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
       </div>
     );
@@ -1474,6 +1468,13 @@ export default function ReaderView() {
     return langs;
   }, [orderedLayers]);
   const sentenceMode = settings?.translationGranularity === 'sentence';
+  const hasTransLayers = React.useMemo(() => orderedLayers.some((l) => l.type === 'trans'), [orderedLayers]);
+  const isProgrammaticScrollRef = useRef(false);
+  const programmaticScrollTimerRef = useRef(null);
+  const [isTargetScrollWaiting, setIsTargetScrollWaiting] = useState(false);
+  const targetWaitTimeoutRef = useRef(null);
+  const attemptScrollTimerRef = useRef(null);
+
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const lastScrollTopRef = useRef(0);
@@ -1495,20 +1496,42 @@ export default function ReaderView() {
   // landing until stable. Any manual scroll cancels it.
   const paraJumpRef = useRef({ key: null, lastOffset: 0, timer: null, deadline: 0 });
 
+  const performProgrammaticScroll = useCallback((container, offset, options = {}) => {
+    if (!container) return;
+    isProgrammaticScrollRef.current = true;
+    clearTimeout(programmaticScrollTimerRef.current);
+    smartScrollTo(container, offset, {
+      scrollMotion: options.scrollMotion || 'fast',
+      onComplete: () => {
+        programmaticScrollTimerRef.current = setTimeout(() => {
+          isProgrammaticScrollRef.current = false;
+        }, 150);
+        if (options.onComplete) options.onComplete();
+      },
+    });
+  }, []);
+
+  const cancelJump = useCallback(() => {
+    if (attemptScrollTimerRef.current) {
+      clearTimeout(attemptScrollTimerRef.current);
+      attemptScrollTimerRef.current = null;
+    }
+    clearTargetScrollIntent();
+    setIsTargetScrollWaiting(false);
+
+    const st = chapterJumpRef.current;
+    if (st.key) {
+      clearTimeout(st.timer);
+      chapterJumpRef.current = { key: null, lastOffset: 0, timer: null };
+    }
+    const ps = paraJumpRef.current;
+    if (ps.key) {
+      clearTimeout(ps.timer);
+      paraJumpRef.current = { key: null, lastOffset: 0, timer: null, deadline: 0 };
+    }
+  }, [clearTargetScrollIntent]);
+
   useEffect(() => {
-    const cancelJump = () => {
-      const st = chapterJumpRef.current;
-      if (st.key) {
-        clearTimeout(st.timer);
-        chapterJumpRef.current = { key: null, lastOffset: 0, timer: null };
-        clearTargetScrollIntent();
-      }
-      const ps = paraJumpRef.current;
-      if (ps.key) {
-        clearTimeout(ps.timer);
-        paraJumpRef.current = { key: null, lastOffset: 0, timer: null, deadline: 0 };
-      }
-    };
     const container = containerRef.current;
     if (container) {
       container.addEventListener('wheel', cancelJump, { passive: true });
@@ -1526,7 +1549,7 @@ export default function ReaderView() {
       }
       window.removeEventListener('keydown', cancelJump);
     };
-  }, [clearTargetScrollIntent]);
+  }, [cancelJump]);
 
   // Initialize clicked words from localStorage
   useEffect(() => {
@@ -1608,6 +1631,12 @@ export default function ReaderView() {
     if (!targetScrollIntent || !containerRef.current || !activeTab) return;
     console.log('[ReaderView targetScrollIntent triggered]', targetScrollIntent);
 
+    setIsTargetScrollWaiting(true);
+    clearTimeout(targetWaitTimeoutRef.current);
+    targetWaitTimeoutRef.current = setTimeout(() => {
+      setIsTargetScrollWaiting(false);
+    }, 12000);
+
     const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = targetScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
     const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
@@ -1623,6 +1652,12 @@ export default function ReaderView() {
     const maxRetries = 80; // Check every 50ms for up to 4.0 seconds (sufficient time for chapter & translation loading)
 
     let timerId = null;
+    const scheduleAttemptScroll = (delay = 50) => {
+      clearTimeout(timerId);
+      clearTimeout(attemptScrollTimerRef.current);
+      timerId = setTimeout(attemptScroll, delay);
+      attemptScrollTimerRef.current = timerId;
+    };
 
     // Safe DOM element finder by ID or data attributes (prevents selector SyntaxError on IDs with dots e.g. V3.0440)
     const findElement = (id, fallbackSelector = '') => {
@@ -1692,6 +1727,55 @@ export default function ReaderView() {
 
     const attemptScroll = () => {
       if (!containerRef.current) return;
+      retries++;
+
+      // ── Translation-settle gate ────────────────────────────────────────
+      // Returns true only once the content above the jump anchor can no longer
+      // grow on its own. With translation layers enabled, each chapter streams
+      // its payload lazily (`data-trans-loading` while a fetch is in flight,
+      // `data-trans-settled` once it has landed/errored). While the target
+      // chapter's own payload is pending, its rows above the target paragraph
+      // expand when it lands; while any content chapter above the anchor is
+      // still loading, the anchor itself can be pushed down. The settle watcher
+      // must not declare stability until those conditions clear.
+      const areaTranslationSettled = (hostChapterEl, { includeHost = true } = {}) => {
+        if (!hasTransLayers) return true;
+        const container = containerRef.current;
+        if (!container) return true;
+        let hostEl = hostChapterEl;
+        if (hostEl) {
+          hostEl = hostEl.closest('.chapter-content-block, .chapter-placeholder') || hostEl;
+        } else if (chapterIdx !== undefined && chapterIdx !== null) {
+          hostEl = container.querySelector(`.chapter-content-block[data-chapter="${chapterIdx}"], .chapter-placeholder[data-chapter="${chapterIdx}"]`);
+        }
+        if (includeHost) {
+          if (!hostEl) return false;
+          if (hostEl.classList.contains('chapter-placeholder')) return false;
+          if (hostEl.getAttribute('data-trans-settled') !== '1') return false;
+        }
+        const targetIdx = hostEl ? Number(hostEl.getAttribute('data-chapter')) : null;
+        if (targetIdx === null || Number.isNaN(targetIdx)) return true;
+        const chapterEls = container.querySelectorAll('.chapter-content-block[data-chapter], .chapter-placeholder[data-chapter]');
+        for (const chEl of chapterEls) {
+          const idx = Number(chEl.getAttribute('data-chapter'));
+          if (Number.isNaN(idx) || idx >= targetIdx) continue; // only chapters above the anchor
+          if (chEl.classList.contains('chapter-placeholder')) continue; // no content yet → cannot grow
+          if (chEl.getAttribute('data-trans-loading') === '1') return false;
+        }
+        return true;
+      };
+
+      const targetChapEl = (chapterIdx !== undefined && chapterIdx !== null)
+        ? containerRef.current?.querySelector(`.chapter-content-block[data-chapter="${chapterIdx}"], .chapter-placeholder[data-chapter="${chapterIdx}"]`)
+        : null;
+      const isWaitingForContent =
+        Boolean(activeTab.loadingChapters?.[chapterIdx]) ||
+        (targetChapEl && targetChapEl.classList.contains('chapter-placeholder')) ||
+        (hasTransLayers &&
+          (!targetChapEl ||
+            targetChapEl.getAttribute('data-trans-settled') !== '1' ||
+            !areaTranslationSettled(targetChapEl)));
+      const effectiveMaxRetries = isWaitingForContent ? 300 : maxRetries;
 
       // ── Paragraph-jump settle watcher ──────────────────────────────────
       // Re-resolve the paragraph target the jump scrolled to (same flavour:
@@ -1861,34 +1945,7 @@ export default function ReaderView() {
         return null;
       };
 
-      // ── Translation-settle gate ────────────────────────────────────────
-      // Returns true only once the content above the jump anchor can no longer
-      // grow on its own. With translation layers enabled, each chapter streams
-      // its payload lazily (`data-trans-loading` while a fetch is in flight,
-      // `data-trans-settled` once it has landed/errored). While the target
-      // chapter's own payload is pending, its rows above the target paragraph
-      // expand when it lands; while any content chapter above the anchor is
-      // still loading, the anchor itself can be pushed down. The settle watcher
-      // must not declare stability until those conditions clear.
-      const hasTransLayers = orderedLayers.some((l) => l.type === 'trans');
-      const areaTranslationSettled = (hostChapterEl, { includeHost = true } = {}) => {
-        if (!hasTransLayers) return true;
-        const container = containerRef.current;
-        if (!container) return true;
-        if (includeHost && hostChapterEl && hostChapterEl.getAttribute('data-trans-settled') !== '1') {
-          return false;
-        }
-        const targetIdx = hostChapterEl ? Number(hostChapterEl.getAttribute('data-chapter')) : null;
-        if (targetIdx === null || Number.isNaN(targetIdx)) return true;
-        const chapterEls = container.querySelectorAll('[data-chapter]');
-        for (const chEl of chapterEls) {
-          const idx = Number(chEl.getAttribute('data-chapter'));
-          if (Number.isNaN(idx) || idx >= targetIdx) continue; // only chapters above the anchor
-          if (chEl.classList.contains('chapter-placeholder')) continue; // no content yet → cannot grow
-          if (chEl.getAttribute('data-trans-loading') === '1') return false;
-        }
-        return true;
-      };
+
 
       // Arm a guarded settle watcher after a paragraph jump. Translation batches
       // streaming in later can shift the target; re-verify until stable (two
@@ -1902,7 +1959,7 @@ export default function ReaderView() {
           key: jumpKey,
           lastOffset: jumpOffset,
           timer: null,
-          deadline: Date.now() + 30000, // payloads can stream several seconds after a deep jump
+          deadline: Date.now() + 6000, // payloads stream before jump is executed, 6s guard is plenty
           stableCount: 0,
           lastScrollHeight: null,
         };
@@ -1918,6 +1975,11 @@ export default function ReaderView() {
             return;
           }
           if (Date.now() > cur.deadline) {
+            paraJumpRef.current.key = null;
+            return;
+          }
+          // If user scrolled away manually from landing point, stand down immediately!
+          if (cur.lastOffset !== null && Math.abs(container.scrollTop - cur.lastOffset) > 60) {
             paraJumpRef.current.key = null;
             return;
           }
@@ -1939,7 +2001,7 @@ export default function ReaderView() {
           if (diff > TOL) {
             cur.stableCount = 0;
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
-            smartScrollTo(container, fresh, { scrollMotion: 'instant' });
+            performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
             if (settings.pulseAnimation) {
               target.classList.remove('pulse-highlight');
               void target.offsetWidth;
@@ -1984,7 +2046,7 @@ export default function ReaderView() {
           key: jumpKey,
           lastOffset: jumpOffset,
           timer: null,
-          deadline: Date.now() + 30000,
+          deadline: Date.now() + 6000,
           stableCount: 0,
           lastScrollHeight: null,
         };
@@ -2000,6 +2062,11 @@ export default function ReaderView() {
             return;
           }
           if (Date.now() > cur.deadline) {
+            chapterJumpRef.current.key = null;
+            return;
+          }
+          // If user scrolled away manually from landing point, stand down immediately!
+          if (cur.lastOffset !== null && Math.abs(container.scrollTop - cur.lastOffset) > 60) {
             chapterJumpRef.current.key = null;
             return;
           }
@@ -2021,7 +2088,7 @@ export default function ReaderView() {
           if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
             cur.stableCount = 0;
             const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
-            smartScrollTo(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
+            performProgrammaticScroll(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
             saveTabScroll(activeTab.bookCode, fresh);
             cur.lastOffset = fresh;
             cur.lastScrollHeight = container.scrollHeight;
@@ -2052,9 +2119,9 @@ export default function ReaderView() {
           ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
           : null;
 
-        // If target chapter element is still a placeholder or not in DOM yet, wait and retry
-        if (chapterIdx !== undefined && chapterIdx !== null && (!chapterEl || chapterEl.classList.contains('chapter-placeholder'))) {
-          // Chapter HTML still loading/rendering, will retry on next tick
+        // If target chapter element is still a placeholder or not in DOM yet, or still loading translations, wait and retry
+        if (chapterIdx !== undefined && chapterIdx !== null && (!chapterEl || chapterEl.classList.contains('chapter-placeholder') || (hasTransLayers && chapterEl.getAttribute('data-trans-settled') !== '1'))) {
+          // Chapter HTML or translations still loading/rendering, will retry on next tick
         } else {
           const scope = chapterEl || containerRef.current;
           const el =
@@ -2082,7 +2149,7 @@ export default function ReaderView() {
                 if (chapterHasTranslations) {
                   // Translation loaded for this chapter, but this specific paragraph has no translation: fall back to Pali
                   targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
-                } else if (retries < maxRetries - 5) {
+                } else if (retries < effectiveMaxRetries - 5) {
                   // Wait for translation block to finish loading and rendering before jumping
                   targetEl = null;
                 } else {
@@ -2106,11 +2173,17 @@ export default function ReaderView() {
             }
 
             if (targetEl) {
+              const hostChapter = targetEl.closest ? targetEl.closest('[data-chapter]') : chapterEl;
+              if (hasTransLayers && !areaTranslationSettled(hostChapter) && retries < effectiveMaxRetries - 5) {
+                scheduleAttemptScroll(50);
+                return;
+              }
+
               const containerRect = containerRef.current.getBoundingClientRect();
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = containerRef.current.scrollTop;
               const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-              smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+              performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
                 targetEl.classList.remove('pulse-highlight');
@@ -2125,6 +2198,66 @@ export default function ReaderView() {
                 offset
               );
               clearTargetScrollIntent();
+              setIsTargetScrollWaiting(false);
+              return;
+            }
+          }
+        }
+      }
+
+      // 1.5. Target search query highlight (for direct URLs like /book/s0103m.mul/3?q=metteyyabuddhuppādo)
+      if ((paraIndex === undefined || paraIndex === null || paraIndex === '') && !paraNum && !page && (searchHighlight?.query || targetScrollIntent?.highlightQuery)) {
+        const queryTerm = (searchHighlight?.query || targetScrollIntent?.highlightQuery || '').trim();
+        if (queryTerm) {
+          const chapterEl = (chapterIdx !== undefined && chapterIdx !== null)
+            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+            : null;
+
+          if (
+            chapterIdx !== undefined &&
+            chapterIdx !== null &&
+            (!chapterEl ||
+              chapterEl.classList.contains('chapter-placeholder') ||
+              (hasTransLayers && chapterEl.getAttribute('data-trans-settled') !== '1'))
+          ) {
+            // Wait for chapter HTML and translations to settle
+            scheduleAttemptScroll(50);
+            return;
+          } else {
+            const scope = chapterEl || containerRef.current;
+            const hitEl = scope.querySelector('mark.search-hit, mark, .search-hit');
+            if (hitEl) {
+              const hostChapter = hitEl.closest ? hitEl.closest('[data-chapter]') : chapterEl;
+              if (hasTransLayers && !areaTranslationSettled(hostChapter) && retries < effectiveMaxRetries - 5) {
+                scheduleAttemptScroll(50);
+                return;
+              }
+
+              const row = hitEl.closest('.reader-para-row') || hitEl.closest('p') || hitEl;
+              const targetEl = hitEl.getClientRects().length > 0 ? hitEl : row;
+              const containerRect = containerRef.current.getBoundingClientRect();
+              const rect = targetEl.getBoundingClientRect();
+              const currentScroll = containerRef.current.scrollTop;
+              const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+              performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+
+              if (settings.pulseAnimation) {
+                row.classList.remove('pulse-highlight');
+                void row.offsetWidth;
+                row.classList.add('pulse-highlight');
+              }
+              const foundPNum = row.getAttribute?.('data-para') || targetEl.getAttribute?.('data-para');
+              if (foundPNum) setActiveParaNum(foundPNum);
+              saveTabScroll(activeTab.bookCode, offset);
+              armParaJumpWatcher(
+                `${activeTab.bookCode}:ch${chapterIdx}:q:${queryTerm}:${Date.now()}`,
+                offset
+              );
+              clearTargetScrollIntent();
+              setIsTargetScrollWaiting(false);
+              return;
+            } else if (retries < effectiveMaxRetries - 5) {
+              scheduleAttemptScroll(50);
               return;
             }
           }
@@ -2210,11 +2343,17 @@ export default function ReaderView() {
                 ? pbEl
                 : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl);
 
+            const hostChapter = pbEl.closest ? pbEl.closest('[data-chapter]') : null;
+            if (hasTransLayers && !areaTranslationSettled(hostChapter) && retries < effectiveMaxRetries - 5) {
+              scheduleAttemptScroll(50);
+              return;
+            }
+
             const containerRect = containerRef.current.getBoundingClientRect();
             const rect = targetEl.getBoundingClientRect();
             const currentScroll = containerRef.current.scrollTop;
             const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+            performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
               targetEl.classList.remove('pulse-highlight');
@@ -2232,6 +2371,7 @@ export default function ReaderView() {
               offset
             );
             clearTargetScrollIntent();
+            setIsTargetScrollWaiting(false);
             return;
           }
         }
@@ -2327,7 +2467,7 @@ export default function ReaderView() {
             const transEl = row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`);
             if (transEl) {
               targetEl = transEl;
-            } else if (retries < maxRetries - 2) {
+            } else if (retries < effectiveMaxRetries - 5) {
               // Translation block still loading/rendering, wait and retry
             } else {
               targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
@@ -2337,34 +2477,49 @@ export default function ReaderView() {
           }
 
           if (targetEl) {
+            const hostChapter = targetEl.closest ? targetEl.closest('[data-chapter]') : null;
+            if (hasTransLayers && !areaTranslationSettled(hostChapter) && retries < effectiveMaxRetries - 5) {
+              scheduleAttemptScroll(50);
+              return;
+            }
+
             const containerRect = containerRef.current.getBoundingClientRect();
             const rect = targetEl.getBoundingClientRect();
             const currentScroll = containerRef.current.scrollTop;
             const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-            smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+            performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
               targetEl.classList.remove('pulse-highlight');
               void targetEl.offsetWidth;
               targetEl.classList.add('pulse-highlight');
             }
-              const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
-              if (foundPNum) setActiveParaNum(foundPNum);
-              saveTabScroll(activeTab.bookCode, offset);
-              armParaJumpWatcher(
-                `${activeTab.bookCode}:ch${chapterIdx}:pn${cleanPara}:${Date.now()}`,
-                offset
-              );
-              clearTargetScrollIntent();
-              return;
+            const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
+            if (foundPNum) setActiveParaNum(foundPNum);
+            saveTabScroll(activeTab.bookCode, offset);
+            armParaJumpWatcher(
+              `${activeTab.bookCode}:ch${chapterIdx}:pn${cleanPara}:${Date.now()}`,
+              offset
+            );
+            clearTargetScrollIntent();
+            setIsTargetScrollWaiting(false);
+            return;
           }
         }
       }
 
       // 4. Target chapter header
-      if (chapterIdx !== undefined && chapterIdx !== null && !paraNum && (paraIndex === undefined || paraIndex === null || paraIndex === '') && !page) {
+      if (
+        chapterIdx !== undefined &&
+        chapterIdx !== null &&
+        !paraNum &&
+        (paraIndex === undefined || paraIndex === null || paraIndex === '') &&
+        !page &&
+        !searchHighlight?.query &&
+        !targetScrollIntent?.highlightQuery
+      ) {
         if (chapterIdx === 0) {
-          smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
+          performProgrammaticScroll(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
           saveTabScroll(activeTab.bookCode, 0);
           const firstP = containerRef.current.querySelector('[data-para]');
           if (firstP) {
@@ -2372,6 +2527,7 @@ export default function ReaderView() {
             if (pNum) setActiveParaNum(pNum);
           }
           clearTargetScrollIntent();
+          setIsTargetScrollWaiting(false);
           return;
         }
 
@@ -2380,11 +2536,16 @@ export default function ReaderView() {
           containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`);
 
         if (target) {
+          if (hasTransLayers && !areaTranslationSettled(target, { includeHost: true }) && retries < effectiveMaxRetries - 5) {
+            scheduleAttemptScroll(50);
+            return;
+          }
+
           const containerRect = containerRef.current.getBoundingClientRect();
           const rect = target.getBoundingClientRect();
           const currentScroll = containerRef.current.scrollTop;
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
-          smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+          performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           // NOTE (Fix 1): no pulse-highlight on whole-chapter jumps — with translation
           // layers enabled the entire chapter flashes and repaints expensively.
@@ -2430,24 +2591,26 @@ export default function ReaderView() {
           armChapterJumpWatcher(jumpKey, offset, chapterIdx);
 
           clearTargetScrollIntent();
+          setIsTargetScrollWaiting(false);
           return;
         }
       }
 
-      retries++;
-      const isWaitingForContent =
-        (sentenceMode && hasTransLayers) ||
-        Boolean(activeTab.loadingChapters?.[chapterIdx]);
-      const effectiveMaxRetries = isWaitingForContent ? 300 : maxRetries;
       if (retries < effectiveMaxRetries) {
-        timerId = setTimeout(attemptScroll, 50);
+        scheduleAttemptScroll(50);
       } else {
         clearTargetScrollIntent();
+        setIsTargetScrollWaiting(false);
       }
     };
 
-    timerId = setTimeout(attemptScroll, 40);
-    return () => clearTimeout(timerId);
+    scheduleAttemptScroll(40);
+    return () => {
+      clearTimeout(timerId);
+      clearTimeout(attemptScrollTimerRef.current);
+      attemptScrollTimerRef.current = null;
+      clearTimeout(targetWaitTimeoutRef.current);
+    };
   }, [
     targetScrollIntent,
     activeTab,
@@ -2461,6 +2624,8 @@ export default function ReaderView() {
     orderedLayers,
     sentenceMode,
     settings?.scrollMotion,
+    hasTransLayers,
+    performProgrammaticScroll,
   ]);
 
 
@@ -2524,6 +2689,11 @@ export default function ReaderView() {
   const handleScroll = useCallback(
     (e) => {
       const top = e.target.scrollTop;
+
+      // Detect manual user scroll to immediately cancel any pending settle watchers
+      if (!isProgrammaticScrollRef.current) {
+        cancelJump();
+      }
 
       // Immediately update memory scroll on every scroll event (no lag, no lost scroll)
       if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
@@ -2626,7 +2796,7 @@ export default function ReaderView() {
         }
       }, 120);
     },
-    [activeTab, saveTabScroll, saveTabPosition, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory]
+    [activeTab, saveTabScroll, saveTabPosition, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory, cancelJump]
   );
 
   const handleReaderClick = useCallback((e) => {
@@ -3263,6 +3433,26 @@ export default function ReaderView() {
         ref={containerRef}
         onScroll={handleScroll}
       >
+        {isTargetScrollWaiting && (
+          <div className="reader-jump-loading-overlay absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--bg-primary)]/85 backdrop-blur-md select-none transition-opacity duration-300">
+            <div className="p-6 sm:p-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl flex flex-col items-center gap-3.5 text-center max-w-sm sm:max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-12 h-12 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center shadow-xs">
+                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+              </div>
+              <div className="text-lg sm:text-xl font-bold text-[var(--text-primary)]">
+                Loading happiness...
+              </div>
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+                {hasTransLayers && activeLangs.length > 0
+                  ? `Preparing Pāḷi and ${activeLangs.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')} translations...`
+                  : 'Preparing section...'}
+              </p>
+              <div className="text-[11px] text-[var(--text-muted)] italic">
+                Everything will appear together once ready
+              </div>
+            </div>
+          </div>
+        )}
         {/* Dynamic Translation Colors CSS Rules */}
         {settings?.translationColors && Object.keys(settings.translationColors).length > 0 && (
           <style

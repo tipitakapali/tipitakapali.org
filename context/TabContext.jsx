@@ -862,7 +862,7 @@ export function TabProvider({ children }) {
           }
         }
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage || options.highlightQuery) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
@@ -1168,7 +1168,7 @@ export function TabProvider({ children }) {
           }
         }
 
-        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage) {
+        if (hasTargetChapter || options.targetParaIndex !== undefined || rawParaNum || options.targetPage || options.highlightQuery) {
           setTargetScrollIntent({
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,

@@ -206,69 +206,79 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
     # 2. Setup destination FTS5 database
     print(f"  [2] Initializing FTS5 virtual table in {os.path.basename(dst_db)}...")
     dst_conn = sqlite3.connect(tmp_dst_db)
-    dst_conn.execute("PRAGMA journal_mode = WAL;")
+    dst_conn.execute("PRAGMA journal_mode = MEMORY;")
+    dst_conn.execute("PRAGMA temp_store = MEMORY;")
     dst_conn.execute("PRAGMA synchronous = OFF;")
     dst_conn.execute("PRAGMA cache_size = -64000;")  # 64 MB memory cache
     dst_cur = dst_conn.cursor()
 
-    # Create translation_meta table
-    dst_cur.execute("CREATE TABLE IF NOT EXISTS translation_meta (key TEXT PRIMARY KEY, value TEXT);")
-    if meta_rows:
-        dst_cur.executemany("INSERT OR REPLACE INTO translation_meta (key, value) VALUES (?, ?);", meta_rows)
-    dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_built_at', datetime('now'));")
-    dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_indexed_rows', ?);", (str(total_rows),))
-    dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_tokenize', ?);", (tokenize_clause,))
+    try:
+        # Create translation_meta table
+        dst_cur.execute("CREATE TABLE IF NOT EXISTS translation_meta (key TEXT PRIMARY KEY, value TEXT);")
+        if meta_rows:
+            dst_cur.executemany("INSERT OR REPLACE INTO translation_meta (key, value) VALUES (?, ?);", meta_rows)
+        dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_built_at', datetime('now'));")
+        dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_indexed_rows', ?);", (str(total_rows),))
+        dst_cur.execute("INSERT OR REPLACE INTO translation_meta (key, value) VALUES ('fts_tokenize', ?);", (tokenize_clause,))
 
-    # Create paragraphs_fts virtual table using the per-language tokenizer.
-    # prefix=3 is skipped for trigram-tokenized languages (zh/ja) since trigram
-    # already indexes every 3-char window - a prefix index there is pure bloat.
-    #
-    # IMPORTANT: tokenize_clause values like "unicode61 categories 'L* N* Mn'"
-    # contain their own single quotes (required by FTS5's tokenizer-argument
-    # syntax). Since the whole clause is embedded inside a SQL single-quoted
-    # string literal (tokenize = '...'), any single quote INSIDE it must be
-    # doubled ('' ) or SQLite's parser sees it as the string terminating early
-    # and throws a syntax error. Plain values like "unicode61 remove_diacritics 0"
-    # or "trigram" have no inner quotes, so doubling is a no-op for them.
-    escaped_tokenize = tokenize_clause.replace("'", "''")
-    prefix_clause = "" if lang_code in TRIGRAM_LANGS else ",\n            prefix = 3"
-    dst_cur.execute(f"""
-    CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
-        book_code,
-        book_title,
-        nikaya,
-        para_num,
-        para_index UNINDEXED,
-        para_rend,
-        content,
-        tokenize = '{escaped_tokenize}'{prefix_clause}
-    );
-    """)
-    dst_conn.commit()
+        # Create paragraphs_fts virtual table using the per-language tokenizer.
+        # prefix=3 is skipped for trigram-tokenized languages (zh/ja) since trigram
+        # already indexes every 3-char window - a prefix index there is pure bloat.
+        #
+        # IMPORTANT: tokenize_clause values like "unicode61 categories 'L* N* Mn'"
+        # contain their own single quotes (required by FTS5's tokenizer-argument
+        # syntax). Since the whole clause is embedded inside a SQL single-quoted
+        # string literal (tokenize = '...'), any single quote INSIDE it must be
+        # doubled ('' ) or SQLite's parser sees it as the string terminating early
+        # and throws a syntax error. Plain values like "unicode61 remove_diacritics 0"
+        # or "trigram" have no inner quotes, so doubling is a no-op for them.
+        escaped_tokenize = tokenize_clause.replace("'", "''")
+        prefix_clause = "" if lang_code in TRIGRAM_LANGS else ",\n            prefix = 3"
+        dst_cur.execute(f"""
+        CREATE VIRTUAL TABLE paragraphs_fts USING fts5(
+            book_code,
+            book_title,
+            nikaya,
+            para_num,
+            para_index UNINDEXED,
+            para_rend,
+            content,
+            tokenize = '{escaped_tokenize}'{prefix_clause}
+        );
+        """)
+        dst_conn.commit()
 
-    # 3. Batch insert clean text into FTS5 virtual table
-    print(f"  [3] Indexing {total_rows:,} rows...")
-    t_insert = time.time()
-    batch = []
-    BATCH_SIZE = 10000
-    inserted_count = 0
+        # 3. Batch insert clean text into FTS5 virtual table
+        print(f"  [3] Indexing {total_rows:,} rows...")
+        t_insert = time.time()
+        batch = []
+        BATCH_SIZE = 10000
+        inserted_count = 0
 
-    for book_code, para_index, para_num, raw_trans in rows:
-        title, nikaya = books_meta.get(book_code, (book_code, ""))
-        rend = rend_map.get((book_code, para_index), "bodytext")
-        clean_text = clean_translation_text(raw_trans)
-        if clean_text:
-            batch.append((
-                book_code,
-                title,
-                nikaya,
-                str(para_num) if para_num is not None else "",
-                para_index,
-                rend,
-                clean_text,
-            ))
+        for book_code, para_index, para_num, raw_trans in rows:
+            title, nikaya = books_meta.get(book_code, (book_code, ""))
+            rend = rend_map.get((book_code, para_index), "bodytext")
+            clean_text = clean_translation_text(raw_trans)
+            if clean_text:
+                batch.append((
+                    book_code,
+                    title,
+                    nikaya,
+                    str(para_num) if para_num is not None else "",
+                    para_index,
+                    rend,
+                    clean_text,
+                ))
 
-        if len(batch) >= BATCH_SIZE:
+            if len(batch) >= BATCH_SIZE:
+                dst_cur.executemany("""
+                    INSERT INTO paragraphs_fts(book_code, book_title, nikaya, para_num, para_index, para_rend, content)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                """, batch)
+                inserted_count += len(batch)
+                batch = []
+
+        if batch:
             dst_cur.executemany("""
                 INSERT INTO paragraphs_fts(book_code, book_title, nikaya, para_num, para_index, para_rend, content)
                 VALUES (?, ?, ?, ?, ?, ?, ?);
@@ -276,51 +286,113 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
             inserted_count += len(batch)
             batch = []
 
-    if batch:
-        dst_cur.executemany("""
-            INSERT INTO paragraphs_fts(book_code, book_title, nikaya, para_num, para_index, para_rend, content)
-            VALUES (?, ?, ?, ?, ?, ?, ?);
-        """, batch)
-        inserted_count += len(batch)
-        batch = []
+        dst_conn.commit()
+        print(f"  [3] Indexed {inserted_count:,} paragraphs ({time.time() - t_insert:.2f}s).")
 
-    dst_conn.commit()
-    print(f"  [3] Indexed {inserted_count:,} paragraphs ({time.time() - t_insert:.2f}s).")
+        # 4. Optimize FTS5 B-tree index
+        print("  [4] Optimizing FTS5 index segments...")
+        t_opt = time.time()
+        dst_cur.execute("INSERT INTO paragraphs_fts(paragraphs_fts) VALUES('optimize');")
+        dst_conn.commit()
+        print(f"  [4] Optimize completed ({time.time() - t_opt:.2f}s).")
 
-    # 4. Optimize FTS5 B-tree index
-    print("  [4] Optimizing FTS5 index segments...")
-    t_opt = time.time()
-    dst_cur.execute("INSERT INTO paragraphs_fts(paragraphs_fts) VALUES('optimize');")
-    dst_conn.commit()
-    print(f"  [4] Optimize completed ({time.time() - t_opt:.2f}s).")
+        # 5. VACUUM database
+        print("  [5] Compacting via VACUUM...")
+        t_vac = time.time()
+        dst_cur.execute("VACUUM;")
+        dst_conn.commit()
+        print(f"  [5] VACUUM completed ({time.time() - t_vac:.2f}s).")
 
-    # 5. VACUUM database
-    print("  [5] Compacting via VACUUM...")
-    t_vac = time.time()
-    dst_cur.execute("VACUUM;")
-    dst_conn.commit()
-    print(f"  [5] VACUUM completed ({time.time() - t_vac:.2f}s).")
+        dst_conn.close()
 
-    dst_conn.close()
+        # Move temp file to final destination atomically
+        os.replace(tmp_dst_db, dst_db)
 
-    # Move temp file to final destination
-    if os.path.exists(dst_db):
-        os.remove(dst_db)
-    os.rename(tmp_dst_db, dst_db)
+        # Clean any leftover WAL files
+        for suffix in ("-wal", "-shm"):
+            f = dst_db + suffix
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
 
-    # Clean any leftover WAL files
-    for suffix in ("-wal", "-shm"):
-        f = dst_db + suffix
-        if os.path.exists(f):
+    except Exception as e:
+        try:
+            dst_conn.close()
+        except Exception:
+            pass
+        if os.path.exists(tmp_dst_db):
             try:
-                os.remove(f)
+                os.remove(tmp_dst_db)
             except Exception:
                 pass
+        print(f"[!] Error building FTS for {lang_code}: {e}", file=sys.stderr)
+        raise
 
     size_mb = os.path.getsize(dst_db) / (1024 * 1024)
     t_total = time.time() - t_start
     print(f"  ✓ {lang_code.upper()} finished: {inserted_count:,} paragraphs, {size_mb:.1f} MB in {t_total:.2f}s.")
     return True
+
+
+def show_status(db_dir: str):
+    """Displays status comparison between translation_*.db and fts_translation_*.db."""
+    print(f"\n{'=' * 96}")
+    print(f"{'Language':14s} | {'Trans DB':10s} | {'Trans Paras':14s} | {'FTS DB':10s} | {'FTS Rows':14s} | {'Status':14s}")
+    print(f"{'-' * 96}")
+
+    available_dbs = sorted(glob.glob(os.path.join(db_dir, "translation_*.db")))
+    needs_rebuild = 0
+
+    for p in available_dbs:
+        m = re.match(r"translation_([a-z_]+)\.db$", os.path.basename(p))
+        if not m:
+            continue
+        lang = m.group(1)
+        fts_p = os.path.join(db_dir, f"fts_translation_{lang}.db")
+
+        t_size_mb = os.path.getsize(p) / (1024 * 1024)
+        t_mtime = os.path.getmtime(p)
+        try:
+            c_t = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+            t_paras = c_t.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
+            c_t.close()
+        except Exception:
+            t_paras = -1
+
+        f_paras = None
+        f_size_mb = 0.0
+        f_mtime = 0
+        if os.path.exists(fts_p):
+            f_size_mb = os.path.getsize(fts_p) / (1024 * 1024)
+            f_mtime = os.path.getmtime(fts_p)
+            try:
+                c_f = sqlite3.connect(f"file:{fts_p}?mode=ro", uri=True)
+                f_paras = c_f.execute("SELECT count(*) FROM paragraphs_fts").fetchone()[0]
+                c_f.close()
+            except Exception:
+                f_paras = -1
+
+        if f_paras is None:
+            status = "MISSING"
+            needs_rebuild += 1
+        elif t_paras != f_paras or t_mtime > f_mtime:
+            status = "NEEDS REBUILD"
+            needs_rebuild += 1
+        else:
+            status = "UP TO DATE"
+
+        t_str = f"{t_paras:,}" if t_paras >= 0 else "err"
+        f_str = f"{f_paras:,}" if f_paras is not None and f_paras >= 0 else ("missing" if f_paras is None else "err")
+        f_size_str = f"{f_size_mb:7.1f} MB" if f_paras is not None else "-"
+        print(f"{lang:14s} | {t_size_mb:7.1f} MB | {t_str:>14s} | {f_size_str:>10s} | {f_str:>14s} | {status:14s}")
+
+    print(f"{'=' * 96}")
+    if needs_rebuild > 0:
+        print(f"{needs_rebuild} FTS database(s) need rebuilding. Run with --updated to rebuild them.\n")
+    else:
+        print("All FTS databases are up to date.\n")
 
 
 def main():
@@ -329,10 +401,16 @@ def main():
     parser.add_argument("--db-dir", default=DB_DIR, help="Path to database directory")
     parser.add_argument("--force", action="store_true", help="Force rebuild even if destination DB exists")
     parser.add_argument("--all", action="store_true", help="Build all available translation databases")
+    parser.add_argument("--status", "--check", action="store_true", dest="status", help="Show status comparison between translation DBs and FTS DBs")
+    parser.add_argument("--updated", "--only-newer", action="store_true", dest="updated", help="Rebuild only languages where translation DB is newer or row count differs")
     args = parser.parse_args()
 
     db_dir = os.path.abspath(args.db_dir)
     print(f"[*] Database directory: {db_dir}")
+
+    if args.status:
+        show_status(db_dir)
+        return
 
     # Discover available translation DBs
     available_dbs = glob.glob(os.path.join(db_dir, "translation_*.db"))
@@ -344,7 +422,32 @@ def main():
 
     print(f"[*] Discovered {len(discovered_langs)} translation DBs: {discovered_langs}")
 
-    if args.lang:
+    if args.updated:
+        target_langs = []
+        for lang in discovered_langs:
+            src_db = os.path.join(db_dir, f"translation_{lang}.db")
+            dst_db = os.path.join(db_dir, f"fts_translation_{lang}.db")
+            if not os.path.exists(dst_db) or os.path.getmtime(src_db) > os.path.getmtime(dst_db) or args.force:
+                target_langs.append(lang)
+            else:
+                # Also check row count difference
+                try:
+                    c_src = sqlite3.connect(f"file:{src_db}?mode=ro", uri=True)
+                    src_cnt = c_src.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
+                    c_src.close()
+                    c_dst = sqlite3.connect(f"file:{dst_db}?mode=ro", uri=True)
+                    dst_cnt = c_dst.execute("SELECT count(*) FROM paragraphs_fts").fetchone()[0]
+                    c_dst.close()
+                    if src_cnt != dst_cnt:
+                        target_langs.append(lang)
+                except Exception:
+                    target_langs.append(lang)
+
+        if not target_langs:
+            print("[*] All FTS databases are up to date with translation DBs. Use --force to rebuild.")
+            return
+        print(f"[*] Databases needing rebuild: {target_langs}")
+    elif args.lang:
         target_langs = [args.lang.lower()]
     else:
         target_langs = discovered_langs
@@ -357,7 +460,7 @@ def main():
 
     success_count = 0
     for lang in target_langs:
-        ok = build_fts_for_lang(lang, db_dir, books_meta, rend_map, force=args.force)
+        ok = build_fts_for_lang(lang, db_dir, books_meta, rend_map, force=(args.force or args.updated))
         if ok:
             success_count += 1
 

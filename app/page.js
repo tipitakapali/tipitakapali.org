@@ -259,7 +259,7 @@ export function MainAppContent({ params: rawParams }) {
       return;
     }
 
-    if (query) {
+    if (query && !bookParam) {
       openSearchModal(query);
     } else if (bookParam) {
       let targetChapterIdx = undefined;
@@ -272,6 +272,8 @@ export function MainAppContent({ params: rawParams }) {
         targetChapterIdx,
         targetParaNum: explicitParaNum,
         targetParaIndex: explicitParaIndex,
+        highlightQuery: query || undefined,
+        searchQuery: query || undefined,
         lang: cleanL || undefined,
         l: cleanL || undefined,
       });
