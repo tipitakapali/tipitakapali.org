@@ -398,54 +398,15 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true, user: authUser });
     }
 
-    // GET /api/auth/config (Get public auth configurations like Google Client ID)
-    if (req.method === 'GET' && pathname === '/api/auth/config') {
-      return sendJson(res, 200, {
-        success: true,
-        google_client_id: process.env.GOOGLE_CLIENT_ID || '1047648398418-demo-google-oauth.apps.googleusercontent.com'
-      });
-    }
-
-    // POST /api/auth/google & /api/auth/reader (Reader Sign-in)
-    if (req.method === 'POST' && (pathname === '/api/auth/google' || pathname === '/api/auth/reader')) {
+    // POST /api/auth/reader (Reader Sign-in)
+    if (req.method === 'POST' && pathname === '/api/auth/reader') {
       const data = await parseBody(req);
       let googleEmail = '';
       let googleName = '';
       let googleId = '';
       let googlePic = '';
 
-      if (data.credential) {
-        // Attempt verification via Google's tokeninfo endpoint
-        try {
-          const gRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(data.credential)}`);
-          if (gRes.ok) {
-            const gData = await gRes.json();
-            googleEmail = (gData.email || '').trim().toLowerCase();
-            googleName = gData.name || gData.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả');
-            googleId = gData.sub || '';
-            googlePic = gData.picture || '';
-          } else {
-            // Fallback decode base64url payload
-            const parts = data.credential.split('.');
-            if (parts.length >= 2) {
-              const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-              googleEmail = (payload.email || '').trim().toLowerCase();
-              googleName = payload.name || payload.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả');
-              googleId = payload.sub || '';
-              googlePic = payload.picture || '';
-            }
-          }
-        } catch (err) {
-          const parts = data.credential.split('.');
-          if (parts.length >= 2) {
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-            googleEmail = (payload.email || '').trim().toLowerCase();
-            googleName = payload.name || payload.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả');
-            googleId = payload.sub || '';
-            googlePic = payload.picture || '';
-          }
-        }
-      } else if (data.email) {
+      if (data.email) {
         // Direct email / reader sign-in
         googleEmail = (data.email || '').trim().toLowerCase();
         googleName = (data.name || googleEmail.split('@')[0]).trim();
@@ -472,7 +433,7 @@ const server = http.createServer(async (req, res) => {
         const salt = crypto.randomBytes(16).toString('hex');
         const dummyPass = crypto.randomBytes(32).toString('hex');
         const hash = hashPassword(dummyPass, salt);
-        const role = (googleEmail && (googleEmail.includes('admin') || googleEmail.includes('phuctue'))) ? 'admin' : 'reader';
+        const role = 'reader'; // Strictly reader role (no self-granted admin)
 
         const stmt = db.prepare(`
           INSERT INTO users (username, password_hash, salt, display_name, role, google_id, email, avatar_url)

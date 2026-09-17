@@ -616,15 +616,7 @@ function registerReaderSubmissionsRoutes(fastify) {
     return { success: true, user: authUser };
   });
 
-  // 7. GET /api/auth/config
-  fastify.get('/api/auth/config', async () => {
-    return {
-      success: true,
-      google_client_id: process.env.GOOGLE_CLIENT_ID || '1047648398418-demo-google-oauth.apps.googleusercontent.com'
-    };
-  });
-
-  // 8. POST /api/auth/google & /api/auth/reader (Reader Sign-in - Role Escalation Prohibited)
+  // 8. POST /api/auth/reader (Reader Sign-in - Role Escalation Prohibited)
   const handleReaderAuth = async (req, reply) => {
     try {
       const data = req.body || {};
@@ -633,38 +625,7 @@ function registerReaderSubmissionsRoutes(fastify) {
       let googleId = '';
       let googlePic = '';
 
-      if (data.credential) {
-        try {
-          const gRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(data.credential)}`);
-          if (gRes.ok) {
-            const gData = await gRes.json();
-            googleEmail = String(gData.email || '').trim().toLowerCase().slice(0, 150);
-            googleName = String(gData.name || gData.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả')).trim().slice(0, 100);
-            googleId = String(gData.sub || '').trim().slice(0, 100);
-            googlePic = String(gData.picture || '').trim().slice(0, 500);
-          } else {
-            const parts = data.credential.split('.');
-            if (parts.length >= 2) {
-              const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-              googleEmail = String(payload.email || '').trim().toLowerCase().slice(0, 150);
-              googleName = String(payload.name || payload.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả')).trim().slice(0, 100);
-              googleId = String(payload.sub || '').trim().slice(0, 100);
-              googlePic = String(payload.picture || '').trim().slice(0, 500);
-            }
-          }
-        } catch (_) {
-          const parts = (data.credential || '').split('.');
-          if (parts.length >= 2) {
-            try {
-              const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-              googleEmail = String(payload.email || '').trim().toLowerCase().slice(0, 150);
-              googleName = String(payload.name || payload.given_name || (googleEmail ? googleEmail.split('@')[0] : 'Độc Giả')).trim().slice(0, 100);
-              googleId = String(payload.sub || '').trim().slice(0, 100);
-              googlePic = String(payload.picture || '').trim().slice(0, 500);
-            } catch (_) {}
-          }
-        }
-      } else if (data.email) {
+      if (data.email) {
         googleEmail = String(data.email || '').trim().toLowerCase().slice(0, 150);
         googleName = String(data.name || googleEmail.split('@')[0]).trim().slice(0, 100);
         googleId = String(data.google_id || `r_${Date.now()}`).slice(0, 100);
@@ -744,8 +705,7 @@ function registerReaderSubmissionsRoutes(fastify) {
     }
   };
 
-  fastify.post('/api/auth/google', { bodyLimit: BODY_LIMIT_AUTH }, handleReaderAuth);
-  fastify.post('/api/auth/reader', { bodyLimit: BODY_LIMIT_AUTH }, handleReaderAuth);
+    fastify.post('/api/auth/reader', { bodyLimit: BODY_LIMIT_AUTH }, handleReaderAuth);
 
   // 9. GET /api/stats
   fastify.get('/api/stats', async () => {

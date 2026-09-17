@@ -7,8 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Gentium+Plus:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Google Identity Services -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --bg-primary: #fcfbf7;
@@ -1475,33 +1473,6 @@
         openReaderModal();
     }
 
-    async function handleGoogleCredentialResponse(response) {
-        if (!response || !response.credential) return;
-        try {
-            const res = await fetch(`${API_BASE}/api/auth/reader`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential: response.credential })
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                authToken = data.token;
-                currentUser = data.user;
-                localStorage.setItem('nibbanagamini_editor_token', data.token);
-                localStorage.setItem('nibbanagamini_user_info', JSON.stringify(data.user));
-                updateAuthUI();
-                closeAuthModal();
-                closeQuickGoogleModal();
-                loadSubmissions();
-                alert(`✓ Chào mừng ${data.user.display_name}! Quý vị đã đăng nhập thành công.`);
-            } else {
-                alert('Lỗi đăng nhập: ' + (data.error || 'Không thể xác thực.'));
-            }
-        } catch (e) {
-            alert('Lỗi kết nối máy chủ xác thực: ' + e.message);
-        }
-    }
-
     async function handleQuickGoogleLogin(e) {
         e.preventDefault();
         const email = document.getElementById('qg-email').value.trim();
@@ -1549,35 +1520,6 @@
         }
     }
 
-    async function initGIS() {
-        try {
-            const res = await fetch(`${API_BASE}/api/auth/config`);
-            if (res.ok) {
-                const cfg = await res.json();
-                const clientId = cfg.google_client_id;
-                if (typeof google !== 'undefined' && google.accounts && google.accounts.id && clientId) {
-                    google.accounts.id.initialize({
-                        client_id: clientId,
-                        callback: handleGoogleCredentialResponse,
-                        auto_select: false
-                    });
-                    const container = document.getElementById('g_id_onload_container');
-                    if (container) {
-                        google.accounts.id.renderButton(container, {
-                            theme: 'outline',
-                            size: 'large',
-                            width: 320,
-                            text: 'signin_with',
-                            locale: 'vi'
-                        });
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('GIS config load error:', e.message);
-        }
-    }
-
     // Auto load current user from storage or me endpoint
     async function checkAuthSession() {
         const savedUser = localStorage.getItem('nibbanagamini_user_info');
@@ -1607,7 +1549,6 @@
     checkAuthSession();
     loadStats();
     loadSubmissions();
-    window.addEventListener('load', initGIS);
 </script>
 </body>
 </html>
