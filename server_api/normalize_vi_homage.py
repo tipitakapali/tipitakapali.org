@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 """Normalize Vietnamese homage phrasing in translation_vi.db.
 
-Reproduces the homage unification applied to the Vietnamese Tipitaka
-translation database:
+Replaces ~80 homage epithet variants with a single canonical TARGET:
 
-  Phase 1: "Nam mô Thế Tôn" -> "Kính lễ Đức Thế Tôn"
-           (DB-wide, translation + sentences_json + sentence rows)
-  Phase 2: ~80 homage epithet variants -> TARGET
-           (DB-wide, longest-match-first so that e.g.
-           "Con đảnh lễ Đức Thế Tôn ..." is replaced wholly instead of
-           leaving a stray "Con " prefix behind)
+    Kính lễ Đức Thế Tôn, bậc A-la-hán, đấng Chánh Đẳng Giác
+
+DB-wide (paragraph_translations.translation +
+paragraph_translations.sentences_json +
+sentence_translations.translation), longest-match-first so that e.g.
+"Con đảnh lễ Đức Thế Tôn ..." is replaced wholly instead of leaving a
+stray "Con " prefix behind.
 
 Only the core homage phrase is swapped; trailing sentence punctuation
 (`.`/`;`/`!`/`"`) is preserved because the match cores carry no
 trailing punctuation.
+
+Why this rewrite: the previous version issued one full-table
+UPDATE ... WHERE col LIKE <variant> per variant per column
+(82 variants x 3 columns = 246 full scans of 464k + 1.2M-row tables),
+which never finishes in practice.  This version does ONE candidate
+scan per column (`WHERE col LIKE '%A-la-hán%' OR col LIKE '%Araha%'`),
+applies all variants in Python (single longest-first regex), and
+UPDATEs only rows that actually changed.
 
 Usage:
     python3 normalize_vi_homage.py [--db PATH] [--dry-run] [--target TEXT]
@@ -24,17 +32,15 @@ Exit code is 0 when no listed variant remains, 1 otherwise.
 import argparse
 import datetime
 import os
+import re
 import shutil
 import sqlite3
 import sys
 
 TARGET = "Kính lễ Đức Thế Tôn, bậc A-la-hán, đấng Chánh Đẳng Giác"
 
-# Phase-1 replacement: (old, new)
-PHASE1 = ("Nam mô Thế Tôn", "Kính lễ Đức Thế Tôn")
-
-# Phase-2 cores: homage variants stripped of trailing ."';! and leading
-# quotes. The TARGET itself is deliberately absent.
+# Homage variants stripped of trailing ."';! and leading quotes.
+# The TARGET itself is deliberately absent.
 VARIANTS = [
     "Con xin đảnh lễ Thế Tôn, bậc A-la-hán, bậc Chánh Đẳng Giác",
     "Con xin đảnh lễ Thế Tôn, bậc A-la-hán, đấng Chánh Đẳng Giác",
@@ -101,6 +107,8 @@ VARIANTS = [
     "Nam mô đức Thế Tôn, bậc A-la-hán, đấng Chánh Đẳng Giác",
     "Namô Thế Tôn, bậc A-la-hán, đấng Chánh Đẳng Giác",
     "Năm lễ Đức Thế Tôn, bậc A-la-hán, Đấng Chánh Đẳng Giác",
+    "Ngọn lúa vàng rực rỡ, thành kính đảnh lễ đức Thế Tôn, bậc A-la-hán, "
+    "đấng Chánh Biến Tri",
     "Tôn kính Đức Thế Tôn, bậc A-la-hán, bậc Chánh Đẳng Giác",
     "Tôn kính đức Thế Tôn, bậc A-la-hán, bậc Chánh Đẳng Giác",
     "Tôn vinh Thế Tôn, bậc A-la-hán, bậc Chánh Đẳng Giác",
@@ -120,46 +128,62 @@ VARIANTS = [
     "Kính lạy Thế Tôn, Bậc A-la-hán, Đấng Chánh Biến Tri",
 ]
 
+# (table, column) text columns to normalize. sentences_json holds JSON
+# but the variants contain no '"' or '\\', so a raw substring replace on
+# the JSON text is safe and preserves formatting.
 COLUMNS = (
     ("paragraph_translations", "translation"),
     ("paragraph_translations", "sentences_json"),
     ("sentence_translations", "translation"),
 )
 
+# Narrowing filter: every variant contains 'A-la-hán' except the single
+# 'Araha' one, so candidates are rows matching either. One scan per
+# column instead of one scan per variant per column.
+CANDIDATE_WHERE = "({col} LIKE '%A-la-hán%' OR {col} LIKE '%Araha%')"
+
 
 def default_db_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "db", "translation_vi.db")
+    here = os.path.dirname(os.path.abspath(__file__))
+    same_dir = os.path.join(here, "translation_vi.db")
+    if os.path.exists(same_dir):
+        return same_dir
+    return os.path.join(here, "db", "translation_vi.db")
 
 
-def count_pattern(cur, pattern):
-    """Rows (summed over the three text columns) currently containing pattern."""
-    total = 0
-    for tbl, col in COLUMNS:
-        cur.execute(f"SELECT count(*) FROM {tbl} WHERE {col} LIKE '%' || ? || '%'", (pattern,))
-        total += cur.fetchone()[0]
-    return total
+def build_pattern(variants):
+    """Single longest-match-first regex over all variants."""
+    cores = sorted(set(variants), key=len, reverse=True)
+    return re.compile("|".join(re.escape(v) for v in cores))
 
 
-def count_hits(cur, pattern):
-    """Rows containing pattern in any of the three text columns."""
-    return count_pattern(cur, pattern)
+def iter_candidates(cur, table, col, chunksize=2000):
+    """Yield (rowid, text) candidate rows possibly containing a variant."""
+    cur.execute(
+        f"SELECT rowid, {col} FROM {table} WHERE " + CANDIDATE_WHERE.format(col=col)
+    )
+    while True:
+        batch = cur.fetchmany(chunksize)
+        if not batch:
+            return
+        for rowid, text in batch:
+            if text:
+                yield rowid, text
 
 
-def apply_replacement(cur, old, new):
-    """REPLACE old->new in all three text columns.
+def apply_to_text(text, pattern, target):
+    """Replace all variant occurrences; return (new_text, n_replacements)."""
+    new_text, n = pattern.subn(target, text)
+    return new_text, n
 
-    Returns rows actually changed, counted from UPDATE ... RETURNING
-    (robust against cursor.rowcount quirks, no extra count scans).
-    """
-    changed = 0
-    for tbl, col in COLUMNS:
-        cur.execute(
-            f"UPDATE {tbl} SET {col} = REPLACE({col}, ?, ?) "
-            "WHERE %s LIKE '%%' || ? || '%%' RETURNING 1" % col,
-            (old, new, old),
-        )
-        changed += len(cur.fetchall())
-    return changed
+
+def count_variants_in_texts(texts, variants):
+    """Per-variant hit counts over an in-memory list of texts (dry-run)."""
+    per_core = []
+    for v in variants:
+        n = sum(t.count(v) for t in texts)
+        per_core.append((v, n))
+    return per_core
 
 
 def backup_db(db_path):
@@ -202,21 +226,33 @@ def main():
 
     assert args.target not in VARIANTS, "TARGET must not be one of the variants"
     cores = sorted(set(VARIANTS), key=len, reverse=True)  # longest first
+    pattern = build_pattern(cores)
 
+    if not os.path.exists(args.db):
+        print(f"error: DB not found: {args.db}", file=sys.stderr)
+        return 2
     con = sqlite3.connect(args.db)
     cur = con.cursor()
 
+    # Single candidate scan per column; everything else is in-memory.
+    candidates = {}  # (table, col) -> list[(rowid, text)]
+    for tbl, col in COLUMNS:
+        rows = list(iter_candidates(cur, tbl, col))
+        candidates[(tbl, col)] = rows
+        print(f"scan {tbl}.{col}: {len(rows)} candidate rows")
+
     if args.dry_run:
-        p1 = count_hits(cur, PHASE1[0])
-        per_core = [(v, count_hits(cur, v)) for v in cores]
+        all_texts = [t for rows in candidates.values() for _, t in rows]
+        per_core = count_variants_in_texts(all_texts, cores)
         n_cores = sum(1 for _, n in per_core if n)
-        print(f"[dry-run] phase-1 {PHASE1[0]!r} hits (rows x cols): {p1}")
-        print(f"[dry-run] phase-2 cores with hits: {n_cores}/{len(cores)}")
+        total_hits = sum(n for _, n in per_core)
+        print(f"[dry-run] variant cores with hits: {n_cores}/{len(cores)} "
+              f"({total_hits} occurrences in candidate rows)")
         for v, n in sorted(per_core, key=lambda r: -r[1]):
             if n:
                 print(f"[dry-run]   {n} :: {v}")
         con.close()
-        return 0 if (p1 == 0 and n_cores == 0) else 0
+        return 0 if total_hits == 0 else 1
 
     if not args.yes and not confirm_overwrite(args.db):
         con.close()
@@ -230,23 +266,42 @@ def main():
     else:
         print("warning: proceeding WITHOUT a backup (--no-backup given)")
 
+    total_rows = 0
+    total_repl = 0
     cur.execute("BEGIN")
-    t1 = apply_replacement(cur, PHASE1[0], PHASE1[1])
-    t2 = 0
-    for v in cores:
-        t2 += apply_replacement(cur, v, args.target)
+    for tbl, col in COLUMNS:
+        changed = []
+        n_repl = 0
+        for rowid, text in candidates[(tbl, col)]:
+            new_text, n = apply_to_text(text, pattern, args.target)
+            if n:
+                changed.append((new_text, rowid))
+                n_repl += n
+        if changed:
+            cur.executemany(
+                f"UPDATE {tbl} SET {col} = ? WHERE rowid = ?", changed
+            )
+        print(f"updated {tbl}.{col}: {len(changed)} rows, {n_repl} replacements")
+        total_rows += len(changed)
+        total_repl += n_repl
     con.commit()
-    print(f"phase-1 rows updated (x3 cols): {t1}")
-    print(f"phase-2 rows updated (x3 cols): {t2}")
+    print(f"total rows updated: {total_rows} ({total_repl} replacements)")
 
     leftover = 0
-    for pat in [PHASE1[0]] + cores:
-        for tbl, col in COLUMNS:
-            cur.execute(f"SELECT count(*) FROM {tbl} WHERE {col} LIKE '%' || ? || '%'", (pat,))
-            n = cur.fetchone()[0]
-            if n:
-                print(f"LEFTOVER {n}x in {tbl}.{col}: {pat}")
-                leftover += n
+    for tbl, col in COLUMNS:
+        cur.execute(
+            f"SELECT rowid, {col} FROM {tbl} WHERE " + CANDIDATE_WHERE.format(col=col)
+        )
+        for _, text in cur.fetchall():
+            if not text:
+                continue
+            for pat in cores:
+                n = text.count(pat)
+                if n:
+                    if leftover == 0:
+                        print(f"LEFTOVER in {tbl}.{col}: {pat} ({n}x in one row)")
+                    leftover += n
+                    break  # one report line per row is enough; keep counting
     cur.execute(
         "SELECT count(*) FROM paragraph_translations WHERE translation LIKE '%' || ? || '%'",
         (args.target,),

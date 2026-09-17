@@ -56,8 +56,13 @@ DB_DIR = os.path.join(SCRIPT_DIR, "db")
 TIPITAKA_DB = os.path.join(DB_DIR, "tipitaka.db")
 FTS_TIPITAKA_DB = os.path.join(DB_DIR, "fts_tipitaka.db")
 
+#ALL_LANGS = [
+ #   "de", "en", "hi", "ja", "km", "lo", "my", "my_nissaya",
+  #  "pt", "ru", "si", "ta", "th", "vi", "zh"
+#]
+
 ALL_LANGS = [
-    "de", "en", "hi", "ja", "km", "lo", "my", "my_nissaya",
+    "de", "en", "hi", "ja", "km", "lo", "my",
     "pt", "ru", "si", "ta", "th", "vi", "zh"
 ]
 
