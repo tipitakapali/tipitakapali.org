@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng Khảo Đính & Đóng Góp Thuật Ngữ — Nibbānagāminī Paṭipadā</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Gentium+Plus:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg-primary: #fcfbf7;
+            --bg-secondary: #f4efe4;
+            --bg-card: #ffffff;
+            --bg-card-hover: #faf7f0;
+            --border-color: #e2d7c3;
+            --text-primary: #2d261e;
+            --text-secondary: #5a4f41;
+            --text-muted: #8c7f70;
+            --accent-primary: #8b2500;
+            --accent-secondary: #5c1800;
+            --accent-gold: #c28822;
+            --accent-gold-light: #fef8ec;
+            --success: #2e7d32;
+            --pending: #ed6c02;
+            --font-serif: 'Crimson Pro', Georgia, serif;
+            --font-sans: 'Inter', system-ui, sans-serif;
+            --font-pali: 'Gentium Plus', serif;
+            --shadow-sm: 0 2px 6px rgba(0,0,0,0.05);
+            --shadow-md: 0 6px 18px rgba(0,0,0,0.08);
+            --radius-md: 10px;
+            --radius-lg: 14px;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #181512;
+            --bg-secondary: #221e1a;
+            --bg-card: #28231e;
+            --bg-card-hover: #322c26;
+            --border-color: #3e362d;
+            --text-primary: #e8e2d8;
+            --text-secondary: #b8ad9e;
+            --text-muted: #85796b;
+            --accent-primary: #e06d44;
+            --accent-secondary: #ff8559;
+            --accent-gold: #d49e3d;
+            --accent-gold-light: #2c2518;
+            --shadow-sm: 0 2px 6px rgba(0,0,0,0.25);
+            --shadow-md: 0 6px 18px rgba(0,0,0,0.35);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        header.dashboard-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .header-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            background: var(--accent-gold-light);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+            font-size: 0.8rem;
+            font-weight: 700;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        h1.title {
+            font-family: var(--font-serif);
+            font-size: 2.2rem;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            max-width: 700px;
+            margin: 0 auto 16px auto;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-primary);
+            color: #ffffff;
+        }
+        .btn-primary:hover { background-color: var(--accent-secondary); }
+
+        .btn-outline {
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        .btn-outline:hover {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stat-num {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            font-family: var(--font-serif);
+        }
+
+        .stat-label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        /* Filter Controls */
+        .filter-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 160px;
+            flex: 1;
+        }
+
+        .filter-group label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        select, input[type="text"] {
+            padding: 9px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: var(--accent-gold);
+        }
+
+        /* Submission List */
+        .submissions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .sub-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 22px 24px;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s;
+        }
+
+        .sub-card:hover {
+            border-color: var(--accent-gold);
+        }
+
+        .sub-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sub-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .badge-book { background: var(--bg-secondary); color: var(--accent-primary); border: 1px solid var(--border-color); }
+        .badge-lang { background: #e3f2fd; color: #1565c0; }
+        .badge-type { background: #f3e5f5; color: #7b1fa2; }
+        .badge-pending { background: #fff3e0; color: #e65100; }
+        .badge-reviewed { background: #e8f5e9; color: #2e7d32; }
+
+        .sub-term-row {
+            margin-bottom: 12px;
+        }
+
+        .sub-term-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .sub-term-box {
+            font-family: var(--font-pali);
+            font-size: 1.15rem;
+            color: var(--accent-primary);
+            background: var(--bg-secondary);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border-left: 4px solid var(--accent-gold);
+            word-break: break-word;
+        }
+
+        .sub-suggestion-box {
+            background: var(--accent-gold-light);
+            padding: 10px 14px;
+            border-radius: 6px;
+            border-left: 4px solid var(--success);
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+
+        .sub-notes {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+
+        .sub-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .sub-submitter {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            border: 1px dashed var(--border-color);
+        }
+
+        .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 620px;
+            padding: 28px;
+            box-shadow: var(--shadow-md);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-family: var(--font-serif);
+            font-size: 1.6rem;
+            color: var(--accent-primary);
+            margin-bottom: 16px;
+        }
+
+        .form-row {
+            margin-bottom: 16px;
+        }
+
+        .form-row label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.92rem;
+            outline: none;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        textarea:focus { border-color: var(--accent-gold); }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Highlight Guide Card */
+        .highlight-guide-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid var(--accent-gold);
+            border-radius: 12px;
+            padding: 22px 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .guide-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .guide-icon {
+            font-size: 1.8rem;
+            background: var(--accent-gold-light, #fef8ec);
+            border: 1px solid var(--border-color);
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .guide-title {
+            margin: 0;
+            font-size: 1.18rem;
+            color: var(--accent-primary);
+            font-weight: 700;
+        }
+
+        .guide-desc {
+            margin: 3px 0 0 0;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .guide-steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 14px;
+        }
+
+        .guide-step-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .step-badge {
+            align-self: flex-start;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--accent-gold);
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .step-illustration {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            background: var(--bg-card);
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.88rem;
+            gap: 8px;
+        }
+
+        .highlighted-text-sample {
+            background: rgba(194, 136, 34, 0.28);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            font-family: var(--font-pali);
+        }
+
+        .btn-sample-tooltip {
+            background: var(--accent-primary);
+            color: #ffffff;
+            padding: 5px 12px;
+            border-radius: 16px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .step-detail {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        /* Google Sign-in Buttons & Badges */
+        .btn-google {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #ffffff;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            text-decoration: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .btn-google:hover {
+            background: #f8f9fa;
+            border-color: #c6c9cc;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }
+
+        .google-icon-svg {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 14px 0;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .auth-divider::before, .auth-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .auth-divider span {
+            padding: 0 10px;
+        }
+
+        .user-profile-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px 4px 5px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.84rem;
+            font-weight: 600;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--accent-gold);
+            background: var(--bg-secondary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="dashboard-header">
+        <span class="header-badge">Hệ Thống Đóng Góp & Hiệu Đính Học Thuật</span>
+        <h1 class="title">Bảng Tiếp Nhận Đóng Góp & Thuật Ngữ Đang Đọc</h1>
+        <p class="subtitle">
+            Nơi tập hợp các đóng góp, hiệu đính thuật ngữ Pāḷi, phản hồi dịch thuật và ghi chú khảo cứu của độc giả cho trọn bộ 10 tập <em>Nibbānagāminī Paṭipadā</em>.
+        </p>
+        <div class="header-actions">
+            <a href="index.html" class="btn-action btn-outline">🏠 Về Thư Viện Chính</a>
+            <button class="btn-action btn-primary" onclick="openSubmitModal()">✍️ Gửi Đóng Góp Mới</button>
+            <div id="user-profile-badge" class="user-profile-badge" style="display: none;"></div>
+            <button class="btn-action btn-outline" id="btn-reader-login" onclick="openQuickGoogleModal()" style="display:inline-flex; align-items:center; gap:6px;">
+                <span style="font-size: 1.1rem;">👤</span>
+                <span>Đăng Nhập Người Đọc</span>
+            </button>
+            <button class="btn-action btn-outline" id="btn-login-toggle" onclick="toggleAuthModal()">🛡️ Đăng Nhập Biên Tập</button>
+        </div>
+    </header>
+
+    <!-- Highlight-to-Suggest Interactive Guide Card -->
+    <div class="highlight-guide-card">
+        <div class="guide-header">
+            <span class="guide-icon">💡</span>
+            <div>
+                <h3 class="guide-title">Hướng Dẫn: Bôi Đen Chữ (Highlight) Để Gửi Đóng Góp Nhanh Khi Đang Đọc Sách</h3>
+                <p class="guide-desc">
+                    Khi đọc bất kỳ cuốn nào trong 10 tập sách <em>Nibbānagāminī Paṭipadā</em>, quý độc giả có thể gửi hiệu đính trực tiếp ngay tại dòng chữ đang đọc.
+                </p>
+            </div>
+        </div>
+        <div class="guide-steps-grid">
+            <div class="guide-step-item">
+                <div class="step-badge">Bước 1 • Chọn Văn Bản</div>
+                <div class="step-illustration">
+                    <span class="highlighted-text-sample">ānāpānassati samādhi</span>
+                    <span>👆</span>
+                </div>
+                <div class="step-detail">
+                    <strong>Bôi đen đoạn văn bản:</strong> Dùng chuột hoặc ngón tay bôi đen thuật ngữ Pāḷi hoặc câu văn cần góp ý trong sách.
+                </div>
+            </div>
+            <div class="guide-step-item">
+                <div class="step-badge">Bước 2 • Nút Xuất Hiện</div>
+                <div class="step-illustration">
+                    <span class="btn-sample-tooltip">📝 Đóng góp thuật ngữ</span>
+                </div>
+                <div class="step-detail">
+                    <strong>Bấm nút nổi trên con trỏ:</strong> Khung góp ý sẽ tự động trích dẫn nội dung đã chọn, tên sách và vị trí mục.
+                </div>
+            </div>
+            <div class="guide-step-item">
+                <div class="step-badge">Bước 3 • Tiếp Nhận &amp; Khảo Đính</div>
+                <div class="step-illustration">
+                    <span style="font-size: 1.2rem;">☸️</span> <strong>Lưu vào CSDL</strong>
+                </div>
+                <div class="step-detail">
+                    <strong>Nhập đề xuất &amp; Gửi:</strong> Đăng nhập người đọc để lưu tên/email tự động. Dữ liệu sẽ chuyển ngay vào bảng này để Ban Biên Tập xem xét.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-num" id="stat-total">0</div>
+            <div class="stat-label">Tổng Đóng Góp Tiếp Nhận</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" id="stat-pending">0</div>
+            <div class="stat-label">Đang Chờ Khảo Duyệt</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" id="stat-reviewed">0</div>
+            <div class="stat-label">Đã Xem Xét / Ghi Nhận</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num">SQLite 3</div>
+            <div class="stat-label">Cơ Sở Dữ Liệu Node.js</div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-section">
+        <div class="filter-group">
+            <label>Lọc Theo Sách</label>
+            <select id="filter-book" onchange="loadSubmissions()">
+                <option value="">Tất Cả Sách (1 – 10)</option>
+                <option value="book_01">Sách 01: Định Học (Ka)</option>
+                <option value="book_02">Sách 02: Định Học (Kha)</option>
+                <option value="book_03">Sách 03: Đề Mục Sắc</option>
+                <option value="book_04">Sách 04: Đề Mục Danh</option>
+                <option value="book_05">Sách 05: Duyên Khởi (Ka)</option>
+                <option value="book_06">Sách 06: Duyên Khởi (Kha)</option>
+                <option value="book_07">Sách 07: Duyên Hệ Paṭṭhāna</option>
+                <option value="book_08">Sách 08: Tướng-Vị-Hiện-Nhân</option>
+                <option value="book_09">Sách 09: Thiền Tuệ & Niết-Bàn</option>
+                <option value="book_10">Sách 10: Tóm Lược Toàn Bộ</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Ngôn Ngữ</label>
+            <select id="filter-lang" onchange="loadSubmissions()">
+                <option value="">Tất Cả Ngôn Ngữ</option>
+                <option value="vi">🇻🇳 Tiếng Việt</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="si">🇱🇰 සිංහල</option>
+                <option value="th">🇹🇭 ภาษาไทย</option>
+                <option value="km">🇰🇭 ភាសាខ្មែរ</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Trạng Thái</label>
+            <select id="filter-status" onchange="loadSubmissions()">
+                <option value="">Tất Cả</option>
+                <option value="pending">⏳ Đang Chờ</option>
+                <option value="reviewed">✅ Đã Xem Xét</option>
+            </select>
+        </div>
+        <div class="filter-group" style="flex: 2;">
+            <label>Tìm Kiếm Thuật Ngữ / Nội Dung</label>
+            <input type="text" id="filter-q" placeholder="Nhập từ khóa tìm kiếm..." oninput="debounceSearch()">
+        </div>
+    </div>
+
+    <!-- Submissions List -->
+    <div class="submissions-list" id="submissions-container">
+        <!-- Loaded via JS -->
+    </div>
+</div>
+
+<!-- Modal: Gửi Đóng Góp Mới -->
+<div class="modal-overlay" id="modal-submit">
+    <div class="modal-box">
+        <h2 class="modal-title">Gửi Đóng Góp Thuật Ngữ / Đoạn Đang Đọc</h2>
+        <form id="form-submission" onsubmit="handleFormSubmit(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-row">
+                    <label>Tác Phẩm / Sách</label>
+                    <select id="form-book" required>
+                        <option value="book_01">Sách 01: Định Học (Ka)</option>
+                        <option value="book_02">Sách 02: Định Học (Kha)</option>
+                        <option value="book_03">Sách 03: Đề Mục Sắc</option>
+                        <option value="book_04">Sách 04: Đề Mục Danh</option>
+                        <option value="book_05">Sách 05: Duyên Khởi (Ka)</option>
+                        <option value="book_06">Sách 06: Duyên Khởi (Kha)</option>
+                        <option value="book_07">Sách 07: Duyên Hệ Paṭṭhāna</option>
+                        <option value="book_08">Sách 08: Tướng-Vị-Hiện-Nhân</option>
+                        <option value="book_09">Sách 09: Thiền Tuệ & Niết-Bàn</option>
+                        <option value="book_10">Sách 10: Tóm Lược Toàn Bộ</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>Ngôn Ngữ Đang Đọc</label>
+                    <select id="form-lang">
+                        <option value="vi">Tiếng Việt</option>
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="zh">中文</option>
+                        <option value="si">සිංහල</option>
+                        <option value="th">ภาษาไทย</option>
+                        <option value="km">ភាសាខ្មែរ</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-row">
+                    <label>Số Trang In (Nếu có)</label>
+                    <input type="text" id="form-page" placeholder="VD: P. 45 hoặc Tr. 45">
+                </div>
+                <div class="form-row">
+                    <label>Loại Góp Ý</label>
+                    <select id="form-type">
+                        <option value="term_correction">Hiệu đính thuật ngữ Pāḷi</option>
+                        <option value="excerpt_feedback">Góp ý đoạn văn / bản dịch</option>
+                        <option value="spelling">Báo lỗi chính tả / hiển thị</option>
+                        <option value="scholarly_note">Ghi chú đối chiếu chú giải</option>
+                        <option value="other">Khác</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>Thuật Ngữ Hoặc Đoạn Trích Đang Đọc (*)</label>
+                <textarea id="form-term" required placeholder="Dán hoặc nhập thuật ngữ, câu văn hoặc đoạn trích cần góp ý..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Bản Dịch / Thuật Ngữ Đề Xuất (Tùy chọn)</label>
+                <textarea id="form-suggested" placeholder="Nhập bản dịch chuẩn hơn hoặc thuật ngữ đề xuất thay thế..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Ghi Chú / Nguồn Đối Chiếu</label>
+                <textarea id="form-notes" placeholder="Giải thích lý do, trích dẫn Tam Tạng Pāḷi, Chú giải Aṭṭhakathā hoặc từ điển..."></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-row">
+                    <label>Họ Tên / Pháp Danh</label>
+                    <input type="text" id="form-name" placeholder="VD: Cư sĩ Phúc Tuệ">
+                </div>
+                <div class="form-row">
+                    <label>Email Liên Hệ (Tùy chọn)</label>
+                    <input type="text" id="form-email" placeholder="email@example.com">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-action btn-outline" onclick="closeSubmitModal()">Hủy Bỏ</button>
+                <button type="submit" class="btn-action btn-primary" id="btn-submit-action">Gửi Đóng Góp Ngay</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Chỉnh Sửa Đóng Góp (Ban Biên Tập) -->
+<div class="modal-overlay" id="modal-edit-submission">
+    <div class="modal-box" style="max-width: 650px;">
+        <h2 class="modal-title" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>✏️ Chỉnh Sửa Đóng Góp <span id="edit-modal-title-id" style="color: var(--accent); font-size: 1.1rem;"></span></span>
+            <button type="button" onclick="closeEditModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </h2>
+        <form id="form-edit-submission" onsubmit="handleEditFormSubmit(event)">
+            <input type="hidden" id="edit-sub-id">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-row">
+                    <label>Tác Phẩm / Sách</label>
+                    <select id="edit-sub-book" required>
+                        <option value="book_01">Sách 01: Định Học (Ka)</option>
+                        <option value="book_02">Sách 02: Định Học (Kha)</option>
+                        <option value="book_03">Sách 03: Đề Mục Sắc</option>
+                        <option value="book_04">Sách 04: Đề Mục Danh</option>
+                        <option value="book_05">Sách 05: Duyên Khởi (Ka)</option>
+                        <option value="book_06">Sách 06: Duyên Khởi (Kha)</option>
+                        <option value="book_07">Sách 07: Duyên Hệ Paṭṭhāna</option>
+                        <option value="book_08">Sách 08: Tướng-Vị-Hiện-Nhân</option>
+                        <option value="book_09">Sách 09: Thiền Tuệ & Niết-Bàn</option>
+                        <option value="book_10">Sách 10: Tóm Lược Toàn Bộ</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>Ngôn Ngữ</label>
+                    <select id="edit-sub-lang">
+                        <option value="vi">Tiếng Việt</option>
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="zh">中文</option>
+                        <option value="si">සිංහල</option>
+                        <option value="th">ภาษาไทย</option>
+                        <option value="km">ភាសាខ្មែរ</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-row">
+                    <label>Số Trang In</label>
+                    <input type="text" id="edit-sub-page" placeholder="VD: P. 45 hoặc Tr. 45">
+                </div>
+                <div class="form-row">
+                    <label>Loại Góp Ý</label>
+                    <select id="edit-sub-type">
+                        <option value="term_correction">Hiệu đính thuật ngữ Pāḷi</option>
+                        <option value="excerpt_feedback">Góp ý đoạn văn / bản dịch</option>
+                        <option value="spelling">Báo lỗi chính tả / hiển thị</option>
+                        <option value="scholarly_note">Ghi chú đối chiếu chú giải</option>
+                        <option value="other">Khác</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>Thuật Ngữ Hoặc Đoạn Trích (*)</label>
+                <textarea id="edit-sub-term" required rows="3" placeholder="Thuật ngữ hoặc đoạn trích..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Bản Dịch / Thuật Ngữ Đề Xuất</label>
+                <textarea id="edit-sub-suggested" rows="3" placeholder="Bản dịch hoặc thuật ngữ đề xuất..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Ghi Chú Của Độc Giả</label>
+                <textarea id="edit-sub-notes" rows="2" placeholder="Ghi chú đối chiếu..."></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 14px;">
+                <div class="form-row" style="margin-bottom: 0;">
+                    <label style="color: var(--accent); font-weight: 600;">Trạng Thái Duyệt</label>
+                    <select id="edit-sub-status" style="font-weight: 600;">
+                        <option value="pending">⏳ Chờ Duyệt</option>
+                        <option value="approved">✓ Đã Chấp Nhận</option>
+                        <option value="reviewed">👁️ Đã Xem Xét</option>
+                        <option value="rejected">✗ Đã Từ Chối</option>
+                    </select>
+                </div>
+                <div class="form-row" style="margin-bottom: 0;">
+                    <label style="color: var(--accent); font-weight: 600;">Ghi Chú Ban Biên Tập</label>
+                    <input type="text" id="edit-sub-review-note" placeholder="Ghi chú của biên tập viên...">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-action btn-outline" onclick="closeEditModal()">Hủy</button>
+                <button type="submit" class="btn-action btn-primary" id="btn-save-edit">💾 Lưu Thay Đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reader Login Modal -->
+<div class="modal-overlay" id="quick-google-modal">
+    <div class="modal-box" style="max-width: 440px;">
+        <h2 class="modal-title" style="font-size: 1.4rem; display: flex; align-items: center; gap: 8px;">
+            <span>👤</span> Đăng Nhập Người Đọc
+        </h2>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5;">
+            Quý độc giả vui lòng nhập Email và Họ Tên/Pháp Danh để các đề xuất khảo đính và đóng góp thuật ngữ được ghi nhận tự động.
+        </p>
+        <div id="qg-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px;"></div>
+        <form onsubmit="handleQuickGoogleLogin(event)">
+            <div class="form-row">
+                <label for="qg-email">Địa Chỉ Email (*)</label>
+                <input type="email" id="qg-email" required placeholder="name@example.com" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+            </div>
+            <div class="form-row">
+                <label for="qg-name">Họ Tên / Pháp Danh (Tùy chọn)</label>
+                <input type="text" id="qg-name" placeholder="VD: Cư Sĩ Chánh Niệm" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+            </div>
+            <div class="modal-footer" style="margin-top: 24px;">
+                <button type="button" class="btn-action btn-outline" onclick="closeQuickGoogleModal()">Đóng</button>
+                <button type="submit" class="btn-action btn-primary" id="btn-qg-submit">Đăng Nhập Người Đọc</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Editor Login Modal -->
+<div class="modal-overlay" id="auth-modal">
+    <div class="modal-box" style="max-width: 440px;">
+        <h2 class="modal-title" style="font-size: 1.4rem; display: flex; align-items: center; gap: 8px;">
+            <span>🛡️</span> Đăng Nhập Ban Biên Tập
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
+            Dành riêng cho Ban Biên Tập (Editor) để duyệt và phân loại đóng góp thuật ngữ Tam Tạng. Tài khoản mặc định: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--accent-primary);">dhamma</code>
+        </p>
+        <div id="auth-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px;"></div>
+        <form onsubmit="handleAuthLogin(event)">
+            <div class="form-row">
+                <label for="auth-username">Tên Đăng Nhập (*)</label>
+                <input type="text" id="auth-username" required placeholder="dhamma" autocomplete="username" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+            </div>
+            <div class="form-row">
+                <label for="auth-password">Mật Khẩu (*)</label>
+                <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+            </div>
+            <div class="modal-footer" style="margin-top: 24px;">
+                <button type="button" class="btn-action btn-outline" onclick="closeAuthModal()">Đóng</button>
+                <button type="submit" class="btn-action btn-primary" id="btn-auth-submit">Đăng Nhập Biên Tập</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '8400')
+        ? (window.location.port === '8400' ? '' : `http://${window.location.hostname}:8400`)
+        : (window.location.hostname === 'api.tipitakapali.org' ? '' : 'https://api.tipitakapali.org');
+
+    let authToken = localStorage.getItem('nibbanagamini_editor_token') || null;
+    let searchTimeout = null;
+    let currentSubmissions = [];
+
+    async function loadStats() {
+        try {
+            const res = await fetch(`${API_BASE}/api/stats`);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('stat-total').textContent = data.total || 0;
+                let pending = 0, reviewed = 0;
+                (data.by_status || []).forEach(s => {
+                    if (s.status === 'pending') pending = s.count;
+                    if (s.status === 'reviewed') reviewed = s.count;
+                });
+                document.getElementById('stat-pending').textContent = pending;
+                document.getElementById('stat-reviewed').textContent = reviewed;
+            }
+        } catch (e) {
+            console.warn('API connection:', e.message);
+        }
+    }
+
+    async function loadSubmissions() {
+        const book = document.getElementById('filter-book').value;
+        const lang = document.getElementById('filter-lang').value;
+        const status = document.getElementById('filter-status').value;
+        const q = document.getElementById('filter-q').value;
+
+        const params = new URLSearchParams();
+        if (book) params.set('book_id', book);
+        if (lang) params.set('lang', lang);
+        if (status) params.set('status', status);
+        if (q) params.set('q', q);
+
+        try {
+            const res = await fetch(`${API_BASE}/api/submissions?${params.toString()}`);
+            const data = await res.json();
+            renderSubmissions(data.submissions || []);
+        } catch (e) {
+            document.getElementById('submissions-container').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">⚠️</div>
+                    <h3>Không thể kết nối đến máy chủ đóng góp SQLite</h3>
+                    <p>Hãy đảm bảo <code>server_reader_submissions.js</code> đang chạy trên cổng 3000 hoặc đã kết nối với <code>https://api.tipitakapali.org</code>.</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderSubmissions(items) {
+        const container = document.getElementById('submissions-container');
+        if (!items || items.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>Chưa có đóng góp nào phù hợp với bộ lọc</h3>
+                    <p>Quý đạo hữu có thể bấm vào nút "Gửi Đóng Góp Mới" để gửi ý kiến hiệu đính.</p>
+                </div>
+            `;
+            return;
+        }
+
+        currentSubmissions = items;
+
+        const bookNames = {
+            'book_01': 'Sách 01 (Định Ka)', 'book_02': 'Sách 02 (Định Kha)',
+            'book_03': 'Sách 03 (Sắc)', 'book_04': 'Sách 04 (Danh)',
+            'book_05': 'Sách 05 (Duyên Khởi Ka)', 'book_06': 'Sách 06 (Duyên Khởi Kha)',
+            'book_07': 'Sách 07 (Paṭṭhāna)', 'book_08': 'Sách 08 (Tướng-Vị-Hiện-Nhân)',
+            'book_09': 'Sách 09 (Minh Sát & Niết-Bàn)', 'book_10': 'Sách 10 (Toát Yếu)'
+        };
+
+        const typeLabels = {
+            'term_correction': 'Hiệu đính thuật ngữ',
+            'excerpt_feedback': 'Góp ý đoạn dịch',
+            'spelling': 'Lỗi chính tả',
+            'scholarly_note': 'Ghi chú học thuật',
+            'other': 'Khác'
+        };
+
+        const html = items.map(sub => `
+            <div class="sub-card">
+                <div class="sub-header">
+                    <div class="sub-badges">
+                        <span class="badge badge-book">📚 ${bookNames[sub.book_id] || sub.book_id}</span>
+                        ${sub.page_number ? `<span class="badge badge-book">📄 ${escapeHtml(sub.page_number)}</span>` : ''}
+                        <span class="badge badge-lang">🌐 ${(sub.lang || 'vi').toUpperCase()}</span>
+                        <span class="badge badge-type">🏷️ ${typeLabels[sub.suggestion_type] || sub.suggestion_type}</span>
+                        <span class="badge ${sub.status === 'reviewed' ? 'badge-reviewed' : 'badge-pending'}">
+                            ${sub.status === 'reviewed' ? '✓ Đã Xem Xét' : '⏳ Chờ Duyệt'}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted);">
+                        ${new Date(sub.created_at).toLocaleDateString('vi-VN')}
+                    </div>
+                </div>
+
+                <div class="sub-term-row">
+                    <div class="sub-term-title">Thuật ngữ / Đoạn văn nguyên tác hoặc bản dịch:</div>
+                    <div class="sub-term-box">${escapeHtml(sub.term_or_excerpt)}</div>
+                </div>
+
+                ${sub.suggested_text ? `
+                    <div class="sub-term-title" style="color: var(--success);">Đề xuất thay thế / hiệu đính:</div>
+                    <div class="sub-suggestion-box"><strong>💡 Đề xuất:</strong> ${escapeHtml(sub.suggested_text)}</div>
+                ` : ''}
+
+                ${sub.notes ? `
+                    <div class="sub-notes"><strong>Ghi chú:</strong> ${escapeHtml(sub.notes)}</div>
+                ` : ''}
+
+                <div class="sub-footer">
+                    <div>
+                        Đóng góp bởi: <span class="sub-submitter">${escapeHtml(sub.submitter_name || 'Ẩn danh')}</span>
+                        ${sub.submitter_email ? `(${escapeHtml(sub.submitter_email)})` : ''}
+                    </div>
+                    ${(currentUser && (currentUser.role === 'admin' || currentUser.role === 'editor')) ? `
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                            ${sub.status === 'pending' ? `
+                                <button class="btn-action" style="background: #166534; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'approved')" title="Chấp nhận đóng góp này">
+                                    ✓ Duyệt Chấp Nhận
+                                </button>
+                                <button class="btn-action" style="background: #991b1b; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'rejected')" title="Từ chối đóng góp này">
+                                    ✗ Từ Chối
+                                </button>
+                                <button class="btn-action btn-outline" style="padding: 4px 10px; font-size: 0.75rem;" onclick="updateStatus(${sub.id}, 'reviewed')" title="Đánh dấu đã xem xét">
+                                    👁️ Đã Xem
+                                </button>
+                            ` : `
+                                <button class="btn-action btn-outline" style="padding: 3px 8px; font-size: 0.72rem;" onclick="updateStatus(${sub.id}, 'pending')" title="Chuyển lại về trạng thái Chờ duyệt">
+                                    ↺ Đưa về Chờ Duyệt
+                                </button>
+                            `}
+                            <button class="btn-action btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: var(--accent); color: var(--accent);" onclick="openEditModal(${sub.id})" title="Chỉnh sửa nội dung đóng góp này">
+                                ✏️ Sửa
+                            </button>
+                            <button class="btn-action" style="background: #dc2626; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="deleteSubmission(${sub.id})" title="Xoá vĩnh viễn đóng góp này">
+                                🗑️ Xoá
+                            </button>
+                        </div>
+                    ` : `
+                        <div style="font-size: 0.76rem; color: var(--text-muted); font-style: italic;">
+                            ${currentUser ? '🔒 Quyền duyệt chỉ dành cho Ban Biên Tập (Editor)' : '🔒 Đăng nhập Biên Tập để duyệt'}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(loadSubmissions, 300);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function openSubmitModal() {
+        const modal = document.getElementById('modal-submit');
+        if (modal) modal.classList.add('active');
+    }
+
+    function closeSubmitModal() {
+        const modal = document.getElementById('modal-submit');
+        if (modal) modal.classList.remove('active');
+    }
+
+    async function handleNewSubmit(e) {
+        e.preventDefault();
+        const book_id = document.getElementById('form-book').value;
+        const lang = document.getElementById('form-lang').value;
+        const page_number = document.getElementById('form-page').value.trim();
+        const suggestion_type = document.getElementById('form-type').value;
+        const term_or_excerpt = document.getElementById('form-term').value.trim();
+        const suggested_text = document.getElementById('form-suggested').value.trim();
+        const notes = document.getElementById('form-notes').value.trim();
+        const submitter_name = document.getElementById('form-name').value.trim() || (currentUser ? currentUser.display_name : '');
+        const submitter_email = document.getElementById('form-email').value.trim() || (currentUser ? currentUser.email : '');
+
+        if (!term_or_excerpt) {
+            alert('Vui lòng nhập thuật ngữ hoặc đoạn trích cần góp ý');
+            return;
+        }
+
+        const btn = document.getElementById('btn-submit-action');
+        btn.disabled = true;
+        btn.textContent = 'Đang gửi...';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/submissions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    book_id, lang, page_number, suggestion_type,
+                    term_or_excerpt, suggested_text, notes,
+                    submitter_name, submitter_email
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert('✓ Đã gửi đóng góp thành công! Tri ân công đức của quý vị.');
+                closeSubmitModal();
+                document.getElementById('form-submit-new').reset();
+                loadStats();
+                loadSubmissions();
+            } else {
+                alert('Lỗi: ' + (data.error || 'Không thể lưu đóng góp'));
+            }
+        } catch (err) {
+            alert('Lỗi kết nối máy chủ: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Gửi Đóng Góp Ngay';
+        }
+    }
+
+    async function updateStatus(id, newStatus) {
+        if (!authToken) {
+            alert('Quý vị cần đăng nhập Ban Biên Tập (Editor) để duyệt thuật ngữ.');
+            openAuthModal();
+            return;
+        }
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
+            alert('Quyền bị từ chối: Tài khoản người đọc (Reader) không được quyền duyệt thuật ngữ. Chỉ có Ban Biên Tập (Editor) mới có quyền duyệt.');
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE}/api/submissions/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                loadStats();
+                loadSubmissions();
+            } else {
+                alert('Lỗi: ' + (data.error || 'Không thể cập nhật trạng thái'));
+            }
+        } catch (e) {
+            alert('Lỗi cập nhật: ' + e.message);
+        }
+    }
+
+    function openEditModal(id) {
+        if (!authToken) {
+            alert('Quý vị cần đăng nhập Ban Biên Tập (Editor) để chỉnh sửa.');
+            openAuthModal();
+            return;
+        }
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
+            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền chỉnh sửa đóng góp.');
+            return;
+        }
+        const item = currentSubmissions.find(s => s.id === id);
+        if (!item) {
+            alert('Không tìm thấy thông tin đóng góp #' + id);
+            return;
+        }
+
+        document.getElementById('edit-modal-title-id').textContent = '#' + item.id;
+        document.getElementById('edit-sub-id').value = item.id;
+        document.getElementById('edit-sub-book').value = item.book_id || 'book_01';
+        document.getElementById('edit-sub-lang').value = item.lang || 'vi';
+        document.getElementById('edit-sub-page').value = item.page_number || '';
+        document.getElementById('edit-sub-type').value = item.suggestion_type || 'term_correction';
+        document.getElementById('edit-sub-term').value = item.term_or_excerpt || '';
+        document.getElementById('edit-sub-suggested').value = item.suggested_text || '';
+        document.getElementById('edit-sub-notes').value = item.notes || '';
+        document.getElementById('edit-sub-status').value = item.status || 'pending';
+        document.getElementById('edit-sub-review-note').value = item.review_note || '';
+
+        const modal = document.getElementById('modal-edit-submission');
+        if (modal) modal.classList.add('active');
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById('modal-edit-submission');
+        if (modal) modal.classList.remove('active');
+    }
+
+    async function handleEditFormSubmit(e) {
+        e.preventDefault();
+        if (!authToken) {
+            alert('Quý vị cần đăng nhập Ban Biên Tập (Editor) để thực hiện.');
+            openAuthModal();
+            return;
+        }
+        const id = document.getElementById('edit-sub-id').value;
+        const payload = {
+            book_id: document.getElementById('edit-sub-book').value,
+            lang: document.getElementById('edit-sub-lang').value,
+            page_number: document.getElementById('edit-sub-page').value.trim(),
+            suggestion_type: document.getElementById('edit-sub-type').value,
+            term_or_excerpt: document.getElementById('edit-sub-term').value.trim(),
+            suggested_text: document.getElementById('edit-sub-suggested').value.trim(),
+            notes: document.getElementById('edit-sub-notes').value.trim(),
+            status: document.getElementById('edit-sub-status').value,
+            review_note: document.getElementById('edit-sub-review-note').value.trim()
+        };
+
+        const btn = document.getElementById('btn-save-edit');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Đang lưu...';
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/api/submissions/${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                closeEditModal();
+                loadStats();
+                loadSubmissions();
+            } else {
+                alert('Lỗi cập nhật: ' + (data.error || 'Không thể lưu thay đổi'));
+            }
+        } catch (err) {
+            alert('Lỗi kết nối máy chủ: ' + err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '💾 Lưu Thay Đổi';
+            }
+        }
+    }
+
+    async function deleteSubmission(id) {
+        if (!authToken) {
+            alert('Quý vị cần đăng nhập Ban Biên Tập (Editor) để xoá.');
+            openAuthModal();
+            return;
+        }
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
+            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền xoá đóng góp.');
+            return;
+        }
+        if (!confirm(`Quý vị có chắc chắn muốn xoá vĩnh viễn đóng góp #${id} không? Hành động này không thể hoàn tác.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/api/submissions/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                loadStats();
+                loadSubmissions();
+            } else {
+                alert('Lỗi khi xoá: ' + (data.error || 'Không thể xoá đóng góp'));
+            }
+        } catch (err) {
+            alert('Lỗi kết nối máy chủ: ' + err.message);
+        }
+    }
+
+    let currentUser = null;
+
+    function openAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) modal.classList.add('active');
+        const alertBox = document.getElementById('auth-alert');
+        if (alertBox) {
+            alertBox.style.display = 'none';
+            alertBox.textContent = '';
+        }
+    }
+
+    function closeAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    function openQuickGoogleModal() {
+        const modal = document.getElementById('quick-google-modal');
+        if (modal) modal.classList.add('active');
+        const alertBox = document.getElementById('qg-alert');
+        if (alertBox) {
+            alertBox.style.display = 'none';
+            alertBox.textContent = '';
+        }
+    }
+
+    function closeQuickGoogleModal() {
+        const modal = document.getElementById('quick-google-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    function toggleAuthModal() {
+        if (authToken) {
+            if (confirm('Quý vị đang đăng nhập (' + (currentUser?.display_name || 'Người dùng') + '). Quý vị có muốn đăng xuất không?')) {
+                logoutUser();
+            }
+            return;
+        }
+        openAuthModal();
+    }
+
+    function logoutUser() {
+        localStorage.removeItem('nibbanagamini_editor_token');
+        localStorage.removeItem('nibbanagamini_user_info');
+        authToken = null;
+        currentUser = null;
+        updateAuthUI();
+        loadSubmissions();
+    }
+
+    function updateAuthUI() {
+        const badge = document.getElementById('user-profile-badge');
+        const readerBtn = document.getElementById('btn-reader-login') || document.getElementById('btn-google-login');
+        const loginToggleBtn = document.getElementById('btn-login-toggle');
+
+        if (currentUser) {
+            if (badge) {
+                const avatar = currentUser.avatar_url 
+                    ? `<img src="${currentUser.avatar_url}" class="user-avatar" alt="Avatar" referrerpolicy="no-referrer">` 
+                    : `<span class="user-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:bold;background:var(--accent-primary);color:#fff;">${currentUser.display_name.charAt(0).toUpperCase()}</span>`;
+                const isEditor = currentUser.role === 'admin' || currentUser.role === 'editor';
+                const roleLabel = isEditor ? '🛡️ Ban Biên Tập' : '👤 Người Đọc';
+                badge.innerHTML = `${avatar} <span>${currentUser.display_name}</span> <small style="color:var(--text-muted);font-size:0.75rem;">(${roleLabel})</small>`;
+                badge.style.display = 'inline-flex';
+            }
+            if (readerBtn) readerBtn.style.display = 'none';
+            if (loginToggleBtn) loginToggleBtn.textContent = '🚪 Đăng Xuất';
+        } else {
+            if (badge) badge.style.display = 'none';
+            if (readerBtn) readerBtn.style.display = 'inline-flex';
+            if (loginToggleBtn) loginToggleBtn.textContent = '🛡️ Đăng Nhập Biên Tập';
+        }
+    }
+
+    async function handleAuthLogin(e) {
+        e.preventDefault();
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const alertBox = document.getElementById('auth-alert');
+        const submitBtn = document.getElementById('btn-auth-submit');
+
+        if (!username || !password) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Đang xử lý...';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                authToken = data.token;
+                currentUser = data.user;
+                localStorage.setItem('nibbanagamini_editor_token', data.token);
+                localStorage.setItem('nibbanagamini_user_info', JSON.stringify(data.user));
+                updateAuthUI();
+                closeAuthModal();
+                loadSubmissions();
+            } else {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.color = '#991b1b';
+                alertBox.style.border = '1px solid #fecaca';
+                alertBox.textContent = '⚠️ ' + (data.error || 'Sai tài khoản hoặc mật khẩu');
+            }
+        } catch (err) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.color = '#991b1b';
+            alertBox.style.border = '1px solid #fecaca';
+            alertBox.textContent = '⚠️ Lỗi kết nối máy chủ: ' + err.message;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Đăng Nhập';
+        }
+    }
+
+    function openReaderModal() {
+        openQuickGoogleModal();
+    }
+
+    async function triggerGoogleSignIn() {
+        openReaderModal();
+    }
+
+    async function handleGoogleCredentialResponse(response) {
+        if (!response || !response.credential) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/reader`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential: response.credential })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                authToken = data.token;
+                currentUser = data.user;
+                localStorage.setItem('nibbanagamini_editor_token', data.token);
+                localStorage.setItem('nibbanagamini_user_info', JSON.stringify(data.user));
+                updateAuthUI();
+                closeAuthModal();
+                closeQuickGoogleModal();
+                loadSubmissions();
+                alert(`✓ Chào mừng ${data.user.display_name}! Quý vị đã đăng nhập thành công.`);
+            } else {
+                alert('Lỗi đăng nhập: ' + (data.error || 'Không thể xác thực.'));
+            }
+        } catch (e) {
+            alert('Lỗi kết nối máy chủ xác thực: ' + e.message);
+        }
+    }
+
+    async function handleQuickGoogleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('qg-email').value.trim();
+        const name = document.getElementById('qg-name').value.trim();
+        const alertBox = document.getElementById('qg-alert');
+        const submitBtn = document.getElementById('btn-qg-submit');
+
+        if (!email) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Đang đăng nhập...';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/reader`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                authToken = data.token;
+                currentUser = data.user;
+                localStorage.setItem('nibbanagamini_editor_token', data.token);
+                localStorage.setItem('nibbanagamini_user_info', JSON.stringify(data.user));
+                updateAuthUI();
+                closeQuickGoogleModal();
+                loadSubmissions();
+                alert(`✓ Đăng nhập người đọc thành công: ${data.user.display_name} (${data.user.email})`);
+            } else {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.color = '#991b1b';
+                alertBox.style.border = '1px solid #fecaca';
+                alertBox.textContent = '⚠️ ' + (data.error || 'Không thể xác thực');
+            }
+        } catch (err) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.color = '#991b1b';
+            alertBox.style.border = '1px solid #fecaca';
+            alertBox.textContent = '⚠️ Lỗi kết nối: ' + err.message;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Đăng Nhập Người Đọc';
+        }
+    }
+
+    async function initGIS() {
+        try {
+            const res = await fetch(`${API_BASE}/api/auth/config`);
+            if (res.ok) {
+                const cfg = await res.json();
+                const clientId = cfg.google_client_id;
+                if (typeof google !== 'undefined' && google.accounts && google.accounts.id && clientId) {
+                    google.accounts.id.initialize({
+                        client_id: clientId,
+                        callback: handleGoogleCredentialResponse,
+                        auto_select: false
+                    });
+                    const container = document.getElementById('g_id_onload_container');
+                    if (container) {
+                        google.accounts.id.renderButton(container, {
+                            theme: 'outline',
+                            size: 'large',
+                            width: 320,
+                            text: 'signin_with',
+                            locale: 'vi'
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('GIS config load error:', e.message);
+        }
+    }
+
+    // Auto load current user from storage or me endpoint
+    async function checkAuthSession() {
+        const savedUser = localStorage.getItem('nibbanagamini_user_info');
+        if (savedUser) {
+            try { currentUser = JSON.parse(savedUser); } catch(e){}
+        }
+        if (authToken) {
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUser = data.user;
+                    localStorage.setItem('nibbanagamini_user_info', JSON.stringify(data.user));
+                } else {
+                    logoutUser();
+                }
+            } catch (e) {
+                // Keep offline session
+            }
+        }
+        updateAuthUI();
+    }
+
+    // Init
+    checkAuthSession();
+    loadStats();
+    loadSubmissions();
+    window.addEventListener('load', initGIS);
+</script>
+</body>
+</html>

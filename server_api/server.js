@@ -8,6 +8,7 @@ const cors = require('@fastify/cors');
 const compress = require('@fastify/compress');
 const { initAiController, registerAiRoutes } = require('./aiController');
 const { initLogEngine, registerLogRoutes, logAsync, closeLogDb } = require('./logEngine');
+const { initReaderSubmissionsEngine, registerReaderSubmissionsRoutes, closeReaderSubmissionsDb } = require('./readerSubmissionsEngine');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
@@ -305,7 +306,8 @@ async function main() {
     // POST is required for the cross-origin Ani AI chat endpoint (/api/ai/chat,
     // /api/ai/search_batch, /api/ai/tool-call) called from the static site at
     // https://tipitakapali.org (see getApiBase in services/api.js).
-    methods: ['GET', 'HEAD', 'OPTIONS', 'POST'],
+    // PATCH is required for submissions approval workflow from editorial dashboard.
+    methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PATCH', 'PUT', 'DELETE'],
   });
 
   if (compress) {
@@ -324,6 +326,10 @@ async function main() {
   // static assets so the log only contains real visitors.
   initLogEngine();
   registerLogRoutes(fastify);
+
+  // Reader contributions & terminology submissions engine
+  initReaderSubmissionsEngine();
+  registerReaderSubmissionsRoutes(fastify);
 
   fastify.addHook('onResponse', (req, reply) => {
     const url = req.url || '';
@@ -1595,6 +1601,7 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
         dictEngine.closeDatabases();
       }
       closeLogDb();
+      closeReaderSubmissionsDb();
     } catch (e) {}
     process.exit(0);
   };
