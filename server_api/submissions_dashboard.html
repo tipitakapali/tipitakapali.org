@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cổng Khảo Đính & Đóng Góp Thuật Ngữ — Nibbānagāminī Paṭipadā</title>
+    <title>Cổng Khảo Đính & Sửa Thuật Ngữ — Nibbānagāminī Paṭipadā</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Gentium+Plus:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
@@ -593,14 +593,14 @@
 
 <div class="container">
     <header class="dashboard-header">
-        <span class="header-badge">Hệ Thống Đóng Góp & Hiệu Đính Học Thuật</span>
-        <h1 class="title">Bảng Tiếp Nhận Đóng Góp & Thuật Ngữ Đang Đọc</h1>
+        <span class="header-badge">Hệ Thống Khảo Đính & Sửa Thuật Ngữ Học Thuật</span>
+        <h1 class="title">Bảng Tiếp Nhận Sửa Thuật Ngữ & Hiệu Đính Bản Dịch</h1>
         <p class="subtitle">
-            Nơi tập hợp các đóng góp, hiệu đính thuật ngữ Pāḷi, phản hồi dịch thuật và ghi chú khảo cứu của độc giả cho trọn bộ 10 tập <em>Nibbānagāminī Paṭipadā</em>.
+            Nơi tập hợp các đề xuất sửa đổi, hiệu đính thuật ngữ Pāḷi, phản hồi dịch thuật và ghi chú khảo cứu của độc giả cho trọn bộ 10 tập <em>Nibbānagāminī Paṭipadā</em>.
         </p>
         <div class="header-actions">
             <a href="index.html" class="btn-action btn-outline">🏠 Về Thư Viện Chính</a>
-            <button class="btn-action btn-primary" onclick="openSubmitModal()">✍️ Gửi Đóng Góp Mới</button>
+            <button class="btn-action btn-primary" onclick="openSubmitModal()">✍️ Gửi Đề Xuất Sửa Mới</button>
             <div id="user-profile-badge" class="user-profile-badge" style="display: none;"></div>
             <button class="btn-action btn-outline" id="btn-reader-login" onclick="openQuickGoogleModal()" style="display:inline-flex; align-items:center; gap:6px;">
                 <span style="font-size: 1.1rem;">👤</span>
@@ -615,7 +615,7 @@
         <div class="guide-header">
             <span class="guide-icon">💡</span>
             <div>
-                <h3 class="guide-title">Hướng Dẫn: Bôi Đen Chữ (Highlight) Để Gửi Đóng Góp Nhanh Khi Đang Đọc Sách</h3>
+                <h3 class="guide-title">Hướng Dẫn: Bôi Đen Chữ (Highlight) Để Gợi Ý Sửa Thuật Ngữ Nhanh Khi Đang Đọc Sách</h3>
                 <p class="guide-desc">
                     Khi đọc bất kỳ cuốn nào trong 10 tập sách <em>Nibbānagāminī Paṭipadā</em>, quý độc giả có thể gửi hiệu đính trực tiếp ngay tại dòng chữ đang đọc.
                 </p>
@@ -635,7 +635,7 @@
             <div class="guide-step-item">
                 <div class="step-badge">Bước 2 • Nút Xuất Hiện</div>
                 <div class="step-illustration">
-                    <span class="btn-sample-tooltip">📝 Đóng góp thuật ngữ</span>
+                    <span class="btn-sample-tooltip">📝 Sửa thuật ngữ</span>
                 </div>
                 <div class="step-detail">
                     <strong>Bấm nút nổi trên con trỏ:</strong> Khung góp ý sẽ tự động trích dẫn nội dung đã chọn, tên sách và vị trí mục.
@@ -657,7 +657,7 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-num" id="stat-total">0</div>
-            <div class="stat-label">Tổng Đóng Góp Tiếp Nhận</div>
+            <div class="stat-label">Tổng Đề Xuất Tiếp Nhận</div>
         </div>
         <div class="stat-card">
             <div class="stat-num" id="stat-pending">0</div>
@@ -724,10 +724,10 @@
     </div>
 </div>
 
-<!-- Modal: Gửi Đóng Góp Mới -->
+<!-- Modal: Gửi Đề Xuất Sửa Mới -->
 <div class="modal-overlay" id="modal-submit">
     <div class="modal-box">
-        <h2 class="modal-title">Gửi Đóng Góp Thuật Ngữ / Đoạn Đang Đọc</h2>
+        <h2 class="modal-title">Gửi Đề Xuất Sửa Thuật Ngữ / Đoạn Đang Đọc</h2>
         <form id="form-submission" onsubmit="handleFormSubmit(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div class="form-row">
@@ -804,17 +804,17 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn-action btn-outline" onclick="closeSubmitModal()">Hủy Bỏ</button>
-                <button type="submit" class="btn-action btn-primary" id="btn-submit-action">Gửi Đóng Góp Ngay</button>
+                <button type="submit" class="btn-action btn-primary" id="btn-submit-action">Gửi Đề Xuất Sửa Ngay</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Modal: Chỉnh Sửa Đóng Góp (Ban Biên Tập) -->
+<!-- Modal: Chỉnh Sửa Đề Xuất (Ban Biên Tập) -->
 <div class="modal-overlay" id="modal-edit-submission">
     <div class="modal-box" style="max-width: 650px;">
         <h2 class="modal-title" style="display: flex; align-items: center; justify-content: space-between;">
-            <span>✏️ Chỉnh Sửa Đóng Góp <span id="edit-modal-title-id" style="color: var(--accent); font-size: 1.1rem;"></span></span>
+            <span>✏️ Chỉnh Sửa Đề Xuất <span id="edit-modal-title-id" style="color: var(--accent); font-size: 1.1rem;"></span></span>
             <button type="button" onclick="closeEditModal()" style="background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--text-muted);">&times;</button>
         </h2>
         <form id="form-edit-submission" onsubmit="handleEditFormSubmit(event)">
@@ -912,7 +912,7 @@
             <span>👤</span> Đăng Nhập Người Đọc
         </h2>
         <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5;">
-            Quý độc giả vui lòng nhập Email và Họ Tên/Pháp Danh để các đề xuất khảo đính và đóng góp thuật ngữ được ghi nhận tự động.
+            Quý độc giả vui lòng nhập Email và Họ Tên/Pháp Danh để các đề xuất khảo đính và đề xuất sửa thuật ngữ được ghi nhận tự động.
         </p>
         <div id="qg-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px;"></div>
         <form onsubmit="handleQuickGoogleLogin(event)">
@@ -939,7 +939,7 @@
             <span>🛡️</span> Đăng Nhập Ban Biên Tập
         </h2>
         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
-            Dành riêng cho Ban Biên Tập (Editor) để duyệt và phân loại đóng góp thuật ngữ Tam Tạng. Tài khoản mặc định: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--accent-primary);">dhamma</code>
+            Dành riêng cho Ban Biên Tập (Editor) để duyệt và phân loại đề xuất sửa thuật ngữ Tam Tạng. Tài khoản mặc định: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--accent-primary);">dhamma</code>
         </p>
         <div id="auth-alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px;"></div>
         <form onsubmit="handleAuthLogin(event)">
@@ -1007,7 +1007,7 @@
             document.getElementById('submissions-container').innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">⚠️</div>
-                    <h3>Không thể kết nối đến máy chủ đóng góp SQLite</h3>
+                    <h3>Không thể kết nối đến máy chủ tiếp nhận khảo đính SQLite</h3>
                     <p>Hãy đảm bảo <code>server_reader_submissions.js</code> đang chạy trên cổng 3000 hoặc đã kết nối với <code>https://api.tipitakapali.org</code>.</p>
                 </div>
             `;
@@ -1020,8 +1020,8 @@
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">📭</div>
-                    <h3>Chưa có đóng góp nào phù hợp với bộ lọc</h3>
-                    <p>Quý đạo hữu có thể bấm vào nút "Gửi Đóng Góp Mới" để gửi ý kiến hiệu đính.</p>
+                    <h3>Chưa có đề xuất nào phù hợp với bộ lọc</h3>
+                    <p>Quý đạo hữu có thể bấm vào nút "Gửi Đề Xuất Sửa Mới" để gửi ý kiến hiệu đính.</p>
                 </div>
             `;
             return;
@@ -1078,16 +1078,16 @@
 
                 <div class="sub-footer">
                     <div>
-                        Đóng góp bởi: <span class="sub-submitter">${escapeHtml(sub.submitter_name || 'Ẩn danh')}</span>
+                        Đề xuất bởi: <span class="sub-submitter">${escapeHtml(sub.submitter_name || 'Ẩn danh')}</span>
                         ${sub.submitter_email ? `(${escapeHtml(sub.submitter_email)})` : ''}
                     </div>
                     ${(currentUser && (currentUser.role === 'admin' || currentUser.role === 'editor')) ? `
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                             ${sub.status === 'pending' ? `
-                                <button class="btn-action" style="background: #166534; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'approved')" title="Chấp nhận đóng góp này">
+                                <button class="btn-action" style="background: #166534; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'approved')" title="Chấp nhận đề xuất này">
                                     ✓ Duyệt Chấp Nhận
                                 </button>
-                                <button class="btn-action" style="background: #991b1b; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'rejected')" title="Từ chối đóng góp này">
+                                <button class="btn-action" style="background: #991b1b; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="updateStatus(${sub.id}, 'rejected')" title="Từ chối đề xuất này">
                                     ✗ Từ Chối
                                 </button>
                                 <button class="btn-action btn-outline" style="padding: 4px 10px; font-size: 0.75rem;" onclick="updateStatus(${sub.id}, 'reviewed')" title="Đánh dấu đã xem xét">
@@ -1098,10 +1098,10 @@
                                     ↺ Đưa về Chờ Duyệt
                                 </button>
                             `}
-                            <button class="btn-action btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: var(--accent); color: var(--accent);" onclick="openEditModal(${sub.id})" title="Chỉnh sửa nội dung đóng góp này">
+                            <button class="btn-action btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: var(--accent); color: var(--accent);" onclick="openEditModal(${sub.id})" title="Chỉnh sửa nội dung đề xuất này">
                                 ✏️ Sửa
                             </button>
-                            <button class="btn-action" style="background: #dc2626; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="deleteSubmission(${sub.id})" title="Xoá vĩnh viễn đóng góp này">
+                            <button class="btn-action" style="background: #dc2626; color: #fff; padding: 4px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer;" onclick="deleteSubmission(${sub.id})" title="Xoá vĩnh viễn đề xuất này">
                                 🗑️ Xoá
                             </button>
                         </div>
@@ -1176,19 +1176,19 @@
 
             const data = await res.json();
             if (res.ok && data.success) {
-                alert('✓ Đã gửi đóng góp thành công! Tri ân công đức của quý vị.');
+                alert('✓ Đã gửi đề xuất sửa thuật ngữ thành công! Tri ân công đức khảo đính của quý vị.');
                 closeSubmitModal();
                 document.getElementById('form-submit-new').reset();
                 loadStats();
                 loadSubmissions();
             } else {
-                alert('Lỗi: ' + (data.error || 'Không thể lưu đóng góp'));
+                alert('Lỗi: ' + (data.error || 'Không thể lưu đề xuất'));
             }
         } catch (err) {
             alert('Lỗi kết nối máy chủ: ' + err.message);
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Gửi Đóng Góp Ngay';
+            btn.textContent = 'Gửi Đề Xuất Sửa Ngay';
         }
     }
 
@@ -1230,12 +1230,12 @@
             return;
         }
         if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
-            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền chỉnh sửa đóng góp.');
+            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền chỉnh sửa đề xuất.');
             return;
         }
         const item = currentSubmissions.find(s => s.id === id);
         if (!item) {
-            alert('Không tìm thấy thông tin đóng góp #' + id);
+            alert('Không tìm thấy thông tin đề xuất #' + id);
             return;
         }
 
@@ -1320,10 +1320,10 @@
             return;
         }
         if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
-            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền xoá đóng góp.');
+            alert('Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor/Admin) mới có quyền xoá đề xuất.');
             return;
         }
-        if (!confirm(`Quý vị có chắc chắn muốn xoá vĩnh viễn đóng góp #${id} không? Hành động này không thể hoàn tác.`)) {
+        if (!confirm(`Quý vị có chắc chắn muốn xoá vĩnh viễn đề xuất #${id} không? Hành động này không thể hoàn tác.`)) {
             return;
         }
 
@@ -1339,7 +1339,7 @@
                 loadStats();
                 loadSubmissions();
             } else {
-                alert('Lỗi khi xoá: ' + (data.error || 'Không thể xoá đóng góp'));
+                alert('Lỗi khi xoá: ' + (data.error || 'Không thể xoá đề xuất'));
             }
         } catch (err) {
             alert('Lỗi kết nối máy chủ: ' + err.message);

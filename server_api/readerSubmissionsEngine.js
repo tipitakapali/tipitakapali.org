@@ -276,13 +276,13 @@ function registerReaderSubmissionsRoutes(fastify) {
       reply.code(201);
       return {
         success: true,
-        message: 'Đã tiếp nhận đóng góp của quý độc giả thành công! Tri ân công đức đóng góp của quý vị.',
+        message: 'Đã tiếp nhận đề xuất sửa của quý độc giả thành công! Tri ân công đức khảo đính của quý vị.',
         submission_id: Number(result.lastInsertRowid)
       };
     } catch (err) {
       req.log.error({ err }, '[ReaderSubmissions] Failed to create submission');
       reply.code(500);
-      return { success: false, error: 'Không thể ghi nhận đóng góp. Quý vị vui lòng thử lại sau.' };
+      return { success: false, error: 'Không thể ghi nhận đề xuất sửa. Quý vị vui lòng thử lại sau.' };
     }
   });
 
@@ -347,7 +347,7 @@ function registerReaderSubmissionsRoutes(fastify) {
     } catch (err) {
       req.log.error({ err }, '[ReaderSubmissions] Failed to query submissions');
       reply.code(500);
-      return { success: false, error: 'Không thể truy xuất dữ liệu đóng góp.' };
+      return { success: false, error: 'Không thể truy xuất dữ liệu đề xuất sửa.' };
     }
   });
 
@@ -357,7 +357,7 @@ function registerReaderSubmissionsRoutes(fastify) {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id) || id <= 0) {
         reply.code(400);
-        return { success: false, error: 'ID đóng góp không hợp lệ' };
+        return { success: false, error: 'ID đề xuất không hợp lệ' };
       }
 
       const authUser = getAuthUser(req);
@@ -365,7 +365,7 @@ function registerReaderSubmissionsRoutes(fastify) {
         reply.code(401);
         return {
           success: false,
-          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để duyệt hoặc cập nhật trạng thái đóng góp.'
+          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để duyệt hoặc cập nhật trạng thái đề xuất sửa.'
         };
       }
 
@@ -466,7 +466,7 @@ function registerReaderSubmissionsRoutes(fastify) {
       const res = db.prepare(`UPDATE submissions SET ${updates.join(', ')} WHERE id = ?`).run(...params);
       if (res.changes === 0) {
         reply.code(404);
-        return { success: false, error: 'Không tìm thấy bản ghi đóng góp' };
+        return { success: false, error: 'Không tìm thấy bản ghi đề xuất' };
       }
 
       const updated = db.prepare(`SELECT * FROM submissions WHERE id = ?`).get(id);
@@ -474,7 +474,7 @@ function registerReaderSubmissionsRoutes(fastify) {
     } catch (err) {
       req.log.error({ err }, '[ReaderSubmissions] Failed to update submission');
       reply.code(500);
-      return { success: false, error: 'Không thể cập nhật đóng góp.' };
+      return { success: false, error: 'Không thể cập nhật đề xuất.' };
     }
   });
 
@@ -484,7 +484,7 @@ function registerReaderSubmissionsRoutes(fastify) {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id) || id <= 0) {
         reply.code(400);
-        return { success: false, error: 'ID đóng góp không hợp lệ' };
+        return { success: false, error: 'ID đề xuất không hợp lệ' };
       }
 
       const authUser = getAuthUser(req);
@@ -492,7 +492,7 @@ function registerReaderSubmissionsRoutes(fastify) {
         reply.code(401);
         return {
           success: false,
-          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để xoá đóng góp.'
+          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để xoá đề xuất.'
         };
       }
 
@@ -500,21 +500,21 @@ function registerReaderSubmissionsRoutes(fastify) {
         reply.code(403);
         return {
           success: false,
-          error: 'Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor) mới có quyền xoá đóng góp.'
+          error: 'Quyền bị từ chối: Chỉ có Ban Biên Tập (Editor) mới có quyền xoá đề xuất.'
         };
       }
 
       const res = db.prepare('DELETE FROM submissions WHERE id = ?').run(id);
       if (res.changes === 0) {
         reply.code(404);
-        return { success: false, error: 'Không tìm thấy đóng góp để xoá' };
+        return { success: false, error: 'Không tìm thấy đề xuất để xoá' };
       }
 
-      return { success: true, message: 'Đã xoá đóng góp thành công', deleted_id: id };
+      return { success: true, message: 'Đã xoá đề xuất thành công', deleted_id: id };
     } catch (err) {
       req.log.error({ err }, '[ReaderSubmissions] Failed to delete submission');
       reply.code(500);
-      return { success: false, error: 'Không thể xoá đóng góp.' };
+      return { success: false, error: 'Không thể xoá đề xuất.' };
     }
   });
 

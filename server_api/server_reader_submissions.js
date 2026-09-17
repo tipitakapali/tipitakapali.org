@@ -221,7 +221,7 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 201, {
         success: true,
-        message: 'Đã tiếp nhận đóng góp của quý độc giả thành công! Tri ân công đức đóng góp của quý vị.',
+        message: 'Đã tiếp nhận đề xuất sửa của quý độc giả thành công! Tri ân công đức khảo đính của quý vị.',
         submission_id: result.lastInsertRowid
       });
     }
@@ -283,7 +283,7 @@ const server = http.createServer(async (req, res) => {
       if (!authUser) {
         return sendJson(res, 401, {
           success: false,
-          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để duyệt hoặc cập nhật trạng thái đóng góp.'
+          error: 'Quý vị cần đăng nhập Ban Biên Tập (Editor) để duyệt hoặc cập nhật trạng thái đề xuất sửa.'
         });
       }
 
