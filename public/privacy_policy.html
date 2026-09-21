@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy | Tipiṭaka Pāḷi — TipitakaPali.org</title>
+<meta name="description" content="Privacy Policy for TipitakaPali.org — what we collect (and do not collect) across the Tipitaka CST mobile app, computer app and website." />
+<link rel="canonical" href="https://tipitakapali.org/privacy_policy.html" />
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root {
+    --bg: #f0eee5;
+    --bg-soft: #f4f4eb;
+    --card: #ffffff;
+    --text: #141413;
+    --muted: #5e5d59;
+    --faint: #9a9996;
+    --accent: #8b2500;
+    --accent-hover: #a82e00;
+    --accent-soft: #fdf0e8;
+    --accent-line: #e8d5c0;
+    --border: #e8e0d0;
+    --code-bg: #ece8de;
+    --max: 860px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18191a;
+      --bg-soft: #242526;
+      --card: #28292a;
+      --text: #e4e6eb;
+      --muted: #b0b3b8;
+      --faint: #777a80;
+      --accent: #e07a3c;
+      --accent-hover: #f08e50;
+      --accent-soft: rgba(224, 122, 60, 0.14);
+      --accent-line: rgba(224, 122, 60, 0.35);
+      --border: #3a3b3c;
+      --code-bg: #1c1d1e;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding-bottom: 4rem;
+  }
+  .pali { font-family: "Gentium Plus", "Times Ext Roman", Georgia, serif; }
+  header.hero {
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.25rem 2rem;
+    text-align: center;
+  }
+  header.hero img.logo {
+    width: 72px; height: 72px; border-radius: 16px;
+    background: #fff; padding: 6px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  header.hero h1 {
+    font-size: 1.7rem; color: var(--accent);
+    margin: 0.8rem 0 0.3rem; letter-spacing: -0.01em;
+  }
+  header.hero p.sub { color: var(--muted); max-width: 640px; margin: 0 auto; }
+  .cta-row { margin-top: 1.1rem; display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 0.55rem 1.3rem; border-radius: 9999px;
+    font-weight: 600; font-size: 0.9rem; text-decoration: none;
+    border: 1px solid var(--accent);
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.ghost { color: var(--accent); background: transparent; }
+  .btn.ghost:hover { background: var(--accent-soft); }
+  main { max-width: var(--max); margin: 0 auto; padding: 0 1.25rem; }
+  .meta-row { margin-top: 1.4rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 700;
+    padding: 1px 8px; border-radius: 9999px; margin-right: 0.3rem;
+    border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent);
+  }
+  .effective { font-size: 0.85rem; color: var(--muted); }
+  section.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.4rem 1.4rem;
+    margin-top: 1.4rem; scroll-margin-top: 70px;
+  }
+  section.card h2 { font-size: 1.15rem; margin-bottom: 0.6rem; color: var(--text); }
+  section.card h2 .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); margin-right: 0.5rem;
+  }
+  section.card p, section.card li { font-size: 0.93rem; color: var(--muted); }
+  section.card p + p { margin-top: 0.6rem; }
+  section.card strong { color: var(--text); }
+  section.card ul { padding-left: 1.2rem; margin-top: 0.5rem; }
+  section.card li { margin-bottom: 0.35rem; }
+  section.card a { color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em; background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 5px; padding: 0 5px;
+  }
+  .tip {
+    margin-top: 0.8rem; background: var(--accent-soft);
+    border: 1px solid var(--accent-line); border-radius: 10px;
+    padding: 0.7rem 0.9rem; font-size: 0.86rem; color: var(--text);
+  }
+  footer.blessing {
+    max-width: var(--max); margin: 2rem auto 0; padding: 1.4rem 1.25rem 0;
+    text-align: center; border-top: 1px solid var(--border);
+  }
+  footer.blessing .verse { color: var(--accent); font-weight: 700; }
+  footer.blessing .trans { color: var(--faint); font-style: italic; font-size: 0.85rem; margin-top: 0.2rem; }
+  footer.blessing .contact { margin-top: 0.8rem; font-size: 0.85rem; color: var(--muted); }
+  footer.blessing .contact a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <img class="logo" src="/tipitakapali_org_logo.svg" alt="TipiṭakaPali.org logo" width="72" height="72" />
+  <h1>Privacy Policy</h1>
+  <p class="sub">Tipitakapali.org is committed to protecting your privacy across our mobile apps (Tipitaka CST), computer apps (Tipitakapali.org) and website — collectively, the “Service”.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="/">Open the Reader</a>
+    <a class="btn ghost" href="/info.html">About &amp; Guide</a>
+    <a class="btn ghost" href="/terms_of_service.html">Terms of Service</a>
+  </div>
+</header>
+
+<main>
+  <div class="meta-row">
+    <span class="badge">Legal</span>
+    <span class="effective"><strong>Effective Date:</strong> 2024-06-21</span>
+  </div>
+
+  <section class="card" id="not-collected">
+    <h2><span class="dot"></span>1. Information We Do Not Collect</h2>
+    <ul>
+      <li>We do <strong>not</strong> collect any personally identifiable information (PII), such as your name, email address, or location.</li>
+      <li>Our focus is on ensuring that your personal privacy is maintained while still delivering a high-quality service.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="collected">
+    <h2><span class="dot"></span>2. Information We Do Collect</h2>
+    <p>To keep the online dictionary API server running smoothly and to improve performance, our dictionary API server may log anonymized text queries sent to it. This includes:</p>
+    <ul>
+      <li><strong>Pāḷi Statistics:</strong> Information such as the statistics of Pāḷi words, including which Pāḷi text files are opened and which words are looked up on our dictionary server.</li>
+      <li><strong>Aggregated Data:</strong> Data is collected in a manner that does not identify you personally.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="use">
+    <h2><span class="dot"></span>3. How We Use the Information</h2>
+    <ul>
+      <li><strong>Performance Improvement:</strong> To monitor and analyze the performance and usage of the app.</li>
+      <li><strong>Service Enhancement:</strong> To improve functionality and user experience.</li>
+      <li><strong>Security &amp; Maintenance:</strong> To help ensure the ongoing security and stability of our Service.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="security">
+    <h2><span class="dot"></span>4. Data Security</h2>
+    <ul>
+      <li>We take reasonable measures to protect the data we collect against unauthorized access or disclosure.</li>
+      <li>However, please note that no method of transmission or electronic storage is 100% secure, so absolute security cannot be guaranteed.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="third-party">
+    <h2><span class="dot"></span>5. Third-Party Services</h2>
+    <ul>
+      <li>Our Service may include links or integrations with third-party services. We do not control these services, and their privacy practices may differ from ours.</li>
+      <li>We encourage you to review the privacy policies of any third-party providers.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="children">
+    <h2><span class="dot"></span>6. Children&rsquo;s Privacy</h2>
+    <p>We do not collect any personal data from users; therefore, provisions regarding children&rsquo;s privacy do not apply.</p>
+  </section>
+
+  <section class="card" id="changes">
+    <h2><span class="dot"></span>7. Changes to This Privacy Policy</h2>
+    <ul>
+      <li>We may update our Privacy Policy from time to time.</li>
+      <li>Any changes will be posted on this page along with an updated &ldquo;Effective Date.&rdquo; We encourage you to review this Privacy Policy periodically for any changes.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="contact">
+    <h2><span class="dot"></span>8. Contact Us</h2>
+    <p>If you have any questions or concerns about this Privacy Policy, please contact us at:<br /><code>tipitakapali.org@gmail.com</code></p>
+    <div class="tip"><strong>Related:</strong> see also our <a href="/terms_of_service.html">Terms of Service</a> and the <a href="/info.html">About &amp; User Guide</a>.</div>
+  </section>
+</main>
+
+<footer class="blessing">
+  <div class="verse pali">Ciraṃ tiṭṭhatu saddhammo, dhamme hontu sagāravā.</div>
+  <div class="trans">&ldquo;May the True Dhamma endure long, and may all beings revere the Dhamma.&rdquo;</div>
+  <div class="contact">Feedback: <code>tipitakapali.org@gmail.com</code> · <a href="/">TipitakaPali.org</a></div>
+</footer>
+
+</body>
+</html>

@@ -823,6 +823,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
             <strong className="text-[var(--text-primary)]">8. License & Usage Terms</strong>
             <p className="text-[11px] text-[var(--text-muted)]">
               This application is distributed under the <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">Creative Commons Attribution-NonCommercial-ShareAlike 3.0 (CC BY-NC-SA 3.0)</a> and <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">CC BY-NC 4.0</a> licenses for non-commercial Dhamma dāna study.
+              {' '}See our <a href="/terms_of_service.html" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">Terms of Service</a> and <a href="/privacy_policy.html" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">Privacy Policy</a>.
             </p>
           </div>
 
