@@ -899,7 +899,17 @@ body.hide-trans-borders .reader-trans-block {
 
 .reader-trans-block[data-trans-lang="ko"],
 .reader-trans-block[data-trans-lang="korean"] {
-  border-left-color: color-mix(in srgb, #6b7280 30%, transparent); /* Neutral Gray (mid vs German dark slate) */
+  border-left-color: color-mix(in srgb, #4f46e5 30%, transparent); /* Indigo */
+}
+
+.reader-trans-block[data-trans-lang="id"],
+.reader-trans-block[data-trans-lang="indonesian"] {
+  border-left-color: color-mix(in srgb, #c026d3 30%, transparent); /* Fuchsia */
+}
+
+.reader-trans-block[data-trans-lang="ne"],
+.reader-trans-block[data-trans-lang="nepali"] {
+  border-left-color: color-mix(in srgb, #9a3412 30%, transparent); /* Burnt orange */
 }
 
 .reader-trans-block[data-trans-lang="pali"],

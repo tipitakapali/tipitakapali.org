@@ -18,6 +18,8 @@ const DEFAULT_TRANSLATION_ORDER = [
   'german',
   'japanese',
   'korean',
+  'indonesian',
+  'nepali',
   'portuguese',
   'russian',
 ];
@@ -87,6 +89,8 @@ const DEFAULT_SETTINGS = {
     german: false,
     japanese: false,
     korean: false,
+    indonesian: false,
+    nepali: false,
     portuguese: false,
     russian: false,
     my_nissaya: false,
@@ -151,9 +155,8 @@ export function ThemeSettingsProvider({ children }) {
             merged.translationColors && typeof merged.translationColors === 'object'
               ? merged.translationColors
               : {};
-          // Ensure translations object has all keys, korean is disabled, and pali defaults to true
+          // Ensure translations object has all keys and pali defaults to true
           merged.translations = { ...prev.translations, ...(parsed.translations || {}) };
-          merged.translations.korean = false;
           if (merged.translations.pali === undefined) {
             merged.translations.pali = true;
           }
@@ -176,10 +179,7 @@ export function ThemeSettingsProvider({ children }) {
 
   const updateSetting = (key, value) => {
     setSettingsState((prev) => {
-      let finalVal = value;
-      if (key === 'translations' && value && typeof value === 'object') {
-        finalVal = { ...value, korean: false };
-      }
+      const finalVal = value;
       const updated = { ...prev, [key]: finalVal };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
@@ -193,9 +193,6 @@ export function ThemeSettingsProvider({ children }) {
   const updateSettings = (newObj) => {
     setSettingsState((prev) => {
       const sanitized = { ...newObj };
-      if (sanitized.translations && typeof sanitized.translations === 'object') {
-        sanitized.translations = { ...sanitized.translations, korean: false };
-      }
       const updated = { ...prev, ...sanitized };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));

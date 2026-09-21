@@ -94,6 +94,8 @@ const LANG_NAME_TO_CODE = {
   german: 'de',
   japanese: 'ja',
   korean: 'ko',
+  indonesian: 'id',
+  nepali: 'ne',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',

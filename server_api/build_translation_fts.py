@@ -16,7 +16,7 @@ translated Tipiṭaka corpora:
                          must type correct tone marks, e.g. "việt" != "viet")
       * th/km/lo/my/
         my_nissaya/
-        hi/ta/si      - unicode61 categories 'L* N* Mn'  (these scripts use combining
+        hi/ta/si/ne    - unicode61 categories 'L* N* Mn'  (these scripts use combining
                          vowel/tone marks - category Mn - which default unicode61
                          treats as a token BREAK, shattering words into meaningless
                          consonant fragments; widening categories to include Mn keeps
@@ -25,7 +25,8 @@ translated Tipiṭaka corpora:
                          unicode61 would tokenize an entire sentence as ONE token,
                          making sub-string/word search impossible; trigram indexes
                          every 3-character window instead, no prefix= needed)
-      * en/de/pt/ru
+      * en/de/pt/ru/
+        id/ko
         (fallback)    - unicode61 remove_diacritics 2  (accent-insensitive search;
                          verified safe only for Latin/Cyrillic scripts with
                          precomposed diacritics - do NOT add hi/ta/si/th/etc. here)
@@ -35,7 +36,7 @@ translated Tipiṭaka corpora:
   - B-tree optimization ('optimize') & VACUUM for maximum query speed.
 
 Usage:
-  python3 build_translation_fts.py                # Build all 15 translation DBs
+  python3 build_translation_fts.py                # Build all translation DBs
   python3 build_translation_fts.py --lang en      # Build specific language
   python3 build_translation_fts.py --force        # Overwrite existing FTS DBs
 ================================================================================
@@ -62,7 +63,7 @@ FTS_TIPITAKA_DB = os.path.join(DB_DIR, "fts_tipitaka.db")
 #]
 
 ALL_LANGS = [
-    "de", "en", "hi", "ja", "km", "lo", "my",
+    "de", "en", "hi", "id", "ja", "km", "ko", "lo", "my", "ne",
     "pt", "ru", "si", "ta", "th", "vi", "zh"
 ]
 
@@ -87,6 +88,7 @@ LANG_TOKENIZE = {
     "my": "unicode61 categories 'L* N* Mn'",
     "my_nissaya": "unicode61 categories 'L* N* Mn'",
     "hi": "unicode61 categories 'L* N* Mn'",
+    "ne": "unicode61 categories 'L* N* Mn'",
     "ta": "unicode61 categories 'L* N* Mn'",
     "si": "unicode61 categories 'L* N* Mn'",
     "zh": "trigram",

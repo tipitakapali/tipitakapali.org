@@ -68,6 +68,9 @@ TRANSLATION_LANGUAGES = [
     {"code": "lo", "name": "Lao", "native": "ລາວ", "flag": "🇱🇦", "lang": "lo", "desc": "ການແປພາສາລາວ • 420K ປະໂຫຍກ"},
     {"code": "ta", "name": "Tamil", "native": "தமிழ்", "flag": "🇮🇳", "lang": "ta", "desc": "தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்"},
     {"code": "ru", "name": "Russian", "native": "Русский", "flag": "🇷🇺", "lang": "ru", "desc": "Русский перевод • 248K предложений"},
+    {"code": "ko", "name": "Korean", "native": "한국어", "flag": "🇰🇷", "lang": "ko", "desc": "한국어 번역 • 337K 문장"},
+    {"code": "id", "name": "Indonesian", "native": "Bahasa Indonesia", "flag": "🇮🇩", "lang": "id", "desc": "Terjemahan Bahasa Indonesia • 1.27M kalimat"},
+    {"code": "ne", "name": "Nepali", "native": "नेपाली", "flag": "🇳🇵", "lang": "ne", "desc": "नेपाली अनुवाद • 35K वाक्य"},
 ]
 
 def find_paths():

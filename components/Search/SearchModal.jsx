@@ -23,6 +23,8 @@ export const LANG_KEY_TO_CODE = {
   german: 'de',
   japanese: 'ja',
   korean: 'ko',
+  indonesian: 'id',
+  nepali: 'ne',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',
@@ -46,6 +48,8 @@ export const CODE_TO_LANG_KEY = {
   pt: 'portuguese',
   ru: 'russian',
   ko: 'korean',
+  id: 'indonesian',
+  ne: 'nepali',
 };
 
 export function normalizeLangCode(langOrDb) {
@@ -137,7 +141,9 @@ const DEFAULT_FTS_DATABASES = [
   { id: 'fts_translation_ja.db', key: 'ja', label: '日本語', flag: '🇯🇵' },
   { id: 'fts_translation_pt.db', key: 'pt', label: 'Português', flag: '🇵🇹' },
   { id: 'fts_translation_ru.db', key: 'ru', label: 'Русский', flag: '🇷🇺' },
-  { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷', disabled: true },
+  { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷' },
+  { id: 'fts_translation_id.db', key: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
+  { id: 'fts_translation_ne.db', key: 'ne', label: 'नेपाली', flag: '🇳🇵' },
 ];
 
 export function resolveDbFromLangParam(param, databases = DEFAULT_FTS_DATABASES) {

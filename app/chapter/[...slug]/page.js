@@ -20,6 +20,9 @@ export const TRANSLATION_LANGS = [
   { code: 'lo', name: 'Lao', native: 'ລາວ' },
   { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
   { code: 'ru', name: 'Russian', native: 'Русский' },
+  { code: 'ko', name: 'Korean', native: '한국어' },
+  { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
+  { code: 'ne', name: 'Nepali', native: 'नेपाली' },
 ];
 
 export async function generateStaticParams() {

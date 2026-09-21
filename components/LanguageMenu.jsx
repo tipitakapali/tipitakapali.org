@@ -39,11 +39,13 @@ export const TRANSLATIONS = [
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#0c4a6e' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 248K предложений', color: '#eab308' },
-  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: 'Korean Translation • Coming soon (Not available yet)', color: '#6b7280', disabled: true },
+  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: '한국어 번역 • 337K 문장', color: '#4f46e5' },
+  { id: 'indonesian', label: 'Bahasa Indonesia', flag: '🇮🇩', desc: 'Terjemahan Bahasa Indonesia • 1.27M kalimat', color: '#c026d3' },
+  { id: 'nepali', label: 'नेपाली', flag: '🇳🇵', desc: 'नेपाली अनुवाद • 35K वाक्य', color: '#9a3412' },
 ];
 
 export const AVAILABLE_TRANSLATIONS = TRANSLATIONS.filter(
-  (t) => t.id !== 'pali' && !t.disabled && t.id !== 'korean'
+  (t) => t.id !== 'pali' && !t.disabled
 );
 
 export const AVAILABLE_TRANSLATION_COUNT = AVAILABLE_TRANSLATIONS.length;
@@ -238,7 +240,7 @@ export default function LanguageMenu() {
 
   const activeCount = useMemo(() => {
     const current = settings.translations || {};
-    return TRANSLATIONS.filter((t) => !t.disabled && t.id !== 'korean' && (t.id === 'pali' ? current.pali !== false : Boolean(current[t.id]))).length;
+    return TRANSLATIONS.filter((t) => !t.disabled && (t.id === 'pali' ? current.pali !== false : Boolean(current[t.id]))).length;
   }, [settings.translations]);
 
   const translationOrder = useMemo(() => {
@@ -309,7 +311,6 @@ export default function LanguageMenu() {
   const translationGranularity = settings.translationGranularity || 'para';
 
   const applyToggleTranslation = (tId) => {
-    if (tId === 'korean') return;
     const item = TRANSLATIONS.find((t) => t.id === tId);
     if (item?.disabled) return;
 
@@ -319,13 +320,11 @@ export default function LanguageMenu() {
     const updated = {
       ...current,
       [tId]: !isCurrentlyChecked,
-      korean: false,
     };
     updateSetting('translations', updated);
   };
 
   const handleToggleTranslation = (tId) => {
-    if (tId === 'korean') return;
     const item = TRANSLATIONS.find((t) => t.id === tId);
     if (item?.disabled) return;
 
@@ -639,7 +638,7 @@ export default function LanguageMenu() {
 
                 <div className="space-y-1.5">
                   {orderedTranslations.map((trans, idx) => {
-                    const isDisabled = Boolean(trans.disabled || trans.id === 'korean');
+                    const isDisabled = Boolean(trans.disabled);
                     const isChecked =
                       !isDisabled &&
                       (trans.id === 'pali'

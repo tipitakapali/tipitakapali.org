@@ -23,6 +23,8 @@ const TRANS_ID_TO_CODE = {
   german: 'de',
   japanese: 'ja',
   korean: 'ko',
+  indonesian: 'id',
+  nepali: 'ne',
   portuguese: 'pt',
   russian: 'ru',
 };
@@ -43,6 +45,8 @@ const LANG_HEADERS = {
   de: 'Deutsche Übersetzung',
   ja: '日本語訳',
   ko: '한국어 번역',
+  id: 'Terjemahan Bahasa Indonesia',
+  ne: 'नेपाली अनुवाद',
   pt: 'Tradução em Português',
   ru: 'Русский перевод',
 };
