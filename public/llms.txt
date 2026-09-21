@@ -46,6 +46,9 @@
 - `lo`: **Lao** (ລາວ) 🇱🇦 → `https://tipitakapali.org/book/s0101m.mul?l=lo` (ການແປພາສາລາວ • 420K ປະໂຫຍກ)
 - `ta`: **Tamil** (தமிழ்) 🇮🇳 → `https://tipitakapali.org/book/s0101m.mul?l=ta` (தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்)
 - `ru`: **Russian** (Русский) 🇷🇺 → `https://tipitakapali.org/book/s0101m.mul?l=ru` (Русский перевод • 248K предложений)
+- `ko`: **Korean** (한국어) 🇰🇷 → `https://tipitakapali.org/book/s0101m.mul?l=ko` (한국어 번역 • 337K 문장)
+- `id`: **Indonesian** (Bahasa Indonesia) 🇮🇩 → `https://tipitakapali.org/book/s0101m.mul?l=id` (Terjemahan Bahasa Indonesia • 1.27M kalimat)
+- `ne`: **Nepali** (नेपाली) 🇳🇵 → `https://tipitakapali.org/book/s0101m.mul?l=ne` (नेपाली अनुवाद • 35K वाक्य)
 
 ### Supported 16 Pāḷi Script Codes:
 - `si`: **Sinhala** (සිංහල) → `https://tipitakapali.org/book/si.s0101m.mul`

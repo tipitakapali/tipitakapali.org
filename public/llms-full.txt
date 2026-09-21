@@ -22,6 +22,9 @@ Users can open any canonical text with side-by-side / sentence-level translation
 | `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 420K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
 | `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/book/s0101m.mul?l=ta` |
 | `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 248K предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
+| `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 337K 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
+| `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.27M kalimat | `https://tipitakapali.org/book/s0101m.mul?l=id` |
+| `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 35K वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
 
 ## Multi-Script Deep-Linking Guide for AI Agents
 Users can open any canonical text directly in their preferred script by prefixing the book code:
