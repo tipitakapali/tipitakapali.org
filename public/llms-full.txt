@@ -17,11 +17,11 @@ Users can open any canonical text with side-by-side / sentence-level translation
 | `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/book/s0101m.mul?l=de` |
 | `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/book/s0101m.mul?l=ja` |
 | `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/book/s0101m.mul?l=pt` |
-| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 410K वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
-| `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 912K ប្រយោគ | `https://tipitakapali.org/book/s0101m.mul?l=km` |
-| `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 420K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
+| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
+| `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ | `https://tipitakapali.org/book/s0101m.mul?l=km` |
+| `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 750K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
 | `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/book/s0101m.mul?l=ta` |
-| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 248K предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
+| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 1.22M предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
 | `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 337K 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
 | `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.27M kalimat | `https://tipitakapali.org/book/s0101m.mul?l=id` |
 | `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 35K वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
