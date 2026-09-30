@@ -23,6 +23,7 @@ export const TRANSLATION_LANGS = [
   { code: 'ko', name: 'Korean', native: '한국어' },
   { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
   { code: 'ne', name: 'Nepali', native: 'नेपाली' },
+  { code: 'be', name: 'Bengali', native: 'বাংলা' },
 ];
 
 export const PALI_SCRIPT_LIST = [

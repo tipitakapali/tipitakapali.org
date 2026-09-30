@@ -912,6 +912,11 @@ body.hide-trans-borders .reader-trans-block {
   border-left-color: color-mix(in srgb, #9a3412 30%, transparent); /* Burnt orange */
 }
 
+.reader-trans-block[data-trans-lang="be"],
+.reader-trans-block[data-trans-lang="bengali"] {
+  border-left-color: color-mix(in srgb, #047857 30%, transparent); /* Emerald Green */
+}
+
 .reader-trans-block[data-trans-lang="pali"],
 .reader-trans-block.reader-pali-trans-block {
   border-left-color: color-mix(in srgb, var(--accent) 30%, transparent); /* Original Pali Accent */
@@ -1232,6 +1237,24 @@ body.hide-trans-borders .reader-trans-block {
 .result-snippet[data-trans-lang="japanese"] * {
   font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "MS PMincho", serif;
   line-height: 1.8;
+}
+
+.reader-trans-block[data-trans-lang="be"],
+.reader-trans-block[data-trans-lang="bengali"],
+.reader-trans-block[data-trans-lang="be"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="bengali"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="be"] p,
+.reader-trans-block[data-trans-lang="bengali"] p {
+  font-family: "Noto Sans Bengali", sans-serif;
+  line-height: 1.85;
+}
+
+.result-snippet[data-trans-lang="be"],
+.result-snippet[data-trans-lang="bengali"],
+.result-snippet[data-trans-lang="be"] *,
+.result-snippet[data-trans-lang="bengali"] * {
+  font-family: "Noto Sans Bengali", sans-serif;
+  line-height: 1.85;
 }
 
 /* Tabs Bar */

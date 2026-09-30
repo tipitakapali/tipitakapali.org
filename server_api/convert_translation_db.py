@@ -40,6 +40,7 @@ LANG_META = {
     'ko': {'id': 'korean', 'name': 'Korean', 'native': '한국어', 'flag': '🇰🇷'},
     'id': {'id': 'indonesian', 'name': 'Indonesian', 'native': 'Bahasa Indonesia', 'flag': '🇮🇩'},
     'ne': {'id': 'nepali', 'name': 'Nepali', 'native': 'नेपाली', 'flag': '🇳🇵'},
+    'be': {'id': 'bengali', 'name': 'Bengali', 'native': 'বাংলা', 'flag': '🇧🇩'},
 }
 
 

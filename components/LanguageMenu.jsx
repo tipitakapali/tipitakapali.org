@@ -39,9 +39,10 @@ export const TRANSLATIONS = [
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#0c4a6e' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 1.22M предложений', color: '#eab308' },
-  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: '한국어 번역 • 337K 문장', color: '#4f46e5' },
-  { id: 'indonesian', label: 'Bahasa Indonesia', flag: '🇮🇩', desc: 'Terjemahan Bahasa Indonesia • 1.27M kalimat', color: '#c026d3' },
-  { id: 'nepali', label: 'नेपाली', flag: '🇳🇵', desc: 'नेपाली अनुवाद • 35K वाक्य', color: '#9a3412' },
+  { id: 'korean', label: '한국어', flag: '🇰🇷', desc: '한국어 번역 • 1.22M 문장', color: '#4f46e5' },
+  { id: 'indonesian', label: 'Bahasa Indonesia', flag: '🇮🇩', desc: 'Terjemahan Bahasa Indonesia • 1.22M kalimat', color: '#c026d3' },
+  { id: 'nepali', label: 'नेपाली', flag: '🇳🇵', desc: 'नेपाली अनुवाद • 1.22M वाक्य', color: '#9a3412' },
+  { id: 'bengali', label: 'বাংলা', flag: '🇧🇩', desc: 'বাংলা অনুবাদ • 93K বাক্য', color: '#047857' },
 ];
 
 export const AVAILABLE_TRANSLATIONS = TRANSLATIONS.filter(

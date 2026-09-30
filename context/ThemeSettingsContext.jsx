@@ -20,6 +20,7 @@ const DEFAULT_TRANSLATION_ORDER = [
   'korean',
   'indonesian',
   'nepali',
+  'bengali',
   'portuguese',
   'russian',
 ];
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS = {
     korean: false,
     indonesian: false,
     nepali: false,
+    bengali: false,
     portuguese: false,
     russian: false,
     my_nissaya: false,

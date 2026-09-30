@@ -63,7 +63,7 @@ FTS_TIPITAKA_DB = os.path.join(DB_DIR, "fts_tipitaka.db")
 #]
 
 ALL_LANGS = [
-    "de", "en", "hi", "id", "ja", "km", "ko", "lo", "my", "ne",
+    "be", "de", "en", "hi", "id", "ja", "km", "ko", "lo", "my", "ne",
     "pt", "ru", "si", "ta", "th", "vi", "zh"
 ]
 
@@ -91,6 +91,7 @@ LANG_TOKENIZE = {
     "ne": "unicode61 categories 'L* N* Mn'",
     "ta": "unicode61 categories 'L* N* Mn'",
     "si": "unicode61 categories 'L* N* Mn'",
+    "be": "unicode61 categories 'L* N* Mn'",
     "zh": "trigram",
     "ja": "trigram",
 }

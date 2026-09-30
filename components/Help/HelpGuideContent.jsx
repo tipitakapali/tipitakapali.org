@@ -221,7 +221,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
           </h3>
         </div>
         <p className="text-[12px] text-[var(--text-secondary)]">
-          TipitakaPali.org supports multi-layered translation reading across <strong>19 languages</strong> simultaneously with the original Pāḷi Canon, with independent layer control, reordering, and flexible display modes.
+          TipitakaPali.org supports multi-layered translation reading across <strong>20 languages</strong> simultaneously with the original Pāḷi Canon, with independent layer control, reordering, and flexible display modes.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11.5px]">
@@ -815,7 +815,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
           <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] space-y-1">
             <strong className="text-[var(--text-primary)]">7. AI-Assisted Translations (Epitaka)</strong>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Multilingual translation datasets across 19 languages adapted from the AI-Assisted Translation Project by <a href="https://epitaka.org/about" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline inline-flex items-center gap-0.5">Epitaka <ExternalLink size={10} /></a>. Freely provided for non-commercial Dhamma study and cross-reference with the canonical Pāḷi root text.
+              Multilingual translation datasets across 20 languages adapted from the AI-Assisted Translation Project by <a href="https://epitaka.org/about" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline inline-flex items-center gap-0.5">Epitaka <ExternalLink size={10} /></a>. Freely provided for non-commercial Dhamma study and cross-reference with the canonical Pāḷi root text.
             </p>
           </div>
 

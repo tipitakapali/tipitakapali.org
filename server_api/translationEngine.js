@@ -22,6 +22,7 @@ const LANG_MAP = {
   portuguese: 'pt',
   russian: 'ru',
   hindi: 'hi',
+  bengali: 'be',
   my_nissaya: 'my_nissaya',
 };
 

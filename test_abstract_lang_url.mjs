@@ -22,6 +22,9 @@ const LANG_KEY_TO_CODE = {
   german: 'de',
   japanese: 'ja',
   korean: 'ko',
+  indonesian: 'id',
+  nepali: 'ne',
+  bengali: 'be',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',
@@ -45,6 +48,9 @@ const CODE_TO_LANG_KEY = {
   pt: 'portuguese',
   ru: 'russian',
   ko: 'korean',
+  id: 'indonesian',
+  ne: 'nepali',
+  be: 'bengali',
 };
 
 const DEFAULT_FTS_DATABASES = [
@@ -65,6 +71,9 @@ const DEFAULT_FTS_DATABASES = [
   { id: 'fts_translation_pt.db', key: 'pt', label: 'Português', flag: '🇵🇹' },
   { id: 'fts_translation_ru.db', key: 'ru', label: 'Русский', flag: '🇷🇺' },
   { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷' },
+  { id: 'fts_translation_id.db', key: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
+  { id: 'fts_translation_ne.db', key: 'ne', label: 'नेपाली', flag: '🇳🇵' },
+  { id: 'fts_translation_be.db', key: 'be', label: 'বাংলা', flag: '🇧🇩' },
 ];
 
 function normalizeLangCode(langOrDb) {
@@ -465,6 +474,60 @@ async function runBrowserTests() {
     assert(state46.search.includes('l=my_nissaya'));
     assert(!state46.search.includes('db='));
     console.log('  ✓ Myanmar Nissaya uses ?l=my_nissaya without db=');
+
+    // 4.7 Test Bengali translation ?l=be&q=Buddha
+    console.log('\n[4.7] Navigating to http://localhost:3000/?l=be&q=Buddha ...');
+    await evaluate(ws, `window.location.href = "http://localhost:3000/?l=be&q=Buddha"`);
+    let state47 = null;
+    for (let i = 0; i < 30; i++) {
+      await sleep(500);
+      state47 = await evaluate(
+        ws,
+        `(() => {
+          const select = document.querySelector('select[aria-label="Select FTS database"]');
+          const summary = document.querySelector('.search-summary-bar');
+          return {
+            url: window.location.href,
+            search: window.location.search,
+            selectedDb: select ? select.value : null,
+            summaryText: summary ? summary.innerText : null,
+          };
+        })()`
+      );
+      if (state47?.summaryText && state47.summaryText.includes('matches')) break;
+    }
+    console.log('  State:', state47);
+    assert.strictEqual(state47.selectedDb, 'fts_translation_be.db');
+    assert(state47.search.includes('l=be'));
+    assert(!state47.search.includes('db='));
+    console.log('  ✓ Bengali translation uses ?l=be without db=');
+
+    // 4.8 Test Korean translation ?l=ko&q=세존
+    console.log('\n[4.8] Navigating to http://localhost:3000/?l=ko&q=%EC%84%B8%EC%A1%B4 ...');
+    await evaluate(ws, `window.location.href = "http://localhost:3000/?l=ko&q=%EC%84%B8%EC%A1%B4"`);
+    let state48 = null;
+    for (let i = 0; i < 30; i++) {
+      await sleep(500);
+      state48 = await evaluate(
+        ws,
+        `(() => {
+          const select = document.querySelector('select[aria-label="Select FTS database"]');
+          const summary = document.querySelector('.search-summary-bar');
+          return {
+            url: window.location.href,
+            search: window.location.search,
+            selectedDb: select ? select.value : null,
+            summaryText: summary ? summary.innerText : null,
+          };
+        })()`
+      );
+      if (state48?.summaryText && state48.summaryText.includes('matches')) break;
+    }
+    console.log('  State:', state48);
+    assert.strictEqual(state48.selectedDb, 'fts_translation_ko.db');
+    assert(state48.search.includes('l=ko'));
+    assert(!state48.search.includes('db='));
+    console.log('  ✓ Korean translation uses ?l=ko without db=');
 
     ws.close();
     console.log('\n🎉 ALL LIVE E2E BROWSER TESTS PASSED PERFECTLY!');
