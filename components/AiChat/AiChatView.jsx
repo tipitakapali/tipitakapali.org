@@ -1239,12 +1239,6 @@ export default function AiChatView({ initialQuery = null }) {
                 e.target.style.height = 'auto';
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
               placeholder="Ask Ani about Pāḷi grammar, or finding suttas..."
               disabled={isGenerating}
               className="flex-1 bg-transparent py-1.5 px-2.5 text-xs sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 leading-relaxed"
@@ -1265,7 +1259,7 @@ export default function AiChatView({ initialQuery = null }) {
                 type="submit"
                 disabled={!inputQuery.trim()}
                 className="p-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:hover:bg-violet-600 text-white transition shadow-sm cursor-pointer shrink-0"
-                title="Send inquiry (Enter)"
+                title="Send inquiry"
               >
                 <Send size={15} />
               </button>
