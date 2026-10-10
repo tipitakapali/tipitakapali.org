@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Book, Layers, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { X, Book, Layers, ArrowUpRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
@@ -10,7 +10,7 @@ import { fetchMatJump } from '../services/api';
 
 export default function MatJumpModal({ isOpen, onClose }) {
   const { activeTab, activeParaNum, jumpToMat } = useTabs();
-  const { settings } = useThemeSettings();
+  const { settings, updateSetting } = useThemeSettings();
 
   const [apiMatByPara, setApiMatByPara] = useState({});
   const [visibleParas, setVisibleParas] = useState([]);
@@ -72,7 +72,9 @@ export default function MatJumpModal({ isOpen, onClose }) {
     : baseCode;
 
   let cIdx = activeTab?.currentChapterIdx !== undefined && activeTab?.currentChapterIdx !== null ? activeTab.currentChapterIdx : 0;
-  if (typeof window !== 'undefined') {
+  if (activeParaNum && activeTab?.para_to_chapter?.[String(activeParaNum).replace(/^(?:para-?|p)/i, '').trim()] !== undefined) {
+    cIdx = activeTab.para_to_chapter[String(activeParaNum).replace(/^(?:para-?|p)/i, '').trim()];
+  } else if (typeof window !== 'undefined') {
     const m = window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i);
     if (m) cIdx = Math.max(0, parseInt(m[1], 10) - 1);
   }
@@ -121,13 +123,6 @@ export default function MatJumpModal({ isOpen, onClose }) {
     }
     if (chap === undefined) {
       chap = cIdx;
-    } else if (chap !== cIdx) {
-      const hasExplicitHash = typeof window !== 'undefined' && window.location.hash && window.location.hash.includes(clean);
-      const hasExplicitPathChapter = typeof window !== 'undefined' && Boolean(window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i));
-      if (!(hasExplicitHash && !subKey && !hasExplicitPathChapter) && !fromScreen) {
-        chap = cIdx;
-        subKey = undefined;
-      }
     }
     subKey = subKey || findSubKey(chap);
     return { raw: paraStr, clean, validP, chap, subKey };
@@ -261,7 +256,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
           info = { isExact, isClosest, isChapterOnly: !targetPara, targetPara, targetChapter, matchQuality };
         }
 
-        const jump = () => {
+        const getFinalChapter = () => {
           let finalChapter = info.targetChapter;
           if (finalChapter === undefined) {
             if (pTarget?.chapter !== undefined) {
@@ -277,18 +272,44 @@ export default function MatJumpModal({ isOpen, onClose }) {
               }
             }
           }
+          return finalChapter;
+        };
+
+        const getTargetUrl = () => {
+          const finalChapter = getFinalChapter();
+          const targetCode = pTarget?.book || item.code;
+          const chNum = (finalChapter !== undefined ? finalChapter : 0) + 1;
+          const p = info.targetPara || clean;
+          return `/book/${targetCode}/${chNum}${p ? `#para${p}` : ''}`;
+        };
+
+        const openInNewWindow = (e) => {
+          if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+          const url = getTargetUrl();
+          if (typeof window !== 'undefined') {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+          onClose();
+        };
+
+        const jump = (e) => {
+          if (e && (e.ctrlKey || e.metaKey || e.button === 1 || settings?.openMatInNewWindow)) {
+            openInNewWindow(e);
+            return;
+          }
+          const finalChapter = getFinalChapter();
           jumpToMat(item.layer, {
             title: pTarget?.title || item.title,
             code: pTarget?.book || item.code,
             chapter: finalChapter,
             targetChapterIdx: finalChapter,
-            targetParaNum: info.targetPara || undefined,
+            targetParaNum: info.targetPara || clean || undefined,
             subBook: activeTab?.sub_book || subKey || undefined,
           });
           onClose();
         };
 
-        return { ...item, info, jump, srcPara: clean };
+        return { ...item, info, jump, openInNewWindow, getTargetUrl, srcPara: clean };
       });
   };
 
@@ -313,7 +334,19 @@ export default function MatJumpModal({ isOpen, onClose }) {
               </h2>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <label
+              className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer select-none px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border-color)] transition"
+              title="Open MAT jumps in a new browser window/tab (ideal for dual monitors / PC)"
+            >
+              <input
+                type="checkbox"
+                checked={!!settings?.openMatInNewWindow}
+                onChange={(e) => updateSetting && updateSetting('openMatInNewWindow', e.target.checked)}
+                className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer"
+              />
+              <span className="hidden min-[420px]:inline font-medium">New window</span>
+            </label>
             <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono text-[9px] text-[var(--text-muted)]">
               Esc
             </kbd>
@@ -366,7 +399,13 @@ export default function MatJumpModal({ isOpen, onClose }) {
                       return (
                 <div
                   key={item.layer}
-                  onClick={() => item.available && item.jump()}
+                  onClick={(e) => item.available && item.jump(e)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1 && item.available) {
+                      e.preventDefault();
+                      item.openInNewWindow(e);
+                    }
+                  }}
                   className={`px-2.5 py-2 rounded-lg border transition flex items-center justify-between gap-2 select-none ${
                     item.available
                       ? 'border-[var(--border-color)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--bg-card)] cursor-pointer group'
@@ -413,32 +452,48 @@ export default function MatJumpModal({ isOpen, onClose }) {
                   </div>
 
                   {/* Action Button / Badge */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex items-center gap-1.5">
                     {item.isCurrent ? (
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 rounded-lg border border-[var(--accent)]/20">
                         <CheckCircle2 size={13} />
                         Reading
                       </span>
                     ) : item.available ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          item.jump();
-                        }}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
-                      >
-                        <span>Jump</span>
-                        {matchInfo?.isExact ? (
-                          <span className="font-mono font-normal opacity-80 text-[10px]">p.{matchInfo.targetPara}</span>
-                        ) : matchInfo?.isClosest ? (
-                          <span className="font-mono font-normal opacity-80 text-[10px]">closest p.{matchInfo.targetPara}</span>
-                        ) : (
-                          <span className="font-sans text-[10px] opacity-75">
-                            closest (Ch {(matchInfo?.targetChapter ?? 0) + 1})
-                          </span>
-                        )}
-                        <ArrowUpRight size={12} />
-                      </button>
+                      <>
+                        <a
+                          href={item.getTargetUrl()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                          }}
+                          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 border border-[var(--border-color)] hover:border-[var(--accent)]/30 transition cursor-pointer inline-flex items-center justify-center"
+                          title="Open in new window / tab (Ctrl+Click)"
+                        >
+                          <ExternalLink size={13} />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            item.jump(e);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] group-hover:text-white group-hover:bg-[var(--accent)] px-2.5 py-1 rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent)] transition cursor-pointer"
+                        >
+                          <span>Jump</span>
+                          {matchInfo?.isExact ? (
+                            <span className="font-mono font-normal opacity-80 text-[10px]">p.{matchInfo.targetPara}</span>
+                          ) : matchInfo?.isClosest ? (
+                            <span className="font-mono font-normal opacity-80 text-[10px]">closest p.{matchInfo.targetPara}</span>
+                          ) : (
+                            <span className="font-sans text-[10px] opacity-75">
+                              closest (Ch {(matchInfo?.targetChapter ?? 0) + 1})
+                            </span>
+                          )}
+                          <ArrowUpRight size={12} />
+                        </button>
+                      </>
                     ) : (
                       <span className="text-[10.5px] text-[var(--text-muted)] px-2 py-1">
                         Unavailable

@@ -75,6 +75,7 @@ const DEFAULT_SETTINGS = {
   paliScript: 'roman',
   dictLookupTrigger: 'single', // 'single' | 'double'
   defaultEditionPage: 'M', // 'M' (Myanmar) | 'V' (VRI) | 'P' (PTS) | 'T' (Thai) | 'all' (All editions)
+  openMatInNewWindow: false,
   translations: {
     pali: true,
     english: false,

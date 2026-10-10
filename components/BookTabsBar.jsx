@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Book, X, History, Bot } from 'lucide-react';
+import { Book, X, History, Bot, ExternalLink } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 
 
@@ -185,6 +185,7 @@ export default function BookTabsBar() {
       y,
       bookCode: tab.bookCode,
       tabIndex: idx,
+      tab,
     });
   };
 
@@ -228,7 +229,19 @@ export default function BookTabsBar() {
                 isOver && dropPosition === 'right' ? 'drag-over-right' : ''
               }`}
               title={`${displayTitle} (${tab.bookCode}) — Drag to reorder, right click for menu`}
-              onClick={() => switchTab(tab.bookCode)}
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  e.preventDefault();
+                  const ch = (tab.currentChapterIdx ?? 0) + 1;
+                  const p = tab.lastParaNum;
+                  const url = `/book/${tab.bookCode}/${ch}${p ? `#para${p}` : ''}`;
+                  if (typeof window !== 'undefined') {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }
+                  return;
+                }
+                switchTab(tab.bookCode);
+              }}
               onAuxClick={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
@@ -283,6 +296,25 @@ export default function BookTabsBar() {
           style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            className="w-full text-left px-3 py-1.5 hover:bg-[var(--bg-secondary)] hover:text-[var(--accent)] transition cursor-pointer flex items-center justify-between"
+            onClick={() => {
+              const tabItem = contextMenu.tab || openTabs[contextMenu.tabIndex];
+              const ch = (tabItem?.currentChapterIdx ?? 0) + 1;
+              const p = tabItem?.lastParaNum;
+              const url = `/book/${contextMenu.bookCode}/${ch}${p ? `#para${p}` : ''}`;
+              if (typeof window !== 'undefined') {
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }
+              setContextMenu(null);
+            }}
+          >
+            <span>Open in New Window</span>
+            <ExternalLink size={12} className="opacity-70" />
+          </button>
+
+          <div className="my-1 border-t border-[var(--border-color)]" />
+
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-[var(--bg-secondary)] hover:text-[var(--accent)] transition cursor-pointer flex items-center justify-between"
             onClick={() => {

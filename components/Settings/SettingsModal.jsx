@@ -744,6 +744,20 @@ export default function SettingsModal() {
                       className="accent-[var(--accent)] w-4 h-4 rounded"
                     />
                   </label>
+                  <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
+                    <div className="flex flex-col pr-2">
+                      <span className="text-xs font-semibold">Open MAT links in new browser window</span>
+                      <span className="text-[10.5px] text-[var(--text-muted)] mt-0.5">
+                        Open Mūla, Aṭṭhakathā, and Ṭīkā in a separate browser window or tab (ideal for multi-monitor PC setups). You can also Ctrl+Click any MAT jump.
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={!!settings.openMatInNewWindow}
+                      onChange={(e) => updateSetting('openMatInNewWindow', e.target.checked)}
+                      className="accent-[var(--accent)] w-4 h-4 rounded shrink-0"
+                    />
+                  </label>
                 </div>
               </div>
             )}

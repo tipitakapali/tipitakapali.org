@@ -342,7 +342,13 @@ export function TabProvider({ children }) {
   const updateUrlParams = useCallback((paramsToUpdate) => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location);
-    const preservedHash = window.location.hash || '';
+    const isChangingBook = paramsToUpdate?.book !== undefined && activeBookCodeRef.current && paramsToUpdate.book !== activeBookCodeRef.current;
+    let preservedHash = '';
+    if (paramsToUpdate?.hash !== undefined) {
+      preservedHash = paramsToUpdate.hash ? (paramsToUpdate.hash.startsWith('#') ? paramsToUpdate.hash : `#${paramsToUpdate.hash}`) : '';
+    } else if (!isChangingBook) {
+      preservedHash = window.location.hash || '';
+    }
     let targetLang = undefined;
 
     if (paramsToUpdate) {
@@ -391,7 +397,7 @@ export function TabProvider({ children }) {
       }
 
       Object.entries(paramsToUpdate).forEach(([k, v]) => {
-        if (k === 'book' || k === 'chapter' || k === 'c' || k === 'book_code') return;
+        if (k === 'book' || k === 'chapter' || k === 'c' || k === 'book_code' || k === 'hash') return;
         if (k === 'db' || k === 'lang' || k === 'l') return; // Handled specially below
         if (v === null || v === undefined) {
           url.searchParams.delete(k);
@@ -399,6 +405,7 @@ export function TabProvider({ children }) {
           url.searchParams.set(k, v);
         }
       });
+      url.searchParams.delete('hash');
 
       if (targetLang !== undefined) {
         const norm = normalizeLangCode(targetLang);
@@ -689,6 +696,16 @@ export function TabProvider({ children }) {
       }
 
 
+      if (activeBookCodeRef.current && activeBookCodeRef.current !== cleanCode && typeof document !== 'undefined') {
+        const container = document.querySelector('main.content-area');
+        if (container) {
+          tabScrollMemoryRef.current[activeBookCodeRef.current] = container.scrollTop;
+          try {
+            localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+          } catch (e) {}
+        }
+      }
+
       if (existingTabIndex !== -1) {
         setActiveBookCode((prev) => (prev !== cleanCode ? cleanCode : prev));
         const tab = currentTabs[existingTabIndex];
@@ -814,12 +831,18 @@ export function TabProvider({ children }) {
         }
 
         // 2. If targetChapter not resolved via targetParaIndex, resolve via rawParaNum
-        if (!hasTargetChapter && rawParaNum && tab.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
-          if (resolved) {
-            targetChapIdx = resolved.chapterIdx;
+        if (rawParaNum && tab.para_to_chapter) {
+          if (tab.para_to_chapter[rawParaNum] !== undefined) {
+            targetChapIdx = tab.para_to_chapter[rawParaNum];
             hasTargetChapter = true;
-            effectivePara = resolved.paraNum || rawParaNum;
+            effectivePara = rawParaNum;
+          } else if (!hasTargetChapter) {
+            const resolved = resolveNearestChapterAndPara(tab.para_to_chapter, rawParaNum, targetSub, tab.sub_books_para_to_chapter);
+            if (resolved) {
+              targetChapIdx = resolved.chapterIdx;
+              hasTargetChapter = true;
+              effectivePara = resolved.paraNum || rawParaNum;
+            }
           }
         }
         if (effectivePara && (!options.lang || options.lang === 'pali')) {
@@ -906,7 +929,8 @@ export function TabProvider({ children }) {
           setSearchHighlight(null);
         }
         setTreeSelectedNode({ bookCode: cleanCode, chapterIdx: activeChap });
-        updateUrlParams({ book: cleanCode, chapter: activeChap + 1, q: qParam, l: lParam, search: null });
+        const existingHash = effectivePara ? `#para${effectivePara}` : (rawParaNum ? `#para${rawParaNum}` : (options.targetParaNum ? `#para${options.targetParaNum}` : undefined));
+        updateUrlParams({ book: cleanCode, chapter: activeChap + 1, hash: existingHash, q: qParam, l: lParam, search: null });
         persistTabs(openTabsRef.current, cleanCode);
 
         addToHistory({
@@ -1045,7 +1069,8 @@ export function TabProvider({ children }) {
       setOpenTabs(nextTabsOptimistic);
       setActiveBookCode(cleanCode);
       persistTabs(nextTabsOptimistic, cleanCode);
-      updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1 });
+      const initialHash = rawParaNum ? `#para${rawParaNum}` : (options.targetParaNum ? `#para${options.targetParaNum}` : undefined);
+      updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, hash: initialHash });
 
       setLoadingBook(true);
       try {
@@ -1068,12 +1093,18 @@ export function TabProvider({ children }) {
         }
 
         // 2. If targetChapter not resolved via targetParaIndex, resolve via rawParaNum
-        if (!hasTargetChapter && rawParaNum && bookData.para_to_chapter) {
-          const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
-          if (resolved) {
-            targetChapIdx = resolved.chapterIdx;
+        if (rawParaNum && bookData.para_to_chapter) {
+          if (bookData.para_to_chapter[rawParaNum] !== undefined) {
+            targetChapIdx = bookData.para_to_chapter[rawParaNum];
             hasTargetChapter = true;
-            effectivePara = resolved.paraNum || rawParaNum;
+            effectivePara = rawParaNum;
+          } else if (!hasTargetChapter) {
+            const resolved = resolveNearestChapterAndPara(bookData.para_to_chapter, rawParaNum, targetSub, bookData.sub_books_para_to_chapter);
+            if (resolved) {
+              targetChapIdx = resolved.chapterIdx;
+              hasTargetChapter = true;
+              effectivePara = resolved.paraNum || rawParaNum;
+            }
           }
         }
         if (effectivePara && (!options.lang || options.lang === 'pali')) {
@@ -1213,7 +1244,8 @@ export function TabProvider({ children }) {
         } else {
           setSearchHighlight(null);
         }
-        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, q: qParam, l: lParam, search: null });
+        const finalHash = effectivePara ? `#para${effectivePara}` : (rawParaNum ? `#para${rawParaNum}` : (options.targetParaNum ? `#para${options.targetParaNum}` : undefined));
+        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, hash: finalHash, q: qParam, l: lParam, search: null });
         bufferAdjacentChapters(cleanCode, targetChapIdx);
 
 
@@ -1252,6 +1284,17 @@ export function TabProvider({ children }) {
   // Switch tabs smoothly with instant scroll position restoration
   const switchTab = useCallback(
     (bookCode) => {
+      // Synchronously save the outgoing tab's scroll position before switching tabs
+      if (activeBookCodeRef.current && typeof document !== 'undefined') {
+        const container = document.querySelector('main.content-area');
+        if (container) {
+          tabScrollMemoryRef.current[activeBookCodeRef.current] = container.scrollTop;
+          try {
+            localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+          } catch (e) {}
+        }
+      }
+
       // Flush any debounced scroll persist immediately before switching
       if (scrollPersistTimerRef.current) {
         clearTimeout(scrollPersistTimerRef.current);
@@ -1347,9 +1390,11 @@ export function TabProvider({ children }) {
           chapterIdx: tab.currentChapterIdx ?? 0,
         });
         setSearchHighlight(null);
+        const hashToApply = tab.lastParaNum ? `#para${tab.lastParaNum}` : '';
         updateUrlParams({
           book: tab.bookCode,
           chapter: (tab.currentChapterIdx ?? 0) + 1,
+          hash: hashToApply,
           q: null,
           search: null,
         });
@@ -1690,6 +1735,17 @@ export function TabProvider({ children }) {
   const jumpToMat = useCallback(
     async (targetLayer, options = {}) => {
       if (!activeTab) return;
+
+      if (activeTab.bookCode && typeof document !== 'undefined') {
+        const container = document.querySelector('main.content-area');
+        if (container) {
+          tabScrollMemoryRef.current[activeTab.bookCode] = container.scrollTop;
+          try {
+            localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+          } catch (e) {}
+        }
+      }
+
       let mat = activeTab.mat;
       if (!mat) {
         try {
@@ -1701,12 +1757,6 @@ export function TabProvider({ children }) {
       let targetTitle = options.title || null;
       let targetChapter = options.chapter !== undefined ? options.chapter : undefined;
       let targetSubBook = options.subBook || null;
-
-      let currentChapIdx = activeTab.currentChapterIdx !== undefined && activeTab.currentChapterIdx !== null ? activeTab.currentChapterIdx : 0;
-      if (typeof window !== 'undefined') {
-        const m = window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i);
-        if (m) currentChapIdx = Math.max(0, parseInt(m[1], 10) - 1);
-      }
 
       let currentPNum = options.targetParaNum || activeParaNum;
       if (!currentPNum && typeof window !== 'undefined' && window.location.hash) {
@@ -1721,6 +1771,14 @@ export function TabProvider({ children }) {
         }
       }
       const cleanP = String(currentPNum || '').replace(/^(?:para-?|p)/i, '').trim();
+
+      let currentChapIdx = activeTab.currentChapterIdx !== undefined && activeTab.currentChapterIdx !== null ? activeTab.currentChapterIdx : 0;
+      if (cleanP && activeTab.para_to_chapter?.[cleanP] !== undefined) {
+        currentChapIdx = activeTab.para_to_chapter[cleanP];
+      } else if (typeof window !== 'undefined') {
+        const m = window.location.pathname.match(/\/book\/[^/]+\/(\d+)/i);
+        if (m) currentChapIdx = Math.max(0, parseInt(m[1], 10) - 1);
+      }
 
       let activeSubKey = activeTab?.sub_book || activeTab?.chapter_to_sub_book?.[currentChapIdx];
       if (!activeSubKey && activeTab?.sub_books) {

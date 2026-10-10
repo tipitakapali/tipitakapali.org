@@ -1497,6 +1497,8 @@ export default function ReaderView() {
   const prevBookCodeRef = useRef(null);
   const restoredContainerRef = useRef(null);
   const restoredBookCodeRef = useRef(null);
+  const isTabSwitchingRef = useRef(false);
+  const tabSwitchSettleTimerRef = useRef(null);
   const clickedWordsByBookRef = useRef({});
 
   // Chapter-jump settle tracking (sidebar chapter clicks): lazy translations streaming
@@ -1526,6 +1528,11 @@ export default function ReaderView() {
   }, []);
 
   const cancelJump = useCallback(() => {
+    isTabSwitchingRef.current = false;
+    if (tabSwitchSettleTimerRef.current) {
+      clearTimeout(tabSwitchSettleTimerRef.current);
+      tabSwitchSettleTimerRef.current = null;
+    }
     if (attemptScrollTimerRef.current) {
       clearTimeout(attemptScrollTimerRef.current);
       attemptScrollTimerRef.current = null;
@@ -1564,6 +1571,77 @@ export default function ReaderView() {
       window.removeEventListener('keydown', cancelJump);
     };
   }, [cancelJump]);
+
+  // Keyboard navigation support for PageUp, PageDown, ArrowUp, ArrowDown, Home, End, Space
+  useEffect(() => {
+    const handleNavigationKeyDown = (e) => {
+      // Don't intercept if modifier keys are pressed (except Shift+Space for PageUp)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      // Don't intercept if user is interacting with an input, textarea, select, or contentEditable element
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName?.toLowerCase();
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        activeEl?.isContentEditable ||
+        activeEl?.closest?.('[contenteditable="true"]') ||
+        activeEl?.closest?.('aside, .app-sidebar, [role="dialog"]')
+      ) {
+        return;
+      }
+
+      // For buttons and links: don't intercept Space / Enter (they activate the element)
+      if ((tag === 'button' || tag === 'a') && (e.key === ' ' || e.key === 'Enter')) {
+        return;
+      }
+      // If button is inside an interactive dropdown/menu, let arrow keys handle menu navigation
+      if ((tag === 'button' || tag === 'a') && activeEl?.closest?.('[role="menu"], [role="listbox"], [role="combobox"]')) {
+        return;
+      }
+
+      // Don't intercept if any modal/dialog overlay is open
+      const hasModal = document.querySelector(
+        '.modal-backdrop, [role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-\\[9999\\]'
+      );
+      if (hasModal) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      isTabSwitchingRef.current = false;
+
+      const clientHeight = container.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const pageStep = Math.max(120, Math.round(clientHeight * 0.85));
+      const lineStep = 80;
+
+      if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+        e.preventDefault();
+        container.scrollBy({ top: pageStep, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+      } else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+        e.preventDefault();
+        container.scrollBy({ top: -pageStep, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        container.scrollBy({ top: lineStep, behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        container.scrollBy({ top: -lineStep, behavior: 'smooth' });
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        container.scrollTo({ top: 0, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        container.scrollTo({ top: container.scrollHeight, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+      }
+    };
+
+    window.addEventListener('keydown', handleNavigationKeyDown, { passive: false });
+    return () => window.removeEventListener('keydown', handleNavigationKeyDown);
+  }, [settings?.scrollMotion]);
 
   // Initialize clicked words from localStorage
   useEffect(() => {
@@ -1604,41 +1682,54 @@ export default function ReaderView() {
     if (!containerRef.current || !activeTab?.bookCode || activeTab.bookCode === 'ai_chat') return;
 
     const container = containerRef.current;
-    const needsRestore =
-      restoredContainerRef.current !== container ||
-      restoredBookCodeRef.current !== activeTab.bookCode;
+    const isNewBook = restoredBookCodeRef.current !== activeTab.bookCode;
+    const isNewContainer = restoredContainerRef.current !== container;
 
-    if (needsRestore) {
+    if (isNewBook || isNewContainer) {
+      isTabSwitchingRef.current = true;
       restoredContainerRef.current = container;
       restoredBookCodeRef.current = activeTab.bookCode;
       prevBookCodeRef.current = activeTab.bookCode;
 
       if (!targetScrollIntent) {
         const savedScroll = getSavedScroll(activeTab.bookCode);
-        if (savedScroll > 0) {
-          container.scrollTop = savedScroll;
-          // Safeguard: re-verify in next frame in case DOM layout / fonts reflowed
-          requestAnimationFrame(() => {
-            if (containerRef.current && !targetScrollIntent && restoredBookCodeRef.current === activeTab.bookCode) {
-              if (Math.abs(containerRef.current.scrollTop - savedScroll) > 5) {
-                containerRef.current.scrollTop = savedScroll;
-              }
-            }
-          });
-        }
-      }
-    }
-  }, [activeTab?.bookCode, getSavedScroll, targetScrollIntent]);
+        const targetPara = activeTab?.lastParaNum;
 
-  // Synchronously save scroll position on unmount or tab switch, and reset restoration flag on unmount
+        const restoreAndVerify = () => {
+          if (!containerRef.current || restoredBookCodeRef.current !== activeTab.bookCode) return;
+          if (savedScroll > 0) {
+            if (Math.abs(containerRef.current.scrollTop - savedScroll) > 5) {
+              containerRef.current.scrollTop = savedScroll;
+            }
+          } else if (targetPara) {
+            const pEl = containerRef.current.querySelector(`[data-para="${targetPara}"]`);
+            if (pEl) {
+              pEl.scrollIntoView({ behavior: 'instant', block: 'start' });
+            }
+          }
+        };
+
+        restoreAndVerify();
+        requestAnimationFrame(restoreAndVerify);
+        setTimeout(restoreAndVerify, 60);
+        setTimeout(restoreAndVerify, 180);
+      }
+
+      if (tabSwitchSettleTimerRef.current) {
+        clearTimeout(tabSwitchSettleTimerRef.current);
+      }
+      tabSwitchSettleTimerRef.current = setTimeout(() => {
+        isTabSwitchingRef.current = false;
+      }, 350);
+    }
+  }, [activeTab?.bookCode, activeTab?.lastParaNum, getSavedScroll, targetScrollIntent]);
+
+  // Reset restoration container reference on unmount of ReaderView
   useEffect(() => {
     return () => {
-      if (containerRef.current && activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
-        saveTabScroll(activeTab.bookCode, containerRef.current.scrollTop);
-      }
       restoredContainerRef.current = null;
     };
-  }, [activeTab?.bookCode, saveTabScroll]);
+  }, []);
 
   // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
@@ -2398,11 +2489,17 @@ export default function ReaderView() {
 
         // Ensure the target chapter containing this paragraph is loaded
         const activeSub = subBook || activeTab.sub_book || activeTab.chapter_to_sub_book?.[chapterIdx ?? activeTab.currentChapterIdx ?? 0];
-        const targetChap = (chapterIdx !== undefined && chapterIdx !== null)
+        let targetChap = (chapterIdx !== undefined && chapterIdx !== null)
           ? chapterIdx
           : (activeTab.sub_books_para_to_chapter && activeSub
               ? activeTab.sub_books_para_to_chapter[activeSub]?.[cleanPara]
               : activeTab.para_to_chapter?.[cleanPara]);
+
+        if (cleanPara && activeTab.para_to_chapter?.[cleanPara] !== undefined) {
+          targetChap = activeTab.para_to_chapter[cleanPara];
+        } else if (cleanPara && activeTab.sub_books_para_to_chapter && activeSub && activeTab.sub_books_para_to_chapter[activeSub]?.[cleanPara] !== undefined) {
+          targetChap = activeTab.sub_books_para_to_chapter[activeSub][cleanPara];
+        }
 
         if (targetChap !== undefined && targetChap !== null) {
           if (!activeTab.loadedChapters?.[targetChap] && !activeTab.loadingChapters?.[targetChap]) {
@@ -2429,8 +2526,9 @@ export default function ReaderView() {
 
         // Check ranged paragraph elements (data-para-first <= targetInt <= data-para-last)
         if (!el && !isNaN(targetInt)) {
-          const scope = (chapterIdx !== undefined && chapterIdx !== null)
-            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+          const effectiveScopeChap = targetChap !== undefined && targetChap !== null ? targetChap : chapterIdx;
+          const scope = (effectiveScopeChap !== undefined && effectiveScopeChap !== null)
+            ? containerRef.current.querySelector(`[data-chapter="${effectiveScopeChap}"]`)
             : containerRef.current;
           if (scope && !scope.classList.contains('chapter-placeholder')) {
             const rangedParas = scope.querySelectorAll('[data-para-first]');
@@ -2450,8 +2548,9 @@ export default function ReaderView() {
 
         // Fallback: nearest paragraph <= targetInt
         if (!el && !isNaN(targetInt)) {
-          const scope = (chapterIdx !== undefined && chapterIdx !== null)
-            ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
+          const effectiveScopeChap = targetChap !== undefined && targetChap !== null ? targetChap : chapterIdx;
+          const scope = (effectiveScopeChap !== undefined && effectiveScopeChap !== null)
+            ? containerRef.current.querySelector(`[data-chapter="${effectiveScopeChap}"]`)
             : containerRef.current;
           if (scope && !scope.classList.contains('chapter-placeholder')) {
             const allParas = scope.querySelectorAll('[data-para]');
@@ -2702,6 +2801,8 @@ export default function ReaderView() {
   // Direct fast scroll listener — preserves tab scroll & detects active paragraph
   const handleScroll = useCallback(
     (e) => {
+      if (isTabSwitchingRef.current) return;
+
       const top = e.target.scrollTop;
 
       // Detect manual user scroll to immediately cancel any pending settle watchers
@@ -2709,8 +2810,12 @@ export default function ReaderView() {
         cancelJump();
       }
 
-      // Immediately update memory scroll on every scroll event (no lag, no lost scroll)
-      if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
+      // Immediately update memory scroll on every scroll event (only if tab restoration is settled)
+      if (
+        activeTab?.bookCode &&
+        activeTab.bookCode !== 'ai_chat' &&
+        restoredBookCodeRef.current === activeTab.bookCode
+      ) {
         saveTabScroll(activeTab.bookCode, top);
       }
 
@@ -2783,12 +2888,14 @@ export default function ReaderView() {
             }
           }
 
-          if (foundParaNum) {
-            setActiveParaNum(foundParaNum);
-          }
+          if (restoredBookCodeRef.current === activeTab.bookCode) {
+            if (foundParaNum) {
+              setActiveParaNum(foundParaNum);
+            }
 
-          // Continuously save tab reading position (chapter, paragraph, scroll offset)
-          saveTabPosition(activeTab.bookCode, foundChapterIdx, foundParaNum, top);
+            // Continuously save tab reading position (chapter, paragraph, scroll offset)
+            saveTabPosition(activeTab.bookCode, foundChapterIdx, foundParaNum, top);
+          }
 
           // Automatically record user's exact reading position into History
           addToHistory({
@@ -3443,7 +3550,8 @@ export default function ReaderView() {
 
       {/* Main Scrollable Reading Container */}
       <main
-        className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
+        className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden"
+        tabIndex={0}
         ref={containerRef}
         onScroll={handleScroll}
       >
