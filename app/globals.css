@@ -3833,11 +3833,56 @@ div.dict-dock-panel.dock-side {
   color: var(--accent);
 }
 
-.dp9 .button-box {
+.dp9 .button-box,
+.dp9 .button_box {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin: 8px 0 6px 0;
+  margin: 6px 0 6px 0;
+}
+
+.dp9 .button-box.dpd-collapsed,
+.dp9 .button_box.dpd-collapsed {
+  display: none !important;
+}
+
+.dp9 .dpd-toggle-play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 24px;
+  height: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--accent);
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 0 0 2px 6px;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dp9 .dpd-toggle-play-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dp9 .dpd-toggle-play-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff !important;
+}
+
+.dp9 .dpd-toggle-play-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.dp9 .dpd-toggle-play-btn.active svg {
+  transform: rotate(90deg);
 }
 
 .dp9 a.button,
@@ -4674,8 +4719,49 @@ section.MWS {
   opacity: 1;
 }
 
+/* ========================================================= */
+/* DPD Summary Section & Meaning Jump Navigation Styles      */
+/* ========================================================= */
+.dict-summary-box,
+.dict-meanings-jump-bar {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
 
+.dict-summary-row {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
 
+.dict-summary-row:hover .summary-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
 
+.summary-jump-arrow {
+  color: var(--accent);
+  cursor: pointer;
+  user-select: none;
+}
 
+@keyframes dict-entry-flash {
+  0% {
+    background-color: var(--accent-light, rgba(234, 88, 12, 0.2));
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
 
+.dict-entry-item {
+  scroll-margin-top: 12px;
+}
+
+.dict-entry-highlighted {
+  animation: dict-entry-flash 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  border-radius: 0.5rem;
+  padding: 2px 4px;
+}

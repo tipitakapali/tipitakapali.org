@@ -22,6 +22,8 @@ import {
   BookOpen,
   Languages,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useDictionary, DEFAULT_DICT_ORDER, DEFAULT_DICT_ENABLED } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -105,7 +107,25 @@ function extractWordFromPointerEvent(e) {
 // Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons, definitions, & EPD English headwords untouched)
 function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
   if (!rawHtml) return '';
-  const restored = dictType === 'dpd' ? restoreMinifiedLinks(rawHtml) : rawHtml;
+  let restored = dictType === 'dpd' ? restoreMinifiedLinks(rawHtml) : rawHtml;
+
+  // DPD: Hide button-box by default and inject toggle play button at end of definition
+  if (dictType === 'dpd' && !restored.includes('dpd-toggle-play-btn')) {
+    const toggleBtnHtml =
+      '<button type="button" class="dpd-toggle-play-btn" title="Toggle buttons" aria-label="Toggle buttons"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>';
+    if (/<\/div>\s*<div\s+class=["']?(?:button[-_]box)/i.test(restored)) {
+      restored = restored.replace(
+        /(<\/div>\s*<div\s+class=["']?(button[-_]box)([^"'>]*)["']?>)/gi,
+        ` ${toggleBtnHtml}</div><div class="$2 dpd-collapsed$3">`
+      );
+    } else {
+      restored = restored.replace(
+        /<div\s+class=["']?(button[-_]box)([^"'>]*)["']?>/gi,
+        `${toggleBtnHtml}<div class="$1 dpd-collapsed$2">`
+      );
+    }
+  }
+
   if (!targetScript || targetScript === 'roman') return restored;
   if (typeof window === 'undefined') return restored;
 
@@ -205,6 +225,222 @@ function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
   }
 }
 
+// Helper to extract concise summary information from a DPD HTML entry (matches dpdict.net & @tpo export)
+function extractDpdSummaryItem(rawHtml, fallbackWord = '') {
+  if (!rawHtml) {
+    return { headword: fallbackWord, pos: '', enMeaning: '', viMeaning: '', viLit: '', construction: '', isEpd: false };
+  }
+
+  // 1. Headword (quoted or unquoted class)
+  const hwMatch = rawHtml.match(/<span class=["']?(?:p1w|p2w|p3w|pm1w|pm2w|pp1w|pp2w)["']?[^>]*>([\s\S]*?)<\/span>/i);
+  let headword = hwMatch ? hwMatch[1].replace(/<[^>]+>/g, '').trim() : fallbackWord;
+
+  // 1.5 Check if this is an English-Pali Dictionary (EPD) entry
+  const isEpd = /<b class=["']?epd["']?>|class=["']?epd["']?/i.test(rawHtml);
+  if (isEpd) {
+    let epdMeaning = '';
+    const epdContentMatch = rawHtml.match(/<div class=["']?dpd(?:\s+[^"'>]*)?["']?>\s*<p[^>]*>([\s\S]*?)<\/div>/i);
+    if (epdContentMatch) {
+      let clean = epdContentMatch[1].replace(/<br\s*\/?>/gi, '; ');
+      clean = clean.replace(/<b class=["']?epd["']?>[\s\S]*?<\/b>/gi, '');
+      clean = clean.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      epdMeaning = clean.slice(0, 110);
+    }
+    return {
+      headword,
+      pos: 'English.',
+      viMeaning: '',
+      viLit: '',
+      enMeaning: epdMeaning,
+      construction: '',
+      isEpd: true,
+    };
+  }
+
+  // 1.6 Check if this is a Root entry (<p>root. <b>√brah</b>...)
+  const rootMatch = rawHtml.match(/<p>root\.\s*<b>([^<]+)<\/b>(?:<sup>[^<]*<\/sup>)?\s*([^(<]*)\(([^)]+)\)/i);
+  if (rootMatch) {
+    const rootSign = rootMatch[1].trim();
+    const group = rootMatch[2].trim();
+    const meaning = rootMatch[3].trim();
+    return {
+      headword: rootSign || headword,
+      pos: 'root.',
+      viMeaning: '',
+      viLit: '',
+      enMeaning: meaning ? `${meaning}` : '',
+      construction: group,
+      isEpd: false,
+    };
+  }
+  const rootFallback = rawHtml.match(/<p>root\.\s*<b>([^<]+)<\/b>(?:<sup>[^<]*<\/sup>)?\s*([^<]+)/i);
+  if (rootFallback) {
+    return {
+      headword: rootFallback[1].trim() || headword,
+      pos: 'root.',
+      viMeaning: '',
+      viLit: '',
+      enMeaning: rootFallback[2].trim().slice(0, 80),
+      construction: '',
+      isEpd: false,
+    };
+  }
+
+  // 2. Vietnamese meaning (from customized @tpo export)
+  let viPos = '';
+  let viMeaning = '';
+  let viLit = '';
+  const viMatch = rawHtml.match(/<p class=["']?dpd-meaning-vi["']?>([\s\S]*?)<\/p>/i);
+  if (viMatch) {
+    const viContent = viMatch[1];
+    const viPosMatch = viContent.match(/^\s*([^<]+?\.)/);
+    if (viPosMatch) viPos = viPosMatch[1].trim();
+    const viBoldMatch = viContent.match(/<b>([\s\S]*?)<\/b>/i);
+    if (viBoldMatch) viMeaning = viBoldMatch[1].replace(/<[^>]+>/g, '').trim();
+    const viLitMatch = viContent.match(/<span class=["']?meaning-lit["']?>([\s\S]*?)<\/span>/i);
+    if (viLitMatch) viLit = viLitMatch[1].replace(/<[^>]+>/g, '').trim();
+  }
+
+  // 3. English meaning
+  let enPos = '';
+  let enMeaning = '';
+  let construction = '';
+  const enMatch =
+    rawHtml.match(/<p class=["']?dpd-meaning-en["']?>([\s\S]*?)<\/p>/i) ||
+    rawHtml.match(/<div class=["']?dpd(?:\s+[^"'>]*)?["']?>\s*<p[^>]*>([\s\S]*?)<\/p>/i);
+
+  if (enMatch) {
+    const enContent = enMatch[1];
+    const enPosMatch = enContent.match(/^\s*([a-z\s]+?\.)/i);
+    if (enPosMatch) enPos = enPosMatch[1].trim();
+
+    const constrMatch = enContent.match(/\[([^\]]+)\]/);
+    if (constrMatch) construction = constrMatch[1].trim();
+
+    const enBoldMatch = enContent.match(/<b>([\s\S]*?)<\/b>/i);
+    if (enBoldMatch) {
+      enMeaning = enBoldMatch[1].replace(/<[^>]+>/g, '').trim();
+    } else {
+      let clean = enContent.replace(/\[[^\]]+\]/g, '');
+      clean = clean.replace(/<span class=["']?gray["']?>[\s\S]*?<\/span>/gi, '');
+      clean = clean.replace(/<[^>]+>/g, ' ');
+      if (enPos && clean.trim().toLowerCase().startsWith(enPos.toLowerCase())) {
+        clean = clean.trim().slice(enPos.length).trim();
+      }
+      enMeaning = clean.replace(/\s+/g, ' ').trim().slice(0, 110);
+    }
+  }
+
+  return {
+    headword,
+    pos: viPos || enPos,
+    viMeaning,
+    viLit,
+    enMeaning,
+    construction,
+    isEpd: false,
+  };
+}
+
+// Helper to extract concise preview information for other dictionaries (PTS, ABD, PSD, SANS, Splitter)
+function extractOtherSummaryItem(rawHtml, dictType, fallbackWord = '', index = 0) {
+  if (!rawHtml) {
+    return { headword: fallbackWord || `Meaning ${index + 1}`, label: `Meaning ${index + 1}`, pos: '', snippet: '' };
+  }
+
+  if (dictType === 'pts') {
+    const hwM = rawHtml.match(/<b>([A-Za-zāīūṭḍṅñṇḷṃ\s]+)(?:<sup>(\d+)<\/sup>)?<\/b>/i);
+    const hw = hwM ? hwM[1].trim() + (hwM[2] ? ` ${hwM[2]}` : '') : (fallbackWord || `Meaning ${index + 1}`);
+    const posM = rawHtml.match(/<b>(?:[A-Za-zāīūṭḍṅñṇḷṃ\s]|<sup>\d+<\/sup>)+<\/b>\s*(\([^)]+\))/i);
+    const pos = posM ? posM[1].trim() : '';
+    let clean = rawHtml.replace(/<span class=["']?pp[12]w["']?>[\s\S]*?<\/span><br\s*\/?>/gi, '');
+    clean = clean.replace(/<div class=["']?pts15["']?>/gi, '');
+    const bracketM = clean.match(/<b>[\s\S]*?<\/b>\s*(?:\([^)]+\))?\s*\[[\s\S]*?\]/i);
+    let after = bracketM ? clean.slice(bracketM.index + bracketM[0].length) : clean.replace(/<b>[\s\S]*?<\/b>/i, '');
+    after = after.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (after.startsWith('.')) after = after.slice(1).trim();
+    return { headword: hw, label: hw, pos, snippet: after.slice(0, 100) };
+  }
+
+  if (dictType === 'abd') {
+    const wordM = rawHtml.match(/<p class=["']?word["']?>\s*([^<\s]+)\s*(?:<span class=["']?gender["']?>\s*([^<]+)<\/span>)?/i);
+    const hw = wordM ? wordM[1].trim() : (fallbackWord || `Meaning ${index + 1}`);
+    const gender = wordM && wordM[2] ? wordM[2].trim() : '';
+    const defM = rawHtml.match(/<div class=["']?definition["']?>([\s\S]*?)<\/div>/i);
+    let snippet = '';
+    if (defM) {
+      snippet = defM[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    } else {
+      const vigM = rawHtml.match(/<div class=["']?viggaha["']?>([\s\S]*?)<\/div>/i);
+      snippet = vigM ? vigM[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    }
+    return { headword: hw, label: gender ? `${hw} ${gender}` : hw, pos: gender, snippet: snippet.slice(0, 100) };
+  }
+
+  if (dictType === 'psd') {
+    const dictNameM = rawHtml.match(/<div class=["']?psdT["']?>([^<]+)<\/div>/i);
+    const hwM = rawHtml.match(/<span class=["']?(?:p2w|psdW|p1w)["']?[^>]*>([^<]+)<\/span>/i);
+    const hw = hwM ? hwM[1].trim() : (fallbackWord || `Meaning ${index + 1}`);
+    const posM = rawHtml.match(/<r[^>]*>([^<]+)<\/r>/i);
+    const pos = posM ? posM[1].trim() : '';
+    const dictName = dictNameM ? dictNameM[1].trim() : '';
+    const shortDict = dictName.includes('බුද්ධදත්ත')
+      ? 'Buddhadatta'
+      : dictName.includes('සුමඞ්ගල')
+      ? 'Sumangala'
+      : dictName.slice(0, 18);
+    const liM = rawHtml.match(/<li>([\s\S]*?)<\/li>/i);
+    let snippet = '';
+    if (liM) {
+      let liText = liM[1].replace(/<r[^>]*>[\s\S]*?<\/r>/gi, '');
+      snippet = liText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return { headword: hw, label: shortDict ? `${hw} (${shortDict})` : hw, pos, snippet: snippet.slice(0, 100) };
+  }
+
+  if (dictType === 'sans') {
+    const dictNameM = rawHtml.match(/<div class=["']?Dn["']?>([^<]+)<\/div>/i);
+    const hwM = rawHtml.match(/<span class=["']?sdata["']?>([^<]+)<\/span>/i);
+    const hw = hwM ? hwM[1].trim() : (fallbackWord || `Meaning ${index + 1}`);
+    const dictName = dictNameM ? dictNameM[1].trim() : '';
+    const shortDict = dictName.includes('Edgerton')
+      ? 'Edgerton'
+      : dictName.includes('Monier-Williams')
+      ? 'Monier-Williams'
+      : dictName.includes('Apte')
+      ? 'Apte'
+      : dictName.slice(0, 18);
+    let after = rawHtml.replace(/^[\s\S]*?\[Printed book page [^\]]+\]\s*/i, '');
+    after = after.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (hw && after.toLowerCase().startsWith(hw.toLowerCase())) {
+      after = after.slice(hw.length).trim();
+    }
+    return { headword: hw, label: shortDict || `Meaning ${index + 1}`, pos: '', snippet: after.slice(0, 100) };
+  }
+
+  if (dictType === 'splitter') {
+    const hwM = rawHtml.match(/<span class=["']?p2w["']?[^>]*>([^<]+)<\/span>/i);
+    const hw = hwM ? hwM[1].trim() : (fallbackWord || `Split ${index + 1}`);
+    const decs = [];
+    const decRegex = /<p class=["']?dec["']?>([\s\S]*?)<\/p>/gi;
+    let m;
+    while ((m = decRegex.exec(rawHtml)) !== null) {
+      const part = m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (part) decs.push(part);
+    }
+    const snippet = decs.join(' • ');
+    return { headword: hw, label: hw, pos: '', snippet: snippet.slice(0, 100) };
+  }
+
+  const clean = rawHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return {
+    headword: fallbackWord || `Meaning ${index + 1}`,
+    label: `Meaning ${index + 1}`,
+    pos: '',
+    snippet: clean.slice(0, 90),
+  };
+}
+
 export default function DictionaryModal() {
   const {
     isOpen,
@@ -298,6 +534,49 @@ export default function DictionaryModal() {
         }
       }
     } catch (e) {}
+  }, []);
+
+  // Meanings Preview Bar Collapse/Expand State (persisted in localStorage)
+  const [isMeaningsExpanded, setIsMeaningsExpanded] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedMeanings = localStorage.getItem('tipitaka_dict_meanings_expanded');
+      if (savedMeanings !== null) {
+        setIsMeaningsExpanded(savedMeanings === 'true');
+      }
+    } catch (e) {}
+  }, []);
+
+  const toggleMeaningsExpanded = useCallback(() => {
+    setIsMeaningsExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('tipitaka_dict_meanings_expanded', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  // Jump to specific meaning/entry with smooth scrolling and flash highlight
+  const handleJumpToEntry = useCallback((index) => {
+    const container = contentContainerRef.current;
+    if (!container) return;
+    const targetEl = container.querySelector(`#dict-entry-${index}`);
+    if (targetEl) {
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const scrollOffset = targetRect.top - containerRect.top + container.scrollTop;
+      container.scrollTo({ top: Math.max(0, scrollOffset - 8), behavior: 'smooth' });
+
+      targetEl.classList.remove('dict-entry-highlighted');
+      void targetEl.offsetWidth; // force reflow
+      targetEl.classList.add('dict-entry-highlighted');
+      setTimeout(() => {
+        targetEl.classList.remove('dict-entry-highlighted');
+      }, 1600);
+    }
   }, []);
 
   // Reset scroll position to top whenever active dictionary tab or query word changes (Task 2)
@@ -602,6 +881,48 @@ export default function DictionaryModal() {
   // Intercept clicks inside definitions (DPD buttons, inflection loader, auto-collapse, word jump)
   const handleContentClick = useCallback(
     async (e) => {
+      // 0. Handle DPD button-box toggle play button
+      const toggleBtn = e.target.closest('.dpd-toggle-play-btn');
+      if (toggleBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const container = toggleBtn.closest('section.dp9, div.dp9, .dict-entry-item') || toggleBtn.parentElement;
+        const buttonBox =
+          toggleBtn.nextElementSibling &&
+          (toggleBtn.nextElementSibling.classList.contains('button-box') ||
+            toggleBtn.nextElementSibling.classList.contains('button_box'))
+            ? toggleBtn.nextElementSibling
+            : container?.querySelector('.button-box, .button_box');
+
+        if (buttonBox) {
+          const isCurrentlyCollapsed = buttonBox.classList.contains('dpd-collapsed');
+          if (isCurrentlyCollapsed) {
+            buttonBox.classList.remove('dpd-collapsed');
+            toggleBtn.classList.add('active');
+            toggleBtn.setAttribute('title', 'Hide buttons');
+            toggleBtn.setAttribute('aria-label', 'Hide buttons');
+          } else {
+            buttonBox.classList.add('dpd-collapsed');
+            toggleBtn.classList.remove('active');
+            toggleBtn.setAttribute('title', 'Toggle buttons');
+            toggleBtn.setAttribute('aria-label', 'Toggle buttons');
+
+            // Collapse any open drawers/tables in this entry
+            if (container) {
+              const allContentDivs = container.querySelectorAll(
+                '[id^="grammar_"], [id^="examples_"], [id^="declension_"], [id^="conjugation_"], [id^="family_"], [id^="feedback_"], div.content'
+              );
+              allContentDivs.forEach((d) => d.classList.add('hidden'));
+
+              const allButtons = container.querySelectorAll('a.dpd-button, a.button');
+              allButtons.forEach((b) => b.classList.remove('active'));
+            }
+          }
+        }
+        return;
+      }
+
       // 1. Handle Audio play button clicks — neutralize inline onclick + delegated double-fire
       const playBtn = e.target.closest('a.dpd-button.play, button.play, a.play');
       if (playBtn) {
@@ -745,6 +1066,49 @@ export default function DictionaryModal() {
         return;
       }
 
+      // 3.5 Handle summary jump links & anchor jumps (e.g. #dict-entry-1, #brahma_1, data-jump-index)
+      const summaryOrAnchor = e.target.closest('a.summary-link, a.summary-jump-arrow, [data-jump-index], a[href^="#"]');
+      if (summaryOrAnchor) {
+        const jumpIdxAttr = summaryOrAnchor.getAttribute('data-jump-index');
+        if (jumpIdxAttr !== null) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleJumpToEntry(parseInt(jumpIdxAttr, 10));
+          return;
+        }
+        const href = summaryOrAnchor.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const targetId = href.slice(1);
+          if (targetId.startsWith('dict-entry-')) {
+            const idx = parseInt(targetId.replace('dict-entry-', ''), 10);
+            if (!isNaN(idx)) {
+              handleJumpToEntry(idx);
+              return;
+            }
+          }
+          const targetEl =
+            contentContainerRef.current?.querySelector(`#${CSS.escape(targetId)}`) ||
+            contentContainerRef.current?.querySelector(`[data-anchor="${CSS.escape(targetId)}"]`) ||
+            document.getElementById(targetId);
+          if (targetEl && contentContainerRef.current) {
+            const container = contentContainerRef.current;
+            const containerRect = container.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+            const scrollOffset = targetRect.top - containerRect.top + container.scrollTop;
+            container.scrollTo({ top: Math.max(0, scrollOffset - 8), behavior: 'smooth' });
+            targetEl.classList.remove('dict-entry-highlighted');
+            void targetEl.offsetWidth;
+            targetEl.classList.add('dict-entry-highlighted');
+            setTimeout(() => {
+              targetEl.classList.remove('dict-entry-highlighted');
+            }, 1600);
+            return;
+          }
+        }
+      }
+
       // 4. Handle clicks on clickable terms / jumps inside definitions (Explicit jump links)
       const jumpLink = e.target.closest('a.jump, span.p1w, span.p2w, span.p3w, .dec-term, b.epd, .epd');
       if (jumpLink) {
@@ -777,7 +1141,7 @@ export default function DictionaryModal() {
         }
       }
     },
-    [queryWord, currentScript, performLookup]
+    [queryWord, currentScript, performLookup, handleJumpToEntry]
   );
 
   // Active results list for current tab
@@ -1072,18 +1436,189 @@ export default function DictionaryModal() {
           </div>
         )}
 
-        {/* Results List */}
+        {/* ========================================================= */}
+        {/* Other Dictionaries: Jump to Meaning Bar (1, 2, 3...)      */}
+        {/* ========================================================= */}
+        {!isLoading && activeDictTab !== 'dpd' && currentTabResults.length > 1 && (
+          <div className="dict-meanings-jump-bar mb-3 bg-[var(--bg-secondary)] border border-[var(--border-color)]/80 rounded-xl p-2.5 sm:p-3 shadow-2xs space-y-2">
+            {/* Header with Meaning Count & Jump Title */}
+            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[var(--border-color)]/50">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1">
+                  <Layers size={13} className="shrink-0" />
+                  <span>Jump to meaning</span>
+                </span>
+                <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center bg-[var(--accent)] text-white">
+                    {currentTabResults.length}
+                  </span>
+                </span>
+              </div>
+
+              {/* Quick Jump Pills (1, 2, 3...) & Toggle */}
+              <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                  {currentTabResults.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleJumpToEntry(i)}
+                      className="inline-flex items-center justify-center min-w-[22px] h-[18px] rounded-full text-[10px] font-bold bg-[var(--bg-card)] hover:bg-[var(--accent)] text-[var(--text-primary)] hover:text-white border border-[var(--border-color)] hover:border-[var(--accent)] transition-all cursor-pointer shadow-2xs"
+                      title={`Jump to meaning ${i + 1}`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleMeaningsExpanded}
+                  className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition cursor-pointer ml-1"
+                  title={isMeaningsExpanded ? 'Collapse meanings preview' : 'Expand meanings preview'}
+                  aria-label={isMeaningsExpanded ? 'Collapse meanings preview' : 'Expand meanings preview'}
+                >
+                  {isMeaningsExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Meaning Quick Jump Buttons (Links to Jump to Meaning 1, 2, 3...) */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {currentTabResults.map((item, idx) => {
+                const itemSummary = extractOtherSummaryItem(item.html, activeDictTab, item.word, idx);
+                const displayHw =
+                  activeDictTab === 'pts' || activeDictTab === 'splitter'
+                    ? convertPaliScript(itemSummary.headword, currentScript) || itemSummary.headword
+                    : itemSummary.headword;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleJumpToEntry(idx)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--bg-card)] hover:bg-[var(--accent-light)] text-[var(--text-primary)] hover:text-[var(--accent)] border border-[var(--border-color)] hover:border-[var(--accent)] transition-all cursor-pointer shadow-2xs group"
+                    title={`Jump to Meaning ${idx + 1}: ${displayHw}`}
+                  >
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[16px] shrink-0">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold min-w-[20px] text-center leading-none inline-flex items-center justify-center bg-[var(--accent)] text-white group-hover:scale-105 transition-transform">
+                        {idx + 1}
+                      </span>
+                    </span>
+                    <span className="font-semibold">Meaning {idx + 1}</span>
+                    {itemSummary.label && (
+                      <span className="text-[11px] text-[var(--text-muted)] group-hover:text-[var(--accent)]/80 max-w-[130px] truncate">
+                        ({itemSummary.label})
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* At-a-glance Detailed Meanings Preview List (Expanded by default) */}
+            {isMeaningsExpanded && (
+              <div className="pt-2 border-t border-[var(--border-color)]/50 space-y-1.5">
+                {currentTabResults.map((item, idx) => {
+                  const itemSummary = extractOtherSummaryItem(item.html, activeDictTab, item.word, idx);
+                  const displayHw =
+                    activeDictTab === 'pts' || activeDictTab === 'splitter'
+                      ? convertPaliScript(itemSummary.headword, currentScript) || itemSummary.headword
+                      : itemSummary.headword;
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleJumpToEntry(idx)}
+                      className="dict-summary-row flex items-baseline justify-between gap-2 p-1.5 rounded-lg hover:bg-[var(--bg-card)] transition-colors group cursor-pointer text-xs"
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
+                        <span className="text-[10px] font-mono text-[var(--text-muted)] font-semibold shrink-0">
+                          {idx + 1}.
+                        </span>
+                        <a
+                          href={`#dict-entry-${idx}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleJumpToEntry(idx);
+                          }}
+                          className="summary-link font-bold text-[var(--accent)] hover:underline whitespace-nowrap"
+                          title={`Jump to Meaning ${idx + 1}`}
+                        >
+                          Meaning {idx + 1}: {displayHw}
+                        </a>
+                        {itemSummary.pos && (
+                          <span className="text-[var(--text-muted)] italic font-serif text-[11px]">
+                            {itemSummary.pos}
+                          </span>
+                        )}
+                        {itemSummary.snippet && (
+                          <span className="text-[var(--text-secondary)] text-[11.5px] leading-relaxed">
+                            {itemSummary.snippet}...
+                          </span>
+                        )}
+                      </div>
+                      <span className="summary-jump-arrow text-[var(--accent)] opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all text-xs font-bold px-1 shrink-0">
+                        ►
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* Results List                                              */}
+        {/* ========================================================= */}
         {!isLoading && currentTabResults.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {currentTabResults.map((item, idx) => {
               const rawHtml = item.html || '';
               const processedHtml = convertDictionaryEntryHtml(rawHtml, activeDictTab, currentScript);
 
+              // Extract item headword for anchor
+              const s =
+                activeDictTab === 'dpd'
+                  ? extractDpdSummaryItem(rawHtml, item.word)
+                  : extractOtherSummaryItem(rawHtml, activeDictTab, item.word, idx);
+              const itemHw = s.headword;
+              const lemmaAnchor = itemHw ? itemHw.toLowerCase().replace(/\s+/g, '_') : '';
+
               return (
                 <div
                   key={idx}
-                  className="dict-entry-item pb-2.5 mb-2.5 border-b border-[var(--border-color)]/30 last:border-b-0 last:pb-0 last:mb-0"
+                  id={`dict-entry-${idx}`}
+                  data-anchor={lemmaAnchor}
+                  className="dict-entry-item pb-3 mb-3 border-b border-[var(--border-color)]/30 last:border-b-0 last:pb-0 last:mb-0 transition-colors"
                 >
+                  {/* Anchor for lemma hash e.g. #brahma_1 */}
+                  {lemmaAnchor && <span id={lemmaAnchor} className="sr-only" />}
+
+                  {/* Entry Meaning Header (only for non-DPD dictionaries when multiple entries exist) */}
+                  {activeDictTab !== 'dpd' && currentTabResults.length > 1 && (
+                    <div className="flex items-center justify-end py-0.5 px-2 mb-2 rounded-lg bg-[var(--bg-secondary)] text-xs text-[var(--text-secondary)] border border-[var(--border-color)]/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (contentContainerRef.current) {
+                            contentContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                            setIsMeaningsExpanded(true);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)] hover:underline cursor-pointer py-0.5 shrink-0"
+                        title="Jump back to meanings"
+                      >
+                        <span className="inline-flex items-center justify-center h-[16px] shrink-0">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold text-center leading-none inline-flex items-center justify-center bg-[var(--accent)] text-white">
+                            {idx + 1}/{currentTabResults.length}
+                          </span>
+                        </span>
+                        <span>↑ Meanings</span>
+                      </button>
+                    </div>
+                  )}
+
                   <div
                     className="dp9 leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: processedHtml }}
