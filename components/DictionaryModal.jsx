@@ -6,7 +6,9 @@ import {
   X,
   Search,
   ArrowLeft,
-  ArrowRight,
+  History,
+  Clock,
+  Trash2,
   Layers,
   PanelLeft,
   PanelRight,
@@ -221,7 +223,6 @@ export default function DictionaryModal() {
     closeDictionary,
     performLookup,
     goBack,
-    goForward,
     setDictTab,
     setDockMode,
     setFontSizeMultiplier,
@@ -229,6 +230,9 @@ export default function DictionaryModal() {
     clearDictionaryInput,
     dictOrder,
     dictEnabled,
+    lookupHistory,
+    clearLookupHistory,
+    removeLookupHistoryItem,
   } = useDictionary();
 
   const { settings } = useThemeSettings();
@@ -236,6 +240,45 @@ export default function DictionaryModal() {
   const inputRef = useRef(null);
   const contentContainerRef = useRef(null);
   const modalPanelRef = useRef(null);
+
+  // History Dropdown State & Refs
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const historyBtnRef = useRef(null);
+  const historyDropdownRef = useRef(null);
+
+  // Close history dropdown on click outside or Escape
+  useEffect(() => {
+    if (!isHistoryOpen) return;
+    const handleClickOutside = (e) => {
+      if (
+        historyDropdownRef.current &&
+        !historyDropdownRef.current.contains(e.target) &&
+        historyBtnRef.current &&
+        !historyBtnRef.current.contains(e.target)
+      ) {
+        setIsHistoryOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setIsHistoryOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isHistoryOpen]);
+
+  // Close history dropdown whenever the dictionary is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setIsHistoryOpen(false);
+    }
+  }, [isOpen]);
 
   // Resizable Width State (persisted in localStorage)
   const [dictWidth, setDictWidth] = useState(420);
@@ -786,8 +829,8 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       <div className="dict-header-bar bg-[var(--bg-secondary)] pt-2 sm:pt-2.5 px-2 sm:px-2.5 pb-0 flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
 
-        {/* Previous / Next Lookup History Controls */}
-        <div className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-0.5 shrink-0 shadow-2xs">
+        {/* Previous Lookup & History Controls */}
+        <div className="relative flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-0.5 shrink-0 shadow-2xs">
           <button
             type="button"
             onClick={goBack}
@@ -799,15 +842,117 @@ export default function DictionaryModal() {
             <ArrowLeft size={14} />
           </button>
           <button
+            ref={historyBtnRef}
             type="button"
-            onClick={goForward}
-            disabled={historyIndex >= history.length - 1}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
-            title="Next lookup (Forward)"
-            aria-label="Next lookup"
+            onClick={() => setIsHistoryOpen((prev) => !prev)}
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
+              isHistoryOpen
+                ? 'text-[var(--accent)] bg-[var(--accent-light)]'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+            }`}
+            title="Lookup history"
+            aria-label="Lookup history"
+            aria-expanded={isHistoryOpen}
           >
-            <ArrowRight size={14} />
+            <History size={14} />
           </button>
+
+          {/* History Dropdown Menu */}
+          {isHistoryOpen && (
+            <div
+              ref={historyDropdownRef}
+              className="absolute left-0 top-full mt-1.5 w-64 sm:w-72 max-w-[calc(100vw-2rem)] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden z-50 text-xs animate-in fade-in zoom-in-95 duration-100"
+            >
+              <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] select-none">
+                <div className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+                  <History size={13} className="text-[var(--accent)]" />
+                  <span>Recent Lookups</span>
+                  {lookupHistory && lookupHistory.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--accent-light)] text-[var(--accent)] font-bold">
+                      {lookupHistory.length}
+                    </span>
+                  )}
+                </div>
+                {lookupHistory && lookupHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearLookupHistory();
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-rose-600 dark:hover:text-rose-400 p-1 rounded hover:bg-[var(--bg-card)] transition cursor-pointer"
+                    title="Clear lookup history"
+                  >
+                    <Trash2 size={12} />
+                    <span>Clear</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-60 overflow-y-auto divide-y divide-[var(--border-color)]/40">
+                {!lookupHistory || lookupHistory.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-[var(--text-muted)] flex flex-col items-center gap-1.5 select-none">
+                    <History size={18} className="opacity-35" />
+                    <span>No recent lookup words</span>
+                  </div>
+                ) : (
+                  lookupHistory.map((word, idx) => {
+                    const isCurrent =
+                      (displayWord && word.toLowerCase() === displayWord.toLowerCase()) ||
+                      (queryWord && word.toLowerCase() === queryWord.toLowerCase());
+                    const scriptDisplay =
+                      currentScript && currentScript !== 'roman'
+                        ? convertPaliScript(word, currentScript)
+                        : word;
+
+                    return (
+                      <div
+                        key={`${word}-${idx}`}
+                        className={`group flex items-center justify-between px-3 py-2 cursor-pointer transition select-none ${
+                          isCurrent
+                            ? 'bg-[var(--accent-light)]/60 text-[var(--accent)] font-semibold'
+                            : 'hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                        }`}
+                        onClick={() => {
+                          performLookup(word, true);
+                          setIsHistoryOpen(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                          <Clock
+                            size={12}
+                            className={`shrink-0 ${
+                              isCurrent ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] opacity-60'
+                            }`}
+                          />
+                          <span className="truncate font-medium" title={word}>
+                            {scriptDisplay}
+                          </span>
+                          {currentScript && currentScript !== 'roman' && scriptDisplay !== word && (
+                            <span className="text-[10px] text-[var(--text-muted)] truncate shrink-0">
+                              ({word})
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeLookupHistoryItem(word);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-[var(--text-muted)] hover:text-rose-600 hover:bg-[var(--bg-card)] transition shrink-0"
+                          title="Remove from history"
+                          aria-label={`Remove ${word} from history`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input Field with Dictionary Icon */}

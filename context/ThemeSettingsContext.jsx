@@ -55,10 +55,24 @@ function applyBrowserThemeColor(theme) {
   if (sb) sb.setAttribute('content', dark ? 'black-translucent' : 'default');
 }
 
+// Detect mobile device vs computer browser
+export function isMobileDevice() {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+  const isSmallScreen = window.innerWidth < 768;
+  const isIPad = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1 && window.innerWidth <= 1024;
+  return isMobileUa || isSmallScreen || isIPad;
+}
+
+export function isComputerBrowser() {
+  return !isMobileDevice();
+}
+
 const DEFAULT_SETTINGS = {
   theme: 'classic',
   accentColor: 'burgundy',
-  fontFamily: 'gentium',
+  fontFamily: 'default',
   fontSize: 22,
   lineHeight: 1.85,
   textAlign: 'justify',
@@ -168,11 +182,29 @@ export function ThemeSettingsProvider({ children }) {
           if (!hasAnyActive) {
             merged.translations.pali = true;
           }
+          // If the user hasn't explicitly customized openMatInNewWindow, apply device-responsive default:
+          // Computer browser -> true (new browser tab), Mobile device -> false (in-app tab)
+          if (!parsed.openMatInNewWindowExplicit) {
+            merged.openMatInNewWindow = isComputerBrowser();
+          }
+
+          // If fontFamily was legacy default 'gentium' without explicit customization, or unsupported/empty, set to 'default'
+          const VALID_FONT_FAMILIES = ['default', 'gentium', 'garamond', 'serif', 'system'];
+          if (!merged.fontFamily || !VALID_FONT_FAMILIES.includes(merged.fontFamily) || (merged.fontFamily === 'gentium' && !parsed.fontFamilyExplicit)) {
+            merged.fontFamily = 'default';
+          }
+
           try {
             localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
           } catch (e) {}
           return merged;
         });
+      } else {
+        // No saved settings: apply responsive default for computer vs mobile
+        setSettingsState((prev) => ({
+          ...prev,
+          openMatInNewWindow: isComputerBrowser(),
+        }));
       }
     } catch (e) {
       console.error('Error loading settings from localStorage:', e);
@@ -184,6 +216,12 @@ export function ThemeSettingsProvider({ children }) {
     setSettingsState((prev) => {
       const finalVal = value;
       const updated = { ...prev, [key]: finalVal };
+      if (key === 'openMatInNewWindow') {
+        updated.openMatInNewWindowExplicit = true;
+      }
+      if (key === 'fontFamily') {
+        updated.fontFamilyExplicit = true;
+      }
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -196,6 +234,12 @@ export function ThemeSettingsProvider({ children }) {
   const updateSettings = (newObj) => {
     setSettingsState((prev) => {
       const sanitized = { ...newObj };
+      if ('openMatInNewWindow' in sanitized) {
+        sanitized.openMatInNewWindowExplicit = true;
+      }
+      if ('fontFamily' in sanitized) {
+        sanitized.fontFamilyExplicit = true;
+      }
       const updated = { ...prev, ...sanitized };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
@@ -255,33 +299,44 @@ export function ThemeSettingsProvider({ children }) {
     document.body.classList.toggle('zen-mode', isZenMode);
   }, [settings, isZenMode, isMounted]);
 
-  // Prime script fonts to avoid FOIT/layout shift when switching scripts
+  // Prime script & reader fonts to avoid FOIT/layout shift when switching scripts or fonts
   useEffect(() => {
-    if (typeof document !== 'undefined' && document.fonts && settings.paliScript && settings.paliScript !== 'roman') {
-      const scriptFontMap = {
-        sinhala: '1em "UN-Abhaya"',
-        myanmar: '1em "Pyidaungsu"',
-        devanagari: '1em "Noto Sans Devanagari"',
-        thai: '1em "THSarabunPali"',
-        laos: '1em "Noto Sans Lao"',
-        khmer: '1em "Noto Sans Khmer"',
-        bengali: '1em "Noto Sans Bengali"',
-        gurmukhi: '1em "Noto Sans Gurmukhi"',
-        gujarati: '1em "Noto Sans Gujarati"',
-        telugu: '1em "Noto Sans Telugu"',
-        kannada: '1em "Noto Sans Kannada"',
-        malayalam: '1em "Noto Sans Malayalam"',
-        taitham: '1em "Noto Sans Tai Tham"',
-        brahmi: '1em "Noto Sans Brahmi"',
-        tibetan: '1em "Noto Serif Tibetan"',
-        cyrillic: '1em "Noto Sans"',
-      };
-      const fontDesc = scriptFontMap[settings.paliScript];
-      if (fontDesc) {
-        document.fonts.load(fontDesc).catch(() => {});
+    if (typeof document !== 'undefined' && document.fonts) {
+      if (settings.paliScript && settings.paliScript !== 'roman') {
+        const scriptFontMap = {
+          sinhala: '1em "UN-Abhaya"',
+          myanmar: '1em "Pyidaungsu"',
+          devanagari: '1em "Noto Sans Devanagari"',
+          thai: '1em "THSarabunPali"',
+          laos: '1em "Noto Sans Lao"',
+          khmer: '1em "Noto Sans Khmer"',
+          bengali: '1em "Noto Sans Bengali"',
+          gurmukhi: '1em "Noto Sans Gurmukhi"',
+          gujarati: '1em "Noto Sans Gujarati"',
+          telugu: '1em "Noto Sans Telugu"',
+          kannada: '1em "Noto Sans Kannada"',
+          malayalam: '1em "Noto Sans Malayalam"',
+          taitham: '1em "Noto Sans Tai Tham"',
+          brahmi: '1em "Noto Sans Brahmi"',
+          tibetan: '1em "Noto Serif Tibetan"',
+          cyrillic: '1em "Noto Sans"',
+        };
+        const fontDesc = scriptFontMap[settings.paliScript];
+        if (fontDesc) {
+          document.fonts.load(fontDesc).catch(() => {});
+        }
+      } else {
+        if (settings.fontFamily === 'gentium') {
+          document.fonts.load('1em "Gentium Plus"').catch(() => {});
+        } else if (settings.fontFamily === 'garamond') {
+          document.fonts.load('1em "EB Garamond"').catch(() => {});
+        } else {
+          document.fonts.load('1em "Noto Sans"').catch(() => {});
+          document.fonts.load('1em "DejaVu Sans"').catch(() => {});
+        }
       }
     }
-  }, [settings.paliScript]);
+  }, [settings.paliScript, settings.fontFamily]);
 
   return (
     <ThemeSettingsContext.Provider

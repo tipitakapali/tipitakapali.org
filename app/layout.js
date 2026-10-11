@@ -138,13 +138,20 @@ const jsonLdWebsite = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="classic" data-script="roman" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
+    <html lang="en" data-theme="classic" data-script="roman" data-font="default" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
       <head>
         <link
           rel="preload"
           href="/fonts/pali/Noto_Sans/static/NotoSans-Regular.ttf"
           as="font"
           type="font/ttf"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/pali/Gentium_Plus/GentiumPlus-Regular.woff2"
+          as="font"
+          type="font/woff2"
           crossOrigin="anonymous"
         />
         <script

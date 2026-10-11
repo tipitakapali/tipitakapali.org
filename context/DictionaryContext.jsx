@@ -64,6 +64,7 @@ const STORAGE_KEYS = {
   LAST_TAB: 'tipitaka_dict_last_tab',
   DICT_ORDER: 'tipitaka_dict_order_v2',
   DICT_ENABLED: 'tipitaka_dict_enabled',
+  LOOKUP_HISTORY: 'tipitaka_dict_lookup_history',
 };
 
 export const DEFAULT_DICT_ORDER = ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'];
@@ -83,9 +84,10 @@ export function DictionaryProvider({ children }) {
   const [dictOrder, setDictOrderState] = useState(DEFAULT_DICT_ORDER);
   const [dictEnabled, setDictEnabledState] = useState(DEFAULT_DICT_ENABLED);
 
-  // History navigation stack
+  // History navigation stack & persistent lookup history
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [lookupHistory, setLookupHistory] = useState([]);
 
   // Lookup results state
   const [lookupData, setLookupData] = useState(null);
@@ -193,6 +195,16 @@ export function DictionaryProvider({ children }) {
           const parsed = JSON.parse(savedEnabled);
           if (parsed && typeof parsed === 'object') {
             setDictEnabledState((prev) => ({ ...prev, ...parsed }));
+          }
+        } catch (e) {}
+      }
+
+      const savedLookupHistory = localStorage.getItem(STORAGE_KEYS.LOOKUP_HISTORY);
+      if (savedLookupHistory) {
+        try {
+          const parsed = JSON.parse(savedLookupHistory);
+          if (Array.isArray(parsed)) {
+            setLookupHistory(parsed);
           }
         } catch (e) {}
       }
@@ -337,6 +349,16 @@ export function DictionaryProvider({ children }) {
     if (lookupDataRef.current?.word === cleanWord) {
       setQueryWord(cleanWord);
       setDisplayWord(rawDisplay);
+      if (addToHistoryStack) {
+        setLookupHistory((prev) => {
+          const filtered = prev.filter((item) => item.toLowerCase() !== rawDisplay.toLowerCase());
+          const next = [rawDisplay, ...filtered].slice(0, 50);
+          try {
+            localStorage.setItem(STORAGE_KEYS.LOOKUP_HISTORY, JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      }
       return;
     }
 
@@ -351,12 +373,20 @@ export function DictionaryProvider({ children }) {
     setIsBackgroundLoading(false);
     setError(null);
 
-    // Update history stack
+    // Update history stack & persistent recent lookup history
     if (addToHistoryStack) {
       setHistory((prev) => {
         const nextStack = [...prev.slice(0, historyIndex + 1), rawDisplay];
         setHistoryIndex(nextStack.length - 1);
         return nextStack;
+      });
+      setLookupHistory((prev) => {
+        const filtered = prev.filter((item) => item.toLowerCase() !== rawDisplay.toLowerCase());
+        const next = [rawDisplay, ...filtered].slice(0, 50);
+        try {
+          localStorage.setItem(STORAGE_KEYS.LOOKUP_HISTORY, JSON.stringify(next));
+        } catch (e) {}
+        return next;
       });
     }
 
@@ -557,6 +587,24 @@ export function DictionaryProvider({ children }) {
     }
   }, [inflectionCache]);
 
+  const clearLookupHistory = useCallback(() => {
+    setLookupHistory([]);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.LOOKUP_HISTORY);
+    } catch (e) {}
+  }, []);
+
+  const removeLookupHistoryItem = useCallback((wordToRemove) => {
+    if (!wordToRemove) return;
+    setLookupHistory((prev) => {
+      const next = prev.filter((item) => item.toLowerCase() !== wordToRemove.toLowerCase());
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOOKUP_HISTORY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
   const clearDictionaryInput = useCallback(() => {
     setQueryWord('');
     setDisplayWord('');
@@ -580,6 +628,7 @@ export function DictionaryProvider({ children }) {
     dictEnabled,
     history,
     historyIndex,
+    lookupHistory,
     lookupData,
     isLoading,
     isBackgroundLoading,
@@ -591,6 +640,8 @@ export function DictionaryProvider({ children }) {
     performLookup,
     goBack,
     goForward,
+    clearLookupHistory,
+    removeLookupHistoryItem,
     setDictTab,
     setDockMode,
     setFontSizeMultiplier,

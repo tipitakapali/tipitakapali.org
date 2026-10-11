@@ -17,7 +17,7 @@ module.exports = {
         }
       },
       fontFamily: {
-        reader: ['"Gentium Plus"', '"Times Ext Roman"', '"Doulos SIL"', '"EB Garamond"', 'Georgia', 'serif'],
+        reader: ['"Noto Sans"', '"DejaVu Sans"', '"Times Ext Roman"', '"Indic Times"', '"Doulos SIL"', '"Tahoma"', '"Arial Unicode MS"', '"Gentium"', 'sans-serif'],
         ui: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
       }
     },

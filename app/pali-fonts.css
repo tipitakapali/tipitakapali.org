@@ -51,18 +51,43 @@
 /* Noto Sans (Roman + Cyrillic) — ro, cyrl */
 @font-face {
   font-family: "Noto Sans";
-  src: url("/fonts/pali/Noto_Sans/static/NotoSans-Regular.ttf") format("truetype");
+  src: local("Noto Sans"),
+       local("NotoSans"),
+       url("/fonts/pali/Noto_Sans/static/NotoSans-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Noto Sans";
-  src: url("/fonts/pali/Noto_Sans/static/NotoSans-Bold.ttf") format("truetype");
+  src: local("Noto Sans Bold"),
+       local("NotoSans-Bold"),
+       url("/fonts/pali/Noto_Sans/static/NotoSans-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
+
+/* DejaVu Sans (Roman fallback) */
+@font-face {
+  font-family: "DejaVu Sans";
+  src: local("DejaVu Sans"),
+       local("DejaVuSans"),
+       url("/fonts/pali/DejaVu_Sans/static/DejaVuSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DejaVu Sans";
+  src: local("DejaVu Sans Bold"),
+       local("DejaVuSans-Bold"),
+       url("/fonts/pali/DejaVu_Sans/static/DejaVuSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 /* Be Vietnam Pro (Vietnamese + Pali Roman diacritics) */
 @font-face {
@@ -154,6 +179,20 @@
   line-height: 2.1;
 }
 
+/* Korean translation blocks typography using Noto Serif for inline Pali diacritics + system Korean fonts */
+.reader-trans-block[data-trans-lang="ko"],
+.reader-trans-block[data-trans-lang="korean"],
+.reader-trans-block[data-trans-lang="ko"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="korean"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="ko"] p,
+.reader-trans-block[data-trans-lang="korean"] p,
+.result-snippet[data-trans-lang="ko"],
+.result-snippet[data-trans-lang="korean"],
+.result-snippet[data-trans-lang="ko"] *,
+.result-snippet[data-trans-lang="korean"] * {
+  font-family: "Noto Serif", "Malgun Gothic", "Apple SD Gothic Neo", "Nanum Gothic", sans-serif;
+  line-height: 1.85;
+}
 
 /* Roman-script translations (English, German, Portuguese, Indonesian) always keep the user's
    Roman reader font — even when a non-Roman Pāḷi script (e.g. Thai) is active,
@@ -467,7 +506,13 @@ html[data-script="taitham"] { --font-reader: "Noto Sans Tai Tham", sans-serif; }
 html[data-script="brahmi"] { --font-reader: "Noto Sans Brahmi", sans-serif; }
 html[data-script="tibetan"] { --font-reader: "Noto Serif Tibetan", serif; }
 html[data-script="cyrillic"] { --font-reader: "Noto Sans", sans-serif; }
-html[data-script="roman"] { /* keep user --font-reader (gentium/garamond/etc) */ }
+html[data-script="roman"]:not([data-font]),
+html[data-script="roman"][data-font="default"],
+html[data-script="roman"][data-font="noto"],
+html[data-script="roman"][data-font="roman"] {
+  --font-reader: "Noto Sans", "DejaVu Sans", "Times Ext Roman", "Indic Times", "Doulos SIL", "Tahoma", "Arial Unicode MS", "Gentium", sans-serif;
+  --font-roman: "Noto Sans", "DejaVu Sans", "Times Ext Roman", "Indic Times", "Doulos SIL", "Tahoma", "Arial Unicode MS", "Gentium", sans-serif;
+}
 
 /* Ensure reader content and transliterated UI use the script font.
    line-height now derives from --line-height-base so Size slider works for all scripts */
@@ -565,6 +610,11 @@ html[data-script="thai"] .sanskritSection .sdatadeva {
 /* Abhidhan (အဘိဓာန်) — Myanmar definition stays in Myanmar font, only pm1w/pm2w Pali headwords use selected script */
 .tmmAbhidhan {
   font-family: "Pyidaungsu", sans-serif;
+}
+
+/* Base Pali script text inherits active --font-reader */
+.pali-script-text {
+  font-family: var(--font-reader);
 }
 
 /* All other transliterated Pali UI should also match main text font (Task 1: navigation bar) */

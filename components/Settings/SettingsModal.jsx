@@ -47,11 +47,19 @@ const TABS = [
   { id: 'help', label: 'Help', icon: HelpCircle },
 ];
 
+const ROMAN_DEFAULT_FONT_STACK = '"Noto Sans", "DejaVu Sans", "Times Ext Roman", "Indic Times", "Doulos SIL", "Tahoma", "Arial Unicode MS", "Gentium", sans-serif';
+
 const FONTS = [
-  { id: 'gentium', label: 'Gentium Plus', family: '"Gentium Plus", serif', desc: 'Standard Tipitaka Roman font with complete diacritics' },
-  { id: 'garamond', label: 'EB Garamond', family: '"EB Garamond", serif', desc: 'Elegant classical serif with rich typography' },
-  { id: 'serif', label: 'Georgia / System Serif', family: 'Georgia, serif', desc: 'Clean, legible serif on all operating systems' },
-  { id: 'system', label: 'System Sans-Serif', family: '-apple-system, BlinkMacSystemFont, sans-serif', desc: 'Modern crisp sans-serif typeface' },
+  {
+    id: 'default',
+    label: 'Noto Sans (Default Roman)',
+    family: ROMAN_DEFAULT_FONT_STACK,
+    desc: 'Default Roman Pāḷi font stack with complete diacritics',
+  },
+  { id: 'gentium', label: 'Gentium Plus', family: '"Gentium Plus", "Noto Serif", serif', desc: 'Classic Tipitaka Roman serif font with complete diacritics' },
+  { id: 'garamond', label: 'EB Garamond', family: '"EB Garamond", "Noto Serif", serif', desc: 'Elegant classical serif with rich typography' },
+  { id: 'serif', label: 'Georgia / System Serif', family: 'Georgia, "Noto Serif", serif', desc: 'Clean, legible serif on all operating systems' },
+  { id: 'system', label: 'System Sans-Serif', family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif', desc: 'Modern crisp sans-serif typeface' },
 ];
 
 const THEMES = [
@@ -626,7 +634,7 @@ export default function SettingsModal() {
                   <p
                     className="leading-relaxed"
                     style={{
-                      fontFamily: FONTS.find((f) => f.id === settings.fontFamily)?.family,
+                      fontFamily: FONTS.find((f) => f.id === settings.fontFamily)?.family || ROMAN_DEFAULT_FONT_STACK,
                       fontSize: `${settings.fontSize}px`,
                       lineHeight: settings.lineHeight,
                       textAlign: settings.textAlign,
