@@ -1284,14 +1284,46 @@ export function TabProvider({ children }) {
   // Switch tabs smoothly with instant scroll position restoration
   const switchTab = useCallback(
     (bookCode) => {
-      // Synchronously save the outgoing tab's scroll position before switching tabs
-      if (activeBookCodeRef.current && typeof document !== 'undefined') {
+      const outgoingCode = activeBookCodeRef.current;
+
+      // Synchronously save the outgoing tab's scroll position AND active reading paragraph/chapter before switching tabs
+      let foundOutgoingPara = null;
+      let foundOutgoingChap = null;
+      if (outgoingCode && typeof document !== 'undefined') {
         const container = document.querySelector('main.content-area');
         if (container) {
-          tabScrollMemoryRef.current[activeBookCodeRef.current] = container.scrollTop;
+          const currentScroll = container.scrollTop;
+          tabScrollMemoryRef.current[outgoingCode] = currentScroll;
           try {
             localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
           } catch (e) {}
+
+          const containerRect = container.getBoundingClientRect();
+          const targetY = containerRect.top + 80;
+          const paraElements = container.querySelectorAll('p[data-pindex]');
+          for (const p of paraElements) {
+            const rect = p.getBoundingClientRect();
+            if (rect.bottom >= targetY) {
+              foundOutgoingPara = p.getAttribute('data-para');
+              if (!foundOutgoingPara) {
+                let prev = p.previousElementSibling;
+                while (prev) {
+                  const pn = prev.getAttribute('data-para');
+                  if (pn) {
+                    foundOutgoingPara = pn;
+                    break;
+                  }
+                  prev = prev.previousElementSibling;
+                }
+              }
+              const chapBlock = p.closest('[data-chapter]');
+              if (chapBlock) {
+                const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
+                if (!isNaN(cIdx)) foundOutgoingChap = cIdx;
+              }
+              break;
+            }
+          }
         }
       }
 
@@ -1369,31 +1401,70 @@ export function TabProvider({ children }) {
                         }
                       : t
                   )
-
                 );
               }
             })
             .catch(() => {});
         }
 
+        let targetChap = tab.currentChapterIdx ?? 0;
+        if (tab.lastParaNum) {
+          const cleanP = String(tab.lastParaNum).replace(/^(?:para-?|p)/i, '').trim();
+          if (cleanP && tab.para_to_chapter?.[cleanP] !== undefined) {
+            targetChap = tab.para_to_chapter[cleanP];
+          }
+        }
+
+        // Synchronously update openTabs state for outgoing and incoming tab positions
+        setOpenTabs((prev) => {
+          let hasChanges = false;
+          const next = prev.map((t) => {
+            if (t.bookCode === outgoingCode && (foundOutgoingPara || foundOutgoingChap !== null)) {
+              hasChanges = true;
+              return {
+                ...t,
+                currentChapterIdx: foundOutgoingChap !== null ? foundOutgoingChap : t.currentChapterIdx,
+                lastParaNum: foundOutgoingPara || t.lastParaNum,
+              };
+            }
+            if (t.bookCode === bookCode && t.currentChapterIdx !== targetChap) {
+              hasChanges = true;
+              return {
+                ...t,
+                currentChapterIdx: targetChap,
+              };
+            }
+            return t;
+          });
+          if (hasChanges) {
+            persistTabs(next, bookCode);
+            return next;
+          }
+          return prev;
+        });
+
+        if (!tab.loadedChapters?.[targetChap]) {
+          loadChapter(bookCode, targetChap);
+        }
+        bufferAdjacentChapters(bookCode, targetChap);
 
         if (tab.lastParaNum) {
           setActiveParaNum(tab.lastParaNum);
         } else {
-          const firstP = getFirstParaOfChapter(tab.para_to_chapter, tab.currentChapterIdx ?? 0);
+          const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChap);
           if (firstP) {
             setActiveParaNum(firstP);
           }
         }
         setTreeSelectedNode({
           bookCode: tab.bookCode,
-          chapterIdx: tab.currentChapterIdx ?? 0,
+          chapterIdx: targetChap,
         });
         setSearchHighlight(null);
         const hashToApply = tab.lastParaNum ? `#para${tab.lastParaNum}` : '';
         updateUrlParams({
           book: tab.bookCode,
-          chapter: (tab.currentChapterIdx ?? 0) + 1,
+          chapter: targetChap + 1,
           hash: hashToApply,
           q: null,
           search: null,
@@ -1404,12 +1475,12 @@ export function TabProvider({ children }) {
           bookCode: tab.bookCode,
           bookTitle: tab.title,
           nikaya: tab.nikaya,
-          chapterIdx: tab.currentChapterIdx ?? 0,
-          chapterTitle: tab.chapters?.[tab.currentChapterIdx ?? 0]?.title || '',
+          chapterIdx: targetChap,
+          chapterTitle: tab.chapters?.[targetChap]?.title || '',
         });
       }
     },
-    [updateUrlParams, persistTabs, addToHistory, setActiveParaNum]
+    [updateUrlParams, persistTabs, addToHistory, setActiveParaNum, loadChapter, bufferAdjacentChapters]
   );
 
 
