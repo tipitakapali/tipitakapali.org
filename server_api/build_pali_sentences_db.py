@@ -22,9 +22,31 @@ import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_APP_DIR = os.path.dirname(BASE_DIR)
-REF_DB = os.path.join(WEB_APP_DIR, 'ref', 'epitaka_app', 'assets', 'db', 'epitaka.db')
+_FREEBUFF_EPI = '/home/administrator/freebuff_run/data/epitaka.db'
+_REF_EPI = os.path.join(WEB_APP_DIR, 'ref', 'epitaka_app', 'assets', 'db', 'epitaka.db')
+REF_DB = _FREEBUFF_EPI if os.path.exists(_FREEBUFF_EPI) else _REF_EPI
 TIPI_DB = os.path.join(BASE_DIR, 'db', 'tipitaka.db')
 OUT_DB = os.path.join(BASE_DIR, 'db', 'pali_sentences.db')
+
+
+def get_para_index(book_id, para_id):
+    b = (book_id or '').strip()
+    if b == 'Ps-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b in ('Sv-i', 'Spk-i', 'Spk-t-i'):
+        return (para_id - 1) if para_id < 5 else (para_id - 2)
+    elif b == 'Ps-t-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b == 'Sp-iii':
+        if para_id < 113:
+            return para_id - 1
+        elif para_id == 113:
+            return None
+        else:
+            return para_id - 2
+    elif b == 'Sas':
+        return (para_id - 1) if para_id < 3 else (para_id - 2)
+    return para_id - 1
 
 
 def main():
@@ -89,7 +111,9 @@ def main():
         if not bcode:
             unmapped_books.add(bid)
             continue
-        pidx = pid - 1
+        pidx = get_para_index(bid, pid)
+        if pidx is None or pidx < 0:
+            continue
         cidx = canon.get((bcode, pidx))
         if cidx is None:
             cidx = book_max_chap.get(bcode, 0)

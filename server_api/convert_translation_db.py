@@ -59,6 +59,41 @@ def load_canon_lookup(tipi_db_path):
     return canon_lookup, book_max_chap
 
 
+def get_para_index(book_id, para_id):
+    """
+    Map Epitaka para_id (1-based) to Tipitaka canon_paragraphs para_index (0-based).
+    Most books align 1-to-1 with para_index = para_id - 1.
+    However, 7 books have structural discrepancies (e.g. duplicate introductory
+    headers like Ganthārambhakathā or extra trailer lines in epitaka.db) which
+    shift all subsequent paragraphs by +1 in epitaka.db:
+      - Ps-i (s0201a.att): duplicate Ganthārambhakathā at para_id=5,6 (shift >= 6)
+      - Sv-i (s0101a.att): duplicate Ganthārambhakathā at para_id=4,5 (shift >= 5)
+      - Spk-i (s0301a.att): duplicate Ganthārambhakathā at para_id=4,5 (shift >= 5)
+      - Ps-t-i (s0201t.tik): duplicate Ganthārambhakathāvaṇṇanā at para_id=5,6 (shift >= 6)
+      - Spk-t-i (s0301t.tik): duplicate Ganthārambhakathāvaṇṇanā at para_id=4,5 (shift >= 5)
+      - Sp-iii (vin02a2.att): extra trailer 'Vimvisārasamāgamakathā niṭṭhitā.' at para_id=113
+                              not present in canon_paragraphs; shift >= 114
+      - Sas (e0702n.nrf): duplicate Sāsanavaṃsappadīpikā at para_id=2,3 (shift >= 3)
+    """
+    b = (book_id or '').strip()
+    if b == 'Ps-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b in ('Sv-i', 'Spk-i', 'Spk-t-i'):
+        return (para_id - 1) if para_id < 5 else (para_id - 2)
+    elif b == 'Ps-t-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b == 'Sp-iii':
+        if para_id < 113:
+            return para_id - 1
+        elif para_id == 113:
+            return None
+        else:
+            return para_id - 2
+    elif b == 'Sas':
+        return (para_id - 1) if para_id < 3 else (para_id - 2)
+    return para_id - 1
+
+
 def load_epitaka_book_map(epi_db_path):
     """Load epitaka book_id -> vri_id (tipitaka book_code) mapping."""
     conn = sqlite3.connect(epi_db_path)
@@ -233,8 +268,8 @@ def convert_language(lang_code, src_db_path, epi_ref_path, tipi_db_path, out_db_
         if not bcode:
             return
         distinct_books.add(bcode)
-        pindex = pid - 1
-        if pindex < 0:
+        pindex = get_para_index(bid, pid)
+        if pindex is None or pindex < 0:
             return
         info = canon_lookup.get((bcode, pindex))
         if info:
@@ -483,6 +518,8 @@ def main():
 
     for lang in langs:
         src_db = os.path.join(data_dir, f'epitaka_{lang}.db')
+        if not os.path.exists(src_db) and lang == 'be':
+            src_db = os.path.join(data_dir, 'epitaka_bn.db')
         out_db = os.path.join(output_dir, f'translation_{lang}.db')
         if not os.path.exists(src_db):
             print(f"Skipping {lang}: {src_db} does not exist")

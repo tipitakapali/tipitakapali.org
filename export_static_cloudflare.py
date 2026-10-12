@@ -1083,7 +1083,7 @@ def sync_translations_to_targets(dist_dir: Path, public_api_dir: Path, git_repo_
         public_api_dir.mkdir(parents=True, exist_ok=True)
         copied_local = 0
         for lang in langs:
-            for src in (target_api_dir / 'book').glob(f"*/translation/{lang}.json"):
+            for src in (target_api_dir / 'book').glob(f"*/translation/{lang}*.json"):
                 rel = src.relative_to(target_api_dir)
                 dst = public_api_dir / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
@@ -1190,14 +1190,14 @@ def export_website(args, paths):
             s = out_dir / item
             d = dist_dir / item
             if s.is_dir():
-                shutil.copytree(s, d, dirs_exist_ok=True)
+                shutil.copytree(s, d, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
             else:
                 shutil.copy2(s, d)
     else:
         log_warn(f"Directory {out_dir} not found. Copying public/ assets instead...")
         public_dir = web_app_dir / 'public'
         if public_dir.exists():
-            shutil.copytree(public_dir, dist_dir, dirs_exist_ok=True)
+            shutil.copytree(public_dir, dist_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
 
     # Backfill any existing translation JSONs if present in git_repo_dir but missing in dist_dir
     backfill_translations_to_dist(dist_dir, git_repo_dir)
@@ -1221,11 +1221,11 @@ def export_website(args, paths):
                 except OSError:
                     pass
 
-        # Sync static API data to public/api for offline local dev
+        # Sync static API data to public/api for offline local dev (ignoring translation)
         public_api_dir = paths['public_api_dir']
         log_info(f"Syncing static API data to local development folder: {public_api_dir}")
         public_api_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(target_api_dir, public_api_dir, dirs_exist_ok=True)
+        shutil.copytree(target_api_dir, public_api_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
         cleanup_stale_index_json(public_api_dir)
         if not args.with_paragraphs:
             for stale_para in public_api_dir.rglob('paragraphs.json'):

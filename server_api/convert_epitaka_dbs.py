@@ -13,11 +13,37 @@ import sys
 import time
 import sqlite3
 
+def get_para_index(book_id, para_id):
+    b = (book_id or '').strip()
+    if b == 'Ps-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b in ('Sv-i', 'Spk-i', 'Spk-t-i'):
+        return (para_id - 1) if para_id < 5 else (para_id - 2)
+    elif b == 'Ps-t-i':
+        return (para_id - 1) if para_id < 6 else (para_id - 2)
+    elif b == 'Sp-iii':
+        if para_id < 113:
+            return para_id - 1
+        elif para_id == 113:
+            return None
+        else:
+            return para_id - 2
+    elif b == 'Sas':
+        return (para_id - 1) if para_id < 3 else (para_id - 2)
+    return para_id - 1
+
+
 def build_summaries_and_sections_db(base_dir):
     start_time = time.time()
     epi_ref_path = os.path.join(base_dir, "../ref/epitaka_app/assets/db/epitaka.db")
+    if not os.path.exists(epi_ref_path):
+        epi_ref_path = "/home/administrator/freebuff_run/data/epitaka.db"
     epi_en_path = os.path.join(base_dir, "../ref/epitaka_app/assets/db/epitaka_en.db")
+    if not os.path.exists(epi_en_path):
+        epi_en_path = "/home/administrator/freebuff_run/data/epitaka_en.db"
     epi_sum_path = os.path.join(base_dir, "../ref/epitaka_app/assets/db/epitaka_summary.db")
+    if not os.path.exists(epi_sum_path):
+        epi_sum_path = "/home/administrator/freebuff_run/data/epitaka_summary.db"
     tipi_path = os.path.join(base_dir, "db/tipitaka.db")
     out_path = os.path.join(base_dir, "db/summaries.db")
 
@@ -83,10 +109,28 @@ def build_summaries_and_sections_db(base_dir):
     print(f"[Conversion] Reading summaries from {src_db}...")
     src_conn = sqlite3.connect(src_db)
     cur = src_conn.cursor()
-    cur.execute("""
-        SELECT book_id, section_id, para_start, para_end, heading_title, sutta_title, vagga_title, title, content, sources
-        FROM summaries
-    """)
+    cur.execute("SELECT rowid FROM summaries")
+    rids = [r[0] for r in cur.fetchall()]
+    min_rid, max_rid = min(rids), max(rids)
+    batch_size = 5000
+
+    def iter_summaries():
+        cols = "book_id, section_id, para_start, para_end, heading_title, sutta_title, vagga_title, title, content, sources"
+        for start in range(min_rid, max_rid + 1, batch_size):
+            end = min(max_rid, start + batch_size - 1)
+            try:
+                cur.execute(f"SELECT {cols} FROM summaries WHERE rowid BETWEEN ? AND ?", (start, end))
+                for r in cur.fetchall():
+                    yield r
+            except Exception:
+                for rid in range(start, end + 1):
+                    try:
+                        cur.execute(f"SELECT {cols} FROM summaries WHERE rowid = ?", (rid,))
+                        r = cur.fetchone()
+                        if r:
+                            yield r
+                    except Exception:
+                        pass
 
     insert_sql = """
         INSERT INTO summaries (
@@ -98,13 +142,17 @@ def build_summaries_and_sections_db(base_dir):
 
     count = 0
     batch = []
-    for row in cur:
+    for row in iter_summaries():
         bid, sec_id, p_start, p_end, h_title, s_title, v_title, title, content, sources = row
         bcode = book_map.get(bid, book_map.get(bid.lower(), bid))
         btitle = book_names.get(bcode, bid)
 
-        p_idx_start = max(0, (p_start or 1) - 1)
-        p_idx_end = max(0, (p_end or p_start or 1) - 1)
+        p_idx_start = get_para_index(bid, p_start or 1)
+        if p_idx_start is None or p_idx_start < 0:
+            p_idx_start = max(0, (p_start or 1) - 1)
+        p_idx_end = get_para_index(bid, p_end or p_start or 1)
+        if p_idx_end is None or p_idx_end < 0:
+            p_idx_end = max(0, (p_end or p_start or 1) - 1)
 
         batch.append((
             bid, bcode, btitle, sec_id, 0,
