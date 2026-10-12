@@ -1008,6 +1008,8 @@ export default function LanguageMenu() {
               {(() => {
                 const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
                 const activeText = langColors.text || '';
+                const isPali = colorPickerTarget.id === 'pali';
+                const textLabel = isPali ? 'Pāḷi Text Color' : 'Translation Text Color';
                 return (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -1016,7 +1018,7 @@ export default function LanguageMenu() {
                           className="w-2.5 h-2.5 rounded-full border border-black/20 inline-block shrink-0"
                           style={{ backgroundColor: formatCssColor(activeText) || '#1e293b' }}
                         />
-                        Translation Text Color
+                        {textLabel}
                       </span>
                       {activeText && (
                         <button
