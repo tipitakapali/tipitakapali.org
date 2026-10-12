@@ -126,6 +126,16 @@ function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
     }
   }
 
+  // DPD: Change audio play icon to a speaker icon (Task 2)
+  if (dictType === 'dpd') {
+    const speakerSvg =
+      '<svg viewBox="0 0 24 24" fill="currentColor" height="16px" width="16px"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>';
+    restored = restored.replace(
+      /(<a\b[^>]*\bclass=["'][^"']*\bplay\b[^"']*["'][^>]*>)\s*<svg[^>]*>[\s\S]*?<\/svg>/gi,
+      `$1${speakerSvg}`
+    );
+  }
+
   if (!targetScript || targetScript === 'roman') return restored;
   if (typeof window === 'undefined') return restored;
 
@@ -889,11 +899,17 @@ export default function DictionaryModal() {
 
         const container = toggleBtn.closest('section.dp9, div.dp9, .dict-entry-item') || toggleBtn.parentElement;
         const buttonBox =
-          toggleBtn.nextElementSibling &&
-          (toggleBtn.nextElementSibling.classList.contains('button-box') ||
-            toggleBtn.nextElementSibling.classList.contains('button_box'))
+          (toggleBtn.nextElementSibling &&
+            (toggleBtn.nextElementSibling.classList.contains('button-box') ||
+              toggleBtn.nextElementSibling.classList.contains('button_box'))
             ? toggleBtn.nextElementSibling
-            : container?.querySelector('.button-box, .button_box');
+            : null) ||
+          (toggleBtn.parentElement?.nextElementSibling &&
+            (toggleBtn.parentElement.nextElementSibling.classList.contains('button-box') ||
+              toggleBtn.parentElement.nextElementSibling.classList.contains('button_box'))
+            ? toggleBtn.parentElement.nextElementSibling
+            : null) ||
+          container?.querySelector('.button-box, .button_box');
 
         if (buttonBox) {
           const isCurrentlyCollapsed = buttonBox.classList.contains('dpd-collapsed');
@@ -902,6 +918,21 @@ export default function DictionaryModal() {
             toggleBtn.classList.add('active');
             toggleBtn.setAttribute('title', 'Hide buttons');
             toggleBtn.setAttribute('aria-label', 'Hide buttons');
+
+            // Task 1: Auto-show "grammar" content (or root_info if root entry)
+            if (container) {
+              const grammarBtn =
+                container.querySelector('a.dpd-button[data-target^="grammar_"], a.button[data-target^="grammar_"]') ||
+                container.querySelector('a.dpd-button[data-target^="root_info_"], a.button[data-target^="root_info_"]');
+              if (grammarBtn) {
+                const targetId = grammarBtn.getAttribute('data-target');
+                const targetDiv = container.querySelector(`#${CSS.escape(targetId)}`) || document.getElementById(targetId);
+                if (targetDiv) {
+                  targetDiv.classList.remove('hidden');
+                  grammarBtn.classList.add('active');
+                }
+              }
+            }
           } else {
             buttonBox.classList.add('dpd-collapsed');
             toggleBtn.classList.remove('active');
@@ -1066,6 +1097,28 @@ export default function DictionaryModal() {
         return;
       }
 
+      // 3.4 Handle clicks inside Meaning Jump bar (prevent accidental word lookup and jump cleanly)
+      const jumpBar = e.target.closest('.dict-meanings-jump-bar');
+      if (jumpBar) {
+        const summaryRow = e.target.closest('.dict-summary-row, [data-entry-index]');
+        if (summaryRow) {
+          e.preventDefault();
+          e.stopPropagation();
+          const entryIdx = summaryRow.getAttribute('data-entry-index');
+          if (entryIdx !== null) {
+            handleJumpToEntry(parseInt(entryIdx, 10));
+          }
+          return;
+        }
+        // If clicked on any button or anchor in jumpBar, let it handle itself
+        if (e.target.closest('button, a')) {
+          return;
+        }
+        // Non-interactive background or text clicked inside jump bar: prevent word lookup
+        e.stopPropagation();
+        return;
+      }
+
       // 3.5 Handle summary jump links & anchor jumps (e.g. #dict-entry-1, #brahma_1, data-jump-index)
       const summaryOrAnchor = e.target.closest('a.summary-link, a.summary-jump-arrow, [data-jump-index], a[href^="#"]');
       if (summaryOrAnchor) {
@@ -1125,8 +1178,12 @@ export default function DictionaryModal() {
       }
 
       // 5. Handle clicking ANY word inside the dictionary text results
-      // Don't trigger if clicked inside buttons, inputs, links, resizers, feedback boxes, or audio
-      if (e.target.closest('button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback')) {
+      // Don't trigger if clicked inside buttons, inputs, links, resizers, feedback boxes, audio, or jump bar
+      if (
+        e.target.closest(
+          'button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback, .dict-meanings-jump-bar, .dict-summary-row'
+        )
+      ) {
         return;
       }
 
@@ -1528,17 +1585,23 @@ export default function DictionaryModal() {
                   return (
                     <div
                       key={idx}
-                      onClick={() => handleJumpToEntry(idx)}
-                      className="dict-summary-row flex items-baseline justify-between gap-2 p-1.5 rounded-lg hover:bg-[var(--bg-card)] transition-colors group cursor-pointer text-xs"
+                      data-entry-index={idx}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleJumpToEntry(idx);
+                      }}
+                      className="dict-summary-row flex items-baseline justify-between gap-2 p-1.5 rounded-lg hover:bg-[var(--bg-card)] transition-colors group cursor-pointer text-sm"
                     >
-                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
-                        <span className="text-[10px] font-mono text-[var(--text-muted)] font-semibold shrink-0">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0">
+                        <span className="text-xs font-mono text-[var(--text-muted)] font-semibold shrink-0">
                           {idx + 1}.
                         </span>
                         <a
                           href={`#dict-entry-${idx}`}
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             handleJumpToEntry(idx);
                           }}
                           className="summary-link font-bold text-[var(--accent)] hover:underline whitespace-nowrap"
@@ -1547,12 +1610,12 @@ export default function DictionaryModal() {
                           Meaning {idx + 1}: {displayHw}
                         </a>
                         {itemSummary.pos && (
-                          <span className="text-[var(--text-muted)] italic font-serif text-[11px]">
+                          <span className="text-[var(--text-secondary)] italic font-serif text-sm">
                             {itemSummary.pos}
                           </span>
                         )}
                         {itemSummary.snippet && (
-                          <span className="text-[var(--text-secondary)] text-[11.5px] leading-relaxed">
+                          <span className="text-[var(--text-primary)] text-sm leading-relaxed">
                             {itemSummary.snippet}...
                           </span>
                         )}
@@ -1597,7 +1660,7 @@ export default function DictionaryModal() {
 
                   {/* Entry Meaning Header (only for non-DPD dictionaries when multiple entries exist) */}
                   {activeDictTab !== 'dpd' && currentTabResults.length > 1 && (
-                    <div className="flex items-center justify-end py-0.5 px-2 mb-2 rounded-lg bg-[var(--bg-secondary)] text-xs text-[var(--text-secondary)] border border-[var(--border-color)]/60">
+                    <div className="flex items-center justify-end mb-1 text-xs text-[var(--text-secondary)]">
                       <button
                         type="button"
                         onClick={() => {
@@ -1606,7 +1669,7 @@ export default function DictionaryModal() {
                             setIsMeaningsExpanded(true);
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)] hover:underline cursor-pointer py-0.5 shrink-0"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] hover:underline cursor-pointer py-0.5 shrink-0"
                         title="Jump back to meanings"
                       >
                         <span className="inline-flex items-center justify-center h-[16px] shrink-0">
