@@ -1059,6 +1059,7 @@ const ChapterBlock = memo(function ChapterBlock({
       id={`chap-${chapter.chapter_index}`}
       data-chapter={chapter.chapter_index}
       className="chapter-placeholder py-8 px-4 my-6 border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--bg-secondary)]/40 select-none"
+      style={{ minHeight: 240 }}
     >
       <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] text-center">
         {convertPaliScript(capitalizePali(chapter.title), paliScript)}
@@ -1768,6 +1769,27 @@ export default function ReaderView() {
           if (!isTabSwitchingRef.current) return false;
           const c = containerRef.current;
           const effChap = getTargetChap();
+          const TOP_PAD = 60;
+
+          // PRIORITY 0 (plain tab switch): exact pixel restore.
+          // The outgoing tab's scrollTop was saved verbatim in tabScrollMemory.
+          // Prefer it over any semantic anchor so mid-paragraph positions survive
+          // A -> B -> A round-trips. Anchor snapping is only for explicit jumps
+          // (targetScrollIntent, #para, MAT, search) which don't reach this branch.
+          if (savedScroll > 0) {
+            const maxScroll = Math.max(0, c.scrollHeight - c.clientHeight);
+            if (maxScroll >= savedScroll - 20) {
+              if (Math.abs(c.scrollTop - savedScroll) > 2) {
+                c.scrollTop = savedScroll;
+              }
+              // Don't overwrite memory with a recomputed anchor offset;
+              // the saved pixel IS the truth on this path.
+              return true;
+            }
+            // Content not tall enough yet (lazy chapters still loading) -> retry.
+            // Fall through to anchor checks only when pixel is out of range AND
+            // the target chapter already exists; otherwise wait for content.
+          }
 
           const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
           if (chapEl && chapEl.classList.contains('chapter-placeholder')) {
@@ -1778,13 +1800,13 @@ export default function ReaderView() {
             return false;
           }
 
-          // PRIORITY 1: Semantic Paragraph Anchor (rock solid across placeholder expansions)
+          // PRIORITY 1: Semantic Paragraph Anchor (explicit jumps / first open)
           if (cleanPara) {
             const pEl = findAnchorPara(chapEl);
             if (pEl) {
               const cRect = c.getBoundingClientRect();
               const pRect = pEl.getBoundingClientRect();
-              const targetOffset = Math.max(0, pRect.top - cRect.top + c.scrollTop - 60);
+              const targetOffset = Math.max(0, pRect.top - cRect.top + c.scrollTop - TOP_PAD);
               if (Math.abs(c.scrollTop - targetOffset) > 2) {
                 c.scrollTop = targetOffset;
               }
@@ -1798,11 +1820,14 @@ export default function ReaderView() {
             }
           }
 
-          // PRIORITY 2: Semantic Chapter Header Anchor
+          // PRIORITY 2: Semantic Chapter Header Anchor (first open, no pixel yet)
           if (chapEl) {
+            // If we have a saved pixel but content isn't tall enough yet, keep
+            // waiting instead of snapping to chapter top (which would lose position).
+            if (savedScroll > 0) return false;
             const cRect = c.getBoundingClientRect();
             const chRect = chapEl.getBoundingClientRect();
-            const offset = Math.max(0, chRect.top - cRect.top + c.scrollTop - 60);
+            const offset = Math.max(0, chRect.top - cRect.top + c.scrollTop - TOP_PAD);
             if (Math.abs(c.scrollTop - offset) > 2) {
               c.scrollTop = offset;
             }
@@ -1810,40 +1835,46 @@ export default function ReaderView() {
             return true;
           }
 
-          // PRIORITY 3: Fallback to saved raw pixel scroll if available
-          if (savedScroll > 0) {
-            const maxScroll = Math.max(0, c.scrollHeight - c.clientHeight);
-            if (maxScroll >= savedScroll - 20) {
-              if (Math.abs(c.scrollTop - savedScroll) > 2) {
-                c.scrollTop = savedScroll;
-              }
-              saveTabScroll(activeTab.bookCode, savedScroll);
-              return true;
-            }
-            return false;
-          }
-
           return false;
         };
 
-        // Layout drift correction: automatically re-aligns target if preceding chapters expand above
+        // Layout drift correction: only compensates for content growth ABOVE the
+        // viewport after a pixel restore (lazy translations / chapters streaming
+        // in). Does NOT re-snap to an anchor top, so it can't fight the saved pixel.
+        // Tracked via scrollHeight deltas; skipped once layout is stable.
+        let lastSeenHeight = -1;
         const correctDrift = () => {
           if (!containerRef.current || restoredBookCodeRef.current !== activeTab.bookCode) return;
           if (!isTabSwitchingRef.current) return;
           const c = containerRef.current;
+          // Pixel path already restored: only adjust if the container grew
+          // (content inserted above). If height is stable, leave scrollTop alone.
+          if (lastSeenHeight === -1) {
+            lastSeenHeight = c.scrollHeight;
+            return;
+          }
+          const growth = c.scrollHeight - lastSeenHeight;
+          lastSeenHeight = c.scrollHeight;
+          if (Math.abs(growth) <= 2) return;
+          // Growth above the viewport pushes content down; only correct when the
+          // target chapter/para is at/above viewport top (i.e. growth happened above).
           const effChap = getTargetChap();
           const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
           if (!chapEl || chapEl.classList.contains('chapter-placeholder')) return;
-
           let targetEl = findAnchorPara(chapEl);
           if (!targetEl) targetEl = chapEl;
-
           const cRect = c.getBoundingClientRect();
           const tRect = targetEl.getBoundingClientRect();
-          const diff = tRect.top - cRect.top - 60;
-          if (Math.abs(diff) > 2) {
-            c.scrollTop = Math.max(0, c.scrollTop + diff);
-            saveTabScroll(activeTab.bookCode, c.scrollTop);
+          // If the anchor sits above the viewport top, the growth was (mostly)
+          // above it -> shift by the measured growth, clamped to observed delta.
+          if (tRect.top < cRect.top) {
+            const TOP_PAD = 60;
+            const diff = tRect.top - cRect.top - TOP_PAD;
+            // Clamp correction to actual growth so a single tick can't jump far.
+            const clamped = Math.max(-Math.abs(growth), Math.min(Math.abs(growth), diff));
+            if (Math.abs(clamped) > 2) {
+              c.scrollTop = Math.max(0, c.scrollTop + clamped);
+            }
           }
         };
 
@@ -3054,10 +3085,11 @@ export default function ReaderView() {
         if (isTabSwitchingRef.current || restoredBookCodeRef.current !== activeTab?.bookCode) return;
         if (activeTab && containerRef.current) {
 
-          // Detect active paragraph in reading viewport
+          // Detect active paragraph in reading viewport.
+          // Unified reading-line offset (must match restore TOP_PAD = 60).
           const container = containerRef.current;
           const containerRect = container.getBoundingClientRect();
-          const targetY = containerRect.top + 80;
+          const targetY = containerRect.top + 60;
 
 
           const paraElements = container.querySelectorAll('p[data-pindex]');

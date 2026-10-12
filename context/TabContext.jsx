@@ -1286,9 +1286,12 @@ export function TabProvider({ children }) {
     (bookCode) => {
       const outgoingCode = activeBookCodeRef.current;
 
-      // Synchronously save the outgoing tab's scroll position AND active reading paragraph/chapter before switching tabs
-      let foundOutgoingPara = null;
-      let foundOutgoingChap = null;
+      // Synchronously save the outgoing tab's exact pixel scroll position.
+      // NOTE: we intentionally do NOT sniff/rewrite currentChapterIdx/lastParaNum
+      // here. The debounced scroll handler in ReaderView is the sole author of
+      // chapter/para position; a viewport guess at switch time (top+offset) would
+      // fight the saved pixel on restore and cause the "shifts when switching
+      // tabs" bug. Pixel memory is the source of truth for plain tab switches.
       if (outgoingCode && typeof document !== 'undefined') {
         const container = document.querySelector('main.content-area');
         if (container) {
@@ -1297,33 +1300,6 @@ export function TabProvider({ children }) {
           try {
             localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
           } catch (e) {}
-
-          const containerRect = container.getBoundingClientRect();
-          const targetY = containerRect.top + 80;
-          const paraElements = container.querySelectorAll('p[data-pindex]');
-          for (const p of paraElements) {
-            const rect = p.getBoundingClientRect();
-            if (rect.bottom >= targetY) {
-              foundOutgoingPara = p.getAttribute('data-para');
-              if (!foundOutgoingPara) {
-                let prev = p.previousElementSibling;
-                while (prev) {
-                  const pn = prev.getAttribute('data-para');
-                  if (pn) {
-                    foundOutgoingPara = pn;
-                    break;
-                  }
-                  prev = prev.previousElementSibling;
-                }
-              }
-              const chapBlock = p.closest('[data-chapter]');
-              if (chapBlock) {
-                const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
-                if (!isNaN(cIdx)) foundOutgoingChap = cIdx;
-              }
-              break;
-            }
-          }
         }
       }
 
@@ -1415,20 +1391,15 @@ export function TabProvider({ children }) {
           }
         }
 
-        // Synchronously update openTabs state for outgoing and incoming tab positions
+        // Plain tab switch: do NOT rewrite the outgoing tab's chapter/para
+        // (see save above). Only ensure the incoming tab's chapter index matches
+        // its own lastParaNum mapping if they drifted apart; never force a
+        // re-anchor — pixel restore in ReaderView owns the scroll position.
         setOpenTabs((prev) => {
-          let hasChanges = false;
+          const incoming = prev.find((t) => t.bookCode === bookCode);
+          if (!incoming || incoming.currentChapterIdx === targetChap) return prev;
           const next = prev.map((t) => {
-            if (t.bookCode === outgoingCode && (foundOutgoingPara || foundOutgoingChap !== null)) {
-              hasChanges = true;
-              return {
-                ...t,
-                currentChapterIdx: foundOutgoingChap !== null ? foundOutgoingChap : t.currentChapterIdx,
-                lastParaNum: foundOutgoingPara || t.lastParaNum,
-              };
-            }
-            if (t.bookCode === bookCode && t.currentChapterIdx !== targetChap) {
-              hasChanges = true;
+            if (t.bookCode === bookCode) {
               return {
                 ...t,
                 currentChapterIdx: targetChap,
@@ -1436,11 +1407,8 @@ export function TabProvider({ children }) {
             }
             return t;
           });
-          if (hasChanges) {
-            persistTabs(next, bookCode);
-            return next;
-          }
-          return prev;
+          persistTabs(next, bookCode);
+          return next;
         });
 
         if (!tab.loadedChapters?.[targetChap]) {
