@@ -175,6 +175,7 @@ vite.config.ts.timestamp-*
 
 # testing
 /coverage
+/test/
 
 # next.js
 /.next/
