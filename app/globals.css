@@ -4367,6 +4367,44 @@ div.dict-dock-panel.dock-side {
   margin-bottom: 4px;
 }
 
+.pts15 .floatrpp {
+  float: right;
+  max-width: 260px;
+  margin: 6px 0 10px 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent, #3b82f6);
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+  border-radius: 6px;
+  font-size: 0.88em;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .pts15 .floatrpp {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: #60a5fa;
+}
+
+.pts15 a {
+  color: var(--accent, #2563eb);
+  text-decoration: none;
+}
+
+.pts15 a:hover {
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .pts15 a {
+  color: #60a5fa;
+}
+
+.pts15 img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: inline-block;
+  margin: 6px 0;
+}
+
 /* ========================================================= */
 /* Abhidhānappadīpikā (Pāli-Myanmar Dictionary) Styling     */
 /* Adapted from tp_dev.css with modern enhancements         */

@@ -40,7 +40,7 @@ const DB_FILES = {
   SYN: 'dpd_synonyms_tipitakapali.db',
   SPLI: 'dpd_splitter_tipitakapali.db',
   INF: 'dpd_inflection_tipitakapali.db',
-  PTS: 'ptsped2015ed_tipitakapali.db',
+  PTS: resolveDbPath('ptsped2015ed_tipitakapali.db') ? 'ptsped2015ed_tipitakapali.db' : 'legacy_ptsped2015ed_tipitakapali.db',
   ABD: 'abhidhan_tipitakapali.db',
   PSD: 'palisinh.db',
   SANS: 'ap_bh_mw_sanskrit.db',
@@ -99,7 +99,7 @@ function initDictDatabases() {
 function getFChar(word, dbKey, useSplitter = false) {
   const chars = tableChars[dbKey] || [];
   if (!word || word.length === 0) return 'misc';
-  if (word.length === 1) return '0000000z';
+  if (word.length === 1) return chars.includes('0000000z') ? '0000000z' : 'misc';
 
   let prefix = word.slice(0, 2) + 'z';
   if (useSplitter) {
@@ -297,7 +297,7 @@ function lookupSinglePTS(word, cachedSyns = null) {
   for (const w of wordsToQuery) {
     const fchar = getFChar(w, 'PTS', false);
     try {
-      const rows = dbs.PTS.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(w);
+      const rows = dbs.PTS.prepare(`SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(w);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
         const html = `<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">${r.word}</span><br>${r.defi}</div>`;
