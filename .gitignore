@@ -17,6 +17,10 @@ next_tipitakapali.org/
 *.db-*
 *.db.bak
 *.db
+
+# Dictionary edge-cache warmer outputs (scripts/warm_dict_cache.py)
+scripts/dict_word_frequencies.tsv
+scripts/dict_warm_checkpoint.jsonl
 *.zip
 !pali-script-converter.zip
 public/api/
