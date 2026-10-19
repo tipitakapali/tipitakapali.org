@@ -126,6 +126,8 @@ export const LANG_KEY_TO_CODE = {
   indonesian: 'id',
   nepali: 'ne',
   bengali: 'be',
+  spanish: 'es',
+  french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',
@@ -153,6 +155,8 @@ export const CODE_TO_LANG_KEY = {
   id: 'indonesian',
   ne: 'nepali',
   be: 'bengali',
+  es: 'spanish',
+  fr: 'french',
 };
 
 export function normalizeLangCode(langOrDb) {

@@ -35,14 +35,16 @@ export const TRANSLATIONS = [
   { id: 'lao', label: 'ລາວ', flag: '🇱🇦', desc: 'ການແປພາສາລາວ • 750K ປະໂຫຍກ', color: '#115e59' },
   { id: 'tamil', label: 'தமிழ்', flag: '🇮🇳', desc: 'தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்', color: '#c2410c' },
   { id: 'hindi', label: 'हिन्दी', flag: '🇮🇳', desc: 'हिन्दी अनुवाद • 1.22M वाक्य', color: '#6b21a8' },
+  { id: 'indonesian', label: 'Bahasa Indonesia', flag: '🇮🇩', desc: 'Terjemahan Bahasa Indonesia • 1.22M kalimat', color: '#c026d3' },
+  { id: 'spanish', label: 'Español', flag: '🇪🇸', desc: 'Traducción en Español • 1.27M oraciones', color: '#b45309' },
+  { id: 'french', label: 'Français', flag: '🇫🇷', desc: 'Traduction en Français • 1.27M phrases', color: '#4338ca' },
   { id: 'german', label: 'Deutsch', flag: '🇩🇪', desc: 'Deutsche Übersetzung • 1.28M Sätze', color: '#475569' },
   { id: 'japanese', label: '日本語', flag: '🇯🇵', desc: '日本語訳 • 1.25M 文', color: '#db2777' },
   { id: 'portuguese', label: 'Português', flag: '🇵🇹', desc: 'Tradução em Português • 1.22M frases', color: '#0c4a6e' },
   { id: 'russian', label: 'Русский', flag: '🇷🇺', desc: 'Русский перевод • 1.22M предложений', color: '#eab308' },
   { id: 'korean', label: '한국어', flag: '🇰🇷', desc: '한국어 번역 • 1.22M 문장', color: '#4f46e5' },
-  { id: 'indonesian', label: 'Bahasa Indonesia', flag: '🇮🇩', desc: 'Terjemahan Bahasa Indonesia • 1.22M kalimat', color: '#c026d3' },
   { id: 'nepali', label: 'नेपाली', flag: '🇳🇵', desc: 'नेपाली अनुवाद • 1.22M वाक्य', color: '#9a3412' },
-  { id: 'bengali', label: 'বাংলা', flag: '🇧🇩', desc: 'বাংলা অনুবাদ • 93K বাক্য', color: '#047857' },
+  { id: 'bengali', label: 'বাংলা', flag: '🇧🇩', desc: 'বাংলা অনুবাদ • 1.27M বাক্য', color: '#047857' },
 ];
 
 export const AVAILABLE_TRANSLATIONS = TRANSLATIONS.filter(

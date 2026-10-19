@@ -63,7 +63,7 @@ FTS_TIPITAKA_DB = os.path.join(DB_DIR, "fts_tipitaka.db")
 #]
 
 ALL_LANGS = [
-    "be", "de", "en", "hi", "id", "ja", "km", "ko", "lo", "my", "ne",
+    "be", "de", "en", "es", "fr", "hi", "id", "ja", "km", "ko", "lo", "my", "ne",
     "pt", "ru", "si", "ta", "th", "vi", "zh"
 ]
 
@@ -433,6 +433,8 @@ def main():
     if args.updated:
         target_langs = []
         for lang in discovered_langs:
+            if lang == 'vi':
+                continue
             src_db = os.path.join(db_dir, f"translation_{lang}.db")
             dst_db = os.path.join(db_dir, f"fts_translation_{lang}.db")
             if not os.path.exists(dst_db) or os.path.getmtime(src_db) > os.path.getmtime(dst_db) or args.force:

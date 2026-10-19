@@ -23,6 +23,8 @@ const LANG_MAP = {
   russian: 'ru',
   hindi: 'hi',
   bengali: 'be',
+  spanish: 'es',
+  french: 'fr',
   my_nissaya: 'my_nissaya',
 };
 

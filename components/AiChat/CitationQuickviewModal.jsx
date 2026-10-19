@@ -26,6 +26,8 @@ const TRANS_ID_TO_CODE = {
   indonesian: 'id',
   nepali: 'ne',
   bengali: 'be',
+  spanish: 'es',
+  french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
 };
@@ -49,6 +51,8 @@ const LANG_HEADERS = {
   id: 'Terjemahan Bahasa Indonesia',
   ne: 'नेपाली अनुवाद',
   be: 'বাংলা অনুবাদ',
+  es: 'Traducción en Español',
+  fr: 'Traduction en Français',
   pt: 'Tradução em Português',
   ru: 'Русский перевод',
 };

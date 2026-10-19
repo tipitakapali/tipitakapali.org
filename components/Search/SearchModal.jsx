@@ -26,6 +26,8 @@ export const LANG_KEY_TO_CODE = {
   indonesian: 'id',
   nepali: 'ne',
   bengali: 'be',
+  spanish: 'es',
+  french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
   my_nissaya: 'my_nissaya',
@@ -52,6 +54,8 @@ export const CODE_TO_LANG_KEY = {
   id: 'indonesian',
   ne: 'nepali',
   be: 'bengali',
+  es: 'spanish',
+  fr: 'french',
 };
 
 export function normalizeLangCode(langOrDb) {
@@ -139,12 +143,14 @@ const DEFAULT_FTS_DATABASES = [
   { id: 'fts_translation_lo.db', key: 'lo', label: 'ລາວ', flag: '🇱🇦' },
   { id: 'fts_translation_ta.db', key: 'ta', label: 'தமிழ்', flag: '🇮🇳' },
   { id: 'fts_translation_hi.db', key: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  { id: 'fts_translation_id.db', key: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
+  { id: 'fts_translation_es.db', key: 'es', label: 'Español', flag: '🇪🇸' },
+  { id: 'fts_translation_fr.db', key: 'fr', label: 'Français', flag: '🇫🇷' },
   { id: 'fts_translation_de.db', key: 'de', label: 'Deutsch', flag: '🇩🇪' },
   { id: 'fts_translation_ja.db', key: 'ja', label: '日本語', flag: '🇯🇵' },
   { id: 'fts_translation_pt.db', key: 'pt', label: 'Português', flag: '🇵🇹' },
   { id: 'fts_translation_ru.db', key: 'ru', label: 'Русский', flag: '🇷🇺' },
   { id: 'fts_translation_ko.db', key: 'ko', label: '한국어', flag: '🇰🇷' },
-  { id: 'fts_translation_id.db', key: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
   { id: 'fts_translation_ne.db', key: 'ne', label: 'नेपाली', flag: '🇳🇵' },
   { id: 'fts_translation_be.db', key: 'be', label: 'বাংলা', flag: '🇧🇩' },
 ];

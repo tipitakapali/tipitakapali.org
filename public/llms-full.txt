@@ -25,7 +25,9 @@ Users can open any canonical text with side-by-side / sentence-level translation
 | `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 1.22M 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
 | `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.22M kalimat | `https://tipitakapali.org/book/s0101m.mul?l=id` |
 | `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
-| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা অনুবাদ • 93K বাক্য | `https://tipitakapali.org/book/s0101m.mul?l=be` |
+| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা অনুবাদ • 1.27M বাক্য | `https://tipitakapali.org/book/s0101m.mul?l=be` |
+| `es` | Spanish | Español | 🇪🇸 | Traducción en Español • 1.27M oraciones | `https://tipitakapali.org/book/s0101m.mul?l=es` |
+| `fr` | French | Français | 🇫🇷 | Traduction en Français • 1.27M phrases | `https://tipitakapali.org/book/s0101m.mul?l=fr` |
 
 ## Multi-Script Deep-Linking Guide for AI Agents
 Users can open any canonical text directly in their preferred script by prefixing the book code:

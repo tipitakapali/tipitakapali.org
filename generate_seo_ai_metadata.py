@@ -71,7 +71,9 @@ TRANSLATION_LANGUAGES = [
     {"code": "ko", "name": "Korean", "native": "한국어", "flag": "🇰🇷", "lang": "ko", "desc": "한국어 번역 • 1.22M 문장"},
     {"code": "id", "name": "Indonesian", "native": "Bahasa Indonesia", "flag": "🇮🇩", "lang": "id", "desc": "Terjemahan Bahasa Indonesia • 1.22M kalimat"},
     {"code": "ne", "name": "Nepali", "native": "नेपाली", "flag": "🇳🇵", "lang": "ne", "desc": "नेपाली अनुवाद • 1.22M वाक्य"},
-    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা অনুবাদ • 93K বাক্য"},
+    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা অনুবাদ • 1.27M বাক্য"},
+    {"code": "es", "name": "Spanish", "native": "Español", "flag": "🇪🇸", "lang": "es", "desc": "Traducción en Español • 1.27M oraciones"},
+    {"code": "fr", "name": "French", "native": "Français", "flag": "🇫🇷", "lang": "fr", "desc": "Traduction en Français • 1.27M phrases"},
 ]
 
 def find_paths():

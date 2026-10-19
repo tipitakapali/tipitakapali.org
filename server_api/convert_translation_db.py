@@ -41,6 +41,8 @@ LANG_META = {
     'id': {'id': 'indonesian', 'name': 'Indonesian', 'native': 'Bahasa Indonesia', 'flag': '🇮🇩'},
     'ne': {'id': 'nepali', 'name': 'Nepali', 'native': 'नेपाली', 'flag': '🇳🇵'},
     'be': {'id': 'bengali', 'name': 'Bengali', 'native': 'বাংলা', 'flag': '🇧🇩'},
+    'es': {'id': 'spanish', 'name': 'Spanish', 'native': 'Español', 'flag': '🇪🇸'},
+    'fr': {'id': 'french', 'name': 'French', 'native': 'Français', 'flag': '🇫🇷'},
 }
 
 
@@ -407,6 +409,8 @@ def show_status(data_dir, output_dir):
     needs_update_count = 0
     for lang, meta in LANG_META.items():
         src_path = os.path.join(data_dir, f'epitaka_{lang}.db')
+        if not os.path.exists(src_path) and lang == 'be':
+            src_path = os.path.join(data_dir, 'epitaka_bn.db')
         tgt_path = os.path.join(output_dir, f'translation_{lang}.db')
 
         if not os.path.exists(src_path):
@@ -495,7 +499,11 @@ def main():
     if args.updated:
         langs_to_convert = []
         for lang in LANG_META.keys():
+            if lang == 'vi':
+                continue
             src_db = os.path.join(data_dir, f'epitaka_{lang}.db')
+            if not os.path.exists(src_db) and lang == 'be':
+                src_db = os.path.join(data_dir, 'epitaka_bn.db')
             out_db = os.path.join(output_dir, f'translation_{lang}.db')
             if not os.path.exists(src_db):
                 continue

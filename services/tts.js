@@ -22,6 +22,8 @@ export const TTS_LANG_ID_TO_CODE = {
   indonesian: 'id',
   nepali: 'ne',
   bengali: 'be',
+  spanish: 'es',
+  french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
 };
@@ -44,6 +46,8 @@ export const TTS_LANG_ID_TO_BCP47 = {
   indonesian: 'id-ID',
   nepali: 'ne-NP',
   bengali: 'bn-BD',
+  spanish: 'es-ES',
+  french: 'fr-FR',
   portuguese: 'pt-PT',
   russian: 'ru-RU',
 };
@@ -66,6 +70,8 @@ export const TTS_LANG_LABEL = {
   indonesian: 'Bahasa Indonesia',
   nepali: 'नेपाली',
   bengali: 'বাংলা',
+  spanish: 'Español',
+  french: 'Français',
   portuguese: 'Português',
   russian: 'Русский',
 };
@@ -88,6 +94,8 @@ export const TTS_LANG_FLAG = {
   indonesian: '🇮🇩',
   nepali: '🇳🇵',
   bengali: '🇧🇩',
+  spanish: '🇪🇸',
+  french: '🇫🇷',
   portuguese: '🇵🇹',
   russian: '🇷🇺',
 };
