@@ -631,15 +631,17 @@ export default function DictionaryModal() {
     return DICT_TABS.filter((t) => t.count > 0);
   }, [DICT_TABS]);
 
-  // Auto-switch to first available tab with results if current tab has none
+  // Auto-switch to top available tab if current tab has none (only when not actively loading)
   useEffect(() => {
+    if (isLoading || isBackgroundLoading) return;
+
     if (visibleTabs.length > 0) {
       const hasActive = visibleTabs.some((t) => t.id === activeDictTab);
       if (!hasActive) {
         setDictTab(visibleTabs[0].id);
       }
     }
-  }, [visibleTabs, activeDictTab, setDictTab]);
+  }, [visibleTabs, isLoading, isBackgroundLoading, activeDictTab, setDictTab]);
 
   // Resize handler for docked width (Left or Right panel)
 

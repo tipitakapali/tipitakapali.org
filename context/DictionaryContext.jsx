@@ -70,6 +70,22 @@ const STORAGE_KEYS = {
 export const DEFAULT_DICT_ORDER = ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'];
 export const DEFAULT_DICT_ENABLED = { dpd: true, abd: true, pts: true, psd: true, sans: true, splitter: true };
 
+export function getTopDictWithMeaning(order, enabled, lookupData) {
+  const activeOrder = (order || DEFAULT_DICT_ORDER).filter((id) => enabled?.[id] !== false);
+  if (!activeOrder.length) return 'dpd';
+
+  if (lookupData) {
+    for (const dictId of activeOrder) {
+      const count = lookupData.counts?.[dictId] ?? lookupData[dictId]?.length ?? 0;
+      if (count > 0) {
+        return dictId;
+      }
+    }
+  }
+
+  return activeOrder[0];
+}
+
 const DictionaryContext = createContext(null);
 
 export function DictionaryProvider({ children }) {
@@ -80,9 +96,18 @@ export function DictionaryProvider({ children }) {
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
   const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
-  const [activeDictTab, setActiveDictTab] = useState('dpd');
   const [dictOrder, setDictOrderState] = useState(DEFAULT_DICT_ORDER);
   const [dictEnabled, setDictEnabledState] = useState(DEFAULT_DICT_ENABLED);
+  const [activeDictTab, setActiveDictTab] = useState('dpd');
+
+  const dictOrderRef = useRef(dictOrder);
+  const dictEnabledRef = useRef(dictEnabled);
+  useEffect(() => {
+    dictOrderRef.current = dictOrder;
+  }, [dictOrder]);
+  useEffect(() => {
+    dictEnabledRef.current = dictEnabled;
+  }, [dictEnabled]);
 
   // History navigation stack & persistent lookup history
   const [history, setHistory] = useState([]);
@@ -172,10 +197,7 @@ export function DictionaryProvider({ children }) {
       if (savedClickMode && ['single', 'double'].includes(savedClickMode)) {
         setClickLookupModeState(savedClickMode);
       }
-      const savedTab = localStorage.getItem(STORAGE_KEYS.LAST_TAB);
-      if (savedTab && ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'].includes(savedTab)) {
-        setActiveDictTab(savedTab);
-      }
+      let loadedOrder = DEFAULT_DICT_ORDER;
       const savedOrder = localStorage.getItem(STORAGE_KEYS.DICT_ORDER);
       if (savedOrder) {
         try {
@@ -185,18 +207,28 @@ export function DictionaryProvider({ children }) {
             for (const id of DEFAULT_DICT_ORDER) {
               if (!merged.includes(id)) merged.push(id);
             }
+            loadedOrder = merged;
+            dictOrderRef.current = merged;
             setDictOrderState(merged);
           }
         } catch (e) {}
       }
+      let loadedEnabled = DEFAULT_DICT_ENABLED;
       const savedEnabled = localStorage.getItem(STORAGE_KEYS.DICT_ENABLED);
       if (savedEnabled) {
         try {
           const parsed = JSON.parse(savedEnabled);
           if (parsed && typeof parsed === 'object') {
+            loadedEnabled = { ...DEFAULT_DICT_ENABLED, ...parsed };
+            dictEnabledRef.current = loadedEnabled;
             setDictEnabledState((prev) => ({ ...prev, ...parsed }));
           }
         } catch (e) {}
+      }
+
+      const activeOrder = loadedOrder.filter((id) => loadedEnabled[id] !== false);
+      if (activeOrder.length > 0) {
+        setActiveDictTab(activeOrder[0]);
       }
 
       const savedLookupHistory = localStorage.getItem(STORAGE_KEYS.LOOKUP_HISTORY);
@@ -267,63 +299,79 @@ export function DictionaryProvider({ children }) {
     } catch (e) {}
   }, []);
 
+  const updateTabFromOrder = useCallback((order, enabled, currentLookup) => {
+    const targetTab = getTopDictWithMeaning(order, enabled, currentLookup);
+    if (targetTab) {
+      setActiveDictTab(targetTab);
+      try {
+        localStorage.setItem(STORAGE_KEYS.LAST_TAB, targetTab);
+      } catch (e) {}
+    }
+  }, []);
+
   const setDictOrder = useCallback((newOrder) => {
     if (!Array.isArray(newOrder)) return;
+    dictOrderRef.current = newOrder;
     setDictOrderState(newOrder);
     try {
       localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(newOrder));
     } catch (e) {}
-  }, []);
+    updateTabFromOrder(newOrder, dictEnabledRef.current, lookupDataRef.current);
+  }, [updateTabFromOrder]);
 
   const moveDictUp = useCallback((dictId) => {
-    setDictOrderState((prev) => {
-      const idx = prev.indexOf(dictId);
-      if (idx <= 0) return prev;
-      const next = [...prev];
-      const temp = next[idx - 1];
-      next[idx - 1] = next[idx];
-      next[idx] = temp;
-      try {
-        localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  }, []);
+    const prev = dictOrderRef.current || DEFAULT_DICT_ORDER;
+    const idx = prev.indexOf(dictId);
+    if (idx <= 0) return;
+    const next = [...prev];
+    const temp = next[idx - 1];
+    next[idx - 1] = next[idx];
+    next[idx] = temp;
+    dictOrderRef.current = next;
+    setDictOrderState(next);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
+    } catch (e) {}
+    updateTabFromOrder(next, dictEnabledRef.current, lookupDataRef.current);
+  }, [updateTabFromOrder]);
 
   const moveDictDown = useCallback((dictId) => {
-    setDictOrderState((prev) => {
-      const idx = prev.indexOf(dictId);
-      if (idx < 0 || idx >= prev.length - 1) return prev;
-      const next = [...prev];
-      const temp = next[idx + 1];
-      next[idx + 1] = next[idx];
-      next[idx] = temp;
-      try {
-        localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  }, []);
+    const prev = dictOrderRef.current || DEFAULT_DICT_ORDER;
+    const idx = prev.indexOf(dictId);
+    if (idx < 0 || idx >= prev.length - 1) return;
+    const next = [...prev];
+    const temp = next[idx + 1];
+    next[idx + 1] = next[idx];
+    next[idx] = temp;
+    dictOrderRef.current = next;
+    setDictOrderState(next);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DICT_ORDER, JSON.stringify(next));
+    } catch (e) {}
+    updateTabFromOrder(next, dictEnabledRef.current, lookupDataRef.current);
+  }, [updateTabFromOrder]);
 
   const toggleDictEnabled = useCallback((dictId) => {
-    setDictEnabledState((prev) => {
-      const next = { ...prev, [dictId]: !prev[dictId] };
-      try {
-        localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  }, []);
+    const prev = dictEnabledRef.current || DEFAULT_DICT_ENABLED;
+    const next = { ...prev, [dictId]: !prev[dictId] };
+    dictEnabledRef.current = next;
+    setDictEnabledState(next);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
+    } catch (e) {}
+    updateTabFromOrder(dictOrderRef.current, next, lookupDataRef.current);
+  }, [updateTabFromOrder]);
 
   const setDictEnabled = useCallback((updater) => {
-    setDictEnabledState((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
-      try {
-        localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-  }, []);
+    const prev = dictEnabledRef.current || DEFAULT_DICT_ENABLED;
+    const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+    dictEnabledRef.current = next;
+    setDictEnabledState(next);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DICT_ENABLED, JSON.stringify(next));
+    } catch (e) {}
+    updateTabFromOrder(dictOrderRef.current, next, lookupDataRef.current);
+  }, [updateTabFromOrder]);
 
   // Two-Phase Progressive Dictionary Lookup:
   // Phase 1: Fetch DPD (primary) instantly → show results immediately
@@ -367,11 +415,17 @@ export function DictionaryProvider({ children }) {
     lookupAbortControllerRef.current = new AbortController();
     const signal = lookupAbortControllerRef.current.signal;
 
+    const currentActiveOrder = (dictOrderRef.current || DEFAULT_DICT_ORDER).filter(
+      (id) => dictEnabledRef.current?.[id] !== false
+    );
+    const currentTopDict = currentActiveOrder[0] || 'dpd';
+
     setQueryWord(cleanWord);
     setDisplayWord(rawDisplay);
     setIsLoading(true);
-    setIsBackgroundLoading(false);
+    setIsBackgroundLoading(true);
     setError(null);
+    setActiveDictTab(currentTopDict);
 
     // Update history stack & persistent recent lookup history
     if (addToHistoryStack) {
@@ -391,36 +445,17 @@ export function DictionaryProvider({ children }) {
     }
 
     try {
-      // ── Parallel-Progressive: fire DPD + others together, render DPD instantly ──
+      // ── Parallel lookup: fire DPD and secondary dictionaries together ──
       const dpdPromise = fetchDictionaryLookup(cleanWord, 'dpd', { signal });
       const othersPromise = fetchDictionaryLookup(cleanWord, 'others', { signal });
       setIsBackgroundLoading(true);
 
-      // Phase 1: DPD resolves first → paint immediately (no extra RTT)
-      const dpdData = await dpdPromise;
-      if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
-
-      const dpdCount = dpdData?.counts?.dpd || dpdData?.dpd?.length || 0;
-
-      // Restore minified links and DPD feedback placeholders
-      const processedDpd = (dpdData?.dpd || []).map((entry) => {
-        if (entry && typeof entry === 'object') {
-          return {
-            ...entry,
-            html: entry.html ? restoreMinifiedLinks(entry.html) : '',
-            defi: entry.defi ? restoreMinifiedLinks(entry.defi) : '',
-          };
-        }
-        return entry;
-      });
-
-      // Show DPD results immediately (user sees results in ~30-80ms, others fetch already in-flight)
-      const immediateLookup = {
+      const mergedData = {
         word: cleanWord,
-        hasResults: dpdCount > 0,
-        synonyms: dpdData?.synonyms || [],
-        counts: { dpd: dpdCount, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
-        dpd: processedDpd,
+        hasResults: false,
+        synonyms: [],
+        counts: { dpd: 0, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
+        dpd: [],
         pts: [],
         abd: [],
         psd: [],
@@ -428,68 +463,122 @@ export function DictionaryProvider({ children }) {
         splitter: [],
       };
 
-      // Tab selection for Phase 1
-      const activeOrder = (dictOrder || DEFAULT_DICT_ORDER).filter(
-        (id) => dictEnabled?.[id] !== false
-      );
-      const currentTabKey = activeDictTab;
+      let dpdDone = false;
+      let othersDone = false;
 
-      setLookupData(immediateLookup);
-      setIsLoading(false);
+      const handleUpdate = () => {
+        if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
 
-      // If current tab is DPD and has results, stay. Otherwise auto-select DPD if it has results.
-      if (dpdCount > 0 && currentTabKey !== 'dpd' && (immediateLookup.counts?.[currentTabKey] || 0) === 0) {
-        if (activeOrder.includes('dpd')) {
-          setActiveDictTab('dpd');
+        const currentActiveOrder = (dictOrderRef.current || DEFAULT_DICT_ORDER).filter(
+          (id) => dictEnabledRef.current?.[id] !== false
+        );
+        const currentTopDict = currentActiveOrder[0] || 'dpd';
+
+        const hasAny = Object.values(mergedData.counts).some((c) => c > 0);
+        mergedData.hasResults = hasAny;
+
+        setLookupData({ ...mergedData });
+
+        if (dpdDone && othersDone) {
+          setIsLoading(false);
+          setIsBackgroundLoading(false);
+
+          // Find first enabled dictionary in order that has meaning (count > 0)
+          const targetTab = getTopDictWithMeaning(currentActiveOrder, dictEnabledRef.current, mergedData);
+          setActiveDictTab(targetTab);
+          return;
         }
-      }
 
-      // ── Phase 2: Secondary dictionaries (already in-flight via parallel Promise) ──
-      const othersData = await othersPromise;
-      if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
-
-      const ptsCount = othersData?.counts?.pts || othersData?.pts?.length || 0;
-      const abdCount = othersData?.counts?.abd || othersData?.abd?.length || 0;
-      const psdCount = othersData?.counts?.psd || othersData?.psd?.length || 0;
-      const sansCount = othersData?.counts?.sans || othersData?.sans?.length || 0;
-      const splitterCount = othersData?.counts?.splitter || othersData?.splitter?.length || 0;
-      const othersHasAny = ptsCount > 0 || abdCount > 0 || psdCount > 0 || sansCount > 0 || splitterCount > 0;
-
-      // Merge secondary results into existing lookup data
-      setLookupData((prev) => {
-        const merged = {
-          ...prev,
-          hasResults: prev.hasResults || othersHasAny,
-          counts: {
-            ...prev.counts,
-            pts: ptsCount,
-            abd: abdCount,
-            psd: psdCount,
-            sans: sansCount,
-            splitter: splitterCount,
-          },
-          pts: othersData?.pts || [],
-          abd: othersData?.abd || [],
-          psd: othersData?.psd || [],
-          sans: othersData?.sans || [],
-          splitter: othersData?.splitter || [],
-        };
-
-        return merged;
-      });
-
-      // If DPD had no results but a secondary dict does, auto-switch tab
-      if (dpdCount === 0 && othersHasAny) {
-        for (const t of activeOrder) {
-          if (t === 'dpd') continue;
-          const cnt = { pts: ptsCount, abd: abdCount, psd: psdCount, sans: sansCount, splitter: splitterCount }[t] || 0;
-          if (cnt > 0) {
-            setActiveDictTab(t);
-            break;
+        // Partial update when one of the two requests has finished
+        if (currentTopDict === 'dpd') {
+          if (dpdDone) {
+            setIsLoading(false);
+            if (mergedData.counts.dpd > 0) {
+              setActiveDictTab('dpd');
+            }
+          }
+        } else {
+          // Top dictionary is in others (pts, abd, psd, sans, splitter)
+          if (othersDone) {
+            if ((mergedData.counts[currentTopDict] || 0) > 0) {
+              setIsLoading(false);
+              setActiveDictTab(currentTopDict);
+            }
+          } else if (dpdDone) {
+            // DPD finished first, but user's top dictionary is in others (e.g. PTS).
+            // Do NOT force switch to DPD; keep activeDictTab as currentTopDict
+            // so user sees "Loading [PTS] results..." until others finishes.
+            setIsLoading(false);
+            setActiveDictTab(currentTopDict);
           }
         }
-      }
+      };
 
+      dpdPromise
+        .then((dpdData) => {
+          if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
+          const dpdCount = dpdData?.counts?.dpd || dpdData?.dpd?.length || 0;
+          const processedDpd = (dpdData?.dpd || []).map((entry) => {
+            if (entry && typeof entry === 'object') {
+              return {
+                ...entry,
+                html: entry.html ? restoreMinifiedLinks(entry.html) : '',
+                defi: entry.defi ? restoreMinifiedLinks(entry.defi) : '',
+              };
+            }
+            return entry;
+          });
+          mergedData.dpd = processedDpd;
+          mergedData.counts.dpd = dpdCount;
+          mergedData.synonyms = dpdData?.synonyms || [];
+          dpdDone = true;
+          handleUpdate();
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          dpdDone = true;
+          handleUpdate();
+        });
+
+      othersPromise
+        .then((othersData) => {
+          if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
+          const ptsCount = othersData?.counts?.pts || othersData?.pts?.length || 0;
+          const abdCount = othersData?.counts?.abd || othersData?.abd?.length || 0;
+          const psdCount = othersData?.counts?.psd || othersData?.psd?.length || 0;
+          const sansCount = othersData?.counts?.sans || othersData?.sans?.length || 0;
+          const splitterCount = othersData?.counts?.splitter || othersData?.splitter?.length || 0;
+
+          mergedData.pts = othersData?.pts || [];
+          mergedData.abd = othersData?.abd || [];
+          mergedData.psd = othersData?.psd || [];
+          mergedData.sans = othersData?.sans || [];
+          mergedData.splitter = othersData?.splitter || [];
+
+          mergedData.counts.pts = ptsCount;
+          mergedData.counts.abd = abdCount;
+          mergedData.counts.psd = psdCount;
+          mergedData.counts.sans = sansCount;
+          mergedData.counts.splitter = splitterCount;
+
+          othersDone = true;
+          handleUpdate();
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          othersDone = true;
+          handleUpdate();
+        });
+
+      const [dpdRes, othersRes] = await Promise.allSettled([dpdPromise, othersPromise]);
+      if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
+
+      if (dpdRes.status === 'rejected' && othersRes.status === 'rejected') {
+        const err = dpdRes.reason || othersRes.reason;
+        console.warn('Dictionary lookup error:', err);
+        setError(err?.message || 'Dictionary lookup failed');
+      }
+      setIsLoading(false);
       setIsBackgroundLoading(false);
     } catch (err) {
       if (err.name === 'AbortError' || err.message?.includes('aborted') || signal.aborted || currentSeq !== lookupSeqRef.current) return;
@@ -498,7 +587,7 @@ export function DictionaryProvider({ children }) {
       setIsLoading(false);
       setIsBackgroundLoading(false);
     }
-  }, [historyIndex, dictOrder, dictEnabled, activeDictTab]);
+  }, [historyIndex]);
 
   // Open dictionary with word (or just open)
   const openDictionary = useCallback((word = '', initialTab = null) => {
@@ -511,6 +600,14 @@ export function DictionaryProvider({ children }) {
     setIsOpen(true);
     if (initialTab) {
       setDictTab(initialTab);
+    } else {
+      const currentActiveOrder = (dictOrderRef.current || DEFAULT_DICT_ORDER).filter(
+        (id) => dictEnabledRef.current?.[id] !== false
+      );
+      const topTab = getTopDictWithMeaning(currentActiveOrder, dictEnabledRef.current, lookupDataRef.current);
+      if (topTab) {
+        setActiveDictTab(topTab);
+      }
     }
     if (word && word.trim()) {
       performLookup(word.trim(), true);
