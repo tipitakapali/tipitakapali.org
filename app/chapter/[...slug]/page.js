@@ -26,6 +26,8 @@ export const TRANSLATION_LANGS = [
   { code: 'ko', name: 'Korean', native: '한국어' },
   { code: 'ne', name: 'Nepali', native: 'नेपाली' },
   { code: 'be', name: 'Bengali', native: 'বাংলা' },
+  { code: 'cs', name: 'Czech', native: 'Čeština' },
+  { code: 'mr', name: 'Marathi', native: 'मराठी' },
 ];
 
 export async function generateStaticParams() {

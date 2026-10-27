@@ -13,21 +13,23 @@ Users can open any canonical text with side-by-side / sentence-level translation
 | `my_nissaya` | Myanmar Nissaya | မြန်မာ နိဿယ | 🇲🇲 | Myanmar Nissaya word-by-word • 570K စာကြောင်း | `https://tipitakapali.org/book/s0101m.mul?l=my_nissaya` |
 | `si` | Sinhala | සිංහල | 🇱🇰 | සිංහල පරිවර්තනය • 1.21M වාක්‍ය | `https://tipitakapali.org/book/s0101m.mul?l=si` |
 | `zh` | Chinese | 中文 | 🇨🇳 | 中文翻译 • 1.27M 句 | `https://tipitakapali.org/book/s0101m.mul?l=zh` |
-| `th` | Thai | ไทย | 🇹🇭 | ฉบับแปลภาษาไทย • 1.27M ประโยค | `https://tipitakapali.org/book/s0101m.mul?l=th` |
-| `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/book/s0101m.mul?l=de` |
-| `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/book/s0101m.mul?l=ja` |
-| `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/book/s0101m.mul?l=pt` |
-| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
 | `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ | `https://tipitakapali.org/book/s0101m.mul?l=km` |
+| `th` | Thai | ไทย | 🇹🇭 | ฉบับแปลภาษาไทย • 1.27M ประโยค | `https://tipitakapali.org/book/s0101m.mul?l=th` |
 | `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 750K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
 | `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/book/s0101m.mul?l=ta` |
-| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 1.22M предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
-| `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 1.22M 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
+| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
+| `mr` | Marathi | मराठी | 🇮🇳 | मराठी अनुवाद • 838K वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=mr` |
 | `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.22M kalimat | `https://tipitakapali.org/book/s0101m.mul?l=id` |
-| `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
-| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা অনুবাদ • 1.27M বাক্য | `https://tipitakapali.org/book/s0101m.mul?l=be` |
+| `cs` | Czech | Čeština | 🇨🇿 | Český překlad • 570K vět | `https://tipitakapali.org/book/s0101m.mul?l=cs` |
+| `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/book/s0101m.mul?l=de` |
 | `es` | Spanish | Español | 🇪🇸 | Traducción en Español • 1.27M oraciones | `https://tipitakapali.org/book/s0101m.mul?l=es` |
 | `fr` | French | Français | 🇫🇷 | Traduction en Français • 1.27M phrases | `https://tipitakapali.org/book/s0101m.mul?l=fr` |
+| `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/book/s0101m.mul?l=ja` |
+| `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/book/s0101m.mul?l=pt` |
+| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 1.22M предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
+| `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 1.22M 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
+| `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
+| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা अनुवाद • 1.27M বাক্য | `https://tipitakapali.org/book/s0101m.mul?l=be` |
 
 ## Multi-Script Deep-Linking Guide for AI Agents
 Users can open any canonical text directly in their preferred script by prefixing the book code:

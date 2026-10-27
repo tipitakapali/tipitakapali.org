@@ -25,6 +25,8 @@ const LANG_MAP = {
   bengali: 'be',
   spanish: 'es',
   french: 'fr',
+  czech: 'cs',
+  marathi: 'mr',
   my_nissaya: 'my_nissaya',
 };
 

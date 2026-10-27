@@ -130,6 +130,10 @@ export const LANG_KEY_TO_CODE = {
   french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
+  czech: 'cs',
+  cs: 'cs',
+  marathi: 'mr',
+  mr: 'mr',
   my_nissaya: 'my_nissaya',
   nissaya: 'my_nissaya',
   burmese_nissaya: 'my_nissaya',
@@ -157,6 +161,8 @@ export const CODE_TO_LANG_KEY = {
   be: 'bengali',
   es: 'spanish',
   fr: 'french',
+  cs: 'czech',
+  mr: 'marathi',
 };
 
 export function normalizeLangCode(langOrDb) {

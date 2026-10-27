@@ -30,6 +30,8 @@ const TRANS_ID_TO_CODE = {
   french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
+  czech: 'cs',
+  marathi: 'mr',
 };
 
 // Localized “Translation” heading per language code (mirrors LanguageMenu descriptions)
@@ -55,6 +57,8 @@ const LANG_HEADERS = {
   fr: 'Traduction en Français',
   pt: 'Tradução em Português',
   ru: 'Русский перевод',
+  cs: 'Český překlad',
+  mr: 'मराठी अनुवाद',
 };
 
 // Language id → colour used by the language menu (for the heading accent)

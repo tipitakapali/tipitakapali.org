@@ -43,6 +43,8 @@ LANG_META = {
     'be': {'id': 'bengali', 'name': 'Bengali', 'native': 'বাংলা', 'flag': '🇧🇩'},
     'es': {'id': 'spanish', 'name': 'Spanish', 'native': 'Español', 'flag': '🇪🇸'},
     'fr': {'id': 'french', 'name': 'French', 'native': 'Français', 'flag': '🇫🇷'},
+    'cs': {'id': 'czech', 'name': 'Czech', 'native': 'Čeština', 'flag': '🇨🇿'},
+    'mr': {'id': 'marathi', 'name': 'Marathi', 'native': 'मराठी', 'flag': '🇮🇳'},
 }
 
 

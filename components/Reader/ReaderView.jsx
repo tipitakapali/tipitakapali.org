@@ -59,6 +59,8 @@ export const LANG_KEY_TO_CODE = {
   french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
+  czech: 'cs',
+  marathi: 'mr',
   my_nissaya: 'my_nissaya',
 };
 
@@ -84,6 +86,8 @@ export const CODE_TO_LANG_KEY = {
   fr: 'french',
   pt: 'portuguese',
   ru: 'russian',
+  cs: 'czech',
+  mr: 'marathi',
 };
 
 export function normalizeLangCode(langOrDb) {
@@ -1281,6 +1285,10 @@ function extractWordAtOffset(text, offset, lang = 'en') {
     pt: 'pt',
     russian: 'ru',
     ru: 'ru',
+    czech: 'cs',
+    cs: 'cs',
+    marathi: 'mr',
+    mr: 'mr',
   };
   const locale = localeMap[lang] || 'en';
 

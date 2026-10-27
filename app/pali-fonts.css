@@ -194,7 +194,7 @@
   line-height: 1.85;
 }
 
-/* Roman-script translations (English, German, Portuguese, Indonesian) always keep the user's
+/* Roman-script translations (English, German, Portuguese, Indonesian, Spanish, French, Czech) always keep the user's
    Roman reader font — even when a non-Roman Pāḷi script (e.g. Thai) is active,
    so they never inherit the Pāḷi script font. */
 .reader-trans-block[data-trans-lang="en"] .reader-trans-content,
@@ -205,6 +205,12 @@
 .reader-trans-block[data-trans-lang="portuguese"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="id"] .reader-trans-content,
 .reader-trans-block[data-trans-lang="indonesian"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="es"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="spanish"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="fr"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="french"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="cs"] .reader-trans-content,
+.reader-trans-block[data-trans-lang="czech"] .reader-trans-content,
 .result-snippet[data-trans-lang="en"],
 .result-snippet[data-trans-lang="english"],
 .result-snippet[data-trans-lang="de"],
@@ -213,6 +219,12 @@
 .result-snippet[data-trans-lang="portuguese"],
 .result-snippet[data-trans-lang="id"],
 .result-snippet[data-trans-lang="indonesian"],
+.result-snippet[data-trans-lang="es"],
+.result-snippet[data-trans-lang="spanish"],
+.result-snippet[data-trans-lang="fr"],
+.result-snippet[data-trans-lang="french"],
+.result-snippet[data-trans-lang="cs"],
+.result-snippet[data-trans-lang="czech"],
 .result-snippet[data-trans-lang="en"] *,
 .result-snippet[data-trans-lang="english"] *,
 .result-snippet[data-trans-lang="de"] *,
@@ -220,7 +232,13 @@
 .result-snippet[data-trans-lang="pt"] *,
 .result-snippet[data-trans-lang="portuguese"] *,
 .result-snippet[data-trans-lang="id"] *,
-.result-snippet[data-trans-lang="indonesian"] * {
+.result-snippet[data-trans-lang="indonesian"] *,
+.result-snippet[data-trans-lang="es"] *,
+.result-snippet[data-trans-lang="spanish"] *,
+.result-snippet[data-trans-lang="fr"] *,
+.result-snippet[data-trans-lang="french"] *,
+.result-snippet[data-trans-lang="cs"] *,
+.result-snippet[data-trans-lang="czech"] * {
   font-family: var(--font-roman);
 }
 

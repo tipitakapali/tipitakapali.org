@@ -101,6 +101,8 @@ const LANG_NAME_TO_CODE = {
   french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
+  czech: 'cs',
+  marathi: 'mr',
   my_nissaya: 'my_nissaya',
   nissaya: 'my_nissaya',
 };

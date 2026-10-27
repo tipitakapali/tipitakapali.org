@@ -59,21 +59,23 @@ TRANSLATION_LANGUAGES = [
     {"code": "my_nissaya", "name": "Myanmar Nissaya", "native": "မြန်မာ နိဿယ", "flag": "🇲🇲", "lang": "my", "desc": "Myanmar Nissaya word-by-word • 570K စာကြောင်း"},
     {"code": "si", "name": "Sinhala", "native": "සිංහල", "flag": "🇱🇰", "lang": "si", "desc": "සිංහල පරිවර්තනය • 1.21M වාක්‍ය"},
     {"code": "zh", "name": "Chinese", "native": "中文", "flag": "🇨🇳", "lang": "zh", "desc": "中文翻译 • 1.27M 句"},
-    {"code": "th", "name": "Thai", "native": "ไทย", "flag": "🇹🇭", "lang": "th", "desc": "ฉบับแปลภาษาไทย • 1.27M ประโยค"},
-    {"code": "de", "name": "German", "native": "Deutsch", "flag": "🇩🇪", "lang": "de", "desc": "Deutsche Übersetzung • 1.28M Sätze"},
-    {"code": "ja", "name": "Japanese", "native": "日本語", "flag": "🇯🇵", "lang": "ja", "desc": "日本語訳 • 1.25M 文"},
-    {"code": "pt", "name": "Portuguese", "native": "Português", "flag": "🇵🇹", "lang": "pt", "desc": "Tradução em Português • 1.22M frases"},
-    {"code": "hi", "name": "Hindi", "native": "हिन्दी", "flag": "🇮🇳", "lang": "hi", "desc": "हिन्दी अनुवाद • 1.22M वाक्य"},
     {"code": "km", "name": "Khmer", "native": "ភាសាខ្មែរ", "flag": "🇰🇭", "lang": "km", "desc": "ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ"},
+    {"code": "th", "name": "Thai", "native": "ไทย", "flag": "🇹🇭", "lang": "th", "desc": "ฉบับแปลภาษาไทย • 1.27M ประโยค"},
     {"code": "lo", "name": "Lao", "native": "ລາວ", "flag": "🇱🇦", "lang": "lo", "desc": "ການແປພາສາລາວ • 750K ປະໂຫຍກ"},
     {"code": "ta", "name": "Tamil", "native": "தமிழ்", "flag": "🇮🇳", "lang": "ta", "desc": "தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள்"},
-    {"code": "ru", "name": "Russian", "native": "Русский", "flag": "🇷🇺", "lang": "ru", "desc": "Русский перевод • 1.22M предложений"},
-    {"code": "ko", "name": "Korean", "native": "한국어", "flag": "🇰🇷", "lang": "ko", "desc": "한국어 번역 • 1.22M 문장"},
+    {"code": "hi", "name": "Hindi", "native": "हिन्दी", "flag": "🇮🇳", "lang": "hi", "desc": "हिन्दी अनुवाद • 1.22M वाक्य"},
+    {"code": "mr", "name": "Marathi", "native": "मराठी", "flag": "🇮🇳", "lang": "mr", "desc": "मराठी अनुवाद • 838K वाक्य"},
     {"code": "id", "name": "Indonesian", "native": "Bahasa Indonesia", "flag": "🇮🇩", "lang": "id", "desc": "Terjemahan Bahasa Indonesia • 1.22M kalimat"},
-    {"code": "ne", "name": "Nepali", "native": "नेपाली", "flag": "🇳🇵", "lang": "ne", "desc": "नेपाली अनुवाद • 1.22M वाक्य"},
-    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা অনুবাদ • 1.27M বাক্য"},
+    {"code": "cs", "name": "Czech", "native": "Čeština", "flag": "🇨🇿", "lang": "cs", "desc": "Český překlad • 570K vět"},
+    {"code": "de", "name": "German", "native": "Deutsch", "flag": "🇩🇪", "lang": "de", "desc": "Deutsche Übersetzung • 1.28M Sätze"},
     {"code": "es", "name": "Spanish", "native": "Español", "flag": "🇪🇸", "lang": "es", "desc": "Traducción en Español • 1.27M oraciones"},
     {"code": "fr", "name": "French", "native": "Français", "flag": "🇫🇷", "lang": "fr", "desc": "Traduction en Français • 1.27M phrases"},
+    {"code": "ja", "name": "Japanese", "native": "日本語", "flag": "🇯🇵", "lang": "ja", "desc": "日本語訳 • 1.25M 文"},
+    {"code": "pt", "name": "Portuguese", "native": "Português", "flag": "🇵🇹", "lang": "pt", "desc": "Tradução em Português • 1.22M frases"},
+    {"code": "ru", "name": "Russian", "native": "Русский", "flag": "🇷🇺", "lang": "ru", "desc": "Русский перевод • 1.22M предложений"},
+    {"code": "ko", "name": "Korean", "native": "한국어", "flag": "🇰🇷", "lang": "ko", "desc": "한국어 번역 • 1.22M 문장"},
+    {"code": "ne", "name": "Nepali", "native": "नेपाली", "flag": "🇳🇵", "lang": "ne", "desc": "नेपाली अनुवाद • 1.22M वाक्य"},
+    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা अनुवाद • 1.27M বাক্য"},
 ]
 
 def find_paths():
@@ -325,14 +327,14 @@ def generate_llms_txt(site_url, books_count, chapters_count):
     translations_list_str = "\n".join(trans_rows)
 
     return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
-> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries with 15 modern translations.
+> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries with {len(TRANSLATION_LANGUAGES)} modern translations.
 
 ## Overview
 - **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
 - **Total Canonical Books**: {books_count} books.
 - **Total Chapters**: {chapters_count:,} chapters across 520,000+ paragraphs.
 - **Languages / Scripts**: Pāḷi in Roman (Latin with full IAST diacritics) + 16 Asian & historic scripts.
-- **Translations Available**: 15 languages (English, Vietnamese, Burmese, Sinhala, Chinese, Thai, German, Japanese, Portuguese, Hindi, Khmer, Lao, Tamil, Russian, Myanmar Nissaya) with 14M+ sentence-aligned translations.
+- **Translations Available**: {len(TRANSLATION_LANGUAGES)} languages (English, Vietnamese, Burmese, Sinhala, Chinese, Thai, German, Japanese, Portuguese, Hindi, Khmer, Lao, Tamil, Russian, Myanmar Nissaya, Korean, Indonesian, Nepali, Bengali, Spanish, French, Czech, Marathi) with 15M+ sentence-aligned translations.
 - **Canonical Piṭakas**:
   1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
   2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
@@ -356,7 +358,7 @@ def generate_llms_txt(site_url, books_count, chapters_count):
 - **Chapter with Translation**: `{site_url}/book/[book_code]/[chapter_number]?l=[lang_code]` (e.g. `{site_url}/book/s0101m.mul/2?l=en`)
 - **Specific Paragraph**: `{site_url}/book/[book_code]#para-[number]` (e.g. `{site_url}/book/s0502m.mul#para-1` for Dhammapada Verse 1)
 
-### Supported 15 Modern Translation Languages (14M+ Aligned Sentences):
+### Supported {len(TRANSLATION_LANGUAGES)} Modern Translation Languages (15M+ Aligned Sentences):
 {translations_list_str}
 
 ### Supported 16 Pāḷi Script Codes:
@@ -512,7 +514,7 @@ def generate_schema_jsonld(site_url, books):
                 "url": f"{site_url}/",
                 "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
                 "alternateName": ["Tipitaka Pali", "CSCD Pali Canon", "VRI Tipitaka"],
-                "description": "Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations, 16 multi-script typography options, DPD dictionary, and full-text search.",
+                "description": f"Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with {len(TRANSLATION_LANGUAGES)} modern translations, 16 multi-script typography options, DPD dictionary, and full-text search.",
                 "inLanguage": lang_list,
                 "potentialAction": [
                     {
@@ -537,7 +539,7 @@ def generate_schema_jsonld(site_url, books):
                 "@type": "DataCatalog",
                 "@id": f"{site_url}/#catalog",
                 "name": "Chaṭṭha Saṅgāyana Pali Canon Canonical Corpus",
-                "description": "217 books of the Theravada Buddhist Pali Canon with 15 modern translations across 16 scripts.",
+                "description": f"217 books of the Theravada Buddhist Pali Canon with {len(TRANSLATION_LANGUAGES)} modern translations across 16 scripts.",
                 "url": f"{site_url}/",
                 "dataset": [
                     {
@@ -659,10 +661,10 @@ def main():
     print(" [✓] MULTI-SCRIPT & TRANSLATION SEO & AI METADATA COMPLETE!")
     print("=" * 60)
     print(f" Total Sitemaps    : {len(sitemaps)} (sitemap.xml index + main + translations + 16 child sitemaps)")
-    print(f" Total Indexed URLs: {total_indexed_urls:,} URLs across 17 scripts and 15 translation languages")
-    print(f" AI Agent Standards: /llms.txt, /llms-full.txt (15 translations and 16 Pali scripts documented)")
+    print(f" Total Indexed URLs: {total_indexed_urls:,} URLs across 17 scripts and {len(TRANSLATION_LANGUAGES)} translation languages")
+    print(f" AI Agent Standards: /llms.txt, /llms-full.txt ({len(TRANSLATION_LANGUAGES)} translations and 16 Pali scripts documented)")
     print(f" Search Engine Rule: /robots.txt (AI-Enabled with {len(sitemaps)} sitemap declarations)")
-    print(f" Structured Data   : /site.jsonld (Schema.org with 15 translation languages)")
+    print(f" Structured Data   : /site.jsonld (Schema.org with {len(TRANSLATION_LANGUAGES)} translation languages)")
     print("=" * 60 + "\n")
 
 if __name__ == '__main__':

@@ -1049,6 +1049,16 @@ body.hide-trans-borders .reader-trans-block {
   border-left-color: color-mix(in srgb, #4338ca 30%, transparent); /* French Royal Indigo */
 }
 
+.reader-trans-block[data-trans-lang="cs"],
+.reader-trans-block[data-trans-lang="czech"] {
+  border-left-color: color-mix(in srgb, #0284c7 30%, transparent); /* Sky Blue */
+}
+
+.reader-trans-block[data-trans-lang="mr"],
+.reader-trans-block[data-trans-lang="marathi"] {
+  border-left-color: color-mix(in srgb, #ea580c 30%, transparent); /* Deep Orange */
+}
+
 .reader-trans-block[data-trans-lang="pali"],
 .reader-trans-block.reader-pali-trans-block {
   border-left-color: color-mix(in srgb, var(--accent) 30%, transparent); /* Original Pali Accent */

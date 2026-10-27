@@ -26,6 +26,8 @@ export const TTS_LANG_ID_TO_CODE = {
   french: 'fr',
   portuguese: 'pt',
   russian: 'ru',
+  czech: 'cs',
+  marathi: 'mr',
 };
 
 export const TTS_LANG_ID_TO_BCP47 = {
@@ -50,6 +52,8 @@ export const TTS_LANG_ID_TO_BCP47 = {
   french: 'fr-FR',
   portuguese: 'pt-PT',
   russian: 'ru-RU',
+  czech: 'cs-CZ',
+  marathi: 'mr-IN',
 };
 
 export const TTS_LANG_LABEL = {
@@ -74,6 +78,8 @@ export const TTS_LANG_LABEL = {
   french: 'Français',
   portuguese: 'Português',
   russian: 'Русский',
+  czech: 'Čeština',
+  marathi: 'मराठी',
 };
 
 export const TTS_LANG_FLAG = {
@@ -98,6 +104,8 @@ export const TTS_LANG_FLAG = {
   french: '🇫🇷',
   portuguese: '🇵🇹',
   russian: '🇷🇺',
+  czech: '🇨🇿',
+  marathi: '🇮🇳',
 };
 
 export function isTtsSupported() {
