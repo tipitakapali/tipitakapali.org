@@ -22,5 +22,8 @@
     "dotenv": "^17.4.2",
     "fastify": "^5.12.1",
     "pm2": "^7.0.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true
   }
 }
