@@ -53,7 +53,7 @@ def build_summaries_and_sections_db(base_dir):
     book_map = {}
     book_names = {}
     if os.path.exists(epi_ref_path):
-        epi_conn = sqlite3.connect(epi_ref_path)
+        epi_conn = sqlite3.connect(f'file:{os.path.abspath(epi_ref_path)}?mode=ro', uri=True)
         cur = epi_conn.cursor()
         cur.execute("SELECT book_id, vri_id, book_name FROM books WHERE vri_id IS NOT NULL AND vri_id != ''")
         for bid, vid, bname in cur.fetchall():
@@ -64,14 +64,21 @@ def build_summaries_and_sections_db(base_dir):
         print(f"[Conversion] Loaded {len(book_map)} book mappings from {epi_ref_path}")
 
     # Also load books from tipitaka.db for any missing
-    tipi_conn = sqlite3.connect(tipi_path)
+    tipi_conn = sqlite3.connect(f'file:{os.path.abspath(tipi_path)}?mode=ro', uri=True)
     cur = tipi_conn.cursor()
     cur.execute("SELECT code, title FROM books")
     for code, title in cur.fetchall():
         if code not in book_names:
             book_names[code] = title
         book_map[code] = code
+
+    # Load canon lookup: (book_code, para_index) -> chapter_index
+    cur.execute("SELECT book_code, para_index, chapter_index FROM canon_paragraphs")
+    canon_lookup = {}
+    for bcode, pidx, cidx in cur.fetchall():
+        canon_lookup[(bcode, pidx)] = cidx
     tipi_conn.close()
+    print(f"[Conversion] Loaded {len(canon_lookup)} canon paragraph mappings from {tipi_path}")
 
     # 2. Connect to output summaries.db
     temp_out = out_path + ".tmp"
@@ -107,7 +114,7 @@ def build_summaries_and_sections_db(base_dir):
     # 3. Read summaries from epitaka_en.db or epitaka_summary.db
     src_db = epi_en_path if os.path.exists(epi_en_path) else epi_sum_path
     print(f"[Conversion] Reading summaries from {src_db}...")
-    src_conn = sqlite3.connect(src_db)
+    src_conn = sqlite3.connect(f'file:{os.path.abspath(src_db)}?mode=ro', uri=True)
     cur = src_conn.cursor()
     cur.execute("SELECT rowid FROM summaries")
     rids = [r[0] for r in cur.fetchall()]
@@ -154,8 +161,12 @@ def build_summaries_and_sections_db(base_dir):
         if p_idx_end is None or p_idx_end < 0:
             p_idx_end = max(0, (p_end or p_start or 1) - 1)
 
+        cidx = canon_lookup.get((bcode, p_idx_start), 0)
+        if cidx is None:
+            cidx = 0
+
         batch.append((
-            bid, bcode, btitle, sec_id, 0,
+            bid, bcode, btitle, sec_id, cidx,
             p_start or 0, p_end or 0, p_idx_start, p_idx_end,
             h_title or '', s_title or '', v_title or '', title or '', content or '', sources or '[]'
         ))
@@ -176,8 +187,10 @@ def build_summaries_and_sections_db(base_dir):
     print(f"[Conversion] Successfully inserted {count} summaries. Creating indexes...")
 
     out_conn.execute("CREATE INDEX idx_summaries_bcode ON summaries(book_code)")
+    out_conn.execute("CREATE INDEX idx_summaries_bcode_chap ON summaries(book_code, chapter_index)")
     out_conn.execute("CREATE INDEX idx_summaries_bcode_sec ON summaries(book_code, section_id)")
     out_conn.execute("CREATE INDEX idx_summaries_paras ON summaries(book_code, para_index_start, para_index_end)")
+    out_conn.execute("CREATE INDEX idx_summaries_chap_paras ON summaries(book_code, chapter_index, para_start, para_end)")
 
     # 4. Create FTS5 virtual table for summaries
     print("[Conversion] Building summaries_fts FTS5 table...")
@@ -216,7 +229,7 @@ def build_summaries_and_sections_db(base_dir):
         )
     """)
 
-    tipi_conn = sqlite3.connect(tipi_path)
+    tipi_conn = sqlite3.connect(f'file:{os.path.abspath(tipi_path)}?mode=ro', uri=True)
     cur_tipi = tipi_conn.cursor()
     cur_tipi.execute("""
         SELECT t.book_code, COALESCE(b.title, t.book_code), t.title, t.chapter_index, t.para_index, t.para_num, t.level
