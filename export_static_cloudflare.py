@@ -1101,17 +1101,18 @@ def prune_stale_books(target_api_dir: Path, valid_per_lang: dict):
 
 
 def ensure_redirects_rule(dist_dir: Path):
-    """Append the translation rewrite rule to dist/_redirects (idempotent)."""
+    """Ensure dist/_redirects has all canonical API rewrite rules and the translation rule."""
     redirects_file = dist_dir / '_redirects'
     if not redirects_file.exists():
-        redirects_file.write_text(
-            "# Cloudflare Pages Redirects & Internal Rewrites\n"
-            f"{TRANSLATION_REDIRECT_RULE}\n",
-            encoding='utf-8'
-        )
+        generate_cloudflare_redirects(dist_dir)
         return True
 
     content = redirects_file.read_text(encoding='utf-8')
+    if '/api/book/:code' not in content:
+        # Full API rules missing; regenerate full file
+        generate_cloudflare_redirects(dist_dir)
+        return True
+
     if 'translation/:lang' in content:
         return False
 
