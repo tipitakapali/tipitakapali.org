@@ -1121,12 +1121,12 @@ def ensure_redirects_rule(dist_dir: Path):
     return True
 
 
-def sync_translations_to_targets(dist_dir: Path, public_api_dir: Path, git_repo_dir: Path, langs: list, no_public_sync: bool):
-    """Sync newly exported translation JSONs to public/api and next_tipitakapali.org."""
+def sync_translations_to_targets(dist_dir: Path, public_api_dir: Path, git_repo_dir: Path, langs: list, sync_public: bool = False):
+    """Sync newly exported translation JSONs to public/api (if opt-in) and next_tipitakapali.org."""
     target_api_dir = dist_dir / 'api'
 
-    # 1. Sync to public/api for local offline dev
-    if not no_public_sync:
+    # 1. Sync to public/api ONLY if opt-in (--sync-public) to prevent VPS disk bloat
+    if sync_public:
         public_api_dir.mkdir(parents=True, exist_ok=True)
         copied_local = 0
         for lang in langs:
@@ -1258,8 +1258,9 @@ def export_website(args, paths):
         if public_dir.exists():
             shutil.copytree(public_dir, dist_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
 
-    # Backfill any existing translation JSONs if present in git_repo_dir but missing in dist_dir
-    backfill_translations_to_dist(dist_dir, git_repo_dir)
+    # Backfill translations only if explicitly requested (e.g. standalone wrangler deploy)
+    if getattr(args, 'backfill_translations', False):
+        backfill_translations_to_dist(dist_dir, git_repo_dir)
 
     # 3. Export Database to Static JSON directly into cloudflare_pages_dist/api
     target_api_dir = dist_dir / 'api'
@@ -1280,18 +1281,19 @@ def export_website(args, paths):
                 except OSError:
                     pass
 
-        # Sync static API data to public/api for offline local dev (ignoring translation)
-        public_api_dir = paths['public_api_dir']
-        log_info(f"Syncing static API data to local development folder: {public_api_dir}")
-        public_api_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(target_api_dir, public_api_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
-        cleanup_stale_index_json(public_api_dir)
-        if not args.with_paragraphs:
-            for stale_para in public_api_dir.rglob('paragraphs.json'):
-                try:
-                    stale_para.unlink()
-                except OSError:
-                    pass
+        # Sync static API data to public/api ONLY if explicitly opted-in (--sync-public)
+        if getattr(args, 'sync_public', False):
+            public_api_dir = paths['public_api_dir']
+            log_info(f"Syncing static API data to local development folder: {public_api_dir}")
+            public_api_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(target_api_dir, public_api_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('translation'))
+            cleanup_stale_index_json(public_api_dir)
+            if not args.with_paragraphs:
+                for stale_para in public_api_dir.rglob('paragraphs.json'):
+                    try:
+                        stale_para.unlink()
+                    except OSError:
+                        pass
 
     # 3b. Prune duplicate chapter/ prerender (canonical SEO lives on /book/*)
     if not args.keep_chapter:
@@ -1332,6 +1334,12 @@ def export_website(args, paths):
 
     print_summary(dist_dir, git_repo_dir, args.vps_url)
 
+    # Auto-clean staging folder to avoid holding duplicate files on disk
+    if git_repo_dir.exists() and dist_dir.exists() and not getattr(args, 'keep_dist', False):
+        log_info(f"Auto-cleaning staging directory ({dist_dir.name}) to conserve VPS disk space...")
+        shutil.rmtree(dist_dir)
+        log_success(f"Cleaned staging directory {dist_dir.name} (live repo preserved in {git_repo_dir.name})")
+
 
 def export_translations(args, paths):
     """Option 2: Export ONLY static translation JSON files (cleans stale files first)."""
@@ -1367,7 +1375,10 @@ def export_translations(args, paths):
 
     # Clean existing translation files for the target languages first to eliminate stale files
     clean_all = (args.langs is None)
-    clean_stale_translations([dist_dir, paths['web_app_dir'] / 'public', git_repo_dir], langs, clean_all=clean_all)
+    clean_targets = [dist_dir, git_repo_dir]
+    if getattr(args, 'sync_public', False):
+        clean_targets.append(paths['web_app_dir'] / 'public')
+    clean_stale_translations(clean_targets, langs, clean_all=clean_all)
 
     total_books = 0
     total_chapters = 0
@@ -1402,17 +1413,23 @@ def export_translations(args, paths):
     export_translations_catalog(target_api_dir, db_dir)
     ensure_redirects_rule(dist_dir)
 
-    # Sync fresh translation files to public/api and next_tipitakapali.org
+    # Sync fresh translation files to next_tipitakapali.org (and public/api if opt-in)
     sync_translations_to_targets(
         dist_dir=dist_dir,
         public_api_dir=public_api_dir,
         git_repo_dir=git_repo_dir,
         langs=langs,
-        no_public_sync=args.no_public_sync
+        sync_public=getattr(args, 'sync_public', False)
     )
 
     # Ensure SEO sitemaps, robots.txt, and LLM metadata reflect current translations
     generate_seo_and_ai_metadata(paths, args.site_url)
+
+    # Auto-clean staging folder to avoid holding duplicate 12 GB on disk
+    if git_repo_dir.exists() and dist_dir.exists() and not getattr(args, 'keep_dist', False):
+        log_info(f"Auto-cleaning staging directory ({dist_dir.name}) to conserve VPS disk space...")
+        shutil.rmtree(dist_dir)
+        log_success(f"Cleaned staging directory {dist_dir.name} (live repo preserved in {git_repo_dir.name})")
 
 
 def export_both(args, paths):
@@ -1470,9 +1487,24 @@ def main():
         help="Comma-separated lang codes to export for translations (e.g. en,vi,my)"
     )
     parser.add_argument(
+        "--sync-public",
+        action="store_true",
+        help="Also copy exported JSON files into public/api for offline local dev (disabled by default to prevent VPS disk bloat)"
+    )
+    parser.add_argument(
         "--no-public-sync",
         action="store_true",
-        help="Skip syncing translation JSON into public/api"
+        help="Legacy option: public/api sync is now disabled by default"
+    )
+    parser.add_argument(
+        "--keep-dist",
+        action="store_true",
+        help="Keep cloudflare_pages_dist staging folder after syncing to git repo (disabled by default to save 12 GB disk space)"
+    )
+    parser.add_argument(
+        "--backfill-translations",
+        action="store_true",
+        help="Backfill translations from git repo into dist directory (only needed for direct wrangler upload without git)"
     )
     parser.add_argument(
         "--out-dir",
