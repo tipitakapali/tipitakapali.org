@@ -141,24 +141,36 @@ function registerLogRoutes(fastify) {
   fastify.get('/log', async (req, reply) => {
     const filter = req.query.filter || 'day';
     const timezone = req.query.timezone || 'Asia/Bangkok';
-    let sql, rows, logItems, html;
+    const rawStatus = String(req.query.status || '').trim().toLowerCase();
+    const statusFilter = /^\d{3}$/.test(rawStatus) || rawStatus === 'error' ? rawStatus : '';
+    let whereClause, sql, rows, logItems, html;
 
     switch (filter) {
       case 'hour':
-        sql = "SELECT * FROM logs WHERE timestamp >= datetime('now', '-1 hours') ORDER BY timestamp DESC";
+        whereClause = "timestamp >= datetime('now', '-1 hours')";
         break;
       case 'week':
-        sql = "SELECT * FROM logs WHERE timestamp >= datetime('now', '-7 days') ORDER BY timestamp DESC";
+        whereClause = "timestamp >= datetime('now', '-7 days')";
         break;
       case 'day':
       default:
-        sql = "SELECT * FROM logs WHERE timestamp >= datetime('now', '-1 days') ORDER BY timestamp DESC";
+        whereClause = "timestamp >= datetime('now', '-1 days')";
         break;
     }
 
+    const params = [];
+    if (statusFilter === 'error') {
+      whereClause += " AND type LIKE '% Error'";
+    } else if (statusFilter) {
+      whereClause += ' AND (data LIKE ? OR data LIKE ?)';
+      params.push(`%"status":${statusFilter},%`, `%"status":${statusFilter}}%`);
+    }
+
+    sql = `SELECT * FROM logs WHERE ${whereClause} ORDER BY timestamp DESC`;
+
     try {
       if (!logsDb) initLogEngine();
-      rows = logsDb.prepare(sql).all();
+      rows = logsDb.prepare(sql).all(...params);
 
       logItems = rows.map((row) => {
         let localizedTime;
@@ -170,6 +182,26 @@ function registerLogRoutes(fastify) {
         return `<li>[${localizedTime}] (${escapeHtml(row.type)}): ${escapeHtml(row.data)}</li>`;
       });
       const totalEvents = logItems.length;
+      const statusQs = statusFilter ? `&status=${encodeURIComponent(statusFilter)}` : '';
+      const tzParam = encodeURIComponent(timezone);
+      const statusPresets = [
+        { value: '', label: 'All' },
+        { value: '404', label: '404 (Not Found)' },
+        { value: 'error', label: 'All Errors (>=400)' },
+        { value: '200', label: '200 (OK)' },
+        { value: '400', label: '400 (Bad Request)' },
+        { value: '500', label: '500 (Server Error)' },
+      ];
+      if (statusFilter && !statusPresets.some((p) => p.value === statusFilter)) {
+        statusPresets.push({ value: statusFilter, label: statusFilter });
+      }
+      const statusOptionsHtml = statusPresets
+        .map(
+          (p) =>
+            `<option value="${escapeHtml(p.value)}"${p.value === statusFilter ? ' selected' : ''}>${escapeHtml(p.label)}</option>`
+        )
+        .join('');
+      const statusLabel = statusFilter ? ` (status: ${escapeHtml(statusFilter)})` : '';
 
       html = `
       <!DOCTYPE html>
@@ -185,19 +217,32 @@ function registerLogRoutes(fastify) {
             urlParams.set("timezone", selectedTimezone);
             window.location.search = urlParams.toString();
           }
+          function updateStatus() {
+            const selectedStatus = document.getElementById("statusSelect").value;
+            const urlParams = new URLSearchParams(window.location.search);
+            if (selectedStatus) {
+              urlParams.set("status", selectedStatus);
+            } else {
+              urlParams.delete("status");
+            }
+            window.location.search = urlParams.toString();
+          }
         </script>
       </head>
       <body>
         <p>Filter by:
-          <a href="/log?filter=hour&timezone=${timezone}">Hour</a> |
-          <a href="/log?filter=day&timezone=${timezone}">Day</a> |
-          <a href="/log?filter=week&timezone=${timezone}">Week</a> |
+          <a href="/log?filter=hour&timezone=${tzParam}${statusQs}">Hour</a> |
+          <a href="/log?filter=day&timezone=${tzParam}${statusQs}">Day</a> |
+          <a href="/log?filter=week&timezone=${tzParam}${statusQs}">Week</a> |
+          <a href="/log?filter=${encodeURIComponent(filter)}&timezone=${tzParam}&status=404">404 Only</a> |
+          <label for="statusSelect">Status:</label>
+          <select id="statusSelect" onchange="updateStatus()">${statusOptionsHtml}</select> |
           <label for="timezoneSelect">Select Time Zone:</label>
           <select id="timezoneSelect" onchange="updateTimezone()">
           </select>
         </p>
 
-        <h1>Timestamps are in ${escapeHtml(timezone)}. Showing ${totalEvents} events from the past 1 ${escapeHtml(filter.toUpperCase())}.</h1>
+        <h1>Timestamps are in ${escapeHtml(timezone)}. Showing ${totalEvents} events${statusLabel} from the past 1 ${escapeHtml(filter.toUpperCase())}.</h1>
         <ol>${logItems.join('')}</ol>
 
         <script>
