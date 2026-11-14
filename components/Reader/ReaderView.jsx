@@ -1508,6 +1508,8 @@ export default function ReaderView() {
   const [isTargetScrollWaiting, setIsTargetScrollWaiting] = useState(false);
   const targetWaitTimeoutRef = useRef(null);
   const attemptScrollTimerRef = useRef(null);
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
 
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
@@ -1709,6 +1711,18 @@ export default function ReaderView() {
     const container = containerRef.current;
     const isNewBook = restoredBookCodeRef.current !== activeTab.bookCode;
     const isNewContainer = restoredContainerRef.current !== container;
+
+    if (targetScrollIntent) {
+      if (tabSwitchRetryTimerRef.current) {
+        clearInterval(tabSwitchRetryTimerRef.current);
+        tabSwitchRetryTimerRef.current = null;
+      }
+      if (tabSwitchSettleTimerRef.current) {
+        clearTimeout(tabSwitchSettleTimerRef.current);
+        tabSwitchSettleTimerRef.current = null;
+      }
+      isTabSwitchingRef.current = false;
+    }
 
     if (isNewBook || isNewContainer) {
       isTabSwitchingRef.current = true;
@@ -1997,24 +2011,29 @@ export default function ReaderView() {
 
   // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
-    if (!targetScrollIntent || !containerRef.current || !activeTab) return;
-    console.log('[ReaderView targetScrollIntent triggered]', targetScrollIntent);
-
-    setIsTargetScrollWaiting(true);
-    clearTimeout(targetWaitTimeoutRef.current);
-    targetWaitTimeoutRef.current = setTimeout(() => {
+    const currentTab = activeTabRef.current;
+    if (
+      !targetScrollIntent ||
+      !containerRef.current ||
+      !currentTab ||
+      currentTab.viewMode === 'toc' ||
+      currentTab.isTocView
+    ) {
+      clearTimeout(targetWaitTimeoutRef.current);
+      targetWaitTimeoutRef.current = null;
       setIsTargetScrollWaiting(false);
-    }, 12000);
+      return;
+    }
 
     const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = targetScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
     const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
 
     if (chapterIdx !== undefined && chapterIdx !== null) {
-      if (!activeTab.loadedChapters?.[chapterIdx]) {
-        loadChapter(activeTab.bookCode, chapterIdx);
+      if (!currentTab.loadedChapters?.[chapterIdx]) {
+        loadChapter(currentTab.bookCode, chapterIdx);
       }
-      bufferAdjacentChapters(activeTab.bookCode, chapterIdx);
+      bufferAdjacentChapters(currentTab.bookCode, chapterIdx);
     }
 
     let retries = 0;
@@ -2098,7 +2117,8 @@ export default function ReaderView() {
     };
 
     const attemptScroll = () => {
-      if (!containerRef.current) return;
+      const activeTab = activeTabRef.current;
+      if (!containerRef.current || !activeTab) return;
       retries++;
 
       // ── Translation-settle gate ────────────────────────────────────────
@@ -2995,20 +3015,40 @@ export default function ReaderView() {
       }
     };
 
-    scheduleAttemptScroll(40);
+    // Try an immediate scroll synchronously before showing the waiting overlay so
+    // already-rendered Pāḷi-only targets jump without flashing or stalling.
+    clearTimeout(attemptScrollTimerRef.current);
+    attemptScrollTimerRef.current = null;
+    attemptScroll();
+    if (attemptScrollTimerRef.current !== null) {
+      setIsTargetScrollWaiting(true);
+      clearTimeout(targetWaitTimeoutRef.current);
+      targetWaitTimeoutRef.current = setTimeout(() => {
+        setIsTargetScrollWaiting(false);
+      }, 12000);
+    } else {
+      clearTimeout(targetWaitTimeoutRef.current);
+      targetWaitTimeoutRef.current = null;
+    }
+
     return () => {
       clearTimeout(timerId);
       clearTimeout(attemptScrollTimerRef.current);
       attemptScrollTimerRef.current = null;
       clearTimeout(targetWaitTimeoutRef.current);
+      targetWaitTimeoutRef.current = null;
+      setIsTargetScrollWaiting(false);
     };
   }, [
     targetScrollIntent,
-    activeTab,
+    activeTab?.bookCode,
+    activeTab?.viewMode,
+    activeTab?.isTocView,
     pulseAnimation,
     loadChapter,
     bufferAdjacentChapters,
     saveTabScroll,
+    saveTabPosition,
     clearTargetScrollIntent,
     setActiveParaNum,
     searchHighlight,
@@ -3829,12 +3869,7 @@ export default function ReaderView() {
       </div>
 
       {/* Main Scrollable Reading Container */}
-      <main
-        className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden"
-        tabIndex={0}
-        ref={containerRef}
-        onScroll={handleScroll}
-      >
+      <div className="relative flex-1 min-h-0 flex flex-col">
         {isTargetScrollWaiting && (
           <div className="reader-jump-loading-overlay absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--bg-primary)]/85 backdrop-blur-md select-none transition-opacity duration-300">
             <div className="p-6 sm:p-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl flex flex-col items-center gap-3.5 text-center max-w-sm sm:max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
@@ -3855,6 +3890,12 @@ export default function ReaderView() {
             </div>
           </div>
         )}
+        <main
+          className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden"
+          tabIndex={0}
+          ref={containerRef}
+          onScroll={handleScroll}
+        >
         {/* Dynamic Translation Colors CSS Rules */}
         {settings?.translationColors && Object.keys(settings.translationColors).length > 0 && (
           <style
@@ -3968,7 +4009,8 @@ export default function ReaderView() {
             )}
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
