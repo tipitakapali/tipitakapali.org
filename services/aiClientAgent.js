@@ -1,6 +1,6 @@
 'use client';
 
-import { getApiBase } from "./api";
+import { fetchAiEndpoint } from "./api";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CANONICAL TOOL DECLARATIONS FOR CLIENT-SIDE GEMINI & OPENAI
@@ -508,7 +508,7 @@ function formatCompactToolResponse(toolName, result) {
 
 async function executeRemoteAiTool(name, args, signal) {
   // CRITICAL: We only pass { name, args }. ZERO API KEY is sent to our backend!
-  const res = await fetch(`${getApiBase()}/api/ai/tool-call`, {
+  const res = await fetchAiEndpoint('/api/ai/tool-call', {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, args: args || {} }),

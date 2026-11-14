@@ -506,6 +506,43 @@ export function getApiBase() {
 // Backward compat alias
 const getDictApiBase = getApiBase;
 
+// AI endpoints talk to https://api.tipitakapali.org online even when the UI is
+// served from the Flutter loopback bundle on 127.0.0.1:<port>.
+export function getAiApiBase() {
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (
+      host === 'tipitakapali.org' ||
+      host.endsWith('.tipitakapali.org') ||
+      (process.env.NODE_ENV !== 'development' && host === '127.0.0.1')
+    ) {
+      return 'https://api.tipitakapali.org';
+    }
+  }
+  return '';
+}
+
+export async function fetchAiEndpoint(pathAndQuery, init = {}) {
+  const base = getAiApiBase();
+  const primaryUrl = `${base}${pathAndQuery}`;
+  try {
+    return await fetch(primaryUrl, init);
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err;
+    if (
+      base &&
+      typeof window !== 'undefined' &&
+      window.location.hostname === '127.0.0.1'
+    ) {
+      return fetch(pathAndQuery, init);
+    }
+    throw err;
+  }
+}
+
 export async function fetchDictionaryLookup(word, dictType = 'all', options = {}) {
   const cleanWord = cleanDictionaryQuery(word || '').trim();
   if (!cleanWord) return { word: '', hasResults: false, error: 'Empty word' };

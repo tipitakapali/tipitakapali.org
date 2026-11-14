@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, BookOpen, ExternalLink, Globe, Loader2, Quote, Sparkles } from 'lucide-react';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript, transliterateHtml } from '../../services/transliterate';
-import { getApiBase } from '../../services/api';
+import { fetchAiEndpoint } from '../../services/api';
 import { TRANSLATIONS } from '../LanguageMenu';
 
 // Translation language key → canonical DB lang code (subset used by the quick view)
@@ -118,15 +118,15 @@ export default function CitationQuickviewModal({ isOpen, citation, onClose, onOp
     const { bookCode, chapterIndex = 0, paraIndex = 0, paraEnd, lineId } = citation;
     const endPara = paraEnd !== null && paraEnd !== undefined ? paraEnd : paraIndex;
     const langsParam = previewLangs.map((l) => l.code).join(',');
-    const paraUrl = `${getApiBase()}/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=${encodeURIComponent(langsParam)}`;
+    const paraPath = `/api/ai/paragraph_content?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&start=${paraIndex}&end=${endPara}&langs=${encodeURIComponent(langsParam)}`;
 
-    const fetchParaPromise = fetch(paraUrl).then((res) => {
+    const fetchParaPromise = fetchAiEndpoint(paraPath).then((res) => {
       if (!res.ok) throw new Error(`Failed to load passage (${res.status})`);
       return res.json();
     });
 
     const fetchSentencePromise = lineId
-      ? fetch(`${getApiBase()}/api/ai/sentences?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&para_index=${paraIndex}&langs=${encodeURIComponent(langsParam)}`)
+      ? fetchAiEndpoint(`/api/ai/sentences?book=${encodeURIComponent(bookCode)}&chapter=${chapterIndex}&para_index=${paraIndex}&langs=${encodeURIComponent(langsParam)}`)
           .then((res) => (res.ok ? res.json() : null))
           .catch(() => null)
       : Promise.resolve(null);
