@@ -968,13 +968,14 @@ const ChapterBlock = memo(function ChapterBlock({
   const displayHtml = React.useMemo(() => {
     if (!html) return null;
     let processed = html;
-    if (paliScript && paliScript !== 'roman') {
-      processed = transliterateHtml(processed, paliScript);
-    }
-    // Sentence display mode: Pāḷi sentence lines from the precomputed map
-    // (before search highlighting so marks nest inside the sentences).
+    // Sentence display mode: Pāḷi sentence lines from the precomputed map.
+    // Run BEFORE transliterateHtml so Roman sentence/page-break matching works
+    // on raw Roman HTML and the injected sentence spans get transliterated too.
     if (sentenceMode && isPaliEnabled && paliSentMap) {
       processed = injectPaliSentencesIntoHtml(processed, paliSentMap);
+    }
+    if (paliScript && paliScript !== 'roman') {
+      processed = transliterateHtml(processed, paliScript);
     }
     // Task 2: Only highlight Pāḷi text if search was in Root Pāḷi CST (not in translation database)
     const isPali = isSearchPali(searchHighlight);
