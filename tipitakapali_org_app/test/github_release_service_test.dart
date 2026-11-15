@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tipitakapali_app/core/models/db_manifest.dart';
+import 'package:tipitakapali_app/core/models/db_update_info.dart';
 import 'package:tipitakapali_app/core/services/github_release_service.dart';
+import 'package:tipitakapali_app/core/storage/db_storage_service.dart';
 
 void main() {
   test('default repository points to tipitakapali/tipitakapali.org', () {
@@ -252,6 +255,92 @@ void main() {
       final offlineResult = await offlineService.fetchOfficialRelease();
       expect(offlineResult.fetchedLive, isFalse);
       expect(offlineResult.manifest.core['tipitaka']?.version, 1);
+    },
+  );
+
+  test(
+    're-uploading unchanged DB on a newer date does not trigger false update',
+    () {
+      final manifest = DatabaseManifest.fromJson({
+        'version': 1,
+        'releaseRepo': 'tipitakapali/tipitakapali.org',
+        'releaseTag': 'db',
+        'core': {
+          'tipitaka': {
+            'id': 'tipitaka',
+            'title': 'Tipitaka',
+            'filename': 'tipitaka.db',
+            'assetName': 'tipitaka.db.zip',
+            'category': 'core',
+            'version': 1,
+            'updated': '2026-11-14',
+            'checksum': 'aaa111',
+            'zipSha256': 'zip111',
+            'url':
+                'https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip',
+          },
+        },
+        'dictionaries': <String, dynamic>{},
+        'languages': <String, dynamic>{},
+      });
+
+      // GitHub release uploaded on 2026-11-15 with same zip digest preserves manifest date.
+      final hydratedSame = manifest.applyGitHubReleaseAssets(
+        [
+          GitHubReleaseAsset(
+            name: 'tipitaka.db.zip',
+            downloadUrl:
+                'https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip',
+            size: 1000,
+            digestSha256: 'zip111',
+            updatedAt: DateTime.utc(2026, 11, 15, 10),
+          ),
+        ],
+        repo: 'tipitakapali/tipitakapali.org',
+        tag: 'db',
+      );
+      expect(hydratedSame.core['tipitaka']!.updated, '2026-11-14');
+
+      final installed = InstalledDbInfo(
+        filename: 'tipitaka.db',
+        path: '/tmp/tipitaka.db',
+        sizeBytes: 1000,
+        modifiedAt: DateTime.utc(2026, 11, 14),
+        validSqlite: true,
+      );
+
+      // Even if zipSha256 and updated date are newer, identical inner checksum means no update.
+      final rezippedRemote = manifest.core['tipitaka']!.copyWith(
+        updated: '2026-11-15',
+        zipSha256: 'zip222',
+      );
+      final upToDate = isDatabaseUpdateAvailable(
+        remoteAsset: rezippedRemote,
+        installed: installed,
+        recordedMeta: const InstalledAssetMetadata(
+          version: 1,
+          updated: '2026-11-14',
+          checksum: 'aaa111',
+          zipSha256: 'zip111',
+        ),
+        manifest: manifest,
+      );
+      expect(upToDate, isFalse);
+
+      // Changed inner DB checksum DOES trigger an update.
+      final changedDbRemote = rezippedRemote.copyWith(checksum: 'bbb222');
+      final hasUpdate = isDatabaseUpdateAvailable(
+        remoteAsset: changedDbRemote,
+        installed: installed,
+        recordedMeta: const InstalledAssetMetadata(
+          version: 1,
+          updated: '2026-11-14',
+          checksum: 'aaa111',
+          zipSha256: 'zip111',
+        ),
+        manifest: manifest,
+      );
+      expect(hasUpdate, isTrue);
     },
   );
 }

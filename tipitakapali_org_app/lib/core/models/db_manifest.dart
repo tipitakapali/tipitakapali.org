@@ -369,11 +369,21 @@ class DatabaseManifest {
       }
       if (match == null) return item;
       final updatedDate = match.updatedAt?.toIso8601String().split('T').first;
+      final localZipSha = item.zipSha256?.trim().toLowerCase();
+      final remoteZipSha = match.digestSha256?.trim().toLowerCase();
+      final sameZipDigest =
+          localZipSha != null &&
+          remoteZipSha != null &&
+          localZipSha == remoteZipSha;
+      final preserveExistingDate =
+          item.updated != null &&
+          item.updated!.trim().isNotEmpty &&
+          sameZipDigest;
       return item.copyWith(
         url: match.downloadUrl,
         zipSize: match.size > 0 ? match.size : item.zipSize,
         zipSha256: match.digestSha256 ?? item.zipSha256,
-        updated: updatedDate ?? item.updated,
+        updated: preserveExistingDate ? item.updated : (updatedDate ?? item.updated),
       );
     }
 

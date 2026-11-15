@@ -3,11 +3,11 @@
 <div align="center" id="download-offline-tipitaka-pali-apps">
   <img src="docs/img/Tipitakapali.org-1024x448-compressed.png" alt="Tipitakapali.org" />
 <br /> <br />
-<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Apple_logo_dark_grey.svg.png" alt="Download for macOS"></a>
+<a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213"><img height="50" src="docs/img/Apple_logo_dark_grey.svg.png" alt="Download for macOS"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>
 <a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Tux.svg.png" alt="Download for Linux"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>
-<a target="_blank" href="https://github.com/tipitakapali/tipitakapali.org/releases"><img height="50" src="docs/img/Windows_logo_-_2012.svg.png" alt="Download for Windows"></a>
+<a target="_blank" href="https://apps.microsoft.com/store/detail/9NL71SJP2XMH"><img height="50" src="docs/img/Windows_logo_-_2012.svg.png" alt="Download for Windows"></a>
 <br /> <br />
 <a target="_blank" href="https://apps.apple.com/vn/app/tipitakacst/id6743404213"><img height="40" src="docs/img/download-on-the-app-store.svg" alt="Download on the App Store"></a>
 <span>&nbsp;&nbsp;&nbsp;</span>

@@ -92,15 +92,19 @@ bool isDatabaseUpdateAvailable({
     if (remoteAsset.version > recordedMeta.version) {
       return true;
     }
-    if (recordedMeta.checksum != null &&
-        remoteChecksum != null &&
-        recordedMeta.checksum != remoteChecksum) {
-      return true;
+    if (recordedMeta.checksum != null && remoteChecksum != null) {
+      if (recordedMeta.checksum != remoteChecksum) {
+        return true;
+      }
+      // Inner .db content is identical; ignore newer zip timestamps or release
+      // re-upload dates so unchanged databases are not re-downloaded.
+      return false;
     }
-    if (recordedMeta.zipSha256 != null &&
-        remoteZipSha != null &&
-        recordedMeta.zipSha256 != remoteZipSha) {
-      return true;
+    if (recordedMeta.zipSha256 != null && remoteZipSha != null) {
+      if (recordedMeta.zipSha256 != remoteZipSha) {
+        return true;
+      }
+      return false;
     }
     if (recordedMeta.updated != null &&
         remoteUpdated != null &&
