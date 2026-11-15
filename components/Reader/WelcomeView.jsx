@@ -19,6 +19,7 @@ export default function WelcomeView() {
 
   // Light variants for light/sepia to avoid harsh black on light UI
   const isLightBadge = settings?.theme === 'classic' || settings?.theme === 'white' || settings?.theme === 'sepia';
+  const showAndroidBadge = process.env.NEXT_PUBLIC_OFFLINE_APP !== 'true';
   const appStoreSrc = isLightBadge ? '/download-on-the-app-store-light.svg' : '/download-on-the-app-store.svg';
   const playStoreSrc = isLightBadge ? '/Google_Play_Store_badge_EN_light.svg' : '/Google_Play_Store_badge_EN.svg';
   const desktopSrc = isLightBadge ? '/download-for-desktop-light.svg' : '/download-for-desktop.svg';
@@ -227,20 +228,22 @@ export default function WelcomeView() {
             />
           </a>
 
-          {/* Google Play Store */}
-          <a
-            href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-all duration-200 hover:scale-[1.03] active:scale-95 inline-flex items-center shrink-0 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--accent)] hover:shadow-md"
-            title="Get it on Google Play (Android)"
-          >
-            <img
-              src={playStoreSrc}
-              alt="Get it on Google Play"
-              className="h-[38px] sm:h-[40px] w-auto object-contain block"
-            />
-          </a>
+          {/* Google Play Store (web only — omitted in offline app bundles) */}
+          {showAndroidBadge && (
+            <a
+              href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-all duration-200 hover:scale-[1.03] active:scale-95 inline-flex items-center shrink-0 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg overflow-hidden shadow-sm hover:border-[var(--accent)] hover:shadow-md"
+              title="Get it on Google Play (Android)"
+            >
+              <img
+                src={playStoreSrc}
+                alt="Get it on Google Play"
+                className="h-[38px] sm:h-[40px] w-auto object-contain block"
+              />
+            </a>
+          )}
 
           {/* Desktop Releases */}
           <a

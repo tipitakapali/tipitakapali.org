@@ -17,7 +17,7 @@ echo "1/3 Exporting static bundle from $WEB_DIR..."
 rm -rf "$WEB_DIR/out"
 (
   cd "$WEB_DIR"
-  NEXT_EXPORT=true STATIC_EXPORT=true npm run build
+  NEXT_PUBLIC_OFFLINE_APP=true NEXT_EXPORT=true STATIC_EXPORT=true npm run build
 )
 
 echo "2/3 Packaging $ASSETS_DIR/web.zip..."
@@ -29,6 +29,7 @@ trap cleanup EXIT
 
 python3 - "$WEB_DIR/out" "$TMP_WEB" "$ASSETS_DIR/web.zip" <<'PY'
 import os
+import re
 import shutil
 import sys
 import zipfile
@@ -36,8 +37,12 @@ import zipfile
 out_dir, staging_dir, zip_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
 skip_top = {'book', 'chapter', '.well-known'}
-skip_prefixes = ('sitemap', 'robots.txt')
+skip_prefixes = ('sitemap', 'robots.txt', 'Google_Play_Store_badge_EN')
 skip_font_prefixes = ('Noto_Serif_SC', 'Noto_Serif_JP')
+play_store_link_re = re.compile(
+    r'\s*<a\b[^>]*href=["\']https://play\.google\.com/[^"\']*["\'][^>]*>.*?</a>\s*',
+    re.IGNORECASE | re.DOTALL,
+)
 
 count = 0
 for root, dirs, files in os.walk(out_dir):
@@ -57,7 +62,14 @@ for root, dirs, files in os.walk(out_dir):
         dst_rel = fname if rel_root == '.' else os.path.join(rel_root, fname)
         dst = os.path.join(staging_dir, dst_rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
+        if rel_root == '.' and fname == 'info.html':
+            with open(src, 'r', encoding='utf-8') as f:
+                html = f.read()
+            html = play_store_link_re.sub('\n', html)
+            with open(dst, 'w', encoding='utf-8') as f:
+                f.write(html)
+        else:
+            shutil.copy2(src, dst)
         count += 1
 
 tmp_zip = zip_path + '.tmp'

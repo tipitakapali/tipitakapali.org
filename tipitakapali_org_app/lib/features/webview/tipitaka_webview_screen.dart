@@ -1805,6 +1805,7 @@ const String _languageMenuBridgeScript = r'''
     style.id = 'tpo-auto-hide-style';
     style.textContent = [
       '@keyframes tpo-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }',
+      'a[href*="play.google.com"], img[src*="Google_Play_Store_badge"] { display: none !important; }',
       '.app-header, .book-tabs-bar, .content-header, footer.app-footer {',
       '  transition: height 0.24s cubic-bezier(0.4, 0, 0.2, 1),',
       '              min-height 0.24s cubic-bezier(0.4, 0, 0.2, 1),',
@@ -2004,12 +2005,22 @@ const String _languageMenuBridgeScript = r'''
     }
   }, { passive: true, capture: true });
 
+  function stripAndroidStoreBadges() {
+    var anchors = document.querySelectorAll('a[href*="play.google.com"]');
+    for (var i = 0; i < anchors.length; i++) {
+      if (anchors[i].parentNode) {
+        anchors[i].parentNode.removeChild(anchors[i]);
+      }
+    }
+  }
+
   var syncScheduled = false;
   function scheduleSync() {
     if (syncScheduled) return;
     syncScheduled = true;
     var run = function() {
       syncScheduled = false;
+      try { stripAndroidStoreBadges(); } catch (_) {}
       try { syncAutoHideState(); } catch (_) {}
       try { syncOpenModal(); } catch (_) {}
       try { syncSearchModal(); } catch (_) {}

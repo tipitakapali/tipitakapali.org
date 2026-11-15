@@ -22,6 +22,8 @@ import {
   Check,
 } from 'lucide-react';
 
+export const SHOW_ANDROID_BADGE = process.env.NEXT_PUBLIC_OFFLINE_APP !== 'true';
+
 export const HELP_SECTIONS = [
   { id: 'topic-overview', label: 'TipitakaPali.org Overview', icon: BookOpen },
   { id: 'topic-translations', label: 'Translations & Pāḷi Layers', icon: Languages },
@@ -182,19 +184,21 @@ export default function HelpGuideContent({ showTabBar = true }) {
                 className="h-[34px] sm:h-[36px] w-auto object-contain"
               />
             </a>
-            <a
-              href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
-              title="Get it on Google Play (Android)"
-            >
-              <img
-                src="/Google_Play_Store_badge_EN.svg"
-                alt="Get it on Google Play"
-                className="h-[34px] sm:h-[36px] w-auto object-contain"
-              />
-            </a>
+            {SHOW_ANDROID_BADGE && (
+              <a
+                href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+                title="Get it on Google Play (Android)"
+              >
+                <img
+                  src="/Google_Play_Store_badge_EN.svg"
+                  alt="Get it on Google Play"
+                  className="h-[34px] sm:h-[36px] w-auto object-contain"
+                />
+              </a>
+            )}
             <a
               href="https://github.com/tipitakapali/tipitakapali.org/releases"
               target="_blank"
@@ -862,19 +866,21 @@ export default function HelpGuideContent({ showTabBar = true }) {
                 className="h-[34px] sm:h-[36px] w-auto object-contain"
               />
             </a>
-            <a
-              href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
-              title="Get it on Google Play (Android)"
-            >
-              <img
-                src="/Google_Play_Store_badge_EN.svg"
-                alt="Get it on Google Play"
-                className="h-[34px] sm:h-[36px] w-auto object-contain"
-              />
-            </a>
+            {SHOW_ANDROID_BADGE && (
+              <a
+                href="https://play.google.com/store/apps/details?id=org.tipitakapali.android"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-transform duration-200 hover:scale-105 active:scale-95 inline-flex items-center shadow-2xs rounded-lg overflow-hidden shrink-0"
+                title="Get it on Google Play (Android)"
+              >
+                <img
+                  src="/Google_Play_Store_badge_EN.svg"
+                  alt="Get it on Google Play"
+                  className="h-[34px] sm:h-[36px] w-auto object-contain"
+                />
+              </a>
+            )}
             <a
               href="https://github.com/tipitakapali/tipitakapali.org/releases"
               target="_blank"

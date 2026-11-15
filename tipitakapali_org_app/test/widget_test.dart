@@ -640,6 +640,8 @@ void main() {
     expect(tipitakaWebBridgeScript, contains('DOWNLOAD_ICON_SVG'));
     expect(tipitakaWebBridgeScript, contains('<svg'));
     expect(tipitakaWebBridgeScript, isNot(contains("'Download'")));
+    expect(tipitakaWebBridgeScript, contains('stripAndroidStoreBadges'));
+    expect(tipitakaWebBridgeScript, contains('a[href*="play.google.com"]'));
   });
 
   testWidgets(
