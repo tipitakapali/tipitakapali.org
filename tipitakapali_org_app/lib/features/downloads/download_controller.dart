@@ -222,6 +222,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
   bool _initialized = false;
   bool _disposed = false;
   Future<void> _ftsQueue = Future.value();
+  Future<ManifestFetchResult>? _inFlightManifestRefresh;
 
   DbStorageService get _storage => ref.read(dbStorageServiceProvider);
   GitHubReleaseService get _releaseService =>
@@ -353,6 +354,23 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
   Future<ManifestFetchResult> refreshReleaseManifest({
     bool silentOffline = false,
+  }) {
+    final inFlight = _inFlightManifestRefresh;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final future = _performRefreshReleaseManifest(silentOffline: silentOffline);
+    _inFlightManifestRefresh = future;
+    future.whenComplete(() {
+      if (identical(_inFlightManifestRefresh, future)) {
+        _inFlightManifestRefresh = null;
+      }
+    });
+    return future;
+  }
+
+  Future<ManifestFetchResult> _performRefreshReleaseManifest({
+    bool silentOffline = false,
   }) async {
     if (!_disposed) {
       state = state.copyWith(
@@ -441,6 +459,30 @@ class DownloadController extends Notifier<DownloadCenterState> {
     );
   }
 
+  Future<bool> _matchesRemoteChecksumAndBackfillMeta({
+    required DatabaseAsset remoteAsset,
+    required InstalledDbInfo localInfo,
+    required SharedPreferences prefs,
+  }) async {
+    if (remoteAsset.category == DbCategory.fts) return false;
+    final expectedSha = remoteAsset.checksum?.trim().toLowerCase();
+    if (expectedSha == null || expectedSha.isEmpty) return false;
+    if (remoteAsset.dbSize > 0 && localInfo.sizeBytes != remoteAsset.dbSize) {
+      return false;
+    }
+    try {
+      final actualSha = await DbStorageService.computeFileSha256(localInfo.path);
+      if (actualSha != expectedSha) return false;
+      await prefs.setString(
+        '$_prefInstalledMetaPrefix${remoteAsset.filename}',
+        InstalledAssetMetadata.fromAsset(remoteAsset).toJsonString(),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<DatabaseUpdateItem>> _computeAvailableUpdates({
     required DatabaseManifest manifest,
     required Map<String, InstalledDbInfo> installed,
@@ -457,6 +499,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
       final recorded = InstalledAssetMetadata.tryParse(
         sp.getString('$_prefInstalledMetaPrefix${asset.filename}'),
       );
+      if (recorded == null &&
+          await _matchesRemoteChecksumAndBackfillMeta(
+            remoteAsset: asset,
+            localInfo: localInfo,
+            prefs: sp,
+          )) {
+        continue;
+      }
       if (isDatabaseUpdateAvailable(
         remoteAsset: asset,
         installed: localInfo,
@@ -752,16 +802,26 @@ class DownloadController extends Notifier<DownloadCenterState> {
     await completeOnboarding();
   }
 
+  Future<DatabaseManifest?> _ensureManifestReadyForDownload({
+    bool silentOffline = true,
+  }) async {
+    if (!state.fetchedLiveRelease) {
+      await refreshReleaseManifest(silentOffline: silentOffline);
+    } else if (_inFlightManifestRefresh != null) {
+      await _inFlightManifestRefresh;
+    }
+    return state.manifest;
+  }
+
   Future<void> downloadRequiredAndSelected() async {
     final manifest = state.manifest;
     if (manifest == null) return;
 
     state = state.copyWith(isBatchInstalling: true, clearWarning: true);
     try {
-      if (!state.fetchedLiveRelease) {
-        await refreshReleaseManifest();
-      }
-      final activeManifest = state.manifest ?? manifest;
+      final activeManifest =
+          await _ensureManifestReadyForDownload(silentOffline: false) ??
+          manifest;
 
       final toDownload = activeManifest.allCatalogAssets.where((asset) {
         if (asset.category == DbCategory.fts) return false;
@@ -784,14 +844,24 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
   Future<void> downloadAssetsGroup(List<DatabaseAsset> assets) async {
     if (state.manifest == null) return;
-    final pending = assets
-        .where((a) => !state.installedDbs.containsKey(a.filename))
-        .toList()
-      ..sort((a, b) => _downloadPriority(a).compareTo(_downloadPriority(b)));
-    if (pending.isEmpty) return;
 
     state = state.copyWith(isBatchInstalling: true, clearWarning: true);
     try {
+      final activeManifest = await _ensureManifestReadyForDownload(
+        silentOffline: true,
+      );
+      if (activeManifest == null) return;
+
+      final pending = assets
+          .map(
+            (a) =>
+                activeManifest.findAsset(id: a.id, filename: a.filename) ?? a,
+          )
+          .where((a) => !state.installedDbs.containsKey(a.filename))
+          .toList()
+        ..sort((a, b) => _downloadPriority(a).compareTo(_downloadPriority(b)));
+      if (pending.isEmpty) return;
+
       final batchOk = await _downloadBatch(pending);
       if (batchOk) {
         await _autoCompleteOnboardingIfReady();
@@ -814,11 +884,18 @@ class DownloadController extends Notifier<DownloadCenterState> {
     bool useWakelock = true,
     bool indexOnComplete = true,
   }) async {
+    if (_inFlightManifestRefresh != null) {
+      await _inFlightManifestRefresh;
+    } else if (!state.fetchedLiveRelease && !state.isBatchInstalling) {
+      await refreshReleaseManifest(silentOffline: true);
+    }
     var manifest = state.manifest;
     if (manifest == null) return;
 
+    var targetAsset =
+        manifest.findAsset(id: asset.id, filename: asset.filename) ?? asset;
     var resolvedUrl = manifest.resolveDownloadUrl(
-      asset,
+      targetAsset,
       overrideRepo: GitHubReleaseService.defaultRepo,
       overrideTag: GitHubReleaseService.defaultTag,
     );
@@ -826,8 +903,11 @@ class DownloadController extends Notifier<DownloadCenterState> {
     if (!state.fetchedLiveRelease && (resolvedUrl == null || resolvedUrl.isEmpty)) {
       final res = await refreshReleaseManifest();
       manifest = res.manifest;
+      targetAsset =
+          manifest.findAsset(id: asset.id, filename: asset.filename) ??
+          targetAsset;
       resolvedUrl = manifest.resolveDownloadUrl(
-        asset,
+        targetAsset,
         overrideRepo: GitHubReleaseService.defaultRepo,
         overrideTag: GitHubReleaseService.defaultTag,
       );
@@ -836,32 +916,33 @@ class DownloadController extends Notifier<DownloadCenterState> {
     if (resolvedUrl == null || resolvedUrl.isEmpty) {
       _updateTransfer(
         DownloadProgress(
-          assetId: asset.id,
-          filename: asset.filename,
+          assetId: targetAsset.id,
+          filename: targetAsset.filename,
           phase: TransferPhase.failed,
-          error: 'Asset ${asset.assetName} is not yet uploaded to GitHub release.',
+          error:
+              'Asset ${targetAsset.assetName} is not yet uploaded to GitHub release.',
         ),
       );
       return;
     }
 
-    _tokens[asset.id]?.cancel();
+    _tokens[targetAsset.id]?.cancel();
     final token = DownloadCancellationToken();
-    _tokens[asset.id] = token;
+    _tokens[targetAsset.id] = token;
 
     Future<void> run() async {
       try {
         await _downloadService.downloadAndInstallAsset(
-          asset,
+          targetAsset,
           url: resolvedUrl!,
           token: token,
           onProgress: _updateTransfer,
         );
-        await _recordInstalledAssetMeta(asset);
+        await _recordInstalledAssetMeta(targetAsset);
         final shouldIndexNow =
             indexOnComplete &&
             !state.hasActiveTransfers &&
-            _needsFtsWorkAfterInstall(asset.filename);
+            _needsFtsWorkAfterInstall(targetAsset.filename);
         if (shouldIndexNow) {
           state = state.copyWith(
             indexingMessage: 'Preparing full-text search index...',
@@ -871,7 +952,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
         await refreshInstalled();
         var ftsOk = true;
         if (shouldIndexNow) {
-          ftsOk = await _indexAfterInstall(asset.filename);
+          ftsOk = await _indexAfterInstall(targetAsset.filename);
         }
         if (indexOnComplete && ftsOk) {
           await _autoCompleteOnboardingIfReady();
@@ -881,7 +962,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
       } catch (_) {
         // Progress already reflects failure message.
       } finally {
-        _tokens.remove(asset.id);
+        _tokens.remove(targetAsset.id);
       }
     }
 

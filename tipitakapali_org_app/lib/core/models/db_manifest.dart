@@ -321,6 +321,21 @@ class DatabaseManifest {
   List<DatabaseAsset> get compulsoryAssets =>
       allCatalogAssets.where((a) => a.compulsory).toList(growable: false);
 
+  /// Finds the latest catalog entry matching [id] or [filename].
+  DatabaseAsset? findAsset({String? id, String? filename}) {
+    if (id != null && id.isNotEmpty) {
+      for (final asset in allCatalogAssets) {
+        if (asset.id == id) return asset;
+      }
+    }
+    if (filename != null && filename.isNotEmpty) {
+      for (final asset in allCatalogAssets) {
+        if (asset.filename == filename) return asset;
+      }
+    }
+    return null;
+  }
+
   /// Resolves an asset's download URL using either explicit manifest `url`
   /// or `https://github.com/<repo>/releases/download/<tag>/<assetName>`.
   String? resolveDownloadUrl(
