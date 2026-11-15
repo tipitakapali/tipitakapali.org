@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tipitaka Pali CST
+GenericName=Tipitaka Reader
+Comment=TipitakaPali.org - Offline Tipitaka Pali CST Reader & Dictionaries
+Exec=tipitakapali_app
+Icon=tipitakapali_app
+Terminal=false
+Categories=Education;Office;Utility;
+StartupWMClass=org.tipitakapali.linux

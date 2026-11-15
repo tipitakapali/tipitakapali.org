@@ -1,0 +1,1221 @@
+{
+  "version": 1,
+  "releaseRepo": "tipitakapali/tipitakapali.org",
+  "releaseTag": "db",
+  "core": {
+    "tipitaka": {
+      "id": "tipitaka",
+      "filename": "tipitaka.db",
+      "assetName": "tipitaka.db.zip",
+      "title": "Tipitaka Canon & Chapters",
+      "description": "CST4 217-book Mula, Atthakatha & Tika tree, rendered HTML chapters, TOC, and paragraph mappings.",
+      "category": "core",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 602218496,
+      "requiredTables": [
+        "books",
+        "chapters",
+        "tree_nodes",
+        "canon_paragraphs"
+      ],
+      "updated": "2026-11-14",
+      "size": 119601641,
+      "checksum": "b9f485c2b42471e9e3501ce7153ad5a944f864db4ef1008a398cb0e436075941",
+      "zipSha256": "9b9195e2a36a52292deeca9ac503f45a986979b8b80fa6da41b22b662fd1ca46",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip"
+    },
+    "fts_tipitaka": {
+      "id": "fts_tipitaka",
+      "filename": "fts_tipitaka.db",
+      "assetName": "fts_tipitaka.db.zip",
+      "title": "Pali Full-Text Search Index",
+      "description": "Pre-built FTS5 index for instant Pali search without client-side rebuilding.",
+      "category": "fts",
+      "compulsory": false,
+      "version": 1,
+      "dbSize": 293261312,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 91233383,
+      "checksum": "db47aa588f50be946c7a074c35a070fa8b50afc5449c816470cba2a13dea09ae",
+      "zipSha256": "a05fd963bc1c44bfcae12f36c2268de892dd4737b43967b25eb13b512f12bcd4",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_tipitaka.db.zip"
+    },
+    "pali_sentences": {
+      "id": "pali_sentences",
+      "filename": "pali_sentences.db",
+      "assetName": "pali_sentences.db.zip",
+      "title": "Pali Sentence Alignments",
+      "description": "Sentence-level Pali segmentation mapped to book codes and chapters.",
+      "category": "core",
+      "compulsory": false,
+      "version": 1,
+      "dbSize": 213532672,
+      "requiredTables": [
+        "pali_sentences",
+        "meta"
+      ],
+      "updated": "2026-11-14",
+      "size": 61416970,
+      "checksum": "f746019491d4276313cac31dc3c2748c768f01a55062c805d6a5514926004a72",
+      "zipSha256": "686c280454849c475feb9d703e217ce5b2a1adf727074f4ba2dce9ab30c8a7a0",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/pali_sentences.db.zip"
+    },
+    "summaries": {
+      "id": "summaries",
+      "filename": "summaries.db",
+      "assetName": "summaries.db.zip",
+      "title": "Chapter & Sutta Summaries",
+      "description": "Structured summaries across canonical sections.",
+      "category": "core",
+      "compulsory": false,
+      "version": 1,
+      "dbSize": 965857280,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 156165045,
+      "checksum": "a1748a236e2b7e4c5b71e9f1bc5691bfb3681bdf983304a8136e75d607b7065e",
+      "zipSha256": "920f1c483874a33885dff535d4f9b4b903c89f4c738c08763650d6fef3191ccc",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/summaries.db.zip"
+    },
+    "books_xml": {
+      "id": "books_xml",
+      "filename": "books_xml.db",
+      "assetName": "books_xml.db.zip",
+      "title": "CST4 Source XML Store",
+      "description": "Raw CST4 book XML archive.",
+      "category": "core",
+      "compulsory": false,
+      "version": 1,
+      "dbSize": 146968576,
+      "requiredTables": [
+        "books_xml"
+      ],
+      "updated": "2026-11-14",
+      "size": 33235475,
+      "checksum": "e32a057b5b3bcd324415f121b7196482d1eeafac7c44d253ac4745dee4ea1d15",
+      "zipSha256": "2e2d1ffc5444d067babea9114ae58448295282654a15bf2679dd9eb177e05dfb",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/books_xml.db.zip"
+    }
+  },
+  "dictionaries": {
+    "dpd_tipitakapali": {
+      "id": "dpd_tipitakapali",
+      "filename": "dpd_tipitakapali.db",
+      "assetName": "dpd_tipitakapali.db.zip",
+      "title": "Digital Pali Dictionary (DPD)",
+      "description": "Prefix-partitioned DPD entries for offline Pali word lookup.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 333930496,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 35095825,
+      "checksum": "39026b32532c04e939368ed78ad9b6e465ac43767c72dd72af913eb350c43500",
+      "zipSha256": "8a41f1a4fe460e224523e9ef75a545616be9fead883c317044e5779e7edb3c78",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/dpd_tipitakapali.db.zip"
+    },
+    "dpd_splitter": {
+      "id": "dpd_splitter",
+      "filename": "dpd_splitter_tipitakapali.db",
+      "assetName": "dpd_splitter_tipitakapali.db.zip",
+      "title": "DPD Compound & Sandhi Splitter",
+      "description": "Pre-computed sandhi and compound deconstructor tables.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 90357760,
+      "requiredTables": [
+        "misc",
+        "synonyms",
+        "zmisc"
+      ],
+      "updated": "2026-11-14",
+      "size": 24194899,
+      "checksum": "53fb98cdde7b855b6b155d1384ca0c53840787c151d9b2fb2212f375cc1b4a57",
+      "zipSha256": "e828307b491fad88a9a3359826c581008ded142b31bdb3563c1b70e2c8b535d1",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/dpd_splitter_tipitakapali.db.zip"
+    },
+    "dpd_inflection": {
+      "id": "dpd_inflection",
+      "filename": "dpd_inflection_tipitakapali.db",
+      "assetName": "dpd_inflection_tipitakapali.db.zip",
+      "title": "DPD Inflections",
+      "description": "Inflected Pali forms mapped to dictionary headwords.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 390479872,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 19963274,
+      "checksum": "08510a8d21b611a405cdb75f74468570a1ca6ff7f2165bb3cedd2f0d3ed17780",
+      "zipSha256": "a0712129206071af00660ed83b522761e34cdacb0b13883807b8151becae874d",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/dpd_inflection_tipitakapali.db.zip"
+    },
+    "dpd_synonyms": {
+      "id": "dpd_synonyms",
+      "filename": "dpd_synonyms_tipitakapali.db",
+      "assetName": "dpd_synonyms_tipitakapali.db.zip",
+      "title": "DPD Synonyms",
+      "description": "Synonym and lookup expansion index.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 90427392,
+      "requiredTables": [
+        "misc",
+        "synonyms"
+      ],
+      "updated": "2026-11-14",
+      "size": 23014310,
+      "checksum": "8336c62eaccb246448a8f3a82a81a04912e8fcefd97c1aa20c4a50bae2381f70",
+      "zipSha256": "861a6f64d5634a6bd828d905a01929fecbe05d2cff2720b54d957165dab6bced",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/dpd_synonyms_tipitakapali.db.zip"
+    },
+    "ptsped2015ed": {
+      "id": "ptsped2015ed",
+      "filename": "ptsped2015ed_tipitakapali.db",
+      "assetName": "ptsped2015ed_tipitakapali.db.zip",
+      "title": "PTS Pali-English Dictionary",
+      "description": "Rhys Davids & Stede PTS Pali-English dictionary tables.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 12251136,
+      "requiredTables": [
+        "synonyms"
+      ],
+      "updated": "2026-11-14",
+      "size": 3163743,
+      "checksum": "3c9409346a2d77f42d07addaeea6d247e5214d86afb96bf0980bda3c89ac2b09",
+      "zipSha256": "4778c6e4b59b765b423851b4b4fedb361d99e021ff52a7e15077e2f3b94fcba9",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/ptsped2015ed_tipitakapali.db.zip"
+    },
+    "abhidhan": {
+      "id": "abhidhan",
+      "filename": "abhidhan_tipitakapali.db",
+      "assetName": "abhidhan_tipitakapali.db.zip",
+      "title": "Abhidhanappadipika",
+      "description": "Classical Pali thesaurus and lexicon.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 113020928,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 12870092,
+      "checksum": "52fc92a7a3bef287587df084d5fd2fb32273c38e1538cb341cd4ebe95bd75a12",
+      "zipSha256": "b5d1d58faf24ab818148e825999e2bbbc0e8f80f92db3566f33235561a709318",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/abhidhan_tipitakapali.db.zip"
+    },
+    "ap_bh_mw_sanskrit": {
+      "id": "ap_bh_mw_sanskrit",
+      "filename": "ap_bh_mw_sanskrit.db",
+      "assetName": "ap_bh_mw_sanskrit.db.zip",
+      "title": "Sanskrit Lexicons (AP/BH/MW)",
+      "description": "Apte, Buddhist Hybrid Sanskrit, and Monier-Williams dictionaries.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 531521536,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 36517142,
+      "checksum": "ef32db197a0da46e51873d2a1ebc3adca2143c56f618de8bf5be1d69fc43fe2b",
+      "zipSha256": "53ef840c0f61fedf25e406feef034e453d027107abb2df29171cdee29a7aa3aa",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/ap_bh_mw_sanskrit.db.zip"
+    },
+    "palisinh": {
+      "id": "palisinh",
+      "filename": "palisinh.db",
+      "assetName": "palisinh.db.zip",
+      "title": "Pali-Sinhala Dictionary",
+      "description": "Buddhadatta Mahathera Pali-Sinhala dictionary.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 25153536,
+      "requiredTables": [],
+      "updated": "2026-11-14",
+      "size": 1969620,
+      "checksum": "fc9da06c05d6f86148b5dcf73b6c204cee3ebf43fa14a4ad0c21aa7dce6425fb",
+      "zipSha256": "67c6a8397174c4dd62ec0b9fc99fbdd59d1e4e7a702358dc964218d5d3fcfbdd",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/palisinh.db.zip"
+    }
+  },
+  "languages": {
+    "en": {
+      "code": "en",
+      "name": "English",
+      "nativeName": "English",
+      "translationDb": {
+        "id": "translation_en",
+        "filename": "translation_en.db",
+        "assetName": "translation_en.db.zip",
+        "title": "AI English Translation",
+        "description": "AI-assisted paragraph & sentence-aligned English translations.",
+        "category": "translation",
+        "compulsory": false,
+        "version": 1,
+        "dbSize": 750493696,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 148680191,
+        "checksum": "e83fa233c3b14d6330dd118e4608e39a763bb31ee7d722397ff42b4e653d6ca6",
+        "zipSha256": "892c179ac413a530d10721c5388cf1a17028e1a2c21efd70a0751d487e14f75b",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_en.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_en",
+        "filename": "fts_translation_en.db",
+        "assetName": "fts_translation_en.db.zip",
+        "title": "English Search Index (FTS5)",
+        "description": "Pre-built FTS5 index for English translations.",
+        "category": "fts",
+        "compulsory": false,
+        "version": 1,
+        "dbSize": 389910528,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 130888552,
+        "checksum": "9bb08d79a65b8b61e7b5d1bc777d237103c266bf77d569056326cac689e39d22",
+        "zipSha256": "fffa4cb91096e515df1618c137a18763d5d07278d913c266652b0892408f4dec",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_en.db.zip"
+      }
+    },
+    "vi": {
+      "code": "vi",
+      "name": "Vietnamese",
+      "nativeName": "Tiếng Việt",
+      "translationDb": {
+        "id": "translation_vi",
+        "filename": "translation_vi.db",
+        "assetName": "translation_vi.db.zip",
+        "title": "Vietnamese Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 882978816,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 157990537,
+        "checksum": "46062ca60b93ecdb830998013b820d8bc22b45c0142dd3c1e757c490eb55193d",
+        "zipSha256": "8b5a7e9b7607eb62bf2b3e645edfc8a9cce697384bf8e9618a5395e2a366d668",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_vi.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_vi",
+        "filename": "fts_translation_vi.db",
+        "assetName": "fts_translation_vi.db.zip",
+        "title": "Vietnamese Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 487616512,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 158473116,
+        "checksum": "11d2928d762d5b3dfdd58fa00ddd4c97b4accd1f08786168902be60120a28c70",
+        "zipSha256": "bad488f926582aa4bc5df0ec596ae86f0e0f363737c3380d984211afb152a472",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_vi.db.zip"
+      }
+    },
+    "my": {
+      "code": "my",
+      "name": "Burmese",
+      "nativeName": "မြန်မာဘာသာ",
+      "translationDb": {
+        "id": "translation_my",
+        "filename": "translation_my.db",
+        "assetName": "translation_my.db.zip",
+        "title": "Burmese Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1505587200,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 175613629,
+        "checksum": "5d1ca070c67861fc3c33ab887d53a82488df73fe0bb22634a668dfbed565a3ab",
+        "zipSha256": "3b6deb34f88182ae53f11e47a4ba5d4b3fe2cb0d33d9a0354f35151784e30a2c",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_my.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_my",
+        "filename": "fts_translation_my.db",
+        "assetName": "fts_translation_my.db.zip",
+        "title": "Burmese Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 681914368,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 145752988,
+        "checksum": "bac0763cdcf6956c9e3238c9d0c7b9ef685397b75d45fee3de94d34213c2f598",
+        "zipSha256": "a12751bd9ad7c9f9a3ee8b36d07dd6a2f2a97e900cbe8cc48001429ed6812ba4",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_my.db.zip"
+      }
+    },
+    "my_nissaya": {
+      "code": "my_nissaya",
+      "name": "Burmese Nissaya",
+      "nativeName": "မြန်မာ နိဿယ",
+      "translationDb": {
+        "id": "translation_my_nissaya",
+        "filename": "translation_my_nissaya.db",
+        "assetName": "translation_my_nissaya.db.zip",
+        "title": "Burmese Nissaya Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1988935680,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 211323166,
+        "checksum": "5f9e3ba6a0d01910003728d741af409bf023fb3e64413fbd3d11aeac59bae030",
+        "zipSha256": "eb9cc9cb0ebcbc9bdabbea365cf999c4dbbd5788c9a0162e57f24d58d193e37a",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_my_nissaya.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_my_nissaya",
+        "filename": "fts_translation_my_nissaya.db",
+        "assetName": "fts_translation_my_nissaya.db.zip",
+        "title": "Burmese Nissaya Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 630620160,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 157866763,
+        "checksum": "19c3d2cf0e2e3566f13fd909a1aa7477d5e350e2872b33e01afe2965a99f7310",
+        "zipSha256": "07be85de404d36b4a5bcec9502509eff1bd50ddd6e141fc36c71c7ee6c4e0796",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_my_nissaya.db.zip"
+      }
+    },
+    "th": {
+      "code": "th",
+      "name": "Thai",
+      "nativeName": "ไทย",
+      "translationDb": {
+        "id": "translation_th",
+        "filename": "translation_th.db",
+        "assetName": "translation_th.db.zip",
+        "title": "Thai Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1307680768,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 169582681,
+        "checksum": "f55dbfa8a9b011458510204e59b06fb9d978b1336349a961b891423431f3657e",
+        "zipSha256": "b07770f02311dd9994cfd928be6c38d3c64804cb6755dc515be29dce7a9ce184",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_th.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_th",
+        "filename": "fts_translation_th.db",
+        "assetName": "fts_translation_th.db.zip",
+        "title": "Thai Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 648310784,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 126994188,
+        "checksum": "1b27935c3b0521d4b3287a54978937aa9165f273d7621a13cb70ddec82d7e618",
+        "zipSha256": "adcb06717dcd63300a44c47884346bddac556f1ac31bb23edd378864ef64cb5f",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_th.db.zip"
+      }
+    },
+    "si": {
+      "code": "si",
+      "name": "Sinhala",
+      "nativeName": "සිංහල",
+      "translationDb": {
+        "id": "translation_si",
+        "filename": "translation_si.db",
+        "assetName": "translation_si.db.zip",
+        "title": "Sinhala Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1135656960,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 159057566,
+        "checksum": "907b69745b19bf70c4f917139dd092a9b53e2214d4853f9099e28f83cc680021",
+        "zipSha256": "059109d8e990632249bd7a36620900b5da054b721e563b33a739f4c1cfb4e85e",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_si.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_si",
+        "filename": "fts_translation_si.db",
+        "assetName": "fts_translation_si.db.zip",
+        "title": "Sinhala Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 531111936,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 129830965,
+        "checksum": "ebec6df029343f3d7ca3d5c8978913f59d3efd6578fe69c7de7c3fbf0d722cc5",
+        "zipSha256": "ff8e7ab4ec56945663ad9f4a47298dc685147388aecd0598fac0bd813b1cbad0",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_si.db.zip"
+      }
+    },
+    "zh": {
+      "code": "zh",
+      "name": "Chinese",
+      "nativeName": "中文",
+      "translationDb": {
+        "id": "translation_zh",
+        "filename": "translation_zh.db",
+        "assetName": "translation_zh.db.zip",
+        "title": "Chinese Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 651763712,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 148685122,
+        "checksum": "05b440f36f19bbe6d6c3b1be60831f97fcea311a6ce97455a4f121a184d86015",
+        "zipSha256": "8f988739af876955024199ecc06da45f1db2b39aaf648cd956ec547b67289fbd",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_zh.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_zh",
+        "filename": "fts_translation_zh.db",
+        "assetName": "fts_translation_zh.db.zip",
+        "title": "Chinese Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 545640448,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 225786519,
+        "checksum": "2642190f4afea9826d751fc2b088186e24e824f9d08b2c53a861471b711183ae",
+        "zipSha256": "ff12ea192c9566c8aa012efdad25bc98eb5b9f21b39e6c367608ddb175221eb6",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_zh.db.zip"
+      }
+    },
+    "ja": {
+      "code": "ja",
+      "name": "Japanese",
+      "nativeName": "日本語",
+      "translationDb": {
+        "id": "translation_ja",
+        "filename": "translation_ja.db",
+        "assetName": "translation_ja.db.zip",
+        "title": "Japanese Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 887779328,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 160072914,
+        "checksum": "efab5a23c41b1a57e37302b0c2327ad690385a9dd3c30115e0a67b02b86774e3",
+        "zipSha256": "3fc217db8d50327aebcf96b45a4eaeafa5d806691a0407db16b26738e9948542",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_ja.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_ja",
+        "filename": "fts_translation_ja.db",
+        "assetName": "fts_translation_ja.db.zip",
+        "title": "Japanese Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 699760640,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 258464606,
+        "checksum": "5b157d3f2d6823a48a2470c8ef478c583253fe0dc58f50f6c70cedcceea02adc",
+        "zipSha256": "36f4a1eaf9b7deedc1d16d007abe96cae0b4c64fb60c2bb7640b10696cc0b1d2",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_ja.db.zip"
+      }
+    },
+    "ko": {
+      "code": "ko",
+      "name": "Korean",
+      "nativeName": "한국어",
+      "translationDb": {
+        "id": "translation_ko",
+        "filename": "translation_ko.db",
+        "assetName": "translation_ko.db.zip",
+        "title": "Korean Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 827416576,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 157867029,
+        "checksum": "605239533ca7c74269a8c6c17668774d7d0e31a9c147955e6f4ac4968a32e8f2",
+        "zipSha256": "17d729dd2992221cfe0d3a380f284eedea16953de763c33d5b64893f8933454c",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_ko.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_ko",
+        "filename": "fts_translation_ko.db",
+        "assetName": "fts_translation_ko.db.zip",
+        "title": "Korean Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 407281664,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 132379929,
+        "checksum": "bb5b2c9f25c35170e8429c0b16e486cb9d694b24a2c34bf7b3b727ec52c46601",
+        "zipSha256": "247a144bdefde8c45eb068c22c0aad57b1a7b63679264b686d071d667778868d",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_ko.db.zip"
+      }
+    },
+    "de": {
+      "code": "de",
+      "name": "German",
+      "nativeName": "Deutsch",
+      "translationDb": {
+        "id": "translation_de",
+        "filename": "translation_de.db",
+        "assetName": "translation_de.db.zip",
+        "title": "German Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 829210624,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 165996047,
+        "checksum": "5d68614120381ac47f20e17114406339ff0660db5e9a5ee8178e4c01dcc3807f",
+        "zipSha256": "e6f4a32a90d1828507e702f8626989eef0cd6075d7cc97b6e5c4cd686fa28811",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_de.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_de",
+        "filename": "fts_translation_de.db",
+        "assetName": "fts_translation_de.db.zip",
+        "title": "German Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 438333440,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 148995628,
+        "checksum": "133464e6aa58565feb3d77162a7c39c979c6c4f721db19fb2c989ef7b0e489ee",
+        "zipSha256": "88eacac303f4bdbc054129fa140bca35fd723d6a7572ab27e848444b0843a592",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_de.db.zip"
+      }
+    },
+    "fr": {
+      "code": "fr",
+      "name": "French",
+      "nativeName": "Français",
+      "translationDb": {
+        "id": "translation_fr",
+        "filename": "translation_fr.db",
+        "assetName": "translation_fr.db.zip",
+        "title": "French Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 785178624,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 152962321,
+        "checksum": "826791bbd5209b5623c47a26ef2cfb386edc87f9ae23b8fae2a62fc2577d5ac4",
+        "zipSha256": "5b47b32c8b69f1d9138d3ad899b8674cbd0731738d8765fb9e68b69a97e556e9",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_fr.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_fr",
+        "filename": "fts_translation_fr.db",
+        "assetName": "fts_translation_fr.db.zip",
+        "title": "French Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 412266496,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 136981757,
+        "checksum": "79fe07bd9b003f0ecb1981c381c0025dc9f73d3f888d5edc343d80648b604898",
+        "zipSha256": "9cda6de1d7957946c675bfbcec8297d8c3b6db847fc00234e352651d01053c84",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_fr.db.zip"
+      }
+    },
+    "es": {
+      "code": "es",
+      "name": "Spanish",
+      "nativeName": "Español",
+      "translationDb": {
+        "id": "translation_es",
+        "filename": "translation_es.db",
+        "assetName": "translation_es.db.zip",
+        "title": "Spanish Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 767361024,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 150892056,
+        "checksum": "b3e9a787bfc09ccfe0c34ce1813e24089cb9ca3d64b5e0801cb40ffad4dfa20e",
+        "zipSha256": "75270502f560cb70f7e86fb0004689d7c62381e3460e9ab0deea7f1a069b1446",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_es.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_es",
+        "filename": "fts_translation_es.db",
+        "assetName": "fts_translation_es.db.zip",
+        "title": "Spanish Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 396025856,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 131333347,
+        "checksum": "dc06e6f246a090a050305e696008aaed8a96bb9fe1f6376dfb49700e4f113a5b",
+        "zipSha256": "717e64e57b805f41cf186e4e642a7a23af1a8f036c5b26beca35d6e614d258b0",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_es.db.zip"
+      }
+    },
+    "ru": {
+      "code": "ru",
+      "name": "Russian",
+      "nativeName": "Русский",
+      "translationDb": {
+        "id": "translation_ru",
+        "filename": "translation_ru.db",
+        "assetName": "translation_ru.db.zip",
+        "title": "Russian Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1078308864,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 173299827,
+        "checksum": "8e275d8fc2be87a5bb6f5852507f6772b0d8a3a550dea201c6f8042a600e64dd",
+        "zipSha256": "4e4402edd8029771e5c9a2d48f3d07ab28bf9d19c45278a37090c6a01f96c038",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_ru.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_ru",
+        "filename": "fts_translation_ru.db",
+        "assetName": "fts_translation_ru.db.zip",
+        "title": "Russian Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 511295488,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 137119045,
+        "checksum": "d0213d032df2e6c96cb0c50e9a9e0c1373c2a9ae6e2f3a016e41a0dce9eb51e6",
+        "zipSha256": "d9a7dd47e353b5174d8d6147d65bbbfc414caaa9d8e2f7d2df1d9c9d8445d9f0",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_ru.db.zip"
+      }
+    },
+    "id": {
+      "code": "id",
+      "name": "Indonesian",
+      "nativeName": "Bahasa Indonesia",
+      "translationDb": {
+        "id": "translation_id",
+        "filename": "translation_id.db",
+        "assetName": "translation_id.db.zip",
+        "title": "Indonesian Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 780816384,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 146220963,
+        "checksum": "213155470a85e313c58529737af2d1f9347267d77029b1e8cf00ad1dd91feb61",
+        "zipSha256": "ea8cbb6460d95c1d5a7d7f257921ce6689ec6ad667e833f35e3827d33cbd64cf",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_id.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_id",
+        "filename": "fts_translation_id.db",
+        "assetName": "fts_translation_id.db.zip",
+        "title": "Indonesian Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 396636160,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 125612209,
+        "checksum": "5f04a02058a82a0ee6175a62ec344409a1aec1f128b443a314adfe6436f01864",
+        "zipSha256": "16473422ba04689d4cfbd57e381ba6da5d7d77c6f19d7ddf0dce1cdb9abc8b84",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_id.db.zip"
+      }
+    },
+    "km": {
+      "code": "km",
+      "name": "Khmer",
+      "nativeName": "ភាសាខ្មែរ",
+      "translationDb": {
+        "id": "translation_km",
+        "filename": "translation_km.db",
+        "assetName": "translation_km.db.zip",
+        "title": "Khmer Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1318641664,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 166816762,
+        "checksum": "dcb17a76244f111e5dc6d350242459040536f7ba5fe6500c8f860984aeb81043",
+        "zipSha256": "70784dd4502867c552a29681b5ea4792e454fdc22a5e6c32a2fc4c07d17337e7",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_km.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_km",
+        "filename": "fts_translation_km.db",
+        "assetName": "fts_translation_km.db.zip",
+        "title": "Khmer Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 616894464,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 143420707,
+        "checksum": "a39f342a54ff3f7a804eca4d89f8108f66735a9ecbf102d2323b0164fac7409a",
+        "zipSha256": "3a269ee910cda111e56c5f165feef958623130b160e017c2ebb193307c27c6d1",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_km.db.zip"
+      }
+    },
+    "lo": {
+      "code": "lo",
+      "name": "Lao",
+      "nativeName": "ລາວ",
+      "translationDb": {
+        "id": "translation_lo",
+        "filename": "translation_lo.db",
+        "assetName": "translation_lo.db.zip",
+        "title": "Lao Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 342777856,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 34859693,
+        "checksum": "17a73f172a08db4bbe8f337a668540e56f820d242373fa72993d8cc57a95a8a6",
+        "zipSha256": "1934704c7c3fd1d7db9869362f057b9262951abd9f8a865a43b6636496466c0f",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_lo.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_lo",
+        "filename": "fts_translation_lo.db",
+        "assetName": "fts_translation_lo.db.zip",
+        "title": "Lao Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 147935232,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 22235598,
+        "checksum": "2ce130d7ad8e4ccd6e73df24eb0892cb0681104fb8f1c3f466f53850884cb128",
+        "zipSha256": "29aa91a5e193b630d05aa15d50b16745957f5840f234f6db5c48212c0d1545db",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_lo.db.zip"
+      }
+    },
+    "hi": {
+      "code": "hi",
+      "name": "Hindi",
+      "nativeName": "हिन्दी",
+      "translationDb": {
+        "id": "translation_hi",
+        "filename": "translation_hi.db",
+        "assetName": "translation_hi.db.zip",
+        "title": "Hindi Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1331191808,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 189200815,
+        "checksum": "983a8d677acab6cb1e82bde9dc24ae33e09e33dabf9fe89083ff9970d3a61915",
+        "zipSha256": "bef3e8f218990c35256f89d8411ea3407713fdd071820493c4247a2b33e53567",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_hi.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_hi",
+        "filename": "fts_translation_hi.db",
+        "assetName": "fts_translation_hi.db.zip",
+        "title": "Hindi Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 627240960,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 156692820,
+        "checksum": "3b2d0551f63911549f3082ded8c948ce68356842b96202aa78e8471e02ed5271",
+        "zipSha256": "ea5b3fa1c7f071e6bfd12ba7066c6b4c371c07877ab43ec114767b74c0e59c6b",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_hi.db.zip"
+      }
+    },
+    "be": {
+      "code": "be",
+      "name": "Bengali",
+      "nativeName": "বাংলা",
+      "translationDb": {
+        "id": "translation_be",
+        "filename": "translation_be.db",
+        "assetName": "translation_be.db.zip",
+        "title": "Bengali Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1245409280,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 173814835,
+        "checksum": "a1abd3faa1bed5e354a5ccf51e5aed10329d1a6641a2a58dca7e82f603ba4e33",
+        "zipSha256": "ae11397a1fc7b2975f115f07e3858bd37eceb0fced5b460f6fce7f58df3f9a3b",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_be.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_be",
+        "filename": "fts_translation_be.db",
+        "assetName": "fts_translation_be.db.zip",
+        "title": "Bengali Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 581705728,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 140423584,
+        "checksum": "e7b1d962676aabc61657f59e8c8e065718fd6d8ff1f308ece44d402ed300ccde",
+        "zipSha256": "a73d6ef5848e39501553d35070def51effa17108d5b8844f21304ad91bf449ca",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_be.db.zip"
+      }
+    },
+    "cs": {
+      "code": "cs",
+      "name": "Czech",
+      "nativeName": "Čeština",
+      "translationDb": {
+        "id": "translation_cs",
+        "filename": "translation_cs.db",
+        "assetName": "translation_cs.db.zip",
+        "title": "Czech Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 714555392,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 149580588,
+        "checksum": "47e2256c8dd463a11dc8dc51c759aca5226b4105bfff7cc6ec1b841eae4ff2c7",
+        "zipSha256": "8297d3961977c10ba806d7e19c66672280cd2bc29b493f559945bbb9af6fcbc3",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_cs.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_cs",
+        "filename": "fts_translation_cs.db",
+        "assetName": "fts_translation_cs.db.zip",
+        "title": "Czech Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 364376064,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 124204859,
+        "checksum": "dd1b7c59a60481cc8bf7283312152e7d5f75b986b13346ce261350410b67fd48",
+        "zipSha256": "21c9f746fadc62ded9b3779bc85098a127684ce32b63d616cd572ac82d83c04b",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_cs.db.zip"
+      }
+    },
+    "mr": {
+      "code": "mr",
+      "name": "Marathi",
+      "nativeName": "मराठी",
+      "translationDb": {
+        "id": "translation_mr",
+        "filename": "translation_mr.db",
+        "assetName": "translation_mr.db.zip",
+        "title": "Marathi Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1236156416,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 167496769,
+        "checksum": "931452ccffe2e217cbddaa95ac91ac259b96dd5406d4f3efa63e799e891615cb",
+        "zipSha256": "de925b0612c9e05cdf203f157fcd1a58b9e6d3047977fc4bd6d125b2cfc4ab48",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_mr.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_mr",
+        "filename": "fts_translation_mr.db",
+        "assetName": "fts_translation_mr.db.zip",
+        "title": "Marathi Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 577785856,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 138463520,
+        "checksum": "4a91aa75342bfcab50805ec092a2501f26845dae1bb6f421fd115247d0751582",
+        "zipSha256": "b455531035463b49be4e3b74fd5a9eb18006d50e9c194dde8d32571f821ad743",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_mr.db.zip"
+      }
+    },
+    "ne": {
+      "code": "ne",
+      "name": "Nepali",
+      "nativeName": "नेपाली",
+      "translationDb": {
+        "id": "translation_ne",
+        "filename": "translation_ne.db",
+        "assetName": "translation_ne.db.zip",
+        "title": "Nepali Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1209413632,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 164964875,
+        "checksum": "a294a0eb57ea450d792144925095c2ed482711f7c6a16a2955ce0d5b1188ef1d",
+        "zipSha256": "3f66c692cd1c30a7f8dd1141bc474e6edbe47a1cdd556cd4a3738118422291f3",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_ne.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_ne",
+        "filename": "fts_translation_ne.db",
+        "assetName": "fts_translation_ne.db.zip",
+        "title": "Nepali Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 562663424,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 133878626,
+        "checksum": "3f5745c47581fb5e697f2a8138e41ade402a4ecdb04bcc7a9b821da8dd4bb01c",
+        "zipSha256": "e22e1b62115bf9d35594eb4980e173d959e9e045a11e94e2a3d1232aef901990",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_ne.db.zip"
+      }
+    },
+    "pt": {
+      "code": "pt",
+      "name": "Portuguese",
+      "nativeName": "Português",
+      "translationDb": {
+        "id": "translation_pt",
+        "filename": "translation_pt.db",
+        "assetName": "translation_pt.db.zip",
+        "title": "Portuguese Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 730767360,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 145280407,
+        "checksum": "b2c0d9e727ae9df9afd723c05d1bc24e2e0110eace2c3658138663a2eb6d6ee9",
+        "zipSha256": "2cc69a64577827641ac8b2ca6789c16ba997607409b0cc085d67bc9c5c7a70d9",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_pt.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_pt",
+        "filename": "fts_translation_pt.db",
+        "assetName": "fts_translation_pt.db.zip",
+        "title": "Portuguese Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 376410112,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 125236471,
+        "checksum": "910dcf154d84429bd1672c757c6abb5157f026d603205721a25b25751cb4b4b5",
+        "zipSha256": "64457c08715613a71f56c807160fbf7e9936bfe1bf7dac461c7660418054fbf1",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_pt.db.zip"
+      }
+    },
+    "ta": {
+      "code": "ta",
+      "name": "Tamil",
+      "nativeName": "தமிழ்",
+      "translationDb": {
+        "id": "translation_ta",
+        "filename": "translation_ta.db",
+        "assetName": "translation_ta.db.zip",
+        "title": "Tamil Translation DB",
+        "category": "translation",
+        "version": 1,
+        "dbSize": 1413705728,
+        "requiredTables": [
+          "paragraph_translations",
+          "sentence_translations",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 170158761,
+        "checksum": "b38b7b52f83f8df8122cd07d95666c70b587623fd47f8d6cf1a505e82d63e717",
+        "zipSha256": "38161e9c176c356406c2a8e2b785e5d729397f94bc37c3bb42b98137a49cdc74",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_ta.db.zip"
+      },
+      "ftsDb": {
+        "id": "fts_translation_ta",
+        "filename": "fts_translation_ta.db",
+        "assetName": "fts_translation_ta.db.zip",
+        "title": "Tamil Search Index (FTS5)",
+        "category": "fts",
+        "version": 1,
+        "dbSize": 650313728,
+        "requiredTables": [
+          "paragraphs_fts",
+          "translation_meta"
+        ],
+        "updated": "2026-11-14",
+        "size": 143807125,
+        "checksum": "d54df210ecb0e2117da2e0ea11193b86f017afcc12db213455344242f05c667c",
+        "zipSha256": "9fc7cfe7514f62aa3820ba1df11a91c733788462c4fe626582b73d8737d684d3",
+        "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/fts_translation_ta.db.zip"
+      }
+    }
+  }
+}

@@ -1,0 +1,193 @@
+name: Build Windows and Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform(s) to build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - windows
+          - linux
+  push:
+    branches:
+      - main
+    paths:
+      - 'tipitakapali_org_app/**'
+      - '.github/workflows/build_windows_linux.yml'
+      - '!tipitakapali_org_app/assets/databases_manifest.json'
+      - '!tipitakapali_org_app/.db_upload_hashes.json'
+      - '!tipitakapali_org_app/**/*.md'
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_windows:
+    name: Windows (x64 + MSIX)
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == 'windows'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tipitakapali_org_app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9' # Or keep '3.47.9' if pinning to 3.47 series
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dart dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package portable Windows zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath dist/tipitakapali-windows-x64.zip -Force
+
+      - name: Create Microsoft Store MSIX package
+        run: dart run msix:create --build-windows false
+
+      - name: Collect MSIX output
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/msix | Out-Null
+          Copy-Item build/windows/x64/runner/Release/*.msix dist/msix/
+
+      - name: Upload Windows MSIX artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: tipitakapali-windows-msix
+          path: tipitakapali_org_app/dist/msix/*.msix
+          if-no-files-found: error
+
+      - name: Upload Windows portable zip artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: tipitakapali-windows-portable
+          path: tipitakapali_org_app/dist/tipitakapali-windows-x64.zip
+          if-no-files-found: error
+
+  build_linux:
+    name: Linux (x64)
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == 'linux'
+    runs-on: ubuntu-latest
+    container:
+      image: debian:testing
+    steps:
+      - name: Install Linux build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git jq unzip xz-utils zip zstd file binutils \
+            libglu1-mesa clang cmake ninja-build pkg-config \
+            libgtk-3-dev libsqlite3-dev libepoxy-dev \
+            libsecret-1-dev libwayland-dev \
+            libwpe-1.0-dev libwpewebkit-2.0-dev libwpebackend-fdo-1.0-dev
+          git config --global --add safe.directory '*'
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9' # Or keep '3.47.9' if pinning to 3.47 series
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dart dependencies
+        working-directory: tipitakapali_org_app
+        run: flutter pub get
+
+      - name: Build Linux release
+        working-directory: tipitakapali_org_app
+        run: flutter build linux --release
+
+      - name: Package Linux release tarball
+        working-directory: tipitakapali_org_app
+        run: |
+          mkdir -p dist/tipitakapali-linux-x64
+          cp -a build/linux/x64/release/bundle/. dist/tipitakapali-linux-x64/
+          cp install/linux/tipitakapali.desktop dist/tipitakapali-linux-x64/
+          cp assets/icons/icon.png dist/tipitakapali-linux-x64/tipitakapali_app.png
+
+          # Ensure bundled WPE runtime soname symlinks exist inside lib/
+          LIB_DIR="dist/tipitakapali-linux-x64/lib"
+          fdo_soname=""
+          for base in libWPEWebKit-2.0 libwpe-1.0 libWPEBackend-fdo-1.0; do
+            real_lib=$(find "$LIB_DIR" -maxdepth 1 -name "${base}.so.*.*" | head -n 1 || true)
+            if [ -n "$real_lib" ]; then
+              real_name=$(basename "$real_lib")
+              soname=$(readelf -d "$real_lib" | sed -n 's/.*Library soname: \[\(.*\)\].*/\1/p' | head -n 1 || true)
+              if [ -n "$soname" ] && [ "$soname" != "$real_name" ]; then
+                ln -sf "$real_name" "$LIB_DIR/$soname"
+                ln -sf "$soname" "$LIB_DIR/${base}.so"
+                if [ "$base" = "libWPEBackend-fdo-1.0" ]; then
+                  fdo_soname="$soname"
+                fi
+              fi
+            fi
+          done
+          if [ -n "$fdo_soname" ]; then
+            ln -sf "$fdo_soname" "$LIB_DIR/libWPEBackend-default.so"
+          fi
+
+          tar -C dist -czf dist/tipitakapali-linux-x64.tar.gz tipitakapali-linux-x64
+
+      - name: Upload Linux release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: tipitakapali-linux-x64
+          path: tipitakapali_org_app/dist/tipitakapali-linux-x64.tar.gz
+          if-no-files-found: error
+
+  publish_tag_release:
+    name: Attach artifacts to tag release
+    needs:
+      - build_windows
+      - build_linux
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Upload assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG_NAME" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Tipitaka Pali CST $TAG_NAME" \
+              --generate-notes
+          fi

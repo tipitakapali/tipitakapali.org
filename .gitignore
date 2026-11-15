@@ -429,3 +429,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Allow tracked Flutter monorepo assets and sources despite root web/Python rules
+!tipitakapali_org_app/assets/web.zip
+!tipitakapali_org_app/lib/
+!tipitakapali_org_app/lib/**
+!tipitakapali_org_app/windows/runner/runner.exe.manifest
