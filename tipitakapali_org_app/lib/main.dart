@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/network/windows_trust_store.dart';
 import 'core/theme/app_theme.dart';
 import 'features/onboarding/onboarding_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  initializeWindowsCertificateTrust();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const ProviderScope(child: TipitakaPaliApp()));
 }
