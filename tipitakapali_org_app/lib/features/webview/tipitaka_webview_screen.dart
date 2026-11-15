@@ -18,12 +18,12 @@ import '../downloads/download_controller.dart';
 
 /// Optional builder override so headless widget tests can inspect the started
 /// loopback [Uri] without instantiating a platform WebView.
-typedef TipitakaWebViewBuilder =
-    Widget Function(BuildContext context, Uri serverUri);
+typedef TipitakaWebViewBuilder = Widget Function(
+  BuildContext context,
+  Uri serverUri,
+);
 
-final tipitakaWebViewBuilderProvider = Provider<TipitakaWebViewBuilder?>((
-  ref,
-) {
+final tipitakaWebViewBuilderProvider = Provider<TipitakaWebViewBuilder?>((ref) {
   return null;
 });
 
@@ -119,14 +119,15 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
             .read(downloadControllerProvider.notifier)
             .ensureMissingFtsIndexed()
             .then((builtAny) {
-          if (!mounted) return;
-          ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
-          if (builtAny) {
-            _webViewController?.evaluateJavascript(
-              source: 'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();',
-            );
-          }
-        }),
+              if (!mounted) return;
+              ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+              if (builtAny) {
+                _webViewController?.evaluateJavascript(
+                  source:
+                      'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();',
+                );
+              }
+            }),
       );
     } catch (e) {
       if (!mounted) return;
@@ -164,10 +165,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => LanguageDownloadDialog(
-        langCode: langCode,
-        label: label,
-      ),
+      builder: (_) => LanguageDownloadDialog(langCode: langCode, label: label),
     );
     if (ok == true && mounted) {
       ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
@@ -235,8 +233,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       statusBarIconBrightness: isDarkTop ? Brightness.light : Brightness.dark,
       systemNavigationBarColor: bottomColor,
       systemNavigationBarDividerColor: bottomColor,
-      systemNavigationBarIconBrightness:
-          isDarkBottom ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: isDarkBottom
+          ? Brightness.light
+          : Brightness.dark,
     );
   }
 
@@ -480,11 +479,7 @@ class LanguageDownloadDialog extends ConsumerStatefulWidget {
   final String langCode;
   final String? label;
 
-  const LanguageDownloadDialog({
-    super.key,
-    required this.langCode,
-    this.label,
-  });
+  const LanguageDownloadDialog({super.key, required this.langCode, this.label});
 
   @override
   ConsumerState<LanguageDownloadDialog> createState() =>
@@ -675,7 +670,8 @@ class _LanguageDownloadDialogState
         ? 'Downloading $displayName'
         : 'Downloading ${normalized.toUpperCase()} Translation';
 
-    final statusMessage = _error ??
+    final statusMessage =
+        _error ??
         state.indexingMessage ??
         transfer?.message ??
         'Downloading translation_$normalized.db & indexing FTS5...';
@@ -699,7 +695,9 @@ class _LanguageDownloadDialogState
           Text(
             statusMessage,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: _error != null ? Theme.of(context).colorScheme.error : null,
+              color: _error != null
+                  ? Theme.of(context).colorScheme.error
+                  : null,
             ),
           ),
         ],
@@ -837,18 +835,15 @@ class _PaliSentencesDownloadDialogState
           FilledButton(
             onPressed: _runDownload,
             child: Text(
-              downloadLabel != null
-                  ? 'Download ($downloadLabel)'
-                  : 'Download',
+              downloadLabel != null ? 'Download ($downloadLabel)' : 'Download',
             ),
           ),
         ],
       );
     }
 
-    final statusMessage = _error ??
-        transfer?.message ??
-        'Downloading pali_sentences.db...';
+    final statusMessage =
+        _error ?? transfer?.message ?? 'Downloading pali_sentences.db...';
     final progressValue = transfer != null && transfer.totalBytes > 0
         ? transfer.fraction
         : null;
@@ -866,7 +861,9 @@ class _PaliSentencesDownloadDialogState
           Text(
             statusMessage,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: _error != null ? Theme.of(context).colorScheme.error : null,
+              color: _error != null
+                  ? Theme.of(context).colorScheme.error
+                  : null,
             ),
           ),
         ],
@@ -877,10 +874,7 @@ class _PaliSentencesDownloadDialogState
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            onPressed: _runDownload,
-            child: const Text('Retry'),
-          ),
+          FilledButton(onPressed: _runDownload, child: const Text('Retry')),
         ],
       ],
     );
@@ -898,7 +892,7 @@ class _LoadingView extends StatelessWidget {
         children: [
           CircularProgressIndicator(),
           SizedBox(height: 16),
-          Text('Starting offline Tipitaka reader...'),
+          Text('Starting offline Tipitakapali.org...'),
         ],
       ),
     );
@@ -1000,8 +994,9 @@ String buildOnboardingTranslationSeedScript(
   String? paliScript,
 }) {
   final code = langCode?.trim().toLowerCase();
-  final settingsKey =
-      (code != null && code.isNotEmpty) ? translationCodeToSettingsKey[code] : null;
+  final settingsKey = (code != null && code.isNotEmpty)
+      ? translationCodeToSettingsKey[code]
+      : null;
   final rawScript = paliScript?.trim().toLowerCase();
   final targetScript = (rawScript != null && rawScript.isNotEmpty)
       ? PaliScript.fromId(rawScript).webId
@@ -1066,9 +1061,10 @@ String buildOnboardingTranslationSeedScript(
 ''';
 }
 
-String _encodeJsJson(Object? value) => jsonEncode(value)
-    .replaceAll('\u2028', r'\u2028')
-    .replaceAll('\u2029', r'\u2029');
+String _encodeJsJson(Object? value) =>
+    jsonEncode(value)
+        .replaceAll('\u2028', r'\u2028')
+        .replaceAll('\u2029', r'\u2029');
 
 /// Builds an `AT_DOCUMENT_START` script that restores the natively persisted
 /// `localStorage` snapshot before React mounts (once per browser session,

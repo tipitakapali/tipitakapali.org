@@ -19,7 +19,10 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
   bool _sawOnboarding = false;
 
   Future<void> _handleOnboardingCompleted() async {
-    await ref.read(downloadControllerProvider.notifier).completeOnboarding();
+    final current = ref.read(downloadControllerProvider);
+    if (current.needsOnboarding) {
+      await ref.read(downloadControllerProvider.notifier).completeOnboarding();
+    }
     if (!mounted) return;
     if (!ref.read(downloadControllerProvider).needsOnboarding) {
       setState(() {

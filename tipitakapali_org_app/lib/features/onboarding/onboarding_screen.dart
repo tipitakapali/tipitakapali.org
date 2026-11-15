@@ -29,6 +29,8 @@ class OnboardingWizardScreen extends ConsumerStatefulWidget {
 
 class _OnboardingWizardScreenState
     extends ConsumerState<OnboardingWizardScreen> {
+  bool _notifiedCompleted = false;
+
   Future<void> _pickAndImport(DatabaseAsset asset) async {
     final picked = await FilePicker.pickFiles(
       dialogTitle: 'Select ${asset.assetName} or ${asset.filename}',
@@ -44,6 +46,26 @@ class _OnboardingWizardScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<DownloadCenterState>(downloadControllerProvider, (prev, next) {
+      final prevReady =
+          prev != null &&
+          prev.onboardingCompleted &&
+          !prev.needsOnboarding &&
+          !prev.isBatchInstalling &&
+          !prev.hasActiveTransfers &&
+          !prev.isIndexingFts;
+      final nextReady =
+          next.onboardingCompleted &&
+          !next.needsOnboarding &&
+          !next.isBatchInstalling &&
+          !next.hasActiveTransfers &&
+          !next.isIndexingFts;
+      if (!_notifiedCompleted && !prevReady && nextReady) {
+        _notifiedCompleted = true;
+        widget.onCompleted();
+      }
+    });
+
     final state = ref.watch(downloadControllerProvider);
     final controller = ref.read(downloadControllerProvider.notifier);
     final colors = Theme.of(context).colorScheme;
@@ -471,7 +493,10 @@ class _OnboardingWizardScreenState
                                   child: FilledButton.icon(
                                     onPressed: isBusy
                                         ? null
-                                        : controller.ensureMissingFtsIndexed,
+                                        : () => controller
+                                            .ensureMissingFtsIndexed(
+                                              autoCompleteOnboarding: true,
+                                            ),
                                     icon: isBusy
                                         ? spinner
                                         : const Icon(Icons.manage_search),

@@ -328,19 +328,11 @@ class DownloadController extends Notifier<DownloadCenterState> {
             : null,
       );
 
-      final hasPendingSelectedDownloads = bundled.allCatalogAssets.any(
-        (a) =>
-            a.category != DbCategory.fts &&
-            (a.compulsory || savedSelection.contains(a.id)) &&
-            !installed.containsKey(a.filename),
-      );
-      if (hasAllCompulsory &&
-          !readyNow &&
-          !hasPendingSelectedDownloads) {
+      if (hasAllCompulsory && !readyNow && !_hasPendingSelectedDownloads()) {
         // Downloads already finished before the app was killed (during
         // onboarding or after installing a new language); resume FTS indexing
         // automatically (core Pāḷi FTS first, then translations).
-        unawaited(ensureMissingFtsIndexed());
+        unawaited(ensureMissingFtsIndexed(autoCompleteOnboarding: true));
       }
 
       if (fetchRemote) {
@@ -608,6 +600,17 @@ class DownloadController extends Notifier<DownloadCenterState> {
     return deletedAny;
   }
 
+  bool _hasPendingSelectedDownloads([DatabaseManifest? overrideManifest]) {
+    final m = overrideManifest ?? state.manifest;
+    if (m == null) return false;
+    return m.allCatalogAssets.any(
+      (a) =>
+          a.category != DbCategory.fts &&
+          (a.compulsory || state.selectedOptionalIds.contains(a.id)) &&
+          !state.installedDbs.containsKey(a.filename),
+    );
+  }
+
   /// Marks onboarding complete once every required DB and FTS index is verified.
   Future<bool> completeOnboarding() async {
     if (!state.allCompulsoryInstalled) return false;
@@ -637,11 +640,13 @@ class DownloadController extends Notifier<DownloadCenterState> {
     await prefs.setBool(_prefOnboardingCompleted, false);
   }
 
-  Future<void> _downloadBatch(
+  Future<bool> _downloadBatch(
     List<DatabaseAsset> toDownload, {
     bool forceReindexUpdated = false,
   }) async {
     await _markOnboardingInProgress();
+    var batchAborted = false;
+    var ftsHadError = false;
     if (toDownload.isNotEmpty) {
       for (final asset in toDownload) {
         _updateTransfer(
@@ -657,7 +662,6 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
       await _withWakelock(() async {
         final updatedFiles = <String>{};
-        var batchAborted = false;
         try {
           for (final asset in toDownload) {
             final current = state.transfers[asset.id];
@@ -673,8 +677,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
             final after = state.transfers[asset.id];
             if (after?.phase == TransferPhase.completed) {
               updatedFiles.add(asset.filename);
-            } else if (after?.phase == TransferPhase.failed ||
-                after?.phase == TransferPhase.cancelled) {
+            } else {
               batchAborted = true;
               if (after?.error != null && after!.error!.isNotEmpty) {
                 state = state.copyWith(releaseWarning: after.error);
@@ -709,22 +712,44 @@ class DownloadController extends Notifier<DownloadCenterState> {
                     .whereType<String>()
                     .toSet()
               : const <String>{};
-          await ensureMissingFtsIndexed(
+          final ftsResult = await _runMissingFtsIndexing(
             forceTipitaka:
                 forceReindexUpdated && updatedFiles.contains('tipitaka.db'),
             forceTranslationLangs: updatedLangs,
           );
+          ftsHadError = ftsResult.hadError;
         } else if (batchAborted &&
             !state.hasActiveTransfers &&
             state.installedDbs.containsKey('tipitaka.db')) {
           // Ensure core Pāḷi FTS is still built first if tipitaka.db finished
           // before a subsequent failure/interruption.
-          await ensureMissingFtsIndexed();
+          final ftsResult = await _runMissingFtsIndexing(preserveWarning: true);
+          ftsHadError = ftsResult.hadError;
         }
       });
     } else if (!state.hasActiveTransfers) {
-      await ensureMissingFtsIndexed();
+      final ftsResult = await _runMissingFtsIndexing();
+      ftsHadError = ftsResult.hadError;
     }
+
+    return !batchAborted &&
+        !ftsHadError &&
+        !state.hasActiveTransfers &&
+        state.releaseWarning == null;
+  }
+
+  Future<void> _autoCompleteOnboardingIfReady() async {
+    if (_disposed ||
+        state.onboardingCompleted ||
+        state.releaseWarning != null ||
+        state.hasActiveTransfers ||
+        state.isIndexingFts ||
+        !state.allCompulsoryInstalled ||
+        !state.hasRequiredFtsReady ||
+        _hasPendingSelectedDownloads()) {
+      return;
+    }
+    await completeOnboarding();
   }
 
   Future<void> downloadRequiredAndSelected() async {
@@ -746,9 +771,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
       }).toList()
         ..sort((a, b) => _downloadPriority(a).compareTo(_downloadPriority(b)));
 
-      await _downloadBatch(toDownload);
+      final batchOk = await _downloadBatch(toDownload);
+      if (batchOk) {
+        await _autoCompleteOnboardingIfReady();
+      }
     } finally {
-      state = state.copyWith(isBatchInstalling: false);
+      if (!_disposed) {
+        state = state.copyWith(isBatchInstalling: false);
+      }
     }
   }
 
@@ -762,9 +792,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
     state = state.copyWith(isBatchInstalling: true, clearWarning: true);
     try {
-      await _downloadBatch(pending);
+      final batchOk = await _downloadBatch(pending);
+      if (batchOk) {
+        await _autoCompleteOnboardingIfReady();
+      }
     } finally {
-      state = state.copyWith(isBatchInstalling: false);
+      if (!_disposed) {
+        state = state.copyWith(isBatchInstalling: false);
+      }
     }
   }
 
@@ -834,8 +869,12 @@ class DownloadController extends Notifier<DownloadCenterState> {
           );
         }
         await refreshInstalled();
+        var ftsOk = true;
         if (shouldIndexNow) {
-          await _indexAfterInstall(asset.filename);
+          ftsOk = await _indexAfterInstall(asset.filename);
+        }
+        if (indexOnComplete && ftsOk) {
+          await _autoCompleteOnboardingIfReady();
         }
       } on DownloadCancelledException {
         // Progress already reflects paused/cancelled state.
@@ -920,37 +959,62 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
   Future<bool> _indexAfterInstall(String filename) async {
     final match = RegExp(r'^translation_(.+)\.db$').firstMatch(filename);
-    return ensureMissingFtsIndexed(
+    final res = await _runMissingFtsIndexing(
       forceTipitaka: filename == 'tipitaka.db',
       forceTranslationLang: match?.group(1),
     );
+    return !res.hadError;
   }
 
   /// Builds any missing `fts_tipitaka.db` or `fts_translation_*.db` files in
   /// the background isolate from locally installed databases.
   ///
   /// Returns `true` if at least one FTS5 database was built or rebuilt.
+  /// When [autoCompleteOnboarding] is `true` and indexing finishes without error
+  /// while all required databases and FTS indexes are ready, completes
+  /// onboarding automatically so the UI enters the app directly.
   Future<bool> ensureMissingFtsIndexed({
     bool force = false,
     bool forceTipitaka = false,
     String? forceTranslationLang,
     Set<String> forceTranslationLangs = const {},
+    bool autoCompleteOnboarding = false,
+  }) async {
+    final result = await _runMissingFtsIndexing(
+      force: force,
+      forceTipitaka: forceTipitaka,
+      forceTranslationLang: forceTranslationLang,
+      forceTranslationLangs: forceTranslationLangs,
+    );
+    if (autoCompleteOnboarding && !result.hadError && !state.isBatchInstalling) {
+      await _autoCompleteOnboardingIfReady();
+    }
+    return result.builtAny;
+  }
+
+  Future<({bool builtAny, bool hadError})> _runMissingFtsIndexing({
+    bool force = false,
+    bool forceTipitaka = false,
+    String? forceTranslationLang,
+    Set<String> forceTranslationLangs = const {},
+    bool preserveWarning = false,
   }) {
     return _enqueueFts(() async {
-      if (_disposed) return false;
+      if (_disposed) return (builtAny: false, hadError: false);
       state = state.copyWith(
         indexingMessage: 'Preparing full-text search index...',
-        clearWarning: true,
+        clearWarning: !preserveWarning,
       );
       var builtAny = false;
+      var hadError = false;
       try {
         final dir = await _storage.getDatabaseDirectory();
         final installed = await _storage.listInstalledDatabases();
-        if (_disposed) return builtAny;
+        if (_disposed) return (builtAny: builtAny, hadError: hadError);
 
         final jobs = <({String? langCode, bool forceRebuild, String label, String filename})>[];
         if (!installed.containsKey('tipitaka.db')) {
-          return false;
+          return (builtAny: false, hadError: false);
         }
         final paliFtsPath = '${dir.path}/fts_tipitaka.db';
         final paliFtsValid = _storage.isPopulatedFtsDb(paliFtsPath);
@@ -994,7 +1058,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
 
         final totalTasks = jobs.length;
         for (var i = 0; i < jobs.length; i++) {
-          if (_disposed) return builtAny;
+          if (_disposed) return (builtAny: builtAny, hadError: hadError);
           final job = jobs[i];
           void emitProgress(FtsBuildProgress p) {
             if (_disposed) return;
@@ -1014,7 +1078,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
                 overallProgress: overall,
                 detail: p.detail,
               ),
-              clearWarning: true,
+              clearWarning: !preserveWarning && !hadError,
             );
           }
 
@@ -1043,7 +1107,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
               // Core Pāḷi FTS must always exist and be valid before any
               // translation FTS is processed.
               if (!_storage.isPopulatedFtsDb(paliFtsPath)) {
-                return builtAny;
+                return (builtAny: builtAny, hadError: hadError);
               }
               await _ftsService.buildTranslationFtsIndex(
                 dbDirPath: dir.path,
@@ -1055,6 +1119,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
             builtAny = true;
             await refreshInstalled();
           } catch (e) {
+            hadError = true;
             if (!_disposed) {
               final prefix = job.langCode == null
                   ? 'Pāḷi FTS5 indexing error'
@@ -1063,7 +1128,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
             }
             if (job.langCode == null) {
               // Abort translation FTS jobs if core Pāḷi FTS failed.
-              return builtAny;
+              return (builtAny: builtAny, hadError: hadError);
             }
           }
         }
@@ -1072,7 +1137,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
           state = state.copyWith(clearIndexingMessage: true);
         }
       }
-      return builtAny;
+      return (builtAny: builtAny, hadError: hadError);
     });
   }
 
@@ -1117,8 +1182,12 @@ class DownloadController extends Notifier<DownloadCenterState> {
           );
         }
         await refreshInstalled();
+        var ftsOk = true;
         if (shouldIndexNow) {
-          await _indexAfterInstall(targetAsset.filename);
+          ftsOk = await _indexAfterInstall(targetAsset.filename);
+        }
+        if (ftsOk) {
+          await _autoCompleteOnboardingIfReady();
         }
       } catch (_) {
         // Failure surfaced in transfer state.

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1247,6 +1248,291 @@ void main() {
       expect(find.byType(OnboardingWizardScreen), findsNothing);
       expect(find.textContaining('WebView ready:'), findsOneWidget);
       expect(webViewBuildCount, equals(initialBuilds));
+    },
+  );
+
+  testWidgets(
+    'OnboardingGate goes directly to HomeShell when Download All and FTS indexing finish with no error',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final tmp = Directory.systemTemp.createTempSync('tp_gate_auto_enter_');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+
+      final webRoot = Directory(p.join(tmp.path, 'web'))..createSync();
+      File(p.join(webRoot.path, 'index.html'))
+          .writeAsStringSync('<html><body>ok</body></html>');
+
+      final sampleDbFile = File(p.join(tmp.path, '_src_tipitaka.db'));
+      _createSampleTipitakaDb(sampleDbFile.path);
+      final db = sqlite3.open(sampleDbFile.path);
+      try {
+        db.execute(
+          "INSERT INTO books (code, title, xml_filename) VALUES ('mula', 'Digha', 'mula.xml');",
+        );
+        db.execute(
+          "INSERT INTO canon_paragraphs (guid, book_code, chapter_index, para_index, para_num, rend, pali_text) "
+          "VALUES ('mula-0-1', 'mula', 0, 1, '1', 'bodytext', 'Evam me sutam.');",
+        );
+      } finally {
+        db.close();
+      }
+      final dbBytes = sampleDbFile.readAsBytesSync();
+      sampleDbFile.deleteSync();
+      final archive = Archive()
+        ..addFile(ArchiveFile('tipitaka.db', dbBytes.length, dbBytes));
+      final tipitakaZip = ZipEncoder().encode(archive);
+
+      final manifestJson = jsonEncode({
+        'version': 1,
+        'releaseRepo': 'tipitakapali/tipitakapali.org',
+        'releaseTag': 'db',
+        'core': {
+          'tipitaka': {
+            'id': 'tipitaka',
+            'title': 'Tipiṭaka Pāḷi Text (CST)',
+            'assetName': 'tipitaka.db.zip',
+            'filename': 'tipitaka.db',
+            'category': 'core',
+            'description': 'Core Pali canon',
+            'compulsory': true,
+            'size': tipitakaZip.length,
+            'dbSize': dbBytes.length,
+            'requiredTables': ['books', 'canon_paragraphs'],
+            'url':
+                'https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip',
+          },
+        },
+        'dictionaries': <String, dynamic>{},
+        'languages': <String, dynamic>{},
+      });
+
+      final storage = DbStorageService(overrideDirectory: tmp);
+      final downloadClient = MockClient.streaming((request, _) async {
+        if (request.url.path.endsWith('/tipitaka.db.zip')) {
+          return http.StreamedResponse(
+            Stream.value(tipitakaZip),
+            200,
+            contentLength: tipitakaZip.length,
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('not found')),
+          404,
+        );
+      });
+
+      final server = _FakeLocalServer(
+        explicitWebRootDir: webRoot,
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmp.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(familyCompounds: const {}),
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dbStorageServiceProvider.overrideWithValue(storage),
+            downloadServiceProvider.overrideWithValue(
+              DownloadService(storage: storage, client: downloadClient),
+            ),
+            gitHubReleaseServiceProvider.overrideWithValue(
+              GitHubReleaseService(
+                client: MockClient((_) async => http.Response('{}', 200)),
+                assetLoader: (_) async => manifestJson,
+              ),
+            ),
+            tipitakaLocalServerProvider.overrideWithValue(server),
+            tipitakaWebViewBuilderProvider.overrideWithValue(
+              (_, uri) => Text('WebView ready: $uri'),
+            ),
+          ],
+          child: const MaterialApp(home: OnboardingGate()),
+        ),
+      );
+
+      await _pumpUntilFound(tester, find.text('Welcome to TipitakaPali.org'));
+      final downloadBtn = find.textContaining('Download All');
+      expect(downloadBtn, findsOneWidget);
+
+      await tester.tap(downloadBtn);
+      await tester.pump();
+
+      // Downloads & FTS5 indexing use Isolate.run; advance real event loop cleanly.
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(OnboardingGate)),
+      );
+      for (var i = 0; i < 80; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+        if (find.textContaining('WebView ready:').evaluate().isNotEmpty) {
+          break;
+        }
+      }
+
+      // Should go straight to HomeShell without requiring tapping "Enter Library".
+      expect(find.textContaining('WebView ready:'), findsOneWidget);
+      expect(find.byType(OnboardingWizardScreen), findsNothing);
+      expect(find.text('Enter Library'), findsNothing);
+
+      final state = container.read(downloadControllerProvider);
+      expect(state.onboardingCompleted, isTrue);
+      expect(state.needsOnboarding, isFalse);
+      expect(state.installedDbs.containsKey('fts_tipitaka.db'), isTrue);
+    },
+  );
+
+  testWidgets(
+    'OnboardingGate stays on OnboardingWizardScreen when a selected download fails',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'onboarding_language_code': 'vi'});
+      final tmp = Directory.systemTemp.createTempSync('tp_gate_err_stay_');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+
+      final webRoot = Directory(p.join(tmp.path, 'web'))..createSync();
+      File(p.join(webRoot.path, 'index.html'))
+          .writeAsStringSync('<html><body>ok</body></html>');
+
+      final sampleDbFile = File(p.join(tmp.path, '_src_tipitaka.db'));
+      _createSampleTipitakaDb(sampleDbFile.path);
+      final db = sqlite3.open(sampleDbFile.path);
+      try {
+        db.execute(
+          "INSERT INTO books (code, title, xml_filename) VALUES ('mula', 'Digha', 'mula.xml');",
+        );
+        db.execute(
+          "INSERT INTO canon_paragraphs (guid, book_code, chapter_index, para_index, para_num, rend, pali_text) "
+          "VALUES ('mula-0-1', 'mula', 0, 1, '1', 'bodytext', 'Evam me sutam.');",
+        );
+      } finally {
+        db.close();
+      }
+      final dbBytes = sampleDbFile.readAsBytesSync();
+      sampleDbFile.deleteSync();
+      final tipitakaZip = ZipEncoder().encode(
+        Archive()..addFile(ArchiveFile('tipitaka.db', dbBytes.length, dbBytes)),
+      );
+
+      final manifestJson = jsonEncode({
+        'version': 1,
+        'releaseRepo': 'tipitakapali/tipitakapali.org',
+        'releaseTag': 'db',
+        'core': {
+          'tipitaka': {
+            'id': 'tipitaka',
+            'title': 'Tipiṭaka Pāḷi Text (CST)',
+            'assetName': 'tipitaka.db.zip',
+            'filename': 'tipitaka.db',
+            'category': 'core',
+            'description': 'Core Pali canon',
+            'compulsory': true,
+            'size': tipitakaZip.length,
+            'dbSize': dbBytes.length,
+            'requiredTables': ['books', 'canon_paragraphs'],
+            'url':
+                'https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip',
+          },
+        },
+        'dictionaries': <String, dynamic>{},
+        'languages': {
+          'vi': {
+            'code': 'vi',
+            'name': 'Vietnamese',
+            'nativeName': 'Tiếng Việt',
+            'translationDb': {
+              'id': 'translation_vi',
+              'title': 'Vietnamese Translation',
+              'assetName': 'translation_vi.db.zip',
+              'filename': 'translation_vi.db',
+              'category': 'translation',
+              'description': 'Vietnamese translation',
+              'compulsory': false,
+              'size': 1024,
+              'dbSize': 2048,
+              'url':
+                  'https://github.com/tipitakapali/tipitakapali.org/releases/download/db/translation_vi.db.zip',
+            },
+          },
+        },
+      });
+
+      final storage = DbStorageService(overrideDirectory: tmp);
+      final downloadClient = MockClient.streaming((request, _) async {
+        if (request.url.path.endsWith('/tipitaka.db.zip')) {
+          return http.StreamedResponse(
+            Stream.value(tipitakaZip),
+            200,
+            contentLength: tipitakaZip.length,
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('not found')),
+          404,
+        );
+      });
+
+      final server = _FakeLocalServer(
+        explicitWebRootDir: webRoot,
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmp.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(familyCompounds: const {}),
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dbStorageServiceProvider.overrideWithValue(storage),
+            downloadServiceProvider.overrideWithValue(
+              DownloadService(storage: storage, client: downloadClient),
+            ),
+            gitHubReleaseServiceProvider.overrideWithValue(
+              GitHubReleaseService(
+                client: MockClient((_) async => http.Response('{}', 200)),
+                assetLoader: (_) async => manifestJson,
+              ),
+            ),
+            tipitakaLocalServerProvider.overrideWithValue(server),
+            tipitakaWebViewBuilderProvider.overrideWithValue(
+              (_, uri) => Text('WebView ready: $uri'),
+            ),
+          ],
+          child: const MaterialApp(home: OnboardingGate()),
+        ),
+      );
+
+      await _pumpUntilFound(tester, find.text('Welcome to TipitakaPali.org'));
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(OnboardingGate)),
+      );
+      await container
+          .read(downloadControllerProvider.notifier)
+          .setLanguageCode('vi');
+      await tester.pump();
+
+      await tester.tap(find.textContaining('Download All'));
+      await tester.pump();
+      for (var i = 0; i < 80; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+        final st = container.read(downloadControllerProvider);
+        if (!st.isBatchInstalling &&
+            !st.hasActiveTransfers &&
+            !st.isIndexingFts &&
+            st.releaseWarning != null) {
+          break;
+        }
+      }
+
+      final state = container.read(downloadControllerProvider);
+      expect(state.releaseWarning, isNotNull);
+      expect(state.onboardingCompleted, isFalse);
+      expect(find.byType(OnboardingWizardScreen), findsOneWidget);
+      expect(find.textContaining('WebView ready:'), findsNothing);
     },
   );
 }
