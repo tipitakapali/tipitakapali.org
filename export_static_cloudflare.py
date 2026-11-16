@@ -109,17 +109,40 @@ def clean_tree(data):
             return data[0]['children']
     return data
 
-def load_pali_sentences_db(web_app_dir):
-    """Open the prebuilt Pāḷi sentence store (build_pali_sentences_db.py).
+def load_pali_sentences_db(web_app_dir, tipi_db_path=None):
+    """Open the prebuilt Pāḷi sentence store (pali_sentences.db or unified tipitaka.db).
 
     Returns (conn, {book_code: {chapter: {para_index: [{line, text}]}}})
-    with the whole table read once — far cheaper than per-book queries.
-    Line numbers align with translation line_ids by construction.
     """
     import sqlite3 as _sqlite3
+    import zlib as _zlib
     db_path = web_app_dir / 'server_api' / 'db' / 'pali_sentences.db'
     if not db_path.exists():
-        log_warn(f"pali_sentences.db not found at {db_path} — skipping Pāḷi sentence export (run server_api/build_pali_sentences_db.py)")
+        # Fall back to embedded chapter_text_pack / pali_sentences inside tipitaka.db
+        cand_tipi = tipi_db_path or (web_app_dir / 'server_api' / 'db' / 'tipitaka.db')
+        if Path(cand_tipi).exists():
+            conn = _sqlite3.connect(str(cand_tipi))
+            conn.row_factory = _sqlite3.Row
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table','view')")}
+            books = {}
+            if 'chapter_text_pack' in tables:
+                for bcode, ci, dz in conn.execute(
+                    'SELECT b.code, ctp.chapter_index, ctp.data_z FROM chapter_text_pack ctp JOIN books b ON b.id = ctp.book_id ORDER BY b.code, ctp.chapter_index'
+                ):
+                    rows = json.loads(_zlib.decompress(dz).decode('utf-8'))
+                    pmap = books.setdefault(bcode, {}).setdefault(str(ci), {})
+                    for item in rows:
+                        if len(item) >= 3 and item[2]:
+                            pmap[str(item[0])] = [{'line': s[0], 'text': s[1]} for s in item[2]]
+                return conn, books
+            elif 'pali_sentences' in tables:
+                for r in conn.execute('SELECT book_code, chapter_index, para_index, line_id, sentence FROM pali_sentences ORDER BY book_code, chapter_index, para_index, line_id'):
+                    chmap = books.setdefault(r['book_code'], {})
+                    pmap = chmap.setdefault(str(r['chapter_index']), {})
+                    pmap.setdefault(str(r['para_index']), []).append({'line': r['line_id'], 'text': r['sentence']})
+                return conn, books
+            conn.close()
+        log_warn(f"pali_sentences.db not found at {db_path} — skipping Pāḷi sentence export")
         return None, {}
     conn = _sqlite3.connect(str(db_path))
     conn.row_factory = _sqlite3.Row
@@ -256,9 +279,18 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
     # 3c. Export Available Translations Catalog (/api/translations)
     export_translations_catalog(target_api_dir, db_path.parent)
 
+    import zlib as _zlib
+    book_cols = {r[1] for r in cur.execute("PRAGMA table_info(books)")}
+    has_meta_z = 'meta_z' in book_cols
+    chap_cols = {r[1] for r in cur.execute("PRAGMA table_info(chapters)")}
+    has_html_z = 'html_z' in chap_cols
+    has_text_pack = bool(cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chapter_text_pack'").fetchone())
+
     # 4. Export all Books, Chapters, and TOCs
     log_info(f"Pre-generating static JSON for {len(books_rows)} books and chapters...")
-    cur.execute("SELECT id, code, title, nikaya, category, chapter_count, meta_json FROM books ORDER BY id")
+    cur.execute(
+        "SELECT id, code, title, nikaya, category, chapter_count, meta_json" + (", meta_z" if has_meta_z else "") + " FROM books ORDER BY id"
+    )
     all_books = cur.fetchall()
 
     total_chapters_exported = 0
@@ -266,7 +298,10 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
 
     for idx, b in enumerate(all_books):
         clean_code = b['code']
-        meta = json.loads(b['meta_json']) if b['meta_json'] else {}
+        raw_meta = b['meta_json']
+        if raw_meta is None and has_meta_z and b['meta_z']:
+            raw_meta = _zlib.decompress(b['meta_z']).decode('utf-8')
+        meta = json.loads(raw_meta) if raw_meta else {}
 
         # Fetch chapters metadata
         cur.execute(
@@ -283,8 +318,16 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
         toc = [dict(r) for r in cur.fetchall()]
 
         # Fetch precomputed chapter HTMLs for this book
-        cur.execute("SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index", (clean_code,))
-        ch_rows = cur.fetchall()
+        cur.execute(
+            "SELECT chapter_index, html" + (", html_z" if has_html_z else "") + " FROM chapters WHERE book_code = ? ORDER BY chapter_index",
+            (clean_code,)
+        )
+        ch_rows = []
+        for cr in cur.fetchall():
+            ch_h = cr['html']
+            if ch_h is None and has_html_z and cr['html_z']:
+                ch_h = _zlib.decompress(cr['html_z']).decode('utf-8')
+            ch_rows.append({'chapter_index': cr['chapter_index'], 'html': ch_h})
         all_chapters_data = {str(r['chapter_index']): r['html'] for r in ch_rows}
 
         # Export individual chapter JSON files (/api/book/{code}/chapter/{idx})
@@ -433,6 +476,19 @@ def export_database_to_static_json(target_api_dir: Path, db_path: Path, catalog_
                     (clean_code,)
                 )
                 canon_p_rows = [dict(r) for r in cur.fetchall()]
+                if canon_p_rows and has_text_pack and any(pr.get('pali_text') is None for pr in canon_p_rows):
+                    pali_pack = {}
+                    for ci_p, dz_p in cur.execute(
+                        "SELECT chapter_index, data_z FROM chapter_text_pack WHERE book_id = ?", (b['id'],)
+                    ):
+                        for item in json.loads(_zlib.decompress(dz_p).decode('utf-8')):
+                            pi_p, pt_p = item[0], item[1]
+                            if pt_p is None and len(item) >= 3 and item[2]:
+                                pt_p = ' '.join(s[1] for s in item[2])
+                            pali_pack[(ci_p, pi_p)] = pt_p
+                    for pr in canon_p_rows:
+                        if pr.get('pali_text') is None:
+                            pr['pali_text'] = pali_pack.get((pr['chapter_index'], pr['para_index']))
                 if canon_p_rows:
                     write_json_multiformat(target_api_dir, f"book/{clean_code}/paragraphs", {
                         "book_code": clean_code,

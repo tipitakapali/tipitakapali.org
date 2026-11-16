@@ -5,6 +5,11 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const dictEngine = require('./dictEngine');
 const {
+  readChapterSentences,
+  readChapterPack,
+  hydrateCanonRows,
+} = require('./tipitakaCoreHelper');
+const {
   understandUserQuery,
   heuristicQueryUnderstanding,
   parseCanonicalCitation,
@@ -1272,24 +1277,39 @@ function aiGetSentences({ book_code, chapter_index, para_index, para_num, line_i
   const tLangs = Array.isArray(langs) ? langs : String(langs).split(',').map((s) => s.trim()).filter(Boolean);
   const paliDbPath = (resolveDbPathFn || ((f) => path.join(__dirname, 'db', f)))('pali_sentences.db');
   let paliSents = [];
+  let pdb = null;
   if (paliDbPath) {
     try {
-      const pdb = new (require('better-sqlite3'))(paliDbPath, { readonly: true });
-      if (pIdx !== null && lid !== null) {
-        paliSents = pdb.prepare('SELECT line_id, sentence FROM pali_sentences WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ? ORDER BY line_id').all(targetCode, cIdx, pIdx, lid);
-      } else if (pIdx !== null) {
-        paliSents = pdb.prepare('SELECT line_id, sentence FROM pali_sentences WHERE book_code = ? AND chapter_index = ? AND para_index = ? ORDER BY line_id').all(targetCode, cIdx, pIdx);
-      } else {
-        paliSents = pdb.prepare('SELECT line_id, sentence, para_index FROM pali_sentences WHERE book_code = ? AND chapter_index = ? ORDER BY para_index, line_id LIMIT 40').all(targetCode, cIdx);
-      }
-      pdb.close();
-    } catch {}
+      pdb = new (require('better-sqlite3'))(paliDbPath, { readonly: true });
+    } catch (_) {}
   }
-  // Fallback: derive sentences from canon_paragraphs when pali DB missing for a para.
+  try {
+    const chapSentMap = readChapterSentences(dbTipitaka, pdb, targetCode, cIdx);
+    if (chapSentMap && chapSentMap.size > 0) {
+      if (pIdx !== null && lid !== null) {
+        paliSents = (chapSentMap.get(pIdx) || []).filter((s) => s.lineId === lid).map((s) => ({ line_id: s.lineId, sentence: s.text }));
+      } else if (pIdx !== null) {
+        paliSents = (chapSentMap.get(pIdx) || []).map((s) => ({ line_id: s.lineId, sentence: s.text }));
+      } else {
+        const pKeys = Array.from(chapSentMap.keys()).sort((a, b) => a - b);
+        for (const pk of pKeys) {
+          for (const s of chapSentMap.get(pk)) {
+            paliSents.push({ line_id: s.lineId, sentence: s.text, para_index: pk });
+            if (paliSents.length >= 40) break;
+          }
+          if (paliSents.length >= 40) break;
+        }
+      }
+    }
+  } finally {
+    try { pdb?.close(); } catch (_) {}
+  }
+  // Fallback: derive sentences from canon_paragraphs / chapter_text_pack when sentences absent.
   if (paliSents.length === 0 && pIdx !== null) {
     try {
       const row = dbTipitaka.prepare('SELECT pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(targetCode, cIdx, pIdx);
-      if (row && row.pali_text) paliSents = [{ line_id: lid || 1, sentence: row.pali_text, para_index: pIdx }];
+      const pt = row?.pali_text || readChapterPack(dbTipitaka, targetCode, cIdx).paliMap.get(pIdx);
+      if (pt) paliSents = [{ line_id: lid || 1, sentence: pt, para_index: pIdx }];
     } catch {}
   }
   const translations = {};
@@ -1442,6 +1462,8 @@ function aiGetParagraphContent({
 
     const passages = [];
     const bookInfo = dbTipitaka.prepare('SELECT title FROM books WHERE code = ?').get(targetCode);
+
+    hydrateCanonRows(dbTipitaka, pRows, targetCode);
 
     for (const p of pRows) {
       const translations = {};
@@ -1605,7 +1627,9 @@ function aiGetCommentaries({ book_code, chapter_index, para_num, para_index }) {
         `).all(atthaBook, atthaChap, Math.max(0, targetParaIdx));
       }
 
-      // Filter out non-commentary book title lines if any
+      // Hydrate pali_text when using optimized tipitaka.db and filter out headings
+      hydrateCanonRows(dbTipitaka, rows, atthaBook);
+      hydrateCanonRows(dbTipitaka, rows, tikaBook);
       rows = rows.filter((r) => r.pali_text && !r.pali_text.startsWith('Namo tassa') && !r.pali_text.endsWith('nikāye') && !r.pali_text.endsWith('nikāyo'));
 
       if (rows.length > 0) {
@@ -1660,6 +1684,7 @@ function aiGetCommentaries({ book_code, chapter_index, para_num, para_index }) {
         `).all(tikaBook, tikaChap, Math.max(0, targetParaIdx));
       }
 
+      hydrateCanonRows(dbTipitaka, rows, tikaBook);
       rows = rows.filter((r) => r.pali_text && !r.pali_text.startsWith('Namo tassa') && !r.pali_text.endsWith('nikāye') && !r.pali_text.endsWith('nikāyo'));
 
       if (rows.length > 0) {

@@ -5,6 +5,9 @@ import 'dart:math' as math;
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
+import '../services/bold_definition_index_service.dart';
+import '../services/linked_definition_service.dart';
+import '../services/tipitaka_core_reader.dart';
 import '../utils/pali_script_converter.dart';
 import 'dpd_family_templates.dart';
 
@@ -34,6 +37,14 @@ class ApiResponse {
 class TipitakaWebApi {
   String dbDirectoryPath;
   final DpdFamilyTemplates dpdFamilyTemplates;
+  final BoldDefinitionIndexService? _boldServiceOverride;
+  final LinkedDefinitionService? _linkedServiceOverride;
+
+  late final BoldDefinitionIndexService boldDefinitionService =
+      _boldServiceOverride ?? BoldDefinitionIndexService();
+  late final LinkedDefinitionService linkedDefinitionService =
+      _linkedServiceOverride ??
+      LinkedDefinitionService(boldService: boldDefinitionService);
 
   final Map<String, Database> _dbs = {};
   final Map<String, Set<String>> _tableNamesCache = {};
@@ -44,6 +55,8 @@ class TipitakaWebApi {
   List<Map<String, dynamic>>? _matListCache;
   final Map<String, Map<String, dynamic>> _bookMetaCache = {};
   final Map<String, List<Map<String, dynamic>>> _tocCache = {};
+  final Map<String, Map<String, dynamic>> _chapterLinksCache = {};
+  bool _boldIndexVerified = false;
 
   static const Map<String, String> _langNameToCode = {
     'english': 'en',
@@ -80,7 +93,10 @@ class TipitakaWebApi {
   TipitakaWebApi({
     required this.dbDirectoryPath,
     required this.dpdFamilyTemplates,
-  });
+    BoldDefinitionIndexService? boldDefinitionService,
+    LinkedDefinitionService? linkedDefinitionService,
+  })  : _boldServiceOverride = boldDefinitionService,
+        _linkedServiceOverride = linkedDefinitionService;
 
   void updateDbDirectory(String newPath) {
     if (newPath != dbDirectoryPath) {
@@ -105,6 +121,56 @@ class TipitakaWebApi {
     _matListCache = null;
     _bookMetaCache.clear();
     _tocCache.clear();
+    _chapterLinksCache.clear();
+    _boldIndexVerified = false;
+  }
+
+  /// Ensures derived offline indexes (such as `bold_definitions.db`) are built
+  /// in the background without blocking startup.
+  Future<void> warmUpIndexes() async {
+    try {
+      if (!BoldDefinitionIndexService.isUpToDate(dbDirectoryPath)) {
+        final prev = _dbs.remove(BoldDefinitionIndexService.dbFilename);
+        if (prev != null) {
+          try {
+            prev.close();
+          } catch (_) {}
+        }
+      }
+      final result = await boldDefinitionService.ensureBuilt(
+        dbDirPath: dbDirectoryPath,
+      );
+      _boldIndexVerified = true;
+      if (!result.skipped) {
+        final prev = _dbs.remove(BoldDefinitionIndexService.dbFilename);
+        if (prev != null) {
+          try {
+            prev.close();
+          } catch (_) {}
+        }
+        _chapterLinksCache.clear();
+      }
+    } catch (_) {}
+  }
+
+  Database? _openFreshBoldDb() {
+    if (BoldDefinitionIndexService.isInFlight(dbDirectoryPath)) {
+      return null;
+    }
+    if (!_boldIndexVerified) {
+      if (BoldDefinitionIndexService.isUpToDate(dbDirectoryPath)) {
+        _boldIndexVerified = true;
+      } else {
+        final prev = _dbs.remove(BoldDefinitionIndexService.dbFilename);
+        if (prev != null) {
+          try {
+            prev.close();
+          } catch (_) {}
+        }
+        return null;
+      }
+    }
+    return _openDb(BoldDefinitionIndexService.dbFilename);
   }
 
   void close() => invalidateDatabases();
@@ -313,7 +379,7 @@ class TipitakaWebApi {
     if (cached != null) return cached;
 
     final bookRows = db.select(
-      'SELECT id, code, title, nikaya, category, chapter_count, meta_json '
+      'SELECT id, code, title, nikaya, category, chapter_count '
       'FROM books WHERE code = ? LIMIT 1',
       [cleanCode],
     );
@@ -337,7 +403,7 @@ class TipitakaWebApi {
         .toList(growable: false);
 
     Map<String, dynamic> meta = {};
-    final metaJson = b['meta_json']?.toString();
+    final metaJson = TipitakaCoreReader.readBookMetaJson(db, cleanCode);
     if (metaJson != null && metaJson.isNotEmpty) {
       try {
         final decoded = jsonDecode(metaJson);
@@ -506,26 +572,21 @@ class TipitakaWebApi {
 
     final chaptersData = <String, String>{};
     if (isFull) {
-      final rows = db.select(
-        'SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index',
-        [cleanCode],
-      );
-      for (final r in rows) {
-        if (r['html'] != null) {
-          chaptersData[r['chapter_index'].toString()] = r['html'].toString();
-        }
+      final htmlMap = TipitakaCoreReader.readChaptersHtml(db, cleanCode);
+      for (final e in htmlMap.entries) {
+        chaptersData[e.key.toString()] = e.value;
       }
     } else if (chapters.isNotEmpty) {
       final startIdx = math.max(0, reqChap - bufferCount);
       final endIdx = math.min(chapters.length - 1, reqChap + bufferCount);
-      final rows = db.select(
-        'SELECT chapter_index, html FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index',
-        [cleanCode, startIdx, endIdx],
+      final htmlMap = TipitakaCoreReader.readChaptersHtml(
+        db,
+        cleanCode,
+        startIdx: startIdx,
+        endIdx: endIdx,
       );
-      for (final r in rows) {
-        if (r['html'] != null) {
-          chaptersData[r['chapter_index'].toString()] = r['html'].toString();
-        }
+      for (final e in htmlMap.entries) {
+        chaptersData[e.key.toString()] = e.value;
       }
     }
 
@@ -574,21 +635,15 @@ class TipitakaWebApi {
       return ApiResponse.serverError('tipitaka.db not installed');
     }
     var cleanCode = Uri.decodeComponent(rawCode).replaceAll('.xml', '');
-    var rows = db.select(
-      'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1',
-      [cleanCode, chapterIndex],
-    );
-    if (rows.isEmpty) {
+    var html = TipitakaCoreReader.readChapterHtml(db, cleanCode, chapterIndex);
+    if (html == null) {
       final parsed = _parseBookCode(cleanCode);
       if (parsed.code != cleanCode) {
         cleanCode = parsed.code;
-        rows = db.select(
-          'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1',
-          [cleanCode, chapterIndex],
-        );
+        html = TipitakaCoreReader.readChapterHtml(db, cleanCode, chapterIndex);
       }
     }
-    if (rows.isEmpty || rows.first['html'] == null) {
+    if (html == null) {
       return ApiResponse.notFound(
         "Chapter $chapterIndex not found in book '$cleanCode'",
       );
@@ -596,7 +651,7 @@ class TipitakaWebApi {
     return ApiResponse({
       'book_code': cleanCode,
       'chapter_index': chapterIndex,
-      'html': rows.first['html'].toString(),
+      'html': html,
     });
   }
 
@@ -626,26 +681,29 @@ class TipitakaWebApi {
   }
 
   ApiResponse getPaliSentences(String rawCode) {
-    final db = _openDb('pali_sentences.db');
-    if (db == null) {
+    final dedicated = _openDb('pali_sentences.db');
+    final tipiDb = _openDb('tipitaka.db');
+    if (!TipitakaCoreReader.hasPaliSentencesSupport(dedicated, tipiDb)) {
       return ApiResponse.notFound('Pali sentences unavailable');
     }
     final cleanCode = _parseBookCode(rawCode).code;
     try {
-      final rows = db.select(
-        'SELECT chapter_index, para_index, line_id, sentence '
-        'FROM pali_sentences WHERE book_code = ? '
-        'ORDER BY chapter_index, para_index, line_id',
-        [cleanCode],
+      final rows = TipitakaCoreReader.readBookSentences(
+        dedicated,
+        tipiDb,
+        cleanCode,
       );
+      if (rows.isEmpty && dedicated == null && tipiDb == null) {
+        return ApiResponse.notFound("No Pali sentences found for '$cleanCode'");
+      }
       final chapters = <String, Map<String, List<Map<String, dynamic>>>>{};
       for (final r in rows) {
-        final ch = r['chapter_index'].toString();
-        final pa = r['para_index'].toString();
+        final ch = r.chapterIndex.toString();
+        final pa = r.paraIndex.toString();
         chapters
             .putIfAbsent(ch, () => {})
             .putIfAbsent(pa, () => [])
-            .add({'line': r['line_id'], 'text': r['sentence']});
+            .add({'line': r.lineId, 'text': r.text});
       }
       return ApiResponse({'book_code': cleanCode, 'chapters': chapters});
     } catch (_) {
@@ -922,15 +980,44 @@ class TipitakaWebApi {
     final db = _openDb('tipitaka.db');
     if (db == null) return ApiResponse.serverError('tipitaka.db not installed');
     try {
-      final rows = db.select(
-        'SELECT * FROM canon_paragraphs WHERE guid = ? LIMIT 1',
-        [guid],
-      );
+      ResultSet rows;
+      final parsed = TipitakaCoreReader.tryParseGuid(guid);
+      if (parsed != null) {
+        rows = db.select(
+          'SELECT * FROM canon_paragraphs '
+          'WHERE book_code = ? AND chapter_index = ? AND para_index = ? LIMIT 1',
+          [parsed.bookCode, parsed.chapterIndex, parsed.paraIndex],
+        );
+      } else {
+        rows = db.select(
+          'SELECT * FROM canon_paragraphs WHERE guid = ? LIMIT 1',
+          [guid],
+        );
+      }
+      if (rows.isEmpty) {
+        rows = db.select(
+          'SELECT * FROM canon_paragraphs WHERE guid = ? LIMIT 1',
+          [guid],
+        );
+      }
       if (rows.isEmpty) {
         return ApiResponse.notFound('Paragraph not found: $guid');
       }
       final r = rows.first;
-      return ApiResponse({for (final c in rows.columnNames) c: r[c]});
+      final out = <String, dynamic>{for (final c in rows.columnNames) c: r[c]};
+      if (out['pali_text'] == null &&
+          out['book_code'] != null &&
+          out['chapter_index'] != null &&
+          out['para_index'] != null) {
+        final chapTexts = TipitakaCoreReader.readChapterPaliTexts(
+          db,
+          out['book_code'].toString(),
+          (out['chapter_index'] as num).toInt(),
+        );
+        final resolved = chapTexts[(out['para_index'] as num).toInt()];
+        if (resolved != null) out['pali_text'] = resolved;
+      }
+      return ApiResponse(out);
     } catch (e) {
       return ApiResponse.serverError(e.toString());
     }
@@ -1018,7 +1105,10 @@ class TipitakaWebApi {
   ApiResponse getAvailableTranslations() {
     return ApiResponse({
       'available': _discoverTranslations(),
-      'has_pali_sentences': _openDb('pali_sentences.db') != null,
+      'has_pali_sentences': TipitakaCoreReader.hasPaliSentencesSupport(
+        _openDb('pali_sentences.db'),
+        _openDb('tipitaka.db'),
+      ),
     });
   }
 
@@ -1906,9 +1996,112 @@ class TipitakaWebApi {
     return out;
   }
 
+  List<String> _resolveLangCodes(String? rawLangs) {
+    final raw = rawLangs?.trim() ?? '';
+    if (raw.isEmpty) return const [];
+    if (raw.toLowerCase() == 'all') {
+      return _discoverTranslations()
+          .map((l) => l['code'].toString())
+          .where((c) => c.isNotEmpty)
+          .toList();
+    }
+    final seen = <String>{};
+    final out = <String>[];
+    for (final part in raw.split(',')) {
+      final norm = _normalizeLangCode(part);
+      if (norm.isNotEmpty && seen.add(norm)) {
+        out.add(norm);
+      }
+    }
+    return out;
+  }
+
+  Future<BoldDefinitionQueryResult> _lookupBoldDef(
+    String word,
+    List<String> langList,
+  ) {
+    return boldDefinitionService.lookup(
+      dbDirPath: dbDirectoryPath,
+      rawWord: word,
+      enabledLangs: langList,
+      boldDbOverride: _openFreshBoldDb(),
+      tipitakaDbOverride: _openDb('tipitaka.db'),
+      openTranslationDb: (code) => _openDb('translation_$code.db'),
+    );
+  }
+
+  Future<ApiResponse> getChapterLinks(
+    String rawCode,
+    int chapterIndex,
+  ) async {
+    final cleanCode = _parseBookCode(rawCode).code;
+    if (cleanCode.isEmpty || chapterIndex < 0) {
+      return ApiResponse.notFound('Invalid chapter for links');
+    }
+    final cacheKey = '$cleanCode#$chapterIndex';
+    final cached = _chapterLinksCache[cacheKey];
+    if (cached != null) {
+      return ApiResponse(cached);
+    }
+
+    final result = await linkedDefinitionService.getLinksForChapter(
+      dbDirPath: dbDirectoryPath,
+      bookCode: cleanCode,
+      chapterIndex: chapterIndex,
+      tipitakaDbOverride: _openDb('tipitaka.db'),
+      boldDbOverride: _openFreshBoldDb(),
+      paliSentencesDbOverride: _openDb('pali_sentences.db'),
+    );
+    _chapterLinksCache[cacheKey] = result;
+    return ApiResponse(result);
+  }
+
+  Future<ApiResponse> getLinkedPreview(Map<String, String> query) async {
+    final rawBook = query['book'] ?? query['bookCode'] ?? '';
+    final cleanCode = _parseBookCode(rawBook).code;
+    if (cleanCode.isEmpty) {
+      return const ApiResponse(
+        {'error': 'Missing book code'},
+        statusCode: 400,
+      );
+    }
+
+    final chapterIdx = int.tryParse(
+      query['chapter'] ?? query['chapterIndex'] ?? '',
+    );
+    final paraIdx = int.tryParse(
+      query['paraIndex'] ?? query['para_index'] ?? '',
+    );
+    final paraNum = query['paraNum'] ?? query['para_num'] ?? query['para'];
+    final lineId = int.tryParse(query['lineId'] ?? query['line_id'] ?? '');
+    final word = query['word'];
+    final langList = _resolveLangCodes(query['langs'] ?? query['lang']);
+
+    final preview = await linkedDefinitionService.getLinkedPreview(
+      dbDirPath: dbDirectoryPath,
+      bookCode: cleanCode,
+      chapterIndex: chapterIdx,
+      paraIndex: paraIdx,
+      paraNum: paraNum,
+      lineId: lineId,
+      word: word,
+      enabledLangs: langList,
+      tipitakaDbOverride: _openDb('tipitaka.db'),
+      paliSentencesDbOverride: _openDb('pali_sentences.db'),
+      openTranslationDb: (code) => _openDb('translation_$code.db'),
+    );
+    if (preview == null) {
+      return ApiResponse.notFound(
+        'Linked passage not found for $cleanCode',
+      );
+    }
+    return ApiResponse(preview.toJson());
+  }
+
   Future<ApiResponse> lookupDict(
     String rawWord, {
     String dictType = 'all',
+    String? langs,
   }) async {
     await dpdFamilyTemplates.ensureLoaded();
     final word = PaliScriptConverter.cleanDictionaryQuery(rawWord);
@@ -1921,6 +2114,20 @@ class TipitakaWebApi {
     }
 
     final type = dictType.toLowerCase();
+    final langList = _resolveLangCodes(langs);
+
+    if (type == 'bold_def' || type == 'bold' || type == 'bold_definitions') {
+      final boldRes = await _lookupBoldDef(word, langList);
+      final jsonList =
+          boldRes.results.map((r) => r.toJson()).toList(growable: false);
+      return ApiResponse({
+        'word': boldRes.query.isNotEmpty ? boldRes.query : word,
+        'search_prefix': boldRes.searchPrefix,
+        'hasResults': jsonList.isNotEmpty,
+        'results': jsonList,
+      });
+    }
+
     final syns = _getSynonyms(word);
 
     if (type == 'dpd') {
@@ -1936,6 +2143,7 @@ class TipitakaWebApi {
           'psd': 0,
           'sans': 0,
           'splitter': 0,
+          'bold_def': 0,
         },
         'dpd': dpd,
         'pts': const [],
@@ -1943,6 +2151,7 @@ class TipitakaWebApi {
         'psd': const [],
         'sans': const [],
         'splitter': const [],
+        'bold_def': const [],
       });
     }
 
@@ -1997,6 +2206,9 @@ class TipitakaWebApi {
     final psd = _lookupPsd(word, syns);
     final sans = _lookupSans(word);
     final splitter = _lookupSplitter(word);
+    final boldRes = await _lookupBoldDef(word, langList);
+    final boldJson =
+        boldRes.results.map((r) => r.toJson()).toList(growable: false);
     return ApiResponse({
       'word': word,
       'hasResults': dpd.isNotEmpty ||
@@ -2004,8 +2216,10 @@ class TipitakaWebApi {
           abd.isNotEmpty ||
           psd.isNotEmpty ||
           sans.isNotEmpty ||
-          splitter.isNotEmpty,
+          splitter.isNotEmpty ||
+          boldJson.isNotEmpty,
       'synonyms': syns,
+      'bold_def_prefix': boldRes.searchPrefix,
       'counts': {
         'dpd': dpd.length,
         'pts': pts.length,
@@ -2013,6 +2227,7 @@ class TipitakaWebApi {
         'psd': psd.length,
         'sans': sans.length,
         'splitter': splitter.length,
+        'bold_def': boldJson.length,
       },
       'dpd': dpd,
       'pts': pts,
@@ -2020,6 +2235,7 @@ class TipitakaWebApi {
       'psd': psd,
       'sans': sans,
       'splitter': splitter,
+      'bold_def': boldJson,
     });
   }
 

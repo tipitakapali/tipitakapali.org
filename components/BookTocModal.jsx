@@ -44,7 +44,9 @@ export default function BookTocModal({ isOpen, onClose }) {
     if (!isOpen || !activeTab) return;
 
     let currentParaIdx = 0;
-    const contentArea = document.querySelector('main.content-area');
+    const contentArea =
+      document.querySelector('main.content-area[data-active-pane="true"]') ||
+      document.querySelector('main.content-area');
     if (contentArea) {
       const containerRect = contentArea.getBoundingClientRect();
       const paras = contentArea.querySelectorAll('[data-pindex]');

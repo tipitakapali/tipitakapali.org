@@ -9,6 +9,15 @@ const compress = require('@fastify/compress');
 const { initAiController, registerAiRoutes } = require('./aiController');
 const { initLogEngine, registerLogRoutes, logAsync, closeLogDb } = require('./logEngine');
 const { initReaderSubmissionsEngine, registerReaderSubmissionsRoutes, closeReaderSubmissionsDb } = require('./readerSubmissionsEngine');
+const {
+  getColumnSet,
+  decodeTextOrZlib,
+  hasPaliSentencesSupport,
+  readBookSentences,
+  hydrateCanonRows,
+  tryParseGuid,
+} = require('./tipitakaCoreHelper');
+const { BoldLinkedEngine } = require('./boldLinkedEngine');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
@@ -151,13 +160,31 @@ function getSearchDatabase(targetParam) {
 }
 
 // Prepared Statements for ultra-low latency direct execution (Zero runtime parsing)
+const hasBookMetaZ = getColumnSet(db, 'books').has('meta_z');
+const hasChapterHtmlZ = getColumnSet(db, 'chapters').has('html_z');
 const stmtGetTreeMeta = db.prepare("SELECT value FROM site_metadata WHERE key = 'tree_json'");
 const stmtGetBooks = db.prepare('SELECT code, title, nikaya, category, chapter_count FROM books ORDER BY id');
-const stmtGetBook = db.prepare('SELECT id, code, title, nikaya, category, chapter_count, meta_json FROM books WHERE code = ?');
+const stmtGetBook = db.prepare(
+  hasBookMetaZ
+    ? 'SELECT id, code, title, nikaya, category, chapter_count, meta_json, meta_z FROM books WHERE code = ?'
+    : 'SELECT id, code, title, nikaya, category, chapter_count, meta_json FROM books WHERE code = ?'
+);
 const stmtGetChapters = db.prepare('SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index');
-const stmtGetChapterHtml = db.prepare('SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ?');
-const stmtGetChaptersRangeHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index');
-const stmtGetAllChaptersHtml = db.prepare('SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index');
+const stmtGetChapterHtml = db.prepare(
+  hasChapterHtmlZ
+    ? 'SELECT html, html_z FROM chapters WHERE book_code = ? AND chapter_index = ?'
+    : 'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ?'
+);
+const stmtGetChaptersRangeHtml = db.prepare(
+  hasChapterHtmlZ
+    ? 'SELECT chapter_index, html, html_z FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index'
+    : 'SELECT chapter_index, html FROM chapters WHERE book_code = ? AND chapter_index BETWEEN ? AND ? ORDER BY chapter_index'
+);
+const stmtGetAllChaptersHtml = db.prepare(
+  hasChapterHtmlZ
+    ? 'SELECT chapter_index, html, html_z FROM chapters WHERE book_code = ? ORDER BY chapter_index'
+    : 'SELECT chapter_index, html FROM chapters WHERE book_code = ? ORDER BY chapter_index'
+);
 const stmtGetToc = db.prepare('SELECT item_index, level, type, rend, title, para_index, para_num, anchor_id, chapter_index FROM book_toc WHERE book_code = ? ORDER BY item_index');
 
 let stmtGetMat = null;
@@ -203,7 +230,9 @@ let stmtGetPaliSentencesDb = null;
 function getPaliSentencesDb() {
   if (stmtGetPaliSentencesDb) return true;
   const p = resolveDbPath('pali_sentences.db');
-  if (!p) return false;
+  if (!p) {
+    return hasPaliSentencesSupport(db, null);
+  }
   try {
     paliSentDb = new Database(p, { readonly: true });
     paliSentDb.exec(`
@@ -218,9 +247,17 @@ function getPaliSentencesDb() {
     return true;
   } catch (err) {
     console.warn('[Database] Pali sentences DB error:', err.message);
-    return false;
+    return hasPaliSentencesSupport(db, null);
   }
 }
+
+const boldLinkedEngine = new BoldLinkedEngine({
+  dbTipitaka: db,
+  tipiDbPath: DB_PATH,
+  dbDir: path.dirname(DB_PATH),
+  getPaliSentDb: () => (getPaliSentencesDb() ? paliSentDb : null),
+  translationEngine,
+});
 
 // Clean top-level Tipiṭaka root if present
 function cleanTree(data) {
@@ -458,9 +495,10 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       }
       chapters = stmtGetChapters.all(cleanCode);
       meta = {};
-      if (book.meta_json) {
+      const metaRaw = decodeTextOrZlib(book.meta_json, hasBookMetaZ ? book.meta_z : null);
+      if (metaRaw) {
         try {
-          meta = JSON.parse(book.meta_json);
+          meta = JSON.parse(metaRaw);
         } catch (e) {}
       }
       if (bookMetaCache.size > 100) {
@@ -531,14 +569,16 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     if (isFullRequested) {
       const allRows = stmtGetAllChaptersHtml.all(cleanCode);
       for (const r of allRows) {
-        chaptersData[r.chapter_index] = r.html;
+        const html = decodeTextOrZlib(r.html, hasChapterHtmlZ ? r.html_z : null);
+        if (html !== null) chaptersData[r.chapter_index] = html;
       }
     } else {
       const startIdx = Math.max(0, reqChap - bufferCount);
       const endIdx = Math.min(totalChaps - 1, reqChap + bufferCount);
       const rangeRows = stmtGetChaptersRangeHtml.all(cleanCode, startIdx, endIdx);
       for (const r of rangeRows) {
-        chaptersData[r.chapter_index] = r.html;
+        const html = decodeTextOrZlib(r.html, hasChapterHtmlZ ? r.html_z : null);
+        if (html !== null) chaptersData[r.chapter_index] = html;
       }
     }
 
@@ -606,7 +646,8 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       }
     }
 
-    if (!row || row.html === null || row.html === undefined) {
+    const chHtml = row ? decodeTextOrZlib(row.html, hasChapterHtmlZ ? row.html_z : null) : null;
+    if (chHtml === null || chHtml === undefined) {
       reply.code(404);
       return { error: `Chapter ${chapIdx} not found in book '${cleanCode}'` };
     }
@@ -614,7 +655,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return {
       book_code: cleanCode,
       chapter_index: chapIdx,
-      html: row.html,
+      html: chHtml,
     };
   });
 
@@ -692,10 +733,64 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return { error: `No MAT relationship found for '${cleanCode}'` };
   });
 
-  // Per-book Pāḷi sentence splits for sentence display mode. Prebuilt from
-  // epitaka.db segmentation (build_pali_sentences_db.py); line numbers align
-  // with translation line_ids by construction. Static export precomputes the
-  // same payload as pali_sentences.json.
+  // Word-level Linked Definitions per chapter (Mūla <-> Aṭṭhakathā <-> Ṭīkā)
+  fastify.get('/api/book/:code/chapter/:chapterIndex/links', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    let cleanCode = req.params.code.replace('.xml', '');
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+    const chapIdx = parseInt(req.params.chapterIndex, 10);
+    if (isNaN(chapIdx) || chapIdx < 0) {
+      reply.code(404);
+      return { error: 'Invalid chapter for links' };
+    }
+    return boldLinkedEngine.getLinksForChapter(cleanCode, chapIdx);
+  });
+
+  // Contextual Linked Definition preview window
+  fastify.get('/api/links/preview', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=3600, stale-while-revalidate=86400');
+    let book = (req.query.book || req.query.bookCode || '').replace('.xml', '');
+    const chapSuffixMatch = book.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) book = chapSuffixMatch[1];
+    if (!book) {
+      reply.code(400);
+      return { error: 'Missing book code' };
+    }
+    const chapter = req.query.chapter !== undefined || req.query.chapterIndex !== undefined
+      ? parseInt(req.query.chapter ?? req.query.chapterIndex, 10)
+      : null;
+    const paraIndex = req.query.paraIndex !== undefined || req.query.para_index !== undefined
+      ? parseInt(req.query.paraIndex ?? req.query.para_index, 10)
+      : null;
+    const paraNum = req.query.paraNum || req.query.para_num || req.query.para || null;
+    const lineId = req.query.lineId !== undefined || req.query.line_id !== undefined
+      ? parseInt(req.query.lineId ?? req.query.line_id, 10)
+      : null;
+    const word = req.query.word || null;
+    const langsRaw = req.query.langs || req.query.lang || '';
+    const langs = langsRaw === 'all'
+      ? translationEngine.getAvailableLanguages().map((l) => l.code)
+      : String(langsRaw).split(',').map((s) => s.trim()).filter(Boolean);
+
+    const preview = boldLinkedEngine.getLinkedPreview({
+      book,
+      chapter: chapter !== null && !isNaN(chapter) ? chapter : null,
+      paraIndex: paraIndex !== null && !isNaN(paraIndex) ? paraIndex : null,
+      paraNum,
+      lineId: lineId !== null && !isNaN(lineId) ? lineId : null,
+      word,
+      langs,
+    });
+    if (!preview) {
+      reply.code(404);
+      return { error: `Linked passage not found for ${book}` };
+    }
+    return preview;
+  });
+
+  // Per-book Pāḷi sentence splits for sentence display mode. Reads either
+  // standalone pali_sentences.db or unified chapter_text_pack inside tipitaka.db.
   const paliSentencesCache = new Map();
   fastify.get('/api/book/:code/pali_sentences', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
@@ -711,7 +806,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     }
     try {
       const chapters = {};
-      const rows = stmtGetPaliSentencesDb.all(cleanCode);
+      const rows = readBookSentences(db, paliSentDb, cleanCode);
       for (const r of rows) {
         const ch = String(r.chapter_index);
         if (!chapters[ch]) chapters[ch] = {};
@@ -926,11 +1021,21 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
       reply.code(500);
       return { error: 'Database not initialized' };
     }
-    const row = stmtGetCanonByGuid.get(guid);
+    const parsed = tryParseGuid(guid);
+    let row = null;
+    if (parsed) {
+      row = db
+        .prepare('SELECT * FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index = ? LIMIT 1')
+        .get(parsed.bookCode, parsed.chapterIndex, parsed.paraIndex);
+    }
+    if (!row) {
+      row = stmtGetCanonByGuid.get(guid);
+    }
     if (!row) {
       reply.code(404);
       return { error: `Paragraph not found: ${guid}` };
     }
+    hydrateCanonRows(db, [row]);
     return row;
   });
 
@@ -950,6 +1055,7 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     } else {
       rows = db.prepare('SELECT global_id, guid, book_code, sub_book, chapter_index, chapter_title, sutta_title, para_index, para_num, rend, pali_text, word_count, mula_guid, attha_guid, tika_guid FROM canon_paragraphs ORDER BY global_id LIMIT ? OFFSET ?').all(limit, offset);
     }
+    hydrateCanonRows(db, rows, book || null);
     return { count: rows.length, paragraphs: rows };
   });
 
@@ -1442,10 +1548,46 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
   // ==========================================
   const dictEngine = require('./dictEngine');
 
+  const parseLangList = (raw) => {
+    const str = String(raw || '').trim();
+    if (!str) return [];
+    if (str.toLowerCase() === 'all') {
+      return translationEngine.getAvailableLanguages().map((l) => l.code);
+    }
+    return str.split(',').map((s) => s.trim()).filter(Boolean);
+  };
+
+  const handleDictLookup = (rawWord, dictType, useSplitter, langsList) => {
+    if (dictType === 'bold_def' || dictType === 'bold' || dictType === 'bold_definitions') {
+      return boldLinkedEngine.lookupBoldDef(rawWord, langsList);
+    }
+    if (dictType === 'dpd') return dictEngine.lookupDPDFast(rawWord, useSplitter);
+    if (dictType === 'others' || dictType === 'rest') return dictEngine.lookupOthers(rawWord);
+    if (dictType === 'pts') return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
+    if (dictType === 'abd') return { word: rawWord, results: dictEngine.lookupABD(rawWord) };
+    if (dictType === 'psd') return { word: rawWord, results: dictEngine.lookupPSD(rawWord) };
+    if (dictType === 'sans') return { word: rawWord, results: dictEngine.lookupSANS(rawWord) };
+    if (dictType === 'splitter') return { word: rawWord, results: dictEngine.lookupSplitter(rawWord) };
+
+    const allRes = dictEngine.lookupAll(rawWord);
+    const boldRes = boldLinkedEngine.lookupBoldDef(rawWord, langsList);
+    return {
+      ...allRes,
+      hasResults: Boolean(allRes.hasResults || boldRes.hasResults),
+      bold_def_prefix: boldRes.search_prefix,
+      counts: {
+        ...(allRes.counts || {}),
+        bold_def: boldRes.results.length,
+      },
+      bold_def: boldRes.results,
+    };
+  };
+
   fastify.get('/api/dict/lookup', async (req, reply) => {
     const rawWord = req.query.w || req.query.word || req.query.q || '';
     const dictType = (req.query.dict || req.query.dictionary || 'all').toLowerCase();
     const useSplitter = req.query.d === 'yes';
+    const langsList = parseLangList(req.query.langs || req.query.lang);
 
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
 
@@ -1453,25 +1595,7 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
       return { word: '', hasResults: false, error: 'Empty word query' };
     }
 
-    if (dictType === 'all') {
-      return dictEngine.lookupAll(rawWord);
-    } else if (dictType === 'dpd') {
-      return dictEngine.lookupDPDFast(rawWord, useSplitter);
-    } else if (dictType === 'others' || dictType === 'rest') {
-      return dictEngine.lookupOthers(rawWord);
-    } else if (dictType === 'pts') {
-      return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
-    } else if (dictType === 'abd') {
-      return { word: rawWord, results: dictEngine.lookupABD(rawWord) };
-    } else if (dictType === 'psd') {
-      return { word: rawWord, results: dictEngine.lookupPSD(rawWord) };
-    } else if (dictType === 'sans') {
-      return { word: rawWord, results: dictEngine.lookupSANS(rawWord) };
-    } else if (dictType === 'splitter') {
-      return { word: rawWord, results: dictEngine.lookupSplitter(rawWord) };
-    } else {
-      return dictEngine.lookupAll(rawWord);
-    }
+    return handleDictLookup(rawWord, dictType, useSplitter, langsList);
   });
 
   fastify.post('/api/dict/lookup', async (req, reply) => {
@@ -1479,6 +1603,7 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
     const rawWord = body.w || body.word || body.q || '';
     const dictType = (body.dict || body.dictionary || 'all').toLowerCase();
     const useSplitter = body.d === 'yes';
+    const langsList = parseLangList(body.langs || body.lang);
 
     applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
 
@@ -1486,25 +1611,7 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
       return { word: '', hasResults: false, error: 'Empty word query' };
     }
 
-    if (dictType === 'all') {
-      return dictEngine.lookupAll(rawWord);
-    } else if (dictType === 'dpd') {
-      return dictEngine.lookupDPDFast(rawWord, useSplitter);
-    } else if (dictType === 'others' || dictType === 'rest') {
-      return dictEngine.lookupOthers(rawWord);
-    } else if (dictType === 'pts') {
-      return { word: rawWord, results: dictEngine.lookupPTS(rawWord) };
-    } else if (dictType === 'abd') {
-      return { word: rawWord, results: dictEngine.lookupABD(rawWord) };
-    } else if (dictType === 'psd') {
-      return { word: rawWord, results: dictEngine.lookupPSD(rawWord) };
-    } else if (dictType === 'sans') {
-      return { word: rawWord, results: dictEngine.lookupSANS(rawWord) };
-    } else if (dictType === 'splitter') {
-      return { word: rawWord, results: dictEngine.lookupSplitter(rawWord) };
-    } else {
-      return dictEngine.lookupAll(rawWord);
-    }
+    return handleDictLookup(rawWord, dictType, useSplitter, langsList);
   });
 
   fastify.get('/api/dict/inf', async (req, reply) => {
@@ -1604,6 +1711,9 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
       await fastify.close();
       if (db && typeof db.close === 'function') db.close();
       if (dbFts && dbFts !== db && typeof dbFts.close === 'function') dbFts.close();
+      if (boldLinkedEngine.boldDb && typeof boldLinkedEngine.boldDb.close === 'function') {
+        boldLinkedEngine.boldDb.close();
+      }
       if (dictEngine && typeof dictEngine.closeDatabases === 'function') {
         dictEngine.closeDatabases();
       }
@@ -1622,6 +1732,13 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
   try {
     await fastify.listen({ port: PORT, host: HOST });
     console.log(`[Fastify] Ultra-optimized Server listening at http://${HOST}:${PORT}`);
+    setImmediate(() => {
+      try {
+        boldLinkedEngine.ensureBoldDb();
+      } catch (e) {
+        console.warn('[BoldLinked] Warmup error:', e.message);
+      }
+    });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

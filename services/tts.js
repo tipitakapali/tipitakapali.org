@@ -169,6 +169,7 @@ export function getEnabledTtsLangIds(settings) {
 export function detectViewportTopPara() {
   if (typeof document === 'undefined') return null;
   const container =
+    document.querySelector('main.content-area[data-active-pane="true"]') ||
     document.querySelector('main.content-area') ||
     document.querySelector('.content-area') ||
     document.querySelector('main');
@@ -240,6 +241,7 @@ export function buildTtsQueueFromDom(selectedLangIds, startPara = null) {
     return [];
   }
   const container =
+    document.querySelector('main.content-area[data-active-pane="true"]') ||
     document.querySelector('main.content-area') ||
     document.querySelector('.content-area') ||
     document.querySelector('main');

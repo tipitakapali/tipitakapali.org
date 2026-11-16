@@ -474,17 +474,6 @@ extension TipitakaWebAiApi on TipitakaWebApi {
     );
   }
 
-  /// Opens `pali_sentences.db` when present, or falls back to `tipitaka.db`
-  /// if it contains a `pali_sentences` table.
-  Database? _openPaliSentencesDb(Database? dbTipitaka) {
-    final dedicated = _openDb('pali_sentences.db');
-    if (dedicated != null) return dedicated;
-    if (dbTipitaka != null && _getTableNames('CORE', dbTipitaka).contains('pali_sentences')) {
-      return dbTipitaka;
-    }
-    return null;
-  }
-
   /// `GET /api/ai/paragraph_content` handler used by Ani `CitationQuickviewModal`
   /// and `get_paragraph_content` tool calls.
   ApiResponse getAiParagraphContent(Map<String, dynamic> params) {
@@ -611,12 +600,26 @@ extension TipitakaWebAiApi on TipitakaWebApi {
 
       final bookTitle = _bookTitleFor(dbTipitaka, targetCode) ?? targetCode;
       final passages = <Map<String, dynamic>>[];
+      final chapPaliCache = <String, Map<int, String>>{};
 
       for (final pRow in pRows) {
         final rowBook = (pRow['book_code'] ?? targetCode).toString();
         final rowChap = _asAiInt(pRow['chapter_index']) ?? 0;
         final rowParaIdx = _asAiInt(pRow['para_index']) ?? 0;
         final rowGuid = pRow['guid']?.toString() ?? '';
+        var rowPali = pRow['pali_text']?.toString();
+        if (rowPali == null || rowPali.isEmpty) {
+          final cacheKey = '$rowBook:$rowChap';
+          final map = chapPaliCache.putIfAbsent(
+            cacheKey,
+            () => TipitakaCoreReader.readChapterPaliTexts(
+              dbTipitaka,
+              rowBook,
+              rowChap,
+            ),
+          );
+          rowPali = map[rowParaIdx];
+        }
 
         final translations = <String, dynamic>{};
         for (final lang in langs) {
@@ -650,7 +653,7 @@ extension TipitakaWebAiApi on TipitakaWebApi {
           'sutta_title': (pRow['sutta_title'] ?? '').toString(),
           'para_index': rowParaIdx,
           'para_num': pRow['para_num'],
-          'pali': pRow['pali_text'],
+          'pali': rowPali,
           'translations': translations,
           'citation_ref': '[$rowBook:c$rowChap:p$rowParaIdx]',
         });
@@ -713,68 +716,58 @@ extension TipitakaWebAiApi on TipitakaWebApi {
     final activeChap = cIdx ?? 0;
 
     var paliSents = <Map<String, dynamic>>[];
-    final pdb = _openPaliSentencesDb(dbTipitaka);
-    if (pdb != null) {
-      try {
-        if (pIdx != null && lid != null) {
-          final rows = pdb.select(
-            'SELECT line_id, sentence FROM pali_sentences '
-            'WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ? '
-            'ORDER BY line_id',
-            [targetCode, activeChap, pIdx, lid],
-          );
-          paliSents = [
-            for (final r in rows)
-              {'line_id': r['line_id'], 'sentence': r['sentence']},
-          ];
-        } else if (pIdx != null) {
-          final rows = pdb.select(
-            'SELECT line_id, sentence FROM pali_sentences '
-            'WHERE book_code = ? AND chapter_index = ? AND para_index = ? '
-            'ORDER BY line_id',
-            [targetCode, activeChap, pIdx],
-          );
-          paliSents = [
-            for (final r in rows)
-              {'line_id': r['line_id'], 'sentence': r['sentence']},
-          ];
-        } else {
-          final rows = pdb.select(
-            'SELECT line_id, sentence, para_index FROM pali_sentences '
-            'WHERE book_code = ? AND chapter_index = ? '
-            'ORDER BY para_index, line_id LIMIT 40',
-            [targetCode, activeChap],
-          );
-          paliSents = [
-            for (final r in rows)
-              {
-                'line_id': r['line_id'],
-                'sentence': r['sentence'],
-                'para_index': r['para_index'],
-              },
-          ];
+    final dedicatedPsDb = _openDb('pali_sentences.db');
+    final chapSentMap = TipitakaCoreReader.readChapterSentences(
+      dedicatedPsDb,
+      dbTipitaka,
+      targetCode,
+      activeChap,
+    );
+    if (chapSentMap.isNotEmpty) {
+      if (pIdx != null && lid != null) {
+        final list = chapSentMap[pIdx] ?? const [];
+        paliSents = [
+          for (final s in list)
+            if (s.lineId == lid) {'line_id': s.lineId, 'sentence': s.text},
+        ];
+      } else if (pIdx != null) {
+        final list = chapSentMap[pIdx] ?? const [];
+        paliSents = [
+          for (final s in list) {'line_id': s.lineId, 'sentence': s.text},
+        ];
+      } else {
+        final pKeys = chapSentMap.keys.toList()..sort();
+        for (final pk in pKeys) {
+          for (final s in chapSentMap[pk]!) {
+            paliSents.add({
+              'line_id': s.lineId,
+              'sentence': s.text,
+              'para_index': pk,
+            });
+            if (paliSents.length >= 40) break;
+          }
+          if (paliSents.length >= 40) break;
         }
-      } catch (_) {}
+      }
     }
 
-    // Fallback to canon_paragraphs.pali_text when pali_sentences has no rows.
+    // Fallback to canon_paragraphs.pali_text / chapter_text_pack when sentences absent.
     if (paliSents.isEmpty && pIdx != null) {
-      try {
-        final rows = dbTipitaka.select(
-          'SELECT pali_text FROM canon_paragraphs '
-          'WHERE book_code = ? AND chapter_index = ? AND para_index = ? LIMIT 1',
-          [targetCode, activeChap, pIdx],
-        );
-        if (rows.isNotEmpty && rows.first['pali_text'] != null) {
-          paliSents = [
-            {
-              'line_id': lid ?? 1,
-              'sentence': rows.first['pali_text'].toString(),
-              'para_index': pIdx,
-            },
-          ];
-        }
-      } catch (_) {}
+      final chapPali = TipitakaCoreReader.readChapterPaliTexts(
+        dbTipitaka,
+        targetCode,
+        activeChap,
+      );
+      final pt = chapPali[pIdx];
+      if (pt != null && pt.isNotEmpty) {
+        paliSents = [
+          {
+            'line_id': lid ?? 1,
+            'sentence': pt,
+            'para_index': pIdx,
+          },
+        ];
+      }
     }
 
     final translations = <String, List<Map<String, dynamic>>>{};

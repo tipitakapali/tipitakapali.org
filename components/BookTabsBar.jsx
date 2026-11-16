@@ -1,11 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Book, X, History, Bot, ExternalLink } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { Book, X, History, Bot, ExternalLink, Columns, Layers, Square, Link2, Unlink2 } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
-
-
-
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 
@@ -14,6 +11,7 @@ export default function BookTabsBar() {
     openTabs,
     activeBookCode,
     switchTab,
+    openAlongside,
     closeTab,
     closeOtherTabs,
     closeAllTabs,
@@ -27,9 +25,44 @@ export default function BookTabsBar() {
     setIsSidebarOpen,
     setIsHeaderVisible,
   } = useTabs();
-  const { settings, isZenMode, setIsZenMode } = useThemeSettings();
+  const { settings, updateSetting, isZenMode, setIsZenMode } = useThemeSettings();
 
   const isHidden = !isHeaderVisible && !isSidebarOpen;
+  const tabView = settings?.tabView || 'columns';
+  const syncScroll = settings?.syncScroll === true;
+
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const bookTabs = useMemo(
+    () => openTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat'),
+    [openTabs]
+  );
+
+  // Determine which bookCodes are currently visible side-by-side in 'columns' mode
+  const visibleColumnCodes = useMemo(() => {
+    if (tabView !== 'columns' || viewportWidth < 900 || bookTabs.length <= 1 || activeBookCode === 'ai_chat') {
+      return new Set();
+    }
+    const maxCols = viewportWidth >= 1100 ? 3 : 2;
+    if (bookTabs.length <= maxCols) {
+      return new Set(bookTabs.map((t) => t.bookCode));
+    }
+    const activeIdx = Math.max(0, bookTabs.findIndex((t) => t.bookCode === activeBookCode));
+    let start = maxCols === 2 ? activeIdx : Math.max(0, activeIdx - 1);
+    if (start + maxCols > bookTabs.length) {
+      start = Math.max(0, bookTabs.length - maxCols);
+    }
+    return new Set(bookTabs.slice(start, start + maxCols).map((t) => t.bookCode));
+  }, [tabView, viewportWidth, bookTabs, activeBookCode]);
 
 
   const tabsScrollRef = useRef(null);
@@ -211,6 +244,8 @@ export default function BookTabsBar() {
                 : tab.title)
             : convertPaliScript(capitalizePali(tab.title), settings?.paliScript);
 
+          const isInColumnView = visibleColumnCodes.has(tab.bookCode);
+
           return (
             <div
               key={tab.bookCode}
@@ -222,6 +257,8 @@ export default function BookTabsBar() {
               onDragEnd={handleDragEnd}
               onContextMenu={(e) => handleContextMenu(e, tab, idx)}
               className={`book-tab group cursor-grab active:cursor-grabbing ${isActive ? 'active' : ''} ${
+                isInColumnView && !isActive ? 'in-column-view' : ''
+              } ${
                 isAiTab ? 'book-tab-ai' : ''
               } ${
                 isDragging ? 'is-dragging' : ''
@@ -257,6 +294,12 @@ export default function BookTabsBar() {
               <span className={`tab-title truncate ${isAiTab ? 'font-semibold text-violet-700 dark:text-violet-300' : ''}`}>
                 {displayTitle}
               </span>
+              {isInColumnView && !isActive && (
+                <span
+                  className="hidden min-[900px]:inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] opacity-75 shrink-0"
+                  title="Visible in parallel column"
+                />
+              )}
               <button
                 className="tab-close-btn"
                 title="Close tab (Middle click)"
@@ -271,6 +314,75 @@ export default function BookTabsBar() {
             </div>
           );
         })}
+      </div>
+
+      {/* View Mode & Parallel Column Controls (wide screens) */}
+      <div className="hidden min-[900px]:flex items-center gap-1 shrink-0 mr-1">
+        {tabView === 'columns' && bookTabs.length > 1 && (
+          <button
+            type="button"
+            onClick={() => updateSetting('syncScroll', !syncScroll)}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold border transition cursor-pointer ${
+              syncScroll
+                ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/40'
+                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] border-[var(--border-color)] hover:text-[var(--text-primary)]'
+            }`}
+            title={
+              syncScroll
+                ? 'Synchronized column scrolling is ON (Mūla / Aṭṭhakathā / Ṭīkā scroll together)'
+                : 'Synchronized column scrolling is OFF (click to enable)'
+            }
+          >
+            {syncScroll ? <Link2 size={12} /> : <Unlink2 size={12} />}
+            <span>Sync</span>
+          </button>
+        )}
+
+        <div
+          className="flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] p-0.5"
+          role="group"
+          aria-label="Tab view mode"
+        >
+          <button
+            type="button"
+            onClick={() => updateSetting('tabView', 'single')}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
+              tabView === 'single'
+                ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+            title="Single tab mode: opening a book replaces the current tab"
+          >
+            <Square size={11} />
+            <span className="hidden xl:inline">Single</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateSetting('tabView', 'tabbed')}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
+              tabView === 'tabbed'
+                ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+            title="Multi-tab mode: keep multiple books open in tabs"
+          >
+            <Layers size={11} />
+            <span className="hidden xl:inline">Tabs</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateSetting('tabView', 'columns')}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
+              tabView === 'columns'
+                ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+            title="Columns mode: view open books side-by-side (Mūla / Aṭṭhakathā / Ṭīkā)"
+          >
+            <Columns size={11} />
+            <span className="hidden xl:inline">Columns</span>
+          </button>
+        </div>
       </div>
 
       <button
@@ -292,10 +404,28 @@ export default function BookTabsBar() {
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-[9999] min-w-[160px] py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-xl text-xs text-[var(--text-primary)] animate-fade-in select-none font-medium"
+          className="fixed z-[9999] min-w-[175px] py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-xl text-xs text-[var(--text-primary)] animate-fade-in select-none font-medium"
           style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
           onClick={(e) => e.stopPropagation()}
         >
+          {contextMenu.bookCode !== 'ai_chat' && (
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-[var(--bg-secondary)] hover:text-[var(--accent)] transition cursor-pointer flex items-center justify-between"
+              onClick={() => {
+                const tabItem = contextMenu.tab || openTabs[contextMenu.tabIndex];
+                openAlongside(contextMenu.bookCode, {
+                  targetChapterIdx: tabItem?.currentChapterIdx ?? null,
+                  targetParaNum: tabItem?.lastParaNum ?? null,
+                  sourceBookCode: activeBookCode,
+                });
+                setContextMenu(null);
+              }}
+            >
+              <span>Open Alongside</span>
+              <Columns size={12} className="opacity-70" />
+            </button>
+          )}
+
           <button
             className="w-full text-left px-3 py-1.5 hover:bg-[var(--bg-secondary)] hover:text-[var(--accent)] transition cursor-pointer flex items-center justify-between"
             onClick={() => {

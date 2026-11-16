@@ -72,7 +72,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     _updateDialogShown = true;
     final updated = await DatabaseUpdatesDialog.show(context);
     if (updated == true && mounted) {
-      ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+      final api = ref.read(tipitakaLocalServerProvider).api;
+      api.invalidateDatabases();
+      unawaited(api.warmUpIndexes());
       await _webViewController?.reload();
     }
   }
@@ -114,6 +116,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
         _serverUri = uri;
         _starting = false;
       });
+      unawaited(server.api.warmUpIndexes());
       unawaited(
         ref
             .read(downloadControllerProvider.notifier)
@@ -153,7 +156,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       MaterialPageRoute<void>(builder: (_) => const DatabaseManagerScreen()),
     );
     if (!mounted) return;
-    ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+    final api = ref.read(tipitakaLocalServerProvider).api;
+    api.invalidateDatabases();
+    unawaited(api.warmUpIndexes());
     await _webViewController?.reload();
   }
 
@@ -259,7 +264,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       ),
       (prev, active) {
         if (prev == true && !active) {
-          ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+          final api = ref.read(tipitakaLocalServerProvider).api;
+          api.invalidateDatabases();
+          unawaited(api.warmUpIndexes());
           _webViewController?.evaluateJavascript(
             source: 'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();',
           );
@@ -367,7 +374,11 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       bootToken: localStorageStore.bootToken,
     );
     final seedScript = buildOnboardingTranslationSeedScript(
-      onboardingLang,
+      onboardingLang ??
+          (downloadState.selectedLanguageCode ==
+                  DownloadController.noLanguageCode
+              ? DownloadController.noLanguageCode
+              : null),
       paliScript: downloadState.selectedPaliScript,
     );
     return InAppWebView(
@@ -994,7 +1005,8 @@ String buildOnboardingTranslationSeedScript(
   String? paliScript,
 }) {
   final code = langCode?.trim().toLowerCase();
-  final settingsKey = (code != null && code.isNotEmpty)
+  final isExplicitNone = code == DownloadController.noLanguageCode;
+  final settingsKey = (code != null && code.isNotEmpty && !isExplicitNone)
       ? translationCodeToSettingsKey[code]
       : null;
   final rawScript = paliScript?.trim().toLowerCase();
@@ -1002,7 +1014,7 @@ String buildOnboardingTranslationSeedScript(
       ? PaliScript.fromId(rawScript).webId
       : null;
 
-  if (settingsKey == null && targetScript == null) return '';
+  if (settingsKey == null && !isExplicitNone && targetScript == null) return '';
 
   return '''
 (function() {
@@ -1010,11 +1022,12 @@ String buildOnboardingTranslationSeedScript(
     var SEED_KEY = 'tpo_onboarding_seeded_lang_v1';
     var SEED_SCRIPT_KEY = 'tpo_onboarding_seeded_script_v1';
     var SETTINGS_KEY = 'tipitaka_advanced_settings_v6';
-    var targetCode = ${jsonEncode(settingsKey != null ? code : null)};
+    var targetCode = ${jsonEncode((settingsKey != null || isExplicitNone) ? code : null)};
     var targetKey = ${jsonEncode(settingsKey)};
+    var isExplicitNone = ${jsonEncode(isExplicitNone)};
     var targetScript = ${jsonEncode(targetScript)};
 
-    var needLangSeed = !!(targetCode && targetKey && localStorage.getItem(SEED_KEY) !== targetCode);
+    var needLangSeed = !!(targetCode && (targetKey || isExplicitNone) && localStorage.getItem(SEED_KEY) !== targetCode);
     var needScriptSeed = !!(targetScript && localStorage.getItem(SEED_SCRIPT_KEY) !== targetScript);
     if (!needLangSeed && !needScriptSeed) return;
 
@@ -1035,7 +1048,11 @@ String buildOnboardingTranslationSeedScript(
       if (translations.pali === undefined) {
         translations.pali = true;
       }
-      translations[targetKey] = true;
+      if (isExplicitNone) {
+        translations.english = false;
+      } else {
+        translations[targetKey] = true;
+      }
       parsed.translations = translations;
       changed = true;
     }

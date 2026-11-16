@@ -43,7 +43,11 @@ export default function BookmarkModal({ isOpen, onClose }) {
     let paraSnippet = '';
 
     if (!currentPara && typeof document !== 'undefined') {
-      const readerEl = document.querySelector('.reader-container') || document.querySelector('main');
+      const readerEl =
+        document.querySelector('main.content-area[data-active-pane="true"] .reader-container') ||
+        document.querySelector('main.content-area[data-active-pane="true"]') ||
+        document.querySelector('.reader-container') ||
+        document.querySelector('main');
       if (readerEl) {
         const targetY = (readerEl.getBoundingClientRect?.().top || 0) + 80;
         const paraElements = readerEl.querySelectorAll('p[data-pindex]');

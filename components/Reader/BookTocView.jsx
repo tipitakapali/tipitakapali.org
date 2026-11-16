@@ -18,8 +18,9 @@ function getTocItemHierarchy(item) {
   return { depth: 4, type: 'subsubhead' };
 }
 
-export default function BookTocView() {
-  const { activeTab, openBook, loadingBook } = useTabs();
+export default function BookTocView({ tab: propTab = null, isColumnsMode = false, onCloseColumn = null }) {
+  const { activeTab: ctxActiveTab, openBook, loadingBook } = useTabs();
+  const activeTab = propTab || ctxActiveTab;
   const { settings } = useThemeSettings();
   const [filterQuery, setFilterQuery] = useState('');
   const inputRef = useRef(null);
@@ -93,6 +94,20 @@ export default function BookTocView() {
             <span className="text-xs text-[var(--text-muted)] truncate shrink-0 md:hidden">
               {activeTab.chapter_count || tocList.length ? `• ${activeTab.chapter_count || tocList.length} sec` : ''}
             </span>
+            {isColumnsMode && onCloseColumn && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseColumn(e);
+                }}
+                className="ml-auto p-1 rounded text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+                title="Close column"
+                aria-label="Close column"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
       </div>

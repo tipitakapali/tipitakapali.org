@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Book, Layers, ArrowUpRight, CheckCircle2, ExternalLink } from 'lucide-react';
+import { X, Book, Layers, ArrowUpRight, CheckCircle2, ExternalLink, Columns } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
@@ -31,7 +31,11 @@ export default function MatJumpModal({ isOpen, onClose }) {
     if (!isOpen) return;
     let paras = [];
     if (typeof document !== 'undefined') {
-      const container = document.querySelector('main.content-area') || document.querySelector('.content-area') || document.querySelector('main');
+      const container =
+        document.querySelector('main.content-area[data-active-pane="true"]') ||
+        document.querySelector('main.content-area') ||
+        document.querySelector('.content-area') ||
+        document.querySelector('main');
       if (container) {
         const cRect = container.getBoundingClientRect();
         const seen = new Set();
@@ -297,6 +301,10 @@ export default function MatJumpModal({ isOpen, onClose }) {
             openInNewWindow(e);
             return;
           }
+          if (settings?.openMatInNewColumn) {
+            jumpAlongside(e);
+            return;
+          }
           const finalChapter = getFinalChapter();
           jumpToMat(item.layer, {
             title: pTarget?.title || item.title,
@@ -305,11 +313,28 @@ export default function MatJumpModal({ isOpen, onClose }) {
             targetChapterIdx: finalChapter,
             targetParaNum: info.targetPara || clean || undefined,
             subBook: activeTab?.sub_book || subKey || undefined,
+            sourceBookCode: currentCode,
           });
           onClose();
         };
 
-        return { ...item, info, jump, openInNewWindow, getTargetUrl, srcPara: clean };
+        const jumpAlongside = (e) => {
+          if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+          const finalChapter = getFinalChapter();
+          jumpToMat(item.layer, {
+            title: pTarget?.title || item.title,
+            code: pTarget?.book || item.code,
+            chapter: finalChapter,
+            targetChapterIdx: finalChapter,
+            targetParaNum: info.targetPara || clean || undefined,
+            subBook: activeTab?.sub_book || subKey || undefined,
+            sourceBookCode: currentCode,
+            alongside: true,
+          });
+          onClose();
+        };
+
+        return { ...item, info, jump, jumpAlongside, openInNewWindow, getTargetUrl, srcPara: clean };
       });
   };
 
@@ -330,11 +355,30 @@ export default function MatJumpModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                Mūla · Aṭṭhakathā · Ṭīkā Jumps
+                MAṬ Jumps
               </h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <label
+              className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer select-none px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border-color)] transition"
+              title="Open MAT jumps alongside in a new column"
+            >
+              <input
+                type="checkbox"
+                checked={!!settings?.openMatInNewColumn}
+                onChange={(e) => {
+                  if (!updateSetting) return;
+                  const next = e.target.checked;
+                  updateSetting('openMatInNewColumn', next);
+                  if (next && settings?.openMatInNewWindow) {
+                    updateSetting('openMatInNewWindow', false);
+                  }
+                }}
+                className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer"
+              />
+              <span className="hidden min-[420px]:inline font-medium">New Column</span>
+            </label>
             <label
               className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer select-none px-2 py-1 rounded bg-[var(--bg-card)] border border-[var(--border-color)] transition"
               title="Open MAT jumps in a new browser window/tab (ideal for dual monitors / PC)"
@@ -342,7 +386,14 @@ export default function MatJumpModal({ isOpen, onClose }) {
               <input
                 type="checkbox"
                 checked={!!settings?.openMatInNewWindow}
-                onChange={(e) => updateSetting && updateSetting('openMatInNewWindow', e.target.checked)}
+                onChange={(e) => {
+                  if (!updateSetting) return;
+                  const next = e.target.checked;
+                  updateSetting('openMatInNewWindow', next);
+                  if (next && settings?.openMatInNewColumn) {
+                    updateSetting('openMatInNewColumn', false);
+                  }
+                }}
                 className="accent-[var(--accent)] w-3.5 h-3.5 rounded cursor-pointer"
               />
               <span className="hidden min-[420px]:inline font-medium">New window</span>
@@ -473,6 +524,15 @@ export default function MatJumpModal({ isOpen, onClose }) {
                         >
                           <ExternalLink size={13} />
                         </a>
+                        <button
+                          type="button"
+                          onClick={item.jumpAlongside}
+                          className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)] hover:text-white px-2 py-1 rounded-lg border border-[var(--accent)]/35 hover:border-[var(--accent)] transition cursor-pointer"
+                          title="Open alongside current text in parallel column / adjacent tab"
+                        >
+                          <Columns size={12} />
+                          <span>Alongside</span>
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {

@@ -19,7 +19,7 @@ import {
   RotateCcw,
   Check,
 } from 'lucide-react';
-import { useThemeSettings } from '../context/ThemeSettingsContext';
+import { useThemeSettings, getDefaultTranslationSlotColor } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
 
 export const TRANSLATIONS = [
@@ -275,6 +275,28 @@ export default function LanguageMenu() {
     );
   }, [translationOrder, settings.translations]);
 
+  const enabledTransSlotMap = useMemo(() => {
+    const map = new Map();
+    let slot = 0;
+    for (const id of enabledLangIds) {
+      if (id !== 'pali') {
+        map.set(id, slot++);
+      }
+    }
+    return map;
+  }, [enabledLangIds]);
+
+  const getDefaultSlotColor = (trans) => {
+    if (!trans) return '#6d28d9';
+    if (trans.id !== 'pali' && enabledTransSlotMap.has(trans.id)) {
+      return getDefaultTranslationSlotColor(
+        settings.theme || 'classic',
+        enabledTransSlotMap.get(trans.id)
+      );
+    }
+    return trans.color || '#8b2500';
+  };
+
   const handleApplyThemeAwareColors = (mode = 'all') => {
     const currentColors = { ...(settings.translationColors || {}) };
     const theme = settings.theme || 'classic';
@@ -313,7 +335,7 @@ export default function LanguageMenu() {
   }, [translationOrder]);
 
   const translationDisplayMode = settings.translationDisplayMode || 'stack';
-  const translationGranularity = settings.translationGranularity || 'para';
+  const translationGranularity = settings.translationGranularity || 'sentence';
 
   const applyToggleTranslation = (tId) => {
     const item = TRANSLATIONS.find((t) => t.id === tId);
@@ -585,6 +607,19 @@ export default function LanguageMenu() {
                     <span className="block text-xs font-semibold text-[var(--text-primary)]">Show left border colors for translations</span>
                     </span>
                   </label>
+                  <label className="flex items-center gap-2.5 px-3 py-2 mt-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.showBookLinks !== false}
+                      onChange={(e) => updateSetting('showBookLinks', e.target.checked)}
+                      className="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer shrink-0"
+                      aria-label="Show Linked Definitions (M ↔ A ↔ Ṭ)"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-[var(--text-primary)]">Show Linked Definitions (M ↔ A ↔ Ṭ)</span>
+                      <span className="block text-[10px] text-[var(--text-muted)]">Inline commentary &amp; root links below lines</span>
+                    </span>
+                  </label>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <button
                       type="button"
@@ -668,11 +703,11 @@ export default function LanguageMenu() {
                             : 'bg-[var(--bg-secondary)]/50 border-[var(--border-color)]/60 opacity-75'
                         }`}
                       >
-                        {/* Language color indicator bar matching custom or default border (hidden when borders are disabled) */}
+                        {/* Language color indicator bar matching custom or theme slot default (hidden when borders are disabled) */}
                         {settings.showTranslationBorders !== false && (
                           <span
                             className="w-1 self-stretch rounded-full shrink-0"
-                            style={{ backgroundColor: isDisabled ? '#9ca3af' : (formatCssColor(settings.translationColors?.[trans.id]?.border) || trans.color) }}
+                            style={{ backgroundColor: isDisabled ? '#9ca3af' : (formatCssColor(settings.translationColors?.[trans.id]?.border) || getDefaultSlotColor(trans)) }}
                             title={`Color: ${trans.label}`}
                           />
                         )}
@@ -774,12 +809,13 @@ export default function LanguageMenu() {
                 type="button"
                 onClick={() => {
                   updateSetting('translationDisplayMode', 'stack');
-                  updateSetting('translationGranularity', 'para');
-                  updateSetting('showTranslationBorders', true);
+                  updateSetting('translationGranularity', 'sentence');
+                  updateSetting('showTranslationBorders', false);
+                  updateSetting('showBookLinks', true);
                   handleResetEnabledColors();
                 }}
                 className="px-4 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-bold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5"
-                title="Reset to defaults: Stacked layout, paragraph unit, borders on, default colors"
+                title="Reset to defaults: Stacked layout, sentence unit, borders off, default colors"
               >
                 <RotateCcw size={12} />
                 Restore default
@@ -907,9 +943,10 @@ export default function LanguageMenu() {
               {/* Live Preview Card */}
               {(() => {
                 const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
-                const activeBorder = langColors.border || colorPickerTarget.color || '#8b2500';
+                const slotDefault = getDefaultSlotColor(colorPickerTarget);
+                const activeBorder = langColors.border || slotDefault || '#8b2500';
                 const activeBg = langColors.bg || '';
-                const activeText = langColors.text || '';
+                const activeText = langColors.text || (colorPickerTarget.id !== 'pali' ? slotDefault : '');
 
                 return (
                   <div>
@@ -1013,6 +1050,7 @@ export default function LanguageMenu() {
                 const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
                 const activeText = langColors.text || '';
                 const isPali = colorPickerTarget.id === 'pali';
+                const slotDefault = isPali ? '#1e293b' : getDefaultSlotColor(colorPickerTarget);
                 const textLabel = isPali ? 'Pāḷi Text Color' : 'Translation Text Color';
                 return (
                   <div>
@@ -1020,7 +1058,7 @@ export default function LanguageMenu() {
                       <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
                         <span
                           className="w-2.5 h-2.5 rounded-full border border-black/20 inline-block shrink-0"
-                          style={{ backgroundColor: formatCssColor(activeText) || '#1e293b' }}
+                          style={{ backgroundColor: formatCssColor(activeText) || slotDefault }}
                         />
                         {textLabel}
                       </span>
@@ -1037,7 +1075,7 @@ export default function LanguageMenu() {
                     <div className="flex items-center gap-2 mb-2">
                       <input
                         type="color"
-                        value={toValidHex(activeText, '#1e293b')}
+                        value={toValidHex(activeText, slotDefault)}
                         onChange={(e) => updateLangColors(colorPickerTarget.id, { text: e.target.value })}
                         className="w-8 h-8 rounded-lg cursor-pointer border border-[var(--border-color)] bg-transparent p-0.5 shrink-0"
                         title="Pick text color"
@@ -1045,7 +1083,7 @@ export default function LanguageMenu() {
                       <input
                         type="text"
                         value={activeText}
-                        placeholder="Default or #hex (e.g. #1e293b)"
+                        placeholder={isPali ? 'Default or #hex (e.g. #1e293b)' : `Default (${slotDefault}) or #hex`}
                         onChange={(e) => updateLangColors(colorPickerTarget.id, { text: e.target.value })}
                         className="flex-1 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition"
                       />
@@ -1078,7 +1116,8 @@ export default function LanguageMenu() {
               {/* 3. Border-Left Color (hidden when borders are disabled) */}
               {settings.showTranslationBorders !== false && (() => {
                 const langColors = settings.translationColors?.[colorPickerTarget.id] || {};
-                const activeBorder = langColors.border || colorPickerTarget.color || '#8b2500';
+                const slotDefault = getDefaultSlotColor(colorPickerTarget);
+                const activeBorder = langColors.border || slotDefault || '#8b2500';
                 return (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -1102,7 +1141,7 @@ export default function LanguageMenu() {
                     <div className="flex items-center gap-2 mb-2">
                       <input
                         type="color"
-                        value={toValidHex(activeBorder, colorPickerTarget.color || '#8b2500')}
+                        value={toValidHex(activeBorder, slotDefault || '#8b2500')}
                         onChange={(e) => updateLangColors(colorPickerTarget.id, { border: e.target.value })}
                         className="w-8 h-8 rounded-lg cursor-pointer border border-[var(--border-color)] bg-transparent p-0.5 shrink-0"
                         title="Pick border-left color"
@@ -1110,7 +1149,7 @@ export default function LanguageMenu() {
                       <input
                         type="text"
                         value={activeBorder}
-                        placeholder={`Default or #hex (${colorPickerTarget.color || '#8b2500'})`}
+                        placeholder={`Default or #hex (${slotDefault || '#8b2500'})`}
                         onChange={(e) => updateLangColors(colorPickerTarget.id, { border: e.target.value })}
                         className="flex-1 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition"
                       />

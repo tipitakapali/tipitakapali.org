@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { fetchDictionaryLookup, fetchDictionaryInflection, getFeedbackTemplateFromDb } from '../services/api';
 import { convertAnyToRoman, cleanDictionaryQuery } from '../services/transliterate';
 import { restoreMinifiedLinks } from '../services/dpdFeedback';
+import { useThemeSettings } from './ThemeSettingsContext';
+import { normalizeLangCode } from './TabContext';
 
 export const AVAILABLE_DICTIONARIES = [
   {
@@ -13,6 +15,14 @@ export const AVAILABLE_DICTIONARIES = [
     badge: 'Primary',
     badgeClass: 'bg-[var(--accent-light)] text-[var(--accent)]',
     desc: 'Over 90,000+ entries with complete grammar, roots, case inflections and compounds.',
+  },
+  {
+    id: 'bold_def',
+    label: 'Bold Definition',
+    shortLabel: 'Bold Def',
+    badge: 'Tipiṭaka',
+    badgeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+    desc: 'Pāḷi bold-highlighted definitions across Mūla, Aṭṭhakathā, and Ṭīkā with context & translations.',
   },
   {
     id: 'abd',
@@ -67,8 +77,8 @@ const STORAGE_KEYS = {
   LOOKUP_HISTORY: 'tipitaka_dict_lookup_history',
 };
 
-export const DEFAULT_DICT_ORDER = ['dpd', 'abd', 'pts', 'psd', 'sans', 'splitter'];
-export const DEFAULT_DICT_ENABLED = { dpd: true, abd: true, pts: true, psd: true, sans: true, splitter: true };
+export const DEFAULT_DICT_ORDER = ['dpd', 'bold_def', 'abd', 'pts', 'psd', 'sans', 'splitter'];
+export const DEFAULT_DICT_ENABLED = { dpd: true, bold_def: true, abd: true, pts: true, psd: true, sans: true, splitter: true };
 
 export function getTopDictWithMeaning(order, enabled, lookupData) {
   const activeOrder = (order || DEFAULT_DICT_ORDER).filter((id) => enabled?.[id] !== false);
@@ -89,6 +99,12 @@ export function getTopDictWithMeaning(order, enabled, lookupData) {
 const DictionaryContext = createContext(null);
 
 export function DictionaryProvider({ children }) {
+  const { settings } = useThemeSettings();
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
@@ -389,12 +405,30 @@ export function DictionaryProvider({ children }) {
     const romanWord = convertAnyToRoman(sanitizedInput).trim().toLowerCase();
     const cleanWord = (romanWord || sanitizedInput.trim().toLowerCase()).replace(/ṁ/g, 'ṃ');
 
+    // Collect active non-Pāḷi translation language codes for Bold Definition translations
+    const activeTransLangs = [];
+    const transMap = settingsRef.current?.translations || {};
+    const transOrder = settingsRef.current?.translationOrder || Object.keys(transMap);
+    const seenLangs = new Set();
+    for (const key of [...transOrder, ...Object.keys(transMap)]) {
+      if (key === 'pali' || !transMap[key]) continue;
+      const code = normalizeLangCode(key);
+      if (code && code !== 'pali' && !seenLangs.has(code)) {
+        seenLangs.add(code);
+        activeTransLangs.push(code);
+      }
+    }
+    const boldEnabled = dictEnabledRef.current?.bold_def !== false;
+    const boldContextKey = `${boldEnabled ? '1' : '0'}:${activeTransLangs.join(',')}`;
+
     // Repeat lookup of the word already displayed (e.g. clicking "dhamma" again):
     // show the cached results instantly with zero state churn — no loading flash,
     // no history duplicate, no in-flight abort, no tab/content motion.
-    // (An in-flight first request, if any, is left alone to complete normally.)
-    // Header labels still follow the clicked form; the results body is untouched.
-    if (lookupDataRef.current?.word === cleanWord) {
+    // Re-run if active translation languages or bold_def enabled state changed.
+    if (
+      lookupDataRef.current?.word === cleanWord &&
+      lookupDataRef.current?._boldContextKey === boldContextKey
+    ) {
       setQueryWord(cleanWord);
       setDisplayWord(rawDisplay);
       if (addToHistoryStack) {
@@ -445,17 +479,23 @@ export function DictionaryProvider({ children }) {
     }
 
     try {
-      // ── Parallel lookup: fire DPD and secondary dictionaries together ──
+      // ── Parallel lookup: fire DPD, secondary dictionaries, and Bold Definition together ──
       const dpdPromise = fetchDictionaryLookup(cleanWord, 'dpd', { signal });
       const othersPromise = fetchDictionaryLookup(cleanWord, 'others', { signal });
+      const boldPromise = boldEnabled
+        ? fetchDictionaryLookup(cleanWord, 'bold_def', { signal, langs: activeTransLangs })
+        : Promise.resolve({ results: [] });
       setIsBackgroundLoading(true);
 
       const mergedData = {
         word: cleanWord,
+        _boldContextKey: boldContextKey,
         hasResults: false,
         synonyms: [],
-        counts: { dpd: 0, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
+        bold_def_prefix: '',
+        counts: { dpd: 0, bold_def: 0, pts: 0, abd: 0, psd: 0, sans: 0, splitter: 0 },
         dpd: [],
+        bold_def: [],
         pts: [],
         abd: [],
         psd: [],
@@ -465,6 +505,7 @@ export function DictionaryProvider({ children }) {
 
       let dpdDone = false;
       let othersDone = false;
+      let boldDone = false;
 
       const handleUpdate = () => {
         if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
@@ -479,7 +520,7 @@ export function DictionaryProvider({ children }) {
 
         setLookupData({ ...mergedData });
 
-        if (dpdDone && othersDone) {
+        if (dpdDone && othersDone && boldDone) {
           setIsLoading(false);
           setIsBackgroundLoading(false);
 
@@ -489,13 +530,23 @@ export function DictionaryProvider({ children }) {
           return;
         }
 
-        // Partial update when one of the two requests has finished
+        // Partial update when one of the requests has finished
         if (currentTopDict === 'dpd') {
           if (dpdDone) {
             setIsLoading(false);
             if (mergedData.counts.dpd > 0) {
               setActiveDictTab('dpd');
             }
+          }
+        } else if (currentTopDict === 'bold_def') {
+          if (boldDone) {
+            setIsLoading(false);
+            if (mergedData.counts.bold_def > 0) {
+              setActiveDictTab('bold_def');
+            }
+          } else if (dpdDone) {
+            setIsLoading(false);
+            setActiveDictTab('bold_def');
           }
         } else {
           // Top dictionary is in others (pts, abd, psd, sans, splitter)
@@ -505,9 +556,6 @@ export function DictionaryProvider({ children }) {
               setActiveDictTab(currentTopDict);
             }
           } else if (dpdDone) {
-            // DPD finished first, but user's top dictionary is in others (e.g. PTS).
-            // Do NOT force switch to DPD; keep activeDictTab as currentTopDict
-            // so user sees "Loading [PTS] results..." until others finishes.
             setIsLoading(false);
             setActiveDictTab(currentTopDict);
           }
@@ -570,11 +618,27 @@ export function DictionaryProvider({ children }) {
           handleUpdate();
         });
 
-      const [dpdRes, othersRes] = await Promise.allSettled([dpdPromise, othersPromise]);
+      boldPromise
+        .then((boldData) => {
+          if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
+          const boldList = Array.isArray(boldData?.results) ? boldData.results : [];
+          mergedData.bold_def = boldList;
+          mergedData.counts.bold_def = boldList.length;
+          mergedData.bold_def_prefix = boldData?.search_prefix || boldData?.bold_def_prefix || '';
+          boldDone = true;
+          handleUpdate();
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          boldDone = true;
+          handleUpdate();
+        });
+
+      const [dpdRes, othersRes, boldRes] = await Promise.allSettled([dpdPromise, othersPromise, boldPromise]);
       if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
 
-      if (dpdRes.status === 'rejected' && othersRes.status === 'rejected') {
-        const err = dpdRes.reason || othersRes.reason;
+      if (dpdRes.status === 'rejected' && othersRes.status === 'rejected' && boldRes.status === 'rejected') {
+        const err = dpdRes.reason || othersRes.reason || boldRes.reason;
         console.warn('Dictionary lookup error:', err);
         setError(err?.message || 'Dictionary lookup failed');
       }

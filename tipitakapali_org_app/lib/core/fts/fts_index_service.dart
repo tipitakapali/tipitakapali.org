@@ -5,6 +5,8 @@ import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
+import '../services/tipitaka_core_reader.dart';
+
 enum FtsBuildStage { preparing, indexing, optimizing, compacting, completed }
 
 class FtsBuildProgress {
@@ -417,9 +419,15 @@ class FtsIndexService {
     );
     emitter.emitInitial();
 
+    final hasTextPack = TipitakaCoreReader.tableAndViewNames(coreDb)
+        .contains('chapter_text_pack');
+    String? cachedBook;
+    int? cachedChap;
+    Map<int, String> cachedChapTexts = const {};
+
     final selectStmt = coreDb.prepare(
-      'SELECT book_code, para_index, para_num, rend, pali_text '
-      'FROM canon_paragraphs ORDER BY book_code, para_index',
+      'SELECT book_code, chapter_index, para_index, para_num, rend, pali_text '
+      'FROM canon_paragraphs ORDER BY book_code, chapter_index, para_index',
     );
     try {
       final cursor = selectStmt.selectCursor();
@@ -429,13 +437,27 @@ class FtsIndexService {
           scanned++;
           final r = cursor.current;
           final code = (r['book_code'] ?? '').toString();
+          final cIdx = (r['chapter_index'] as num?)?.toInt() ?? 0;
+          final pIdx = (r['para_index'] as num?)?.toInt() ?? 0;
+          var rawText = r['pali_text']?.toString();
+          if ((rawText == null || rawText.isEmpty) && hasTextPack) {
+            if (code != cachedBook || cIdx != cachedChap) {
+              cachedBook = code;
+              cachedChap = cIdx;
+              cachedChapTexts = TipitakaCoreReader.readChapterPaliTexts(
+                coreDb,
+                code,
+                cIdx,
+              );
+            }
+            rawText = cachedChapTexts[pIdx];
+          }
           final meta = booksMeta[code];
-          final clean = cleanParagraphText((r['pali_text'] ?? '').toString());
+          final clean = cleanParagraphText((rawText ?? '').toString());
           if (clean.isEmpty) {
             emitter.maybeEmit(scanned);
             continue;
           }
-          final pIdx = (r['para_index'] as num?)?.toInt() ?? 0;
           final pNum = (r['para_num'] ?? '').toString();
           final rend = (r['rend'] ?? 'bodytext').toString();
           insertStmt.execute([

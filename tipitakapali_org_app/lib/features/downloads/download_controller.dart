@@ -61,6 +61,7 @@ class DownloadCenterState {
   final bool onboardingInterrupted;
 
   static const _defaultOptionalIds = {
+    'translation_en',
     'dpd_tipitakapali',
     'dpd_splitter',
     'dpd_inflection',
@@ -79,7 +80,7 @@ class DownloadCenterState {
     this.releaseWarning,
     this.installedDbs = const {},
     this.transfers = const {},
-    this.selectedLanguageCode = DownloadController.noLanguageCode,
+    this.selectedLanguageCode = DownloadController.defaultLanguageCode,
     this.selectedPaliScript = DownloadController.defaultPaliScript,
     this.selectedOptionalIds = _defaultOptionalIds,
     this.dbDirectoryPath,
@@ -210,6 +211,7 @@ final downloadControllerProvider =
 
 class DownloadController extends Notifier<DownloadCenterState> {
   static const noLanguageCode = 'none';
+  static const defaultLanguageCode = 'en';
   static const defaultPaliScript = 'roman';
   static const _prefLanguageCode = 'selected_language_code';
   static const _prefPaliScript = 'selected_pali_script';
@@ -250,7 +252,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_disposed) return;
-      final savedLang = prefs.getString(_prefLanguageCode) ?? noLanguageCode;
+      final savedLang = prefs.getString(_prefLanguageCode) ?? defaultLanguageCode;
       final savedScript =
           PaliScript.fromId(prefs.getString(_prefPaliScript)).webId;
 

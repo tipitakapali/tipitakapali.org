@@ -5,15 +5,38 @@ export const ENABLE_CLIENT_CACHE = true;
 const cache = new Map();
 const pendingRequests = new Map();
 
+function makeAbortError() {
+  const err = new Error('Aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+function raceWithSignal(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(makeAbortError());
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(makeAbortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (val) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(val);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      }
+    );
+  });
+}
+
 async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) {
   if (signal?.aborted) {
-    const err = new Error('Aborted');
-    err.name = 'AbortError';
-    throw err;
+    throw makeAbortError();
   }
 
   if (!ENABLE_CLIENT_CACHE) {
-    return fetcher();
+    return raceWithSignal(fetcher(), signal);
   }
 
   const cached = cache.get(key);
@@ -22,7 +45,7 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) 
   }
 
   if (pendingRequests.has(key)) {
-    return pendingRequests.get(key);
+    return raceWithSignal(pendingRequests.get(key), signal);
   }
 
   const promise = fetcher()
@@ -37,7 +60,7 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) 
     });
 
   pendingRequests.set(key, promise);
-  return promise;
+  return raceWithSignal(promise, signal);
 }
 
 // Book Code to Info Index Map (Title, Nikaya, Category)
@@ -270,7 +293,14 @@ const matStaticMapCache = new Map();
 const matStaticMapPending = new Map();
 const MAT_STATIC_MAP_TTL = 24 * 60 * 60 * 1000;
 
+function isLocalDynamicHost() {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === '127.0.0.1' || h === 'localhost';
+}
+
 async function fetchMatStaticMap(cleanCode, mapName) {
+  if (isLocalDynamicHost()) return null;
   const key = `${mapName}_${cleanCode}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = matStaticMapCache.get(key);
@@ -551,6 +581,11 @@ export async function fetchDictionaryLookup(word, dictType = 'all', options = {}
   params.set('w', cleanWord);
   if (dictType && dictType !== 'all') params.set('dict', dictType);
   if (options.useSplitter) params.set('d', 'yes');
+  if (Array.isArray(options.langs) && options.langs.length > 0) {
+    params.set('langs', options.langs.filter(Boolean).join(','));
+  } else if (typeof options.langs === 'string' && options.langs.trim()) {
+    params.set('langs', options.langs.trim());
+  }
 
   const qs = params.toString();
   const cacheKey = `dict_${qs}`;
@@ -576,6 +611,10 @@ export async function fetchDPDLookup(word, options = {}) {
 
 export async function fetchOthersLookup(word, options = {}) {
   return fetchDictionaryLookup(word, 'others', options);
+}
+
+export async function fetchBoldDefinitionLookup(word, options = {}) {
+  return fetchDictionaryLookup(word, 'bold_def', options);
 }
 
 /**
@@ -636,6 +675,7 @@ const transStaticPending = new Map();
 const TRANS_STATIC_TTL = 24 * 60 * 60 * 1000;
 
 async function fetchBookTranslationStatic(cleanCode, lang) {
+  if (isLocalDynamicHost()) return null;
   const key = `trans_static_${cleanCode}_${lang}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = transStaticCache.get(key);
@@ -684,10 +724,12 @@ export async function fetchPaliSentences(bookCode) {
   const cacheKey = `pali_sent_${cleanCode}`;
 
   return cachedFetch(cacheKey, async () => {
-    try {
-      const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/pali_sentences.json`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+    if (!isLocalDynamicHost()) {
+      try {
+        const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/pali_sentences.json`);
+        if (res.ok) return await res.json();
+      } catch (_) {}
+    }
     try {
       const base = getApiBase();
       const res = await fetch(`${base}/api/book/${encodeURIComponent(cleanCode)}/pali_sentences`);
@@ -697,11 +739,25 @@ export async function fetchPaliSentences(bookCode) {
   }, 24 * 60 * 60 * 1000);
 }
 
+export function getCachedPaliSentences(bookCode, chapterIndex = null) {
+  if (!ENABLE_CLIENT_CACHE || !bookCode) return null;
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+  const cached = cache.get(`pali_sent_${cleanCode}`);
+  if (!cached || !cached.data) return null;
+  if (chapterIndex !== null && chapterIndex !== undefined) {
+    return cached.data?.chapters?.[String(chapterIndex)] || null;
+  }
+  return cached.data;
+}
+
 // Sentence-split payload for sentence display mode. Static per-book file
 // `<lang>.sentences.json` (written by export_static_cloudflare.py) first,
 // VPS `?sentences=1` fallback (also covers local dev). Same book+lang cache
 // pattern as fetchBookTranslationStatic; only fetched on demand.
 async function fetchBookTranslationSentencesStatic(cleanCode, lang) {
+  if (isLocalDynamicHost()) return null;
   const key = `trans_sent_static_${cleanCode}_${lang}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = transStaticCache.get(key);
@@ -741,6 +797,24 @@ function isNissayaLang(lang) {
   return /_nissaya$/i.test(String(lang || '').trim());
 }
 
+function getChapterTransCompositeCacheKey(cleanCode, chapterIndex, langArr, sentencesMode) {
+  return `chapter_trans_resolved_${cleanCode}_ch${chapterIndex}_${langArr.join(',')}_${sentencesMode ? 'sent' : 'para'}`;
+}
+
+export function getCachedChapterTranslations(bookCode, chapterIndex, requestedLangs = [], options = {}) {
+  if (!ENABLE_CLIENT_CACHE || !bookCode) return null;
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+  const langArr = Array.isArray(requestedLangs)
+    ? requestedLangs.filter(Boolean)
+    : (requestedLangs ? String(requestedLangs).split(',').map((s) => s.trim()).filter(Boolean) : []);
+  if (langArr.length === 0) return null;
+  const compKey = getChapterTransCompositeCacheKey(cleanCode, chapterIndex, langArr, Boolean(options.sentences));
+  const cached = cache.get(compKey);
+  return cached?.data || null;
+}
+
 export async function fetchChapterTranslations(bookCode, chapterIndex, requestedLangs = [], options = {}) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -751,6 +825,14 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
     : (requestedLangs ? String(requestedLangs).split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (langArr.length === 0) {
     return { book_code: cleanCode, chapter_index: chapterIndex, languages: [], translations: {} };
+  }
+
+  const compKey = getChapterTransCompositeCacheKey(cleanCode, chapterIndex, langArr, Boolean(options.sentences));
+  if (ENABLE_CLIENT_CACHE) {
+    const hit = cache.get(compKey);
+    if (hit && Date.now() - hit.timestamp < 60 * 60 * 1000) {
+      return hit.data;
+    }
   }
 
   const translations = {};
@@ -841,5 +923,115 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
 
   const result = { book_code: cleanCode, chapter_index: chapterIndex, languages: langArr, translations };
   if (options.sentences) result.sentences = sentences;
+  if (ENABLE_CLIENT_CACHE) {
+    cache.set(compKey, { data: result, timestamp: Date.now() });
+  }
   return result;
+}
+
+export function getCachedChapterLinks(bookCode, chapterIndex) {
+  if (!ENABLE_CLIENT_CACHE || !bookCode || chapterIndex === undefined || chapterIndex === null) return null;
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+  const cached = cache.get(`chapter_links_${cleanCode}_ch${chapterIndex}`);
+  return cached?.data?.paragraphs || null;
+}
+
+export async function fetchChapterLinks(bookCode, chapterIndex, options = {}) {
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+  if (!cleanCode || chapterIndex === undefined || chapterIndex === null) {
+    return { book_code: cleanCode || '', chapter_index: chapterIndex ?? 0, paragraphs: {} };
+  }
+
+  const cacheKey = `chapter_links_${cleanCode}_ch${chapterIndex}`;
+  const base = getApiBase();
+
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = timeoutCtrl ? setTimeout(() => timeoutCtrl.abort(), 15000) : null;
+      try {
+        const res = await fetch(
+          `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/links`,
+          timeoutCtrl ? { signal: timeoutCtrl.signal } : undefined
+        );
+        if (!res.ok) {
+          return { book_code: cleanCode, chapter_index: chapterIndex, paragraphs: {} };
+        }
+        return await res.json();
+      } catch (err) {
+        return { book_code: cleanCode, chapter_index: chapterIndex, paragraphs: {} };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+    30 * 60 * 1000,
+    options.signal
+  );
+}
+
+export async function fetchLinkedPreview(
+  { book, chapter, paraIndex, paraNum, lineId, word, langs } = {},
+  options = {}
+) {
+  let cleanCode = splitScriptCode((book || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+  if (!cleanCode) return null;
+
+  const params = new URLSearchParams();
+  params.set('book', cleanCode);
+  if (chapter !== undefined && chapter !== null) params.set('chapter', String(chapter));
+  if (paraIndex !== undefined && paraIndex !== null) params.set('paraIndex', String(paraIndex));
+  if (paraNum !== undefined && paraNum !== null && String(paraNum).trim() !== '') {
+    params.set('paraNum', String(paraNum));
+  }
+  if (lineId !== undefined && lineId !== null) params.set('lineId', String(lineId));
+  if (word) params.set('word', String(word));
+  if (Array.isArray(langs) && langs.length > 0) {
+    params.set('langs', langs.filter(Boolean).join(','));
+  } else if (typeof langs === 'string' && langs.trim()) {
+    params.set('langs', langs.trim());
+  }
+
+  const qs = params.toString();
+  const base = getApiBase();
+
+  return cachedFetch(
+    `linked_preview_${qs}`,
+    async () => {
+      const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = timeoutCtrl ? setTimeout(() => timeoutCtrl.abort(), 15000) : null;
+      try {
+        const res = await fetch(
+          `${base}/api/links/preview?${qs}`,
+          timeoutCtrl ? { signal: timeoutCtrl.signal } : undefined
+        );
+        if (!res.ok) {
+          let msg = `Linked preview not found for ${cleanCode} (HTTP ${res.status})`;
+          try {
+            const errJson = await res.json();
+            if (errJson?.error) msg = errJson.error;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+        return await res.json();
+      } catch (err) {
+        if (err?.name === 'AbortError') {
+          throw new Error('Timed out while loading linked passage.');
+        }
+        throw err;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+    30 * 60 * 1000,
+    options.signal
+  );
 }

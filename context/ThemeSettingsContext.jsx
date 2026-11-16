@@ -94,9 +94,13 @@ const DEFAULT_SETTINGS = {
   dictLookupTrigger: 'single', // 'single' | 'double'
   defaultEditionPage: 'M', // 'M' (Myanmar) | 'V' (VRI) | 'P' (PTS) | 'T' (Thai) | 'all' (All editions)
   openMatInNewWindow: false,
+  openMatInNewColumn: false,
+  tabView: 'columns', // 'single' | 'tabbed' | 'columns'
+  syncScroll: false,
+  showBookLinks: true,
   translations: {
     pali: true,
-    english: false,
+    english: true,
     vietnamese: false,
     myanmar: false,
     sinhala: false,
@@ -122,9 +126,9 @@ const DEFAULT_SETTINGS = {
   },
   translationOrder: [...DEFAULT_TRANSLATION_ORDER],
   translationDisplayMode: 'stack', // 'stack' (Vertical) | 'side' (Pali left) | 'side_rev' (Translation left)
-  translationGranularity: 'para', // 'para' (paragraph) | 'sentence' (sentence lines)
+  translationGranularity: 'sentence', // 'para' (paragraph) | 'sentence' (sentence lines)
   translationColors: {},
-  showTranslationBorders: true,
+  showTranslationBorders: false,
   translationFontSize: null, // null = same size as Pāḷi (fontSize)
 };
 
@@ -174,7 +178,7 @@ export function ThemeSettingsProvider({ children }) {
             merged.translationDisplayMode = 'stack';
           }
           if (!['para', 'sentence'].includes(merged.translationGranularity)) {
-            merged.translationGranularity = 'para';
+            merged.translationGranularity = 'sentence';
           }
           merged.translationColors =
             merged.translationColors && typeof merged.translationColors === 'object'
@@ -190,10 +194,14 @@ export function ThemeSettingsProvider({ children }) {
           if (!hasAnyActive) {
             merged.translations.pali = true;
           }
-          // If the user hasn't explicitly customized openMatInNewWindow, apply device-responsive default:
-          // Computer browser -> true (new browser tab), Mobile device -> false (in-app tab)
+          if (!['single', 'tabbed', 'columns'].includes(merged.tabView)) {
+            merged.tabView = 'columns';
+          }
+          if (typeof merged.syncScroll !== 'boolean') {
+            merged.syncScroll = false;
+          }
           if (!parsed.openMatInNewWindowExplicit) {
-            merged.openMatInNewWindow = isComputerBrowser();
+            merged.openMatInNewWindow = false;
           }
 
           // If fontFamily was legacy default 'gentium' without explicit customization, or unsupported/empty, set to 'default'
@@ -207,12 +215,6 @@ export function ThemeSettingsProvider({ children }) {
           } catch (e) {}
           return merged;
         });
-      } else {
-        // No saved settings: apply responsive default for computer vs mobile
-        setSettingsState((prev) => ({
-          ...prev,
-          openMatInNewWindow: isComputerBrowser(),
-        }));
       }
     } catch (e) {
       console.error('Error loading settings from localStorage:', e);
@@ -369,6 +371,84 @@ export function ThemeSettingsProvider({ children }) {
       {children}
     </ThemeSettingsContext.Provider>
   );
+}
+
+export const THEME_TRANSLATION_PALETTES = {
+  classic: [
+    '#6d28d9', // 1st: Violet 700 (requested)
+    '#1e3a8a', // 2nd: Navy Blue 900 (requested)
+    '#0e7491', // 3rd: Deep Teal Cyan (requested)
+    '#166534', // 4th: Forest Emerald
+    '#9a3412', // 5th: Burnt Sienna
+    '#9d174d', // 6th: Deep Rose Berry
+    '#3f6212', // 7th: Olive Moss
+    '#334155', // 8th: Cool Slate
+  ],
+  default: [
+    '#6d28d9', // 1st: Violet 700
+    '#1e3a8a', // 2nd: Navy Blue 900
+    '#0e7491', // 3rd: Deep Teal Cyan
+    '#15803d', // 4th: Emerald 700
+    '#9a3412', // 5th: Rust Sienna
+    '#9d174d', // 6th: Berry Rose
+    '#4338ca', // 7th: Indigo 700
+    '#334155', // 8th: Slate 700
+  ],
+  sepia: [
+    '#6d28d9', // 1st: Amethyst Violet
+    '#1e40af', // 2nd: Cobalt Blue
+    '#0f766e', // 3rd: Jade Teal
+    '#854d0e', // 4th: Ochre Bronze
+    '#9f1239', // 5th: Carmine Rose
+    '#166534', // 6th: Bodhi Green
+    '#9a3412', // 7th: Terracotta
+    '#3730a3', // 8th: Deep Indigo
+  ],
+  dark: [
+    '#c4b5fd', // 1st: Soft Lavender Violet
+    '#93c5fd', // 2nd: Periwinkle Sky
+    '#67e8f9', // 3rd: Lagoon Cyan
+    '#86efac', // 4th: Sage Mint
+    '#fdba74', // 5th: Warm Apricot
+    '#f9a8d4', // 6th: Blossom Rose
+    '#fcd34d', // 7th: Soft Amber
+    '#cbd5e1', // 8th: Silver Mist
+  ],
+  oled: [
+    '#d8b4fe', // 1st: Orchid Violet
+    '#93c5fd', // 2nd: Ice Blue
+    '#67e8f9', // 3rd: Aqua Mist
+    '#6ee7b7', // 4th: Spring Emerald
+    '#fed7aa', // 5th: Warm Sand
+    '#f9a8d4', // 6th: Rosewater
+    '#fde68a', // 7th: Buttercream
+    '#e2e8f0', // 8th: Moonlight Slate
+  ],
+  dusk: [
+    '#bd93f9', // 1st: Dracula Purple
+    '#8be9fd', // 2nd: Dracula Cyan
+    '#5eead4', // 3rd: Seafoam Teal
+    '#a7f3d0', // 4th: Calm Mint
+    '#ffb86c', // 5th: Dracula Orange
+    '#ff92df', // 6th: Soft Dracula Pink
+    '#f1fa8c', // 7th: Dracula Soft Yellow
+    '#cdd6f4', // 8th: Lavender Mist
+  ],
+};
+
+export function getDefaultTranslationSlotColor(theme = 'classic', slotIndex = 0) {
+  const palette = THEME_TRANSLATION_PALETTES[theme] || THEME_TRANSLATION_PALETTES.classic;
+  const idx = ((Number(slotIndex) || 0) % palette.length + palette.length) % palette.length;
+  return palette[idx];
+}
+
+export function getDefaultTranslationColorsForTheme(theme = 'classic', slotIndex = 0) {
+  const color = getDefaultTranslationSlotColor(theme, slotIndex);
+  return {
+    text: color,
+    border: color,
+    bg: '',
+  };
 }
 
 export function useThemeSettings() {

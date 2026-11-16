@@ -1,18 +1,26 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
-import { Bookmark, BookmarkCheck, History } from 'lucide-react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, memo } from 'react';
+import { Bookmark, BookmarkCheck, History, X, Columns } from 'lucide-react';
 import WelcomeView from './WelcomeView';
 import MeditationLoader from './MeditationLoader';
 import BookTocView from './BookTocView';
+import LinkedDefinitionModal from './LinkedDefinitionModal';
 import AiChatView from '../AiChat/AiChatView';
 import { useTabs } from '../../context/TabContext';
-import { useThemeSettings } from '../../context/ThemeSettingsContext';
+import { useThemeSettings, getDefaultTranslationColorsForTheme } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
 
 import { transliterateHtml, convertPaliScript, highlightHtmlText, highlightTranslationText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
 import { smartScrollTo } from '../../services/scroll';
-import { fetchChapterTranslations, fetchPaliSentences } from '../../services/api';
+import {
+  fetchChapterTranslations,
+  fetchPaliSentences,
+  fetchChapterLinks,
+  getCachedChapterTranslations,
+  getCachedPaliSentences,
+  getCachedChapterLinks,
+} from '../../services/api';
 
 const TRANSLATION_METAS = {
   en: { label: 'English', flag: '🇬🇧' },
@@ -173,7 +181,7 @@ function formatTranslationContent(text, lang) {
         if (colonIdx > 0) {
           const pali = trimmed.substring(0, colonIdx).trim();
           const meaning = trimmed.substring(colonIdx + 2).trim();
-          return `<span class="reader-nissaya-pair"><strong class="reader-nissaya-pali">${escapeHtml(pali)}</strong><span class="reader-nissaya-sep">:</span> <span class="reader-nissaya-meaning">${formatInlineTags(meaning)}</span></span>`;
+          return `<span class="reader-nissaya-pair"><strong class="reader-nissaya-pali">${formatInlineTags(pali)}</strong><span class="reader-nissaya-sep">:</span> <span class="reader-nissaya-meaning">${formatInlineTags(meaning)}</span></span>`;
         }
         return `<span class="reader-nissaya-meaning">${formatInlineTags(trimmed)}</span>`;
       })
@@ -186,13 +194,32 @@ function formatTranslationContent(text, lang) {
   return formatInlineTags(text);
 }
 
+export function getSentenceDisplayFlags({
+  sentenceMode = false,
+  hasActiveTrans = false,
+  isPaliEnabled = true,
+  orderedLayers = [],
+  translationDisplayMode = 'stack',
+}) {
+  const effectiveSentenceMode = Boolean(sentenceMode && hasActiveTrans);
+  const isSideMode = translationDisplayMode === 'side' || translationDisplayMode === 'side_rev';
+  const transCount = orderedLayers.filter((l) => l.type === 'trans').length;
+  const isSideActive =
+    isSideMode && ((isPaliEnabled && hasActiveTrans) || (!isPaliEnabled && transCount >= 2));
+  return {
+    effectiveSentenceMode,
+    showSentenceNumbers: Boolean(effectiveSentenceMode && isSideActive),
+    isSideActive,
+  };
+}
+
 // Pāḷi sentence lines for sentence display mode. Replaces the inside of
-// prose <p data-para data-pindex> elements with numbered sentence spans
-// from the precomputed pali_sentences map (epitaka.db segmentation, shared
-// line numbers with translation line_ids), keeping the leading
+// prose <p data-para data-pindex> elements with sentence spans from the
+// precomputed pali_sentences map (epitaka.db segmentation, shared line
+// numbers with translation line_ids), keeping the leading
 // paragraph-number element and preserving all page break (<span class="pb">)
 // elements so that edition pagination, page jumps, and indicators work.
-function injectPaliSentencesIntoHtml(html, paliSentMap) {
+export function injectPaliSentencesIntoHtml(html, paliSentMap, { showSentenceNumbers = true } = {}) {
   if (!html || !paliSentMap) return html;
   // NOTE: keyed by data-pindex (para_index), NOT data-para — some paragraphs
   // (e.g. s0201m.mul ch0 p7) carry no data-para attribute at all.
@@ -315,7 +342,8 @@ function injectPaliSentencesIntoHtml(html, paliSentMap) {
         }
 
         const lid = line ?? '';
-        return `<span class="pali-sent" data-line="${lid}"><span class="pali-sent-num">${lid}</span><span class="pali-sent-text">${t}</span></span>`;
+        const numBadge = showSentenceNumbers ? `<span class="pali-sent-num">${lid}</span>` : '';
+        return `<span class="pali-sent" data-line="${lid}">${numBadge}<span class="pali-sent-text">${t}</span></span>`;
       })
       .filter(Boolean);
     if (numbered.length === 0) return full;
@@ -366,13 +394,13 @@ function extractClassSpans(html, cls) {
   return out;
 }
 
-// Strip the muted line-number badge from a sentence cell (the pair row
-// shows one shared gutter number instead).
+// Strip the muted line-number badge from a sentence cell (Stacked layout
+// never displays sentence number badges).
 function stripSentNumBadge(html) {
-  return String(html || '').replace(/<span class="(?:pali|trans)-sent-num"[^>]*>.*?<\/span>/, '');
+  return String(html || '').replace(/<span class="(?:pali|trans)-sent-num"[^>]*>[\s\S]*?<\/span>/g, '');
 }
 
-function injectTranslationsIntoHtml(
+export function injectTranslationsIntoHtml(
   html,
   translations,
   orderedLayers = [],
@@ -381,11 +409,19 @@ function injectTranslationsIntoHtml(
   translationColors = {},
   searchHighlight = null,
   sentenceMode = false,
-  transSentences = null
+  transSentences = null,
+  theme = 'classic'
 ) {
   if (!html) return html;
 
-  const hasTranslations = orderedLayers.some((l) => l.type === 'trans');
+  const transLayers = orderedLayers.filter((l) => l.type === 'trans');
+  const transSlotByKey = new Map();
+  transLayers.forEach((l, idx) => {
+    transSlotByKey.set(l.id, idx);
+    transSlotByKey.set(l.lang, idx);
+  });
+
+  const hasTranslations = transLayers.length > 0;
   const paliColors = translationColors?.pali || {};
   const hasCustomPaliColors = Boolean(
     formatCssColor(paliColors.border) ||
@@ -398,7 +434,17 @@ function injectTranslationsIntoHtml(
 
   const isSide = displayMode === 'side' || displayMode === 'side_rev';
   const isSwapped = displayMode === 'side_rev';
-  const isSideActive = isSide && ((isPaliEnabled && hasTranslations) || (!isPaliEnabled && orderedLayers.filter((l) => l.type === 'trans').length >= 2));
+  const {
+    effectiveSentenceMode,
+    showSentenceNumbers,
+    isSideActive,
+  } = getSentenceDisplayFlags({
+    sentenceMode,
+    hasActiveTrans: hasTranslations,
+    isPaliEnabled,
+    orderedLayers,
+    translationDisplayMode: displayMode,
+  });
 
   return html.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullMatch, pTag, pIndex) => {
     const paraMatch = pTag.match(/\bdata-para="([^"]+)"/i);
@@ -470,6 +516,7 @@ function injectTranslationsIntoHtml(
     for (const layer of orderedLayers) {
       if (layer.type === 'pali') {
         if (isPaliEnabled) {
+          const safePTag = showSentenceNumbers ? pTag : stripSentNumBadge(pTag);
           const isPaliInTopPosition = renderedItems.length === 0 && orderedLayers[0]?.type === 'pali';
           const isPaliTop = isPaliInTopPosition;
           const currentPaliColors = translationColors?.pali || {};
@@ -500,14 +547,14 @@ function injectTranslationsIntoHtml(
                 lang: 'pali',
                 html: `
       <div class="${topBlockClasses}" data-trans-lang="pali"${paliBlockStyles ? ` style="${paliBlockStyles}"` : ''}>
-        ${pTag}
+        ${safePTag}
       </div>`,
               });
             } else {
               renderedItems.push({
                 type: 'pali',
                 lang: 'pali',
-                html: pTag,
+                html: safePTag,
               });
             }
           } else {
@@ -525,7 +572,7 @@ function injectTranslationsIntoHtml(
               lang: 'pali',
               html: `
       <div class="reader-trans-block reader-pali-trans-block" data-trans-lang="pali"${paliBlockStyles ? ` style="${paliBlockStyles}"` : ''}>
-        ${pTag}
+        ${safePTag}
       </div>`,
             });
           }
@@ -535,7 +582,7 @@ function injectTranslationsIntoHtml(
         // Sentence mode may carry splits without the full paragraph text
         // (sentence files only) — splits alone are enough to render.
         const sentArr =
-          sentenceMode && transSentences ? transSentences[layer.lang]?.[pIndex] : null;
+          effectiveSentenceMode && transSentences ? transSentences[layer.lang]?.[pIndex] : null;
         const hasSentArr = Array.isArray(sentArr) && sentArr.length > 0;
         if ((trans && trans.trim()) || hasSentArr) {
           transCount++;
@@ -565,7 +612,10 @@ function injectTranslationsIntoHtml(
           let content;
           if (sentItems && sentItems.length > 1) {
             content = sentItems
-              .map((it) => `<span class="trans-sent" data-line="${it.line}"><span class="trans-sent-num">${it.line}</span><span class="trans-sent-text">${it.html}</span></span>`)
+              .map((it) => {
+                const numBadge = showSentenceNumbers ? `<span class="trans-sent-num">${it.line}</span>` : '';
+                return `<span class="trans-sent" data-line="${it.line}">${numBadge}<span class="trans-sent-text">${it.html}</span></span>`;
+              })
               .join('');
           } else if (sentItems && sentItems.length === 1) {
             content = sentItems[0].html;
@@ -608,11 +658,15 @@ function injectTranslationsIntoHtml(
             ...inheritedClasses,
           ].filter(Boolean).join(' ');
 
-          // Task 3: Dynamically apply custom colors for translation language
+          // Task 3: Dynamically apply custom colors or theme default slot palette for translation language
+          const slotIdx = transSlotByKey.has(layer.id)
+            ? transSlotByKey.get(layer.id)
+            : transSlotByKey.get(layer.lang) ?? Math.max(0, transCount - 1);
+          const slotDefaults = getDefaultTranslationColorsForTheme(theme, slotIdx);
           const customColors = translationColors?.[layer.id] || translationColors?.[layer.lang] || {};
-          const transBorder = formatCssColor(customColors.border);
+          const transBorder = formatCssColor(customColors.border) || slotDefaults.border;
           const transBg = formatCssColor(customColors.bg);
-          const transText = formatCssColor(customColors.text);
+          const transText = formatCssColor(customColors.text) || slotDefaults.text;
           const blockStyles = [
             transBorder ? `border-left-color: ${transBorder}` : '',
             transBg ? `background-color: ${transBg}` : '',
@@ -703,7 +757,7 @@ function injectTranslationsIntoHtml(
     // Paired sentence rows (epitaka-style 1 Pāḷi vs 1 translation per line).
     // Stack mode only, Pāḷi enabled, prose paragraphs where every layer has
     // sentence splits. Missing lines render an empty cell so alignment holds.
-    if (!isSideActive && sentenceMode && isPaliEnabled && !isHeading) {
+    if (!isSideActive && effectiveSentenceMode && isPaliEnabled && !isHeading) {
       const isProse =
         pClasses.some((c) => /^(bodytext|indent|hangnum|unindented)$/i.test(c)) ||
         /^(bodytext|indent|hangnum|unindented)$/i.test(paraType || '');
@@ -767,7 +821,6 @@ function injectTranslationsIntoHtml(
                 .join('');
               if (pHtml === undefined && !cells) return '';
               return `<div class="sent-pair" data-line="${ln}">` +
-                `<div class="sent-pair-num">${ln}</div>` +
                 `<div class="sent-pair-body">` +
                 (pHtml !== undefined
                   ? `<div class="sent-pair-pali reader-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-line="${ln}">${stripSentNumBadge(pHtml)}</div>`
@@ -793,8 +846,200 @@ function injectTranslationsIntoHtml(
   });
 }
 
+function escapeLinkText(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeLinkAttr(str) {
+  return escapeLinkText(str).replace(/"/g, '&quot;');
+}
+
+function renderBookLinksStrip(links, paliScript = 'roman', { inline = false } = {}) {
+  if (!Array.isArray(links) || links.length === 0) return '';
+  const MAX_INITIAL = 3;
+
+  const renderChip = (link) => {
+    const isSource = Boolean(link.is_source);
+    const arrow = isSource ? '←' : '→';
+    const rawWord = link.word || '';
+    const displayWord =
+      paliScript && paliScript !== 'roman'
+        ? convertPaliScript(rawWord, paliScript) || rawWord
+        : rawWord;
+    const cat = (link.target_category || '').toLowerCase();
+    const shortCat =
+      cat === 'mūla'
+        ? 'M'
+        : cat === 'aṭṭhakathā'
+        ? 'A'
+        : cat === 'ṭīkā'
+        ? 'Ṭ'
+        : '';
+    const catClass =
+      cat.includes('mūla') || cat === 'mula'
+        ? 'linked-def-chip-mula'
+        : cat.includes('aṭṭha') || cat.includes('attha')
+        ? 'linked-def-chip-attha'
+        : cat.includes('ṭīkā') || cat.includes('tika')
+        ? 'linked-def-chip-tika'
+        : '';
+    const payload = escapeLinkAttr(encodeURIComponent(JSON.stringify(link)));
+    const title = escapeLinkAttr(
+      `${isSource ? 'Source' : 'Commentary'}: ${link.target_book_title || link.target_book}${link.target_para_num ? ` (§ ${link.target_para_num})` : ''}`
+    );
+    return (
+      `<button type="button" class="linked-def-chip ${isSource ? 'linked-def-chip-source' : 'linked-def-chip-forward'}${catClass ? ` ${catClass}` : ''}" data-link="${payload}" title="${title}">` +
+      `<span class="linked-def-arrow">${arrow}</span>` +
+      `<span class="linked-def-word">${escapeLinkText(displayWord)}</span>` +
+      (shortCat ? `<span class="linked-def-cat">${shortCat}</span>` : '') +
+      `</button>`
+    );
+  };
+
+  const primaryHtml = links.slice(0, MAX_INITIAL).map(renderChip).join('');
+  const extraCount = links.length - MAX_INITIAL;
+  const extraHtml =
+    extraCount > 0
+      ? `<span class="linked-def-more-group hidden">${links.slice(MAX_INITIAL).map(renderChip).join('')}</span>` +
+        `<button type="button" class="linked-def-more-btn" data-more-count="${extraCount}">+${extraCount} more</button>`
+      : '';
+
+  const tag = inline ? 'span' : 'div';
+  const cls = inline ? 'linked-def-row linked-def-row-inline' : 'linked-def-row';
+  return `<${tag} class="${cls}">${primaryHtml}${extraHtml}</${tag}>`;
+}
+
+function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', sentenceMode = false) {
+  if (!htmlStr || !chapterLinks || typeof chapterLinks !== 'object' || typeof document === 'undefined') {
+    return htmlStr;
+  }
+  const keys = Object.keys(chapterLinks);
+  if (keys.length === 0) return htmlStr;
+
+  const root = document.createElement('div');
+  root.innerHTML = htmlStr;
+
+  const paraRows = root.querySelectorAll('.reader-para-row[data-pindex]');
+  if (paraRows.length > 0) {
+    paraRows.forEach((row) => {
+      const pIdx = row.getAttribute('data-pindex');
+      const pLinks = pIdx !== null ? chapterLinks[pIdx] : null;
+      if (!pLinks) return;
+
+      const sentPairs = row.querySelectorAll('.sent-pair[data-line]');
+      if (sentenceMode && sentPairs.length > 0) {
+        const injectedLines = new Set();
+        sentPairs.forEach((pair) => {
+          const ln = pair.getAttribute('data-line');
+          const lineLinks = ln ? pLinks.by_line?.[ln] : null;
+          if (Array.isArray(lineLinks) && lineLinks.length > 0) {
+            injectedLines.add(ln);
+            const stripHtml = renderBookLinksStrip(lineLinks, paliScript, { inline: false });
+            const paliCell = pair.querySelector('.sent-pair-pali');
+            if (paliCell) {
+              paliCell.insertAdjacentHTML('afterend', stripHtml);
+            } else {
+              const target = pair.querySelector('.sent-pair-body') || pair;
+              target.insertAdjacentHTML('afterbegin', stripHtml);
+            }
+          }
+        });
+        const leftovers = [];
+        if (pLinks.by_line && typeof pLinks.by_line === 'object') {
+          for (const [ln, list] of Object.entries(pLinks.by_line)) {
+            if (!injectedLines.has(ln) && Array.isArray(list)) {
+              leftovers.push(...list);
+            }
+          }
+        }
+        if (leftovers.length > 0) {
+          const stripHtml = renderBookLinksStrip(leftovers, paliScript, { inline: false });
+          const firstPali = row.querySelector('.sent-pair-pali');
+          const paraNumEl = row.querySelector('.sent-paranum');
+          if (firstPali) {
+            firstPali.insertAdjacentHTML('afterend', stripHtml);
+          } else if (paraNumEl) {
+            paraNumEl.insertAdjacentHTML('afterend', stripHtml);
+          } else {
+            row.insertAdjacentHTML('afterbegin', stripHtml);
+          }
+        }
+        return;
+      }
+
+      if (Array.isArray(pLinks.all) && pLinks.all.length > 0) {
+        const stripHtml = renderBookLinksStrip(pLinks.all, paliScript, { inline: false });
+        if (row.classList.contains('reader-trans-side-row')) {
+          const paliCol = row.querySelector('.reader-pali-col');
+          if (paliCol) {
+            paliCol.insertAdjacentHTML('beforeend', stripHtml);
+          } else {
+            row.insertAdjacentHTML(
+              'afterend',
+              `<div class="reader-para-links-footer">${stripHtml}</div>`
+            );
+          }
+        } else {
+          const paliEl =
+            row.querySelector('.reader-pali-trans-block') ||
+            Array.from(row.children).find((el) => el.tagName === 'P');
+          if (paliEl) {
+            paliEl.insertAdjacentHTML('afterend', stripHtml);
+          } else {
+            row.insertAdjacentHTML('afterbegin', stripHtml);
+          }
+        }
+      }
+    });
+    return root.innerHTML;
+  }
+
+  const pEls = root.querySelectorAll('p[data-pindex]');
+  pEls.forEach((pEl) => {
+    const pIdx = pEl.getAttribute('data-pindex');
+    const pLinks = pIdx !== null ? chapterLinks[pIdx] : null;
+    if (!pLinks) return;
+
+    if (sentenceMode) {
+      const paliSents = pEl.querySelectorAll('.pali-sent[data-line]');
+      if (paliSents.length > 0) {
+        const injectedLines = new Set();
+        paliSents.forEach((sentEl) => {
+          const ln = sentEl.getAttribute('data-line');
+          const lineLinks = ln ? pLinks.by_line?.[ln] : null;
+          if (Array.isArray(lineLinks) && lineLinks.length > 0) {
+            injectedLines.add(ln);
+            sentEl.insertAdjacentHTML('afterend', renderBookLinksStrip(lineLinks, paliScript, { inline: true }));
+          }
+        });
+        const leftovers = [];
+        if (pLinks.by_line && typeof pLinks.by_line === 'object') {
+          for (const [ln, list] of Object.entries(pLinks.by_line)) {
+            if (!injectedLines.has(ln) && Array.isArray(list)) {
+              leftovers.push(...list);
+            }
+          }
+        }
+        if (leftovers.length > 0) {
+          pEl.insertAdjacentHTML('afterend', renderBookLinksStrip(leftovers, paliScript, { inline: false }));
+        }
+        return;
+      }
+    }
+
+    if (Array.isArray(pLinks.all) && pLinks.all.length > 0) {
+      pEl.insertAdjacentHTML('afterend', renderBookLinksStrip(pLinks.all, paliScript, { inline: false }));
+    }
+  });
+
+  return root.innerHTML;
+}
+
 // Memoized Chapter Block with Pre-Buffering Intersection Observer, Lazy Translation Loading, and Scoped Highlighting
-const ChapterBlock = memo(function ChapterBlock({
+export const ChapterBlock = memo(function ChapterBlock({
   chapter,
   bookCode,
   html,
@@ -810,18 +1055,54 @@ const ChapterBlock = memo(function ChapterBlock({
   translationDisplayMode = 'stack',
   translationColors = {},
   sentenceMode = false,
+  showBookLinks = true,
+  isParallelSyncActive = false,
+  onLinksLoaded = null,
+  theme = 'classic',
 }) {
   const blockRef = useRef(null);
-  const [translations, setTranslations] = React.useState({});
-  const [transSentences, setTransSentences] = React.useState({});
-  const [paliSentMap, setPaliSentMap] = React.useState(null);
+  const activeLangsKey = activeLangs.join(',');
+  const hasActiveTrans = activeLangs.length > 0;
+  const { effectiveSentenceMode, showSentenceNumbers } = getSentenceDisplayFlags({
+    sentenceMode,
+    hasActiveTrans,
+    isPaliEnabled,
+    orderedLayers,
+    translationDisplayMode,
+  });
+  const activeLangsKeyWithMode = activeLangsKey ? `${activeLangsKey}:${effectiveSentenceMode ? 'sent' : 'para'}` : '';
+
+  const initialLangsToFetch = activeLangsKey ? activeLangsKey.split(',').filter(Boolean) : [];
+  const initialCachedTrans =
+    html && bookCode && initialLangsToFetch.length > 0 && typeof getCachedChapterTranslations === 'function'
+      ? getCachedChapterTranslations(bookCode, chapter.chapter_index, initialLangsToFetch, {
+          sentences: effectiveSentenceMode,
+        })
+      : null;
+  const initialCachedPaliSent =
+    effectiveSentenceMode && isPaliEnabled && html && bookCode && typeof getCachedPaliSentences === 'function'
+      ? getCachedPaliSentences(bookCode)
+      : null;
+  const initialCachedLinks =
+    (showBookLinks || isParallelSyncActive) && html && bookCode && typeof getCachedChapterLinks === 'function'
+      ? getCachedChapterLinks(bookCode, chapter.chapter_index)
+      : null;
+
+  const [translations, setTranslations] = React.useState(() => initialCachedTrans?.translations || {});
+  const [transSentences, setTransSentences] = React.useState(() =>
+    effectiveSentenceMode ? initialCachedTrans?.sentences || {} : {}
+  );
+  const [paliSentMap, setPaliSentMap] = React.useState(
+    () => initialCachedPaliSent?.chapters?.[String(chapter.chapter_index)] || null
+  );
+  const [chapterLinks, setChapterLinks] = React.useState(() => initialCachedLinks?.paragraphs || null);
   const [isTransLoading, setIsTransLoading] = React.useState(false);
   const [isPaliSentLoading, setIsPaliSentLoading] = React.useState(false);
-  const [transFetchedKey, setTransFetchedKey] = React.useState(null);
-  const [paliSentFetched, setPaliSentFetched] = React.useState(false);
+  const [transFetchedKey, setTransFetchedKey] = React.useState(() =>
+    initialCachedTrans ? activeLangsKeyWithMode : null
+  );
+  const [paliSentFetched, setPaliSentFetched] = React.useState(() => Boolean(initialCachedPaliSent));
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
-  const activeLangsKey = activeLangs.join(',');
-  const activeLangsKeyWithMode = activeLangsKey ? `${activeLangsKey}:${sentenceMode ? 'sent' : 'para'}` : '';
 
   useEffect(() => {
     if (isCurrentOrTarget) {
@@ -876,6 +1157,22 @@ const ChapterBlock = memo(function ChapterBlock({
       return;
     }
 
+    const syncCached =
+      typeof getCachedChapterTranslations === 'function'
+        ? getCachedChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, {
+            sentences: effectiveSentenceMode,
+          })
+        : null;
+    if (syncCached) {
+      setTranslations(syncCached.translations || {});
+      setTransSentences(effectiveSentenceMode ? syncCached.sentences || {} : {});
+      setTransFetchedKey(activeLangsKeyWithMode);
+      setIsTransLoading(false);
+      blockRef.current?.removeAttribute('data-trans-loading');
+      blockRef.current?.setAttribute('data-trans-settled', '1');
+      return;
+    }
+
     // Expose the translation fetch state on the chapter block so the reader's
     // post-jump settle watcher knows whether this chapter can still grow:
     // rows above a jump target expand when the payload lands, shifting it.
@@ -883,15 +1180,11 @@ const ChapterBlock = memo(function ChapterBlock({
     blockRef.current?.setAttribute('data-trans-loading', '1');
     setIsTransLoading(true);
 
-    fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, { sentences: sentenceMode })
+    fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, { sentences: effectiveSentenceMode })
       .then((data) => {
         if (!isMounted) return;
-        if (data?.translations) {
-          setTranslations(data.translations);
-        }
-        if (sentenceMode && data?.sentences) {
-          setTransSentences(data.sentences);
-        }
+        setTranslations(data?.translations || {});
+        setTransSentences(effectiveSentenceMode ? (data?.sentences || {}) : {});
         setTransFetchedKey(activeLangsKeyWithMode);
         setIsTransLoading(false);
       })
@@ -906,12 +1199,26 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => {
       isMounted = false;
     };
-  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, sentenceMode, activeLangsKeyWithMode]);
+  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, effectiveSentenceMode, activeLangsKeyWithMode]);
 
   // Pāḷi sentence map for sentence display mode (book-level, shared cache).
+  // Only needed when at least one translation is enabled; Pāḷi alone renders as paragraphs.
   useEffect(() => {
-    if (!sentenceMode || !isPaliEnabled || !html || !bookCode) {
-      if (!sentenceMode) setPaliSentMap(null);
+    if (!effectiveSentenceMode || !isPaliEnabled || !html || !bookCode) {
+      if (!effectiveSentenceMode) {
+        setPaliSentMap(null);
+        setPaliSentFetched(false);
+      } else if (!isPaliEnabled && !paliSentMap) {
+        setPaliSentFetched(false);
+      }
+      setIsPaliSentLoading(false);
+      return;
+    }
+    const syncCached =
+      typeof getCachedPaliSentences === 'function' ? getCachedPaliSentences(bookCode) : null;
+    if (syncCached) {
+      const chapMap = syncCached?.chapters?.[String(chapter.chapter_index)];
+      setPaliSentMap(chapMap || null);
       setPaliSentFetched(true);
       setIsPaliSentLoading(false);
       return;
@@ -935,11 +1242,43 @@ const ChapterBlock = memo(function ChapterBlock({
     return () => {
       cancelled = true;
     };
-  }, [sentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
+  }, [effectiveSentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
 
-  const hasActiveTrans = activeLangs.length > 0;
+  // Lazy load inline Linked Definitions for this chapter when visible and enabled (or when parallel column sync is active)
+  useEffect(() => {
+    const needLinks = (showBookLinks && isPaliEnabled) || isParallelSyncActive;
+    if (!needLinks || !html || !bookCode || (!isNearViewport && !isCurrentOrTarget)) {
+      if (!showBookLinks || !isPaliEnabled) setChapterLinks(null);
+      return;
+    }
+    const syncCached =
+      typeof getCachedChapterLinks === 'function'
+        ? getCachedChapterLinks(bookCode, chapter.chapter_index)
+        : null;
+    if (syncCached) {
+      const paras = syncCached?.paragraphs || null;
+      setChapterLinks(paras);
+      onLinksLoaded?.(chapter.chapter_index, paras);
+      return;
+    }
+    let cancelled = false;
+    fetchChapterLinks(bookCode, chapter.chapter_index)
+      .then((data) => {
+        if (cancelled) return;
+        const paras = data?.paragraphs || null;
+        setChapterLinks(paras);
+        onLinksLoaded?.(chapter.chapter_index, paras);
+      })
+      .catch(() => {
+        if (!cancelled) setChapterLinks(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showBookLinks, isParallelSyncActive, isPaliEnabled, html, bookCode, chapter.chapter_index, isNearViewport, isCurrentOrTarget, onLinksLoaded]);
+
   const transFetchPending = isTransLoading || transFetchedKey !== activeLangsKeyWithMode;
-  const paliSentFetchPending = sentenceMode && isPaliEnabled && (isPaliSentLoading || !paliSentFetched);
+  const paliSentFetchPending = effectiveSentenceMode && isPaliEnabled && (isPaliSentLoading || !paliSentFetched);
   const isTransPending =
     hasActiveTrans &&
     (isNearViewport || isCurrentOrTarget) &&
@@ -971,8 +1310,10 @@ const ChapterBlock = memo(function ChapterBlock({
     // Sentence display mode: Pāḷi sentence lines from the precomputed map.
     // Run BEFORE transliterateHtml so Roman sentence/page-break matching works
     // on raw Roman HTML and the injected sentence spans get transliterated too.
-    if (sentenceMode && isPaliEnabled && paliSentMap) {
-      processed = injectPaliSentencesIntoHtml(processed, paliSentMap);
+    if (effectiveSentenceMode && isPaliEnabled && paliSentMap) {
+      processed = injectPaliSentencesIntoHtml(processed, paliSentMap, {
+        showSentenceNumbers,
+      });
     }
     if (paliScript && paliScript !== 'roman') {
       processed = transliterateHtml(processed, paliScript);
@@ -1003,9 +1344,13 @@ const ChapterBlock = memo(function ChapterBlock({
         translationDisplayMode,
         translationColors,
         highlightSearchTerms ? searchHighlight : null,
-        sentenceMode,
-        transSentences
+        effectiveSentenceMode,
+        transSentences,
+        theme
       );
+    }
+    if (showBookLinks && isPaliEnabled && chapterLinks) {
+      processed = injectBookLinksIntoHtml(processed, chapterLinks, paliScript, effectiveSentenceMode);
     }
     return processed;
   }, [
@@ -1019,9 +1364,13 @@ const ChapterBlock = memo(function ChapterBlock({
     isPaliEnabled,
     translationDisplayMode,
     translationColors,
-    sentenceMode,
+    effectiveSentenceMode,
+    showSentenceNumbers,
     transSentences,
     paliSentMap,
+    showBookLinks,
+    chapterLinks,
+    theme,
   ]);
 
   if (displayHtml) {
@@ -1045,7 +1394,7 @@ const ChapterBlock = memo(function ChapterBlock({
             </span>
           </p>
           <div className="text-[11px] text-[var(--text-muted)]/70 italic">
-            {sentenceMode ? 'Sentence-by-sentence alignment in progress…' : 'Everything will appear together once ready'}
+            {effectiveSentenceMode ? 'Sentence-by-sentence alignment in progress…' : 'Everything will appear together once ready'}
           </div>
         </div>
       );
@@ -1433,108 +1782,463 @@ function restoreClickedWordHighlight(bookCode, record, container = document) {
   return false;
 }
 
-export default function ReaderView() {
-  const {
-    activeTab,
-    loadChapter,
-    bufferAdjacentChapters,
-    saveTabScroll,
-    getSavedScroll,
-    targetScrollIntent,
-    clearTargetScrollIntent,
-    setIsSidebarOpen,
-    isSidebarOpen,
-    isHeaderVisible,
-    setIsHeaderVisible,
-    addBookmark,
-    removeBookmark,
-    isBookmarked,
-    bookmarks,
-    activeParaNum,
-    setActiveParaNum,
-    activeEditionPages,
-    setActiveEditionPages,
-    openGoToModal,
-    addToHistory,
-    saveTabPosition,
-    searchHighlight,
-    openBook,
-    setIsHistoryOpen,
-  } = useTabs();
+// Determine Mūla / Aṭṭhakathā / Ṭīkā layer and sibling layers for quick "Open Alongside" controls
+export function getBookLayerInfo(bookCode = '', category = '') {
+  const code = String(bookCode || '').toLowerCase();
+  const cat = String(category || '').toLowerCase();
+  let layer = 'other';
+  let label = '';
+  let shortLabel = '';
 
-  const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
-  const { settings, setIsZenMode } = useThemeSettings();
-  const pulseAnimation = Boolean(settings?.pulseAnimation);
+  if (code.endsWith('.mul') || code.includes('m.mul') || cat.includes('mūla') || cat.includes('mula')) {
+    layer = 'mula';
+    label = 'Mūla';
+    shortLabel = 'M';
+  } else if (code.endsWith('.att') || code.includes('a.att') || cat.includes('aṭṭha') || cat.includes('attha')) {
+    layer = 'attha';
+    label = 'Aṭṭha';
+    shortLabel = 'A';
+  } else if (
+    code.endsWith('.tik') ||
+    code.includes('t.tik') ||
+    code.endsWith('.nrf') ||
+    cat.includes('ṭīkā') ||
+    cat.includes('tika')
+  ) {
+    layer = 'tika';
+    label = 'Ṭīkā';
+    shortLabel = 'Ṭ';
+  }
 
-  const isPaliEnabled = settings?.translations?.pali !== false;
+  const allMatLayers = [
+    { layer: 'mula', label: 'Mūla', short: 'M' },
+    { layer: 'attha', label: 'Aṭṭha', short: 'A' },
+    { layer: 'tika', label: 'Ṭīkā', short: 'Ṭ' },
+  ];
 
-  const orderedLayers = React.useMemo(() => {
-    const order = settings?.translationOrder || [];
-    const layers = [];
-    for (const id of order) {
-      if (id === 'pali') {
-        if (isPaliEnabled) {
-          layers.push({ id: 'pali', type: 'pali' });
+  const siblingLayers =
+    layer === 'mula' || layer === 'attha' || layer === 'tika'
+      ? allMatLayers.filter((item) => item.layer !== layer)
+      : [];
+
+  return { layer, label, shortLabel, siblingLayers };
+}
+
+// Compute Longest Non-Decreasing Subsequence (LNDS) of [srcY, dstY] pairs in O(N log N).
+// Filters out cross-reference outliers so parallel column scrolling stays strictly monotonic.
+export function increasingChain(pairs) {
+  if (!Array.isArray(pairs) || pairs.length === 0) return [];
+  const valid = [];
+  for (let i = 0; i < pairs.length; i++) {
+    const p = pairs[i];
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const s = Number(p[0]);
+    const d = Number(p[1]);
+    if (Number.isFinite(s) && Number.isFinite(d)) {
+      valid.push([s, d]);
+    }
+  }
+  if (valid.length === 0) return [];
+
+  valid.sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]));
+
+  const deduped = [valid[0]];
+  for (let i = 1; i < valid.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    const cur = valid[i];
+    if (Math.abs(cur[0] - prev[0]) < 1 && Math.abs(cur[1] - prev[1]) < 1) {
+      continue;
+    }
+    deduped.push(cur);
+  }
+
+  const n = deduped.length;
+  const tailIndices = [];
+  const prevIndices = new Int32Array(n).fill(-1);
+
+  for (let i = 0; i < n; i++) {
+    const dstVal = deduped[i][1];
+    let lo = 0;
+    let hi = tailIndices.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (deduped[tailIndices[mid]][1] <= dstVal) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    if (lo > 0) {
+      prevIndices[i] = tailIndices[lo - 1];
+    }
+    if (lo === tailIndices.length) {
+      tailIndices.push(i);
+    } else {
+      tailIndices[lo] = i;
+    }
+  }
+
+  const result = new Array(tailIndices.length);
+  let k = tailIndices[tailIndices.length - 1];
+  for (let i = tailIndices.length - 1; i >= 0; i--) {
+    result[i] = deduped[k];
+    k = prevIndices[k];
+  }
+  return result;
+}
+
+// Piece-wise linear interpolation along a monotonic anchor chain [[srcY, dstY], ...]
+export function interpolateMonotonicY(chain, srcY) {
+  if (!Array.isArray(chain) || chain.length === 0 || !Number.isFinite(srcY)) {
+    return null;
+  }
+  if (chain.length === 1) {
+    return chain[0][1] + (srcY - chain[0][0]);
+  }
+  if (srcY <= chain[0][0]) {
+    return chain[0][1] + (srcY - chain[0][0]);
+  }
+  const last = chain[chain.length - 1];
+  if (srcY >= last[0]) {
+    return last[1] + (srcY - last[0]);
+  }
+
+  let lo = 0;
+  let hi = chain.length - 2;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    const s0 = chain[mid][0];
+    const s1 = chain[mid + 1][0];
+    if (srcY < s0) {
+      hi = mid - 1;
+    } else if (srcY > s1) {
+      lo = mid + 1;
+    } else {
+      const span = s1 - s0;
+      if (span <= 0) return chain[mid][1];
+      const ratio = (srcY - s0) / span;
+      return chain[mid][1] + ratio * (chain[mid + 1][1] - chain[mid][1]);
+    }
+  }
+
+  const idx = Math.max(0, Math.min(chain.length - 2, lo));
+  const [s0, d0] = chain[idx];
+  const [s1, d1] = chain[idx + 1];
+  const span = s1 - s0;
+  if (span <= 0) return d0;
+  return d0 + ((srcY - s0) / span) * (d1 - d0);
+}
+
+// Collect parallel anchor pairs [srcY, dstY] between two visible reader column containers
+export function buildParallelAnchors(
+  srcContainer,
+  dstContainer,
+  srcTab,
+  dstTab,
+  srcLinksByChap = null,
+  dstLinksByChap = null
+) {
+  if (!srcContainer || !dstContainer || !srcTab || !dstTab) return [];
+  const srcRect = srcContainer.getBoundingClientRect();
+  const dstRect = dstContainer.getBoundingClientRect();
+  const srcScroll = srcContainer.scrollTop;
+  const dstScroll = dstContainer.scrollTop;
+
+  const docY = (el, cRect, cScroll) => {
+    const r = el.getBoundingClientRect();
+    return r.top - cRect.top + cScroll;
+  };
+  const isMeasurable = (el) => Boolean(el && el.getClientRects && el.getClientRects().length > 0);
+
+  const pairs = [];
+
+  const resolveLinkTargetEl = (container, link) => {
+    if (!link) return null;
+    const chapScope =
+      link.target_chapter !== undefined && link.target_chapter !== null
+        ? container.querySelector(`.chapter-content-block[data-chapter="${link.target_chapter}"]`)
+        : container;
+    if (!chapScope) return null;
+    const targetLine = link.target_line_id ?? link.target_line;
+    if (link.target_para_index !== undefined && link.target_para_index !== null) {
+      const row =
+        chapScope.querySelector(`.reader-para-row[data-pindex="${link.target_para_index}"]`) ||
+        chapScope.querySelector(`p[data-pindex="${link.target_para_index}"]`) ||
+        chapScope.querySelector(`[data-pindex="${link.target_para_index}"]`);
+      if (row) {
+        if (targetLine) {
+          const lineEl =
+            row.querySelector(`[data-line="${targetLine}"]`) ||
+            row.querySelector(`.sent-pair[data-line="${targetLine}"]`) ||
+            row.querySelector(`.pali-sent[data-line="${targetLine}"]`);
+          if (isMeasurable(lineEl)) return lineEl;
         }
-      } else if (settings?.translations?.[id] && LANG_KEY_TO_CODE[id]) {
-        layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
+        if (isMeasurable(row)) return row;
       }
     }
-    if (isPaliEnabled && !layers.some((l) => l.id === 'pali')) {
-      layers.unshift({ id: 'pali', type: 'pali' });
+    const targetPara = link.target_para_num ?? link.target_para;
+    if (targetPara) {
+      const pEl = chapScope.querySelector(`[data-para="${targetPara}"]`);
+      if (isMeasurable(pEl)) return (pEl.closest && pEl.closest('.reader-para-row')) || pEl;
     }
-    if (settings?.translations) {
-      for (const [id, enabled] of Object.entries(settings.translations)) {
-        if (id !== 'pali' && enabled && LANG_KEY_TO_CODE[id] && !layers.some((l) => l.id === id)) {
-          layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
+    return null;
+  };
+
+  const parseChipLink = (chip) => {
+    if (chip.__parsedLink !== undefined) return chip.__parsedLink;
+    const raw = chip.getAttribute('data-link');
+    if (!raw) {
+      chip.__parsedLink = null;
+      return null;
+    }
+    try {
+      chip.__parsedLink = JSON.parse(decodeURIComponent(raw));
+    } catch (_) {
+      chip.__parsedLink = null;
+    }
+    return chip.__parsedLink;
+  };
+
+  const srcChips = srcContainer.querySelectorAll('.linked-def-chip[data-link]');
+  for (const chip of srcChips) {
+    const link = parseChipLink(chip);
+    if (!link || link.target_book !== dstTab.bookCode) continue;
+    const srcEl = chip.closest('.sent-pair, .pali-sent, .reader-para-row, p[data-pindex]') || chip;
+    if (!isMeasurable(srcEl)) continue;
+    const dstEl = resolveLinkTargetEl(dstContainer, link);
+    if (!dstEl) continue;
+    pairs.push([docY(srcEl, srcRect, srcScroll), docY(dstEl, dstRect, dstScroll)]);
+  }
+
+  const dstChips = dstContainer.querySelectorAll('.linked-def-chip[data-link]');
+  for (const chip of dstChips) {
+    const link = parseChipLink(chip);
+    if (!link || link.target_book !== srcTab.bookCode) continue;
+    const dstEl = chip.closest('.sent-pair, .pali-sent, .reader-para-row, p[data-pindex]') || chip;
+    if (!isMeasurable(dstEl)) continue;
+    const srcEl = resolveLinkTargetEl(srcContainer, link);
+    if (!srcEl) continue;
+    pairs.push([docY(srcEl, srcRect, srcScroll), docY(dstEl, dstRect, dstScroll)]);
+  }
+
+  const addLinksFromMap = (linksByChap, fromContainer, toContainer, toBookCode, isForward) => {
+    if (!linksByChap) return;
+    for (const [chapIdx, paraMap] of Object.entries(linksByChap)) {
+      if (!paraMap) continue;
+      const fromChapEl = fromContainer.querySelector(`.chapter-content-block[data-chapter="${chapIdx}"]`);
+      if (!fromChapEl) continue;
+      for (const [pIdx, pEntry] of Object.entries(paraMap)) {
+        if (!pEntry) continue;
+        const fromRow =
+          fromChapEl.querySelector(`.reader-para-row[data-pindex="${pIdx}"]`) ||
+          fromChapEl.querySelector(`p[data-pindex="${pIdx}"]`) ||
+          fromChapEl.querySelector(`[data-pindex="${pIdx}"]`);
+        if (!fromRow) continue;
+
+        const pushLinkPair = (link, explicitLineId = null) => {
+          if (!link || link.target_book !== toBookCode) return;
+          const srcLine = explicitLineId ?? link.source_line_id ?? link.source_line;
+          const fromEl = (srcLine && fromRow.querySelector(`[data-line="${srcLine}"]`)) || fromRow;
+          if (!isMeasurable(fromEl)) return;
+          const toEl = resolveLinkTargetEl(toContainer, link);
+          if (!toEl) return;
+          if (isForward) {
+            pairs.push([docY(fromEl, srcRect, srcScroll), docY(toEl, dstRect, dstScroll)]);
+          } else {
+            pairs.push([docY(toEl, srcRect, srcScroll), docY(fromEl, dstRect, dstScroll)]);
+          }
+        };
+
+        if (Array.isArray(pEntry)) {
+          for (const link of pEntry) pushLinkPair(link, null);
+        } else if (typeof pEntry === 'object') {
+          let addedByLine = false;
+          if (pEntry.by_line && typeof pEntry.by_line === 'object') {
+            for (const [lineId, list] of Object.entries(pEntry.by_line)) {
+              if (!Array.isArray(list)) continue;
+              for (const link of list) {
+                pushLinkPair(link, lineId);
+                addedByLine = true;
+              }
+            }
+          }
+          if (!addedByLine && Array.isArray(pEntry.all)) {
+            for (const link of pEntry.all) pushLinkPair(link, null);
+          }
         }
       }
     }
-    return layers;
-  }, [settings?.translations, settings?.translationOrder, isPaliEnabled]);
+  };
 
-  const activeLangs = React.useMemo(() => {
-    const langs = [];
-    for (const layer of orderedLayers) {
-      if (layer.type === 'trans' && !langs.includes(layer.lang)) {
-        langs.push(layer.lang);
+  if (srcChips.length === 0 && srcLinksByChap) {
+    addLinksFromMap(srcLinksByChap, srcContainer, dstContainer, dstTab.bookCode, true);
+  }
+  if (dstChips.length === 0 && dstLinksByChap) {
+    addLinksFromMap(dstLinksByChap, dstContainer, srcContainer, srcTab.bookCode, false);
+  }
+
+  const dstParaMap = new Map();
+  const dstRangedParas = [];
+  const dstParaNodes = dstContainer.querySelectorAll('.chapter-content-block [data-para]');
+  for (const node of dstParaNodes) {
+    const pNum = node.getAttribute('data-para');
+    if (!pNum) continue;
+    const row = (node.closest && node.closest('.reader-para-row')) || node;
+    if (!isMeasurable(row)) continue;
+    if (!dstParaMap.has(pNum)) {
+      dstParaMap.set(pNum, row);
+    }
+    const first = parseInt(node.getAttribute('data-para-first'), 10);
+    const last = parseInt(node.getAttribute('data-para-last'), 10);
+    if (!isNaN(first) && !isNaN(last)) {
+      dstRangedParas.push({ first, last, row });
+    }
+  }
+
+  const findDstParaRow = (targetParaStr) => {
+    if (!targetParaStr) return null;
+    const clean = String(targetParaStr).trim();
+    if (dstParaMap.has(clean)) return dstParaMap.get(clean);
+    const num = parseInt(clean, 10);
+    if (!isNaN(num)) {
+      for (let i = 0; i < dstRangedParas.length; i++) {
+        const rp = dstRangedParas[i];
+        if (num >= rp.first && num <= rp.last) return rp.row;
       }
     }
-    return langs;
-  }, [orderedLayers]);
-  const sentenceMode = settings?.translationGranularity === 'sentence';
-  const hasTransLayers = React.useMemo(() => orderedLayers.some((l) => l.type === 'trans'), [orderedLayers]);
+    return null;
+  };
+
+  const dstLayer = getBookLayerInfo(dstTab.bookCode, dstTab.category).layer;
+  const srcParaNodes = srcContainer.querySelectorAll('.chapter-content-block [data-para]');
+  const seenSrcPara = new Set();
+
+  for (const srcNode of srcParaNodes) {
+    const pNum = srcNode.getAttribute('data-para');
+    if (!pNum || seenSrcPara.has(pNum)) continue;
+    seenSrcPara.add(pNum);
+    const srcRow = (srcNode.closest && srcNode.closest('.reader-para-row')) || srcNode;
+    if (!isMeasurable(srcRow)) continue;
+
+    let dstRow = null;
+    const matEntry =
+      (srcTab.sub_books_para_to_mat &&
+        srcTab.sub_book &&
+        srcTab.sub_books_para_to_mat[srcTab.sub_book]?.[pNum]?.[dstLayer]) ||
+      srcTab.para_to_mat?.[pNum]?.[dstLayer];
+
+    const matBook = matEntry?.book || matEntry?.book_code;
+    if (matEntry && (!matBook || matBook === dstTab.bookCode)) {
+      dstRow = findDstParaRow(matEntry.para || pNum);
+    }
+    if (!dstRow) {
+      dstRow = findDstParaRow(pNum);
+    }
+    if (!dstRow) continue;
+
+    const sRect = srcRow.getBoundingClientRect();
+    const dRect = dstRow.getBoundingClientRect();
+    const sTop = sRect.top - srcRect.top + srcScroll;
+    const dTop = dRect.top - dstRect.top + dstScroll;
+    pairs.push([sTop, dTop]);
+
+    if (sRect.height > 120 && dRect.height > 120) {
+      pairs.push([sTop + sRect.height, dTop + dRect.height]);
+    }
+  }
+
+  return increasingChain(pairs);
+}
+
+// Persistent per-tab ReaderPane component: keeps each open book's DOM alive across tab switches
+// and supports side-by-side parallel column rendering with zero-bounce scroll preservation.
+const ReaderPane = memo(function ReaderPane({
+  tab,
+  isVisible,
+  isActive,
+  isColumnsMode,
+  isParallelSyncActive,
+  paneScrollIntent,
+  clearTargetScrollIntent,
+  loadChapter,
+  bufferAdjacentChapters,
+  saveTabScroll,
+  getSavedScroll,
+  saveTabPosition,
+  activatePane,
+  closeTab,
+  jumpToMat,
+  openBook,
+  openGoToModal,
+  addBookmark,
+  removeBookmark,
+  bookmarks,
+  activeParaNum,
+  setActiveParaNum,
+  setActiveEditionPages,
+  addToHistory,
+  setIsHistoryOpen,
+  isSidebarOpen,
+  setIsSidebarOpen,
+  isHeaderVisible,
+  setIsHeaderVisible,
+  searchHighlight,
+  settings,
+  orderedLayers,
+  activeLangs,
+  isPaliEnabled,
+  sentenceMode,
+  hasTransLayers,
+  pulseAnimation,
+  openDictionary,
+  clickToLookupEnabled,
+  clickLookupMode,
+  recordClickedWord,
+  clickedWordsByBookRef,
+  setActiveLinkedItem,
+  registerPaneRef,
+  onColumnUserInteract,
+  onColumnScrollSync,
+  onPaneLinksLoaded,
+}) {
+  const containerRef = useRef(null);
+  const contentHeaderRef = useRef(null);
+  const scrollTimeoutRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollTimerRef = useRef(null);
   const [isTargetScrollWaiting, setIsTargetScrollWaiting] = useState(false);
   const targetWaitTimeoutRef = useRef(null);
   const attemptScrollTimerRef = useRef(null);
-  const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
+  const activeTabRef = useRef(tab);
+  activeTabRef.current = tab;
+  const activeTab = tab;
 
-  const containerRef = useRef(null);
-  const contentHeaderRef = useRef(null);
-  const lastScrollTopRef = useRef(0);
-  const scrollAccDeltaRef = useRef(0);
-  const scrollTimeoutRef = useRef(null);
-  const prevBookCodeRef = useRef(null);
-  const restoredContainerRef = useRef(null);
-  const restoredBookCodeRef = useRef(null);
+  // Tracks whether this tab pane has completed its initial load/hydration scroll restoration.
+  // Once true, switching away and back to this tab restores scrollTop directly with zero drift timers!
+  const hasInitialRestoredRef = useRef(false);
+  const wasVisibleReaderRef = useRef(false);
   const isTabSwitchingRef = useRef(false);
-  const tabSwitchSettleTimerRef = useRef(null);
   const tabSwitchRetryTimerRef = useRef(null);
-  const clickedWordsByBookRef = useRef({});
 
-  // Chapter-jump settle tracking (sidebar chapter clicks): lazy translations streaming
-  // into chapters above the target can shift it after we measured, so a guarded
-  // one-shot drift correction is scheduled per jump. Any manual scroll cancels it.
+  const [paneParaNum, setPaneParaNum] = useState(tab?.lastParaNum || null);
+  const [paneEditionPages, setPaneEditionPages] = useState({});
+
   const chapterJumpRef = useRef({ key: null, lastOffset: 0, timer: null });
-
-  // Paragraph-jump settle tracking (citation / search / bookmark / history / MAT /
-  // GoTo jumps): translation batches stream in lazily AFTER the initial scroll and
-  // expand content above the target, shifting it. A guarded watcher re-verifies the
-  // landing until stable. Any manual scroll cancels it.
   const paraJumpRef = useRef({ key: null, lastOffset: 0, timer: null, deadline: 0 });
+
+  const setMainRef = useCallback(
+    (node) => {
+      containerRef.current = node;
+      registerPaneRef?.(tab.bookCode, node);
+    },
+    [registerPaneRef, tab.bookCode]
+  );
+
+  useEffect(() => {
+    if (tab?.lastParaNum && !paneParaNum) {
+      setPaneParaNum(tab.lastParaNum);
+    }
+  }, [tab?.lastParaNum, paneParaNum]);
 
   const performProgrammaticScroll = useCallback((container, offset, options = {}) => {
     if (!container) return;
@@ -1553,10 +2257,6 @@ export default function ReaderView() {
 
   const cancelJump = useCallback(() => {
     isTabSwitchingRef.current = false;
-    if (tabSwitchSettleTimerRef.current) {
-      clearTimeout(tabSwitchSettleTimerRef.current);
-      tabSwitchSettleTimerRef.current = null;
-    }
     if (tabSwitchRetryTimerRef.current) {
       clearInterval(tabSwitchRetryTimerRef.current);
       tabSwitchRetryTimerRef.current = null;
@@ -1565,7 +2265,9 @@ export default function ReaderView() {
       clearTimeout(attemptScrollTimerRef.current);
       attemptScrollTimerRef.current = null;
     }
-    clearTargetScrollIntent();
+    if (paneScrollIntent) {
+      clearTargetScrollIntent(tab.bookCode);
+    }
     setIsTargetScrollWaiting(false);
 
     const st = chapterJumpRef.current;
@@ -1578,443 +2280,229 @@ export default function ReaderView() {
       clearTimeout(ps.timer);
       paraJumpRef.current = { key: null, lastOffset: 0, timer: null, deadline: 0 };
     }
-  }, [clearTargetScrollIntent]);
+  }, [clearTargetScrollIntent, paneScrollIntent, tab.bookCode]);
 
   useEffect(() => {
     const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', cancelJump, { passive: true });
-      container.addEventListener('touchstart', cancelJump, { passive: true });
-      container.addEventListener('mousedown', cancelJump, { passive: true });
-    }
-    window.addEventListener('keydown', cancelJump, { passive: true });
+    if (!container) return;
+    const onUserInput = () => {
+      onColumnUserInteract?.(tab.bookCode);
+      cancelJump();
+    };
+    container.addEventListener('wheel', onUserInput, { passive: true });
+    container.addEventListener('touchstart', onUserInput, { passive: true });
+    container.addEventListener('mousedown', onUserInput, { passive: true });
     return () => {
       clearTimeout(chapterJumpRef.current.timer);
       clearTimeout(paraJumpRef.current.timer);
-      if (container) {
-        container.removeEventListener('wheel', cancelJump);
-        container.removeEventListener('touchstart', cancelJump);
-        container.removeEventListener('mousedown', cancelJump);
-      }
-      window.removeEventListener('keydown', cancelJump);
-    };
-  }, [cancelJump]);
-
-  // Keyboard navigation support for PageUp, PageDown, ArrowUp, ArrowDown, Home, End, Space
-  useEffect(() => {
-    const handleNavigationKeyDown = (e) => {
-      // Don't intercept if modifier keys are pressed (except Shift+Space for PageUp)
-      if (e.ctrlKey || e.metaKey || e.altKey) {
-        return;
-      }
-
-      // Don't intercept if user is interacting with an input, textarea, select, or contentEditable element
-      const activeEl = document.activeElement;
-      const tag = activeEl?.tagName?.toLowerCase();
-      if (
-        tag === 'input' ||
-        tag === 'textarea' ||
-        tag === 'select' ||
-        activeEl?.isContentEditable ||
-        activeEl?.closest?.('[contenteditable="true"]') ||
-        activeEl?.closest?.('aside, .app-sidebar, [role="dialog"]')
-      ) {
-        return;
-      }
-
-      // For buttons and links: don't intercept Space / Enter (they activate the element)
-      if ((tag === 'button' || tag === 'a') && (e.key === ' ' || e.key === 'Enter')) {
-        return;
-      }
-      // If button is inside an interactive dropdown/menu, let arrow keys handle menu navigation
-      if ((tag === 'button' || tag === 'a') && activeEl?.closest?.('[role="menu"], [role="listbox"], [role="combobox"]')) {
-        return;
-      }
-
-      // Don't intercept if any modal/dialog overlay is open
-      const hasModal = document.querySelector(
-        '.modal-backdrop, [role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-\\[9999\\]'
-      );
-      if (hasModal) return;
-
-      const container = containerRef.current;
-      if (!container) return;
-
-      isTabSwitchingRef.current = false;
-
-      const clientHeight = container.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 800);
-      const pageStep = Math.max(120, Math.round(clientHeight * 0.85));
-      const lineStep = 80;
-
-      if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
-        e.preventDefault();
-        container.scrollBy({ top: pageStep, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
-      } else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
-        e.preventDefault();
-        container.scrollBy({ top: -pageStep, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        container.scrollBy({ top: lineStep, behavior: 'smooth' });
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        container.scrollBy({ top: -lineStep, behavior: 'smooth' });
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        container.scrollTo({ top: 0, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        container.scrollTo({ top: container.scrollHeight, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
-      }
-    };
-
-    window.addEventListener('keydown', handleNavigationKeyDown, { passive: false });
-    return () => window.removeEventListener('keydown', handleNavigationKeyDown);
-  }, [settings?.scrollMotion]);
-
-  // Initialize clicked words from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CLICKED_WORDS);
-      if (saved) {
-        clickedWordsByBookRef.current = JSON.parse(saved);
-      }
-    } catch (e) {}
-  }, []);
-
-  const recordClickedWord = useCallback((bookCode, record) => {
-    if (!bookCode || !record) return;
-    clickedWordsByBookRef.current[bookCode] = record;
-    try {
-      localStorage.setItem(STORAGE_KEY_CLICKED_WORDS, JSON.stringify(clickedWordsByBookRef.current));
-    } catch (e) {}
-  }, []);
-
-  // Restore highlight when switching books / tabs or when chapters render
-  useEffect(() => {
-    if (!activeTab?.bookCode) return;
-    const bookCode = activeTab.bookCode;
-    const record = clickedWordsByBookRef.current[bookCode];
-
-    clearClickedWordHighlight();
-
-    if (record) {
-      const timer = setTimeout(() => {
-        restoreClickedWordHighlight(bookCode, record, containerRef.current || document);
-      }, 70);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab?.bookCode, activeTab?.currentChapterIdx, settings?.paliScript]);
-
-  // Synchronously restore scroll position BEFORE browser paint (Zero jumping / bouncing!)
-  useLayoutEffect(() => {
-    if (!containerRef.current || !activeTab?.bookCode || activeTab.bookCode === 'ai_chat') return;
-
-    const container = containerRef.current;
-    const isNewBook = restoredBookCodeRef.current !== activeTab.bookCode;
-    const isNewContainer = restoredContainerRef.current !== container;
-
-    if (targetScrollIntent) {
       if (tabSwitchRetryTimerRef.current) {
         clearInterval(tabSwitchRetryTimerRef.current);
         tabSwitchRetryTimerRef.current = null;
       }
-      if (tabSwitchSettleTimerRef.current) {
-        clearTimeout(tabSwitchSettleTimerRef.current);
-        tabSwitchSettleTimerRef.current = null;
-      }
-      isTabSwitchingRef.current = false;
+      container.removeEventListener('wheel', onUserInput);
+      container.removeEventListener('touchstart', onUserInput);
+      container.removeEventListener('mousedown', onUserInput);
+    };
+  }, [cancelJump, onColumnUserInteract, tab.bookCode, tab.isLoading, tab.viewMode]);
+
+  // Restore clicked word highlight when pane becomes visible or chapters render
+  useEffect(() => {
+    if (!isVisible || !tab?.bookCode || !containerRef.current) return;
+    const record = clickedWordsByBookRef.current?.[tab.bookCode];
+    clearClickedWordHighlight(containerRef.current);
+    if (record) {
+      const timer = setTimeout(() => {
+        if (containerRef.current) {
+          restoreClickedWordHighlight(tab.bookCode, record, containerRef.current);
+        }
+      }, 70);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, tab?.bookCode, tab?.currentChapterIdx, settings?.paliScript, clickedWordsByBookRef]);
+
+  // Zero-bounce scroll restoration before paint when switching tabs or hydrating a tab
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const isReaderReady =
+      Boolean(isVisible && container && tab?.bookCode && tab.bookCode !== 'ai_chat') &&
+      tab.viewMode !== 'toc' &&
+      !tab.isTocView &&
+      !tab.isLoading;
+
+    if (!isReaderReady) {
+      wasVisibleReaderRef.current = false;
+      return;
     }
 
-    if (isNewBook || isNewContainer) {
-      isTabSwitchingRef.current = true;
-      restoredContainerRef.current = container;
-      restoredBookCodeRef.current = activeTab.bookCode;
-      prevBookCodeRef.current = activeTab.bookCode;
+    if (paneScrollIntent) {
+      if (tabSwitchRetryTimerRef.current) {
+        clearInterval(tabSwitchRetryTimerRef.current);
+        tabSwitchRetryTimerRef.current = null;
+      }
+      isTabSwitchingRef.current = false;
+      wasVisibleReaderRef.current = true;
+      return;
+    }
 
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
+    // If this pane was ALREADY visible in reader mode (e.g. paneScrollIntent just cleared
+    // after completing a jump, or props re-rendered while visible), do NOT re-apply savedScroll!
+    if (wasVisibleReaderRef.current && hasInitialRestoredRef.current) {
+      return;
+    }
+    wasVisibleReaderRef.current = true;
+
+    const savedScroll = getSavedScroll(tab.bookCode);
+
+    // FAST PATH: Pane was already mounted & restored previously.
+    // Because the pane's DOM stayed mounted while hidden, its layout height is already exact.
+    // Restore exact pixel scrollTop synchronously before paint with ZERO drift timers or anchor snapping!
+    if (hasInitialRestoredRef.current) {
+      isTabSwitchingRef.current = true;
+      if (Math.abs(container.scrollTop - savedScroll) > 1) {
+        container.scrollTop = savedScroll;
+      }
+      const rafId = requestAnimationFrame(() => {
+        if (containerRef.current && !paneScrollIntent) {
+          if (Math.abs(containerRef.current.scrollTop - savedScroll) > 2) {
+            containerRef.current.scrollTop = savedScroll;
+          }
+        }
+        isTabSwitchingRef.current = false;
+      });
+      return () => {
+        cancelAnimationFrame(rafId);
+        isTabSwitchingRef.current = false;
+      };
+    }
+
+    // INITIAL HYDRATION PATH: First time this tab is rendered without an explicit scroll intent.
+    const targetPara = tab?.lastParaNum;
+    const currentChap = tab?.currentChapterIdx;
+    const cleanPara = targetPara ? String(targetPara).replace(/^(?:para-?|p)/i, '').trim() : null;
+
+    const getTargetChap = () => {
+      if (currentChap !== undefined && currentChap !== null) {
+        return currentChap;
+      }
+      const curTab = activeTabRef.current;
+      const subKey = curTab?.sub_book;
+      if (cleanPara && subKey && curTab?.sub_books_para_to_chapter?.[subKey]?.[cleanPara] !== undefined) {
+        return curTab.sub_books_para_to_chapter[subKey][cleanPara];
+      }
+      if (cleanPara && curTab?.para_to_chapter?.[cleanPara] !== undefined) {
+        return curTab.para_to_chapter[cleanPara];
+      }
+      return 0;
+    };
+
+    const targetChap = getTargetChap();
+    if (targetChap !== undefined && targetChap !== null) {
+      if (!tab.loadedChapters?.[targetChap] && !tab.loadingChapters?.[targetChap]) {
+        loadChapter(tab.bookCode, targetChap);
+      }
+      bufferAdjacentChapters(tab.bookCode, targetChap);
+    }
+
+    const tryInitialRestore = () => {
+      const c = containerRef.current;
+      if (!c) return false;
+      const effChap = getTargetChap();
+      const TOP_PAD = 60;
+
+      if (savedScroll > 0) {
+        const maxScroll = Math.max(0, c.scrollHeight - c.clientHeight);
+        if (maxScroll >= savedScroll - 20) {
+          c.scrollTop = savedScroll;
+          hasInitialRestoredRef.current = true;
+          return true;
+        }
+        return false;
       }
 
-      if (!targetScrollIntent) {
-        const savedScroll = getSavedScroll(activeTab.bookCode);
-        const targetPara = activeTab?.lastParaNum;
-        const currentChap = activeTab?.currentChapterIdx;
-        const cleanPara = targetPara ? String(targetPara).replace(/^(?:para-?|p)/i, '').trim() : null;
+      const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
+      if (!chapEl || chapEl.classList.contains('chapter-placeholder')) {
+        return false;
+      }
 
-        // Dynamic resolver for target chapter (handles cases where para_to_chapter loads asynchronously)
-        const getTargetChap = () => {
-          if (cleanPara) {
-            if (activeTab.para_to_chapter?.[cleanPara] !== undefined) {
-              return activeTab.para_to_chapter[cleanPara];
-            }
-            const pDom = containerRef.current?.querySelector(`[data-para="${cleanPara}"]`);
-            if (pDom) {
-              const chBlock = pDom.closest('[data-chapter]');
-              if (chBlock) {
-                const cIdx = parseInt(chBlock.getAttribute('data-chapter'), 10);
-                if (!isNaN(cIdx)) return cIdx;
-              }
-            }
-          }
-          return (currentChap !== undefined && currentChap !== null) ? currentChap : 0;
-        };
-
-        const targetChap = getTargetChap();
-
-        // Preload target chapter and adjacent chapters if not yet loaded
-        if (targetChap !== undefined && targetChap !== null) {
-          if (!activeTab.loadedChapters?.[targetChap] && !activeTab.loadingChapters?.[targetChap]) {
-            loadChapter(activeTab.bookCode, targetChap);
-          }
-          bufferAdjacentChapters(activeTab.bookCode, targetChap);
-        }
-
-        // Semantic paragraph element finder
-        const findAnchorPara = (chapContainer) => {
-          if (!cleanPara) return null;
-          let pEl =
-            chapContainer?.querySelector(`[data-para="${cleanPara}"]`) ||
-            chapContainer?.querySelector(`[data-pindex="${cleanPara}"]`) ||
-            containerRef.current?.querySelector(`[data-para="${cleanPara}"]`) ||
-            containerRef.current?.querySelector(`[data-pindex="${cleanPara}"]`) ||
-            containerRef.current?.querySelector(`#para-${cleanPara}`) ||
-            containerRef.current?.querySelector(`#para${cleanPara}`);
-
-          if (!pEl && chapContainer) {
-            const targetInt = parseInt(cleanPara, 10);
-            if (!isNaN(targetInt)) {
-              const rangedParas = chapContainer.querySelectorAll('[data-para-first]');
-              for (const rp of rangedParas) {
-                const f = parseInt(rp.getAttribute('data-para-first'), 10);
-                const l = parseInt(rp.getAttribute('data-para-last'), 10);
-                if (!isNaN(f) && !isNaN(l) && targetInt >= f && targetInt <= l) {
-                  pEl = rp;
-                  break;
-                }
-              }
-            }
-          }
-          return pEl;
-        };
-
-        const restoreAndVerify = () => {
-          if (!containerRef.current || restoredBookCodeRef.current !== activeTab.bookCode) return false;
-          if (!isTabSwitchingRef.current) return false;
-          const c = containerRef.current;
-          const effChap = getTargetChap();
-          const TOP_PAD = 60;
-
-          // PRIORITY 0 (plain tab switch): exact pixel restore.
-          // The outgoing tab's scrollTop was saved verbatim in tabScrollMemory.
-          // Prefer it over any semantic anchor so mid-paragraph positions survive
-          // A -> B -> A round-trips. Anchor snapping is only for explicit jumps
-          // (targetScrollIntent, #para, MAT, search) which don't reach this branch.
-          if (savedScroll > 0) {
-            const maxScroll = Math.max(0, c.scrollHeight - c.clientHeight);
-            if (maxScroll >= savedScroll - 20) {
-              if (Math.abs(c.scrollTop - savedScroll) > 2) {
-                c.scrollTop = savedScroll;
-              }
-              // Don't overwrite memory with a recomputed anchor offset;
-              // the saved pixel IS the truth on this path.
-              return true;
-            }
-            // Content not tall enough yet (lazy chapters still loading) -> retry.
-            // Fall through to anchor checks only when pixel is out of range AND
-            // the target chapter already exists; otherwise wait for content.
-          }
-
-          const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
-          if (chapEl && chapEl.classList.contains('chapter-placeholder')) {
-            // Target chapter is still a placeholder, wait for its HTML to arrive
-            return false;
-          }
-          if (!chapEl) {
-            return false;
-          }
-
-          // PRIORITY 1: Semantic Paragraph Anchor (explicit jumps / first open)
-          if (cleanPara) {
-            const pEl = findAnchorPara(chapEl);
-            if (pEl) {
-              const cRect = c.getBoundingClientRect();
-              const pRect = pEl.getBoundingClientRect();
-              const targetOffset = Math.max(0, pRect.top - cRect.top + c.scrollTop - TOP_PAD);
-              if (Math.abs(c.scrollTop - targetOffset) > 2) {
-                c.scrollTop = targetOffset;
-              }
-              saveTabScroll(activeTab.bookCode, targetOffset);
-              return true;
-            }
-
-            // Paragraphs might still be mounting inside chapEl
-            if (chapEl.querySelectorAll('[data-para], [data-pindex]').length === 0) {
-              return false;
-            }
-          }
-
-          // PRIORITY 2: Semantic Chapter Header Anchor (first open, no pixel yet)
-          if (chapEl) {
-            // If we have a saved pixel but content isn't tall enough yet, keep
-            // waiting instead of snapping to chapter top (which would lose position).
-            if (savedScroll > 0) return false;
-            const cRect = c.getBoundingClientRect();
-            const chRect = chapEl.getBoundingClientRect();
-            const offset = Math.max(0, chRect.top - cRect.top + c.scrollTop - TOP_PAD);
-            if (Math.abs(c.scrollTop - offset) > 2) {
-              c.scrollTop = offset;
-            }
-            saveTabScroll(activeTab.bookCode, offset);
-            return true;
-          }
-
-          return false;
-        };
-
-        // Layout drift correction: only compensates for content growth ABOVE the
-        // viewport after a pixel restore (lazy translations / chapters streaming
-        // in). Does NOT re-snap to an anchor top, so it can't fight the saved pixel.
-        // Tracked via scrollHeight deltas; skipped once layout is stable.
-        let lastSeenHeight = -1;
-        const correctDrift = () => {
-          if (!containerRef.current || restoredBookCodeRef.current !== activeTab.bookCode) return;
-          if (!isTabSwitchingRef.current) return;
-          const c = containerRef.current;
-          // Pixel path already restored: only adjust if the container grew
-          // (content inserted above). If height is stable, leave scrollTop alone.
-          if (lastSeenHeight === -1) {
-            lastSeenHeight = c.scrollHeight;
-            return;
-          }
-          const growth = c.scrollHeight - lastSeenHeight;
-          lastSeenHeight = c.scrollHeight;
-          if (Math.abs(growth) <= 2) return;
-          // Growth above the viewport pushes content down; only correct when the
-          // target chapter/para is at/above viewport top (i.e. growth happened above).
-          const effChap = getTargetChap();
-          const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
-          if (!chapEl || chapEl.classList.contains('chapter-placeholder')) return;
-          let targetEl = findAnchorPara(chapEl);
-          if (!targetEl) targetEl = chapEl;
+      if (cleanPara) {
+        const pEl =
+          chapEl.querySelector(`[data-para="${cleanPara}"]`) ||
+          chapEl.querySelector(`[data-pindex="${cleanPara}"]`) ||
+          c.querySelector(`[data-para="${cleanPara}"]`);
+        if (pEl) {
           const cRect = c.getBoundingClientRect();
-          const tRect = targetEl.getBoundingClientRect();
-          // If the anchor sits above the viewport top, the growth was (mostly)
-          // above it -> shift by the measured growth, clamped to observed delta.
-          if (tRect.top < cRect.top) {
-            const TOP_PAD = 60;
-            const diff = tRect.top - cRect.top - TOP_PAD;
-            // Clamp correction to actual growth so a single tick can't jump far.
-            const clamped = Math.max(-Math.abs(growth), Math.min(Math.abs(growth), diff));
-            if (Math.abs(clamped) > 2) {
-              c.scrollTop = Math.max(0, c.scrollTop + clamped);
-            }
-          }
-        };
+          const pRect = pEl.getBoundingClientRect();
+          const offset = Math.max(0, pRect.top - cRect.top + c.scrollTop - TOP_PAD);
+          c.scrollTop = offset;
+          saveTabScroll(tab.bookCode, offset);
+          hasInitialRestoredRef.current = true;
+          return true;
+        }
+        if (chapEl.querySelectorAll('[data-para], [data-pindex]').length === 0) {
+          return false;
+        }
+      }
 
+      if (effChap > 0) {
+        const cRect = c.getBoundingClientRect();
+        const chRect = chapEl.getBoundingClientRect();
+        const offset = Math.max(0, chRect.top - cRect.top + c.scrollTop - TOP_PAD);
+        c.scrollTop = offset;
+        saveTabScroll(tab.bookCode, offset);
+      }
+      hasInitialRestoredRef.current = true;
+      return true;
+    };
+
+    isTabSwitchingRef.current = true;
+    if (tryInitialRestore()) {
+      isTabSwitchingRef.current = false;
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 50;
+    if (tabSwitchRetryTimerRef.current) {
+      clearInterval(tabSwitchRetryTimerRef.current);
+    }
+    tabSwitchRetryTimerRef.current = setInterval(() => {
+      attempts++;
+      if (tryInitialRestore() || attempts >= maxAttempts) {
+        hasInitialRestoredRef.current = true;
+        isTabSwitchingRef.current = false;
         if (tabSwitchRetryTimerRef.current) {
           clearInterval(tabSwitchRetryTimerRef.current);
           tabSwitchRetryTimerRef.current = null;
         }
-        if (tabSwitchSettleTimerRef.current) {
-          clearTimeout(tabSwitchSettleTimerRef.current);
-          tabSwitchSettleTimerRef.current = null;
-        }
-
-        // Try synchronously on layout
-        let initialRestored = restoreAndVerify();
-
-        // Run continuous drift-correction and retry watcher for 2.0s
-        let attempts = 0;
-        const maxAttempts = 40; // 40 * 50ms = 2000ms
-        tabSwitchRetryTimerRef.current = setInterval(() => {
-          attempts++;
-          if (!containerRef.current || restoredBookCodeRef.current !== activeTab.bookCode) {
-            if (tabSwitchRetryTimerRef.current) {
-              clearInterval(tabSwitchRetryTimerRef.current);
-              tabSwitchRetryTimerRef.current = null;
-            }
-            return;
-          }
-
-          if (!initialRestored) {
-            initialRestored = restoreAndVerify();
-          } else {
-            correctDrift();
-          }
-
-          if (attempts >= maxAttempts) {
-            if (tabSwitchRetryTimerRef.current) {
-              clearInterval(tabSwitchRetryTimerRef.current);
-              tabSwitchRetryTimerRef.current = null;
-            }
-            tabSwitchSettleTimerRef.current = setTimeout(() => {
-              if (restoredBookCodeRef.current === activeTab.bookCode) {
-                isTabSwitchingRef.current = false;
-              }
-            }, 100);
-          }
-        }, 50);
       }
-    }
+    }, 50);
+
+    return () => {
+      if (tabSwitchRetryTimerRef.current) {
+        clearInterval(tabSwitchRetryTimerRef.current);
+        tabSwitchRetryTimerRef.current = null;
+      }
+      isTabSwitchingRef.current = false;
+    };
   }, [
-    activeTab?.bookCode,
-    activeTab?.lastParaNum,
-    activeTab?.currentChapterIdx,
+    isVisible,
+    tab?.bookCode,
+    tab?.isLoading,
+    tab?.viewMode,
+    tab?.isTocView,
+    paneScrollIntent,
     getSavedScroll,
-    targetScrollIntent,
     loadChapter,
     bufferAdjacentChapters,
     saveTabScroll,
   ]);
 
-  // Handle immediate manual scroll cancellation for tab switching lock
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const onUserScrollStart = () => {
-      if (isTabSwitchingRef.current) {
-        isTabSwitchingRef.current = false;
-        if (tabSwitchSettleTimerRef.current) {
-          clearTimeout(tabSwitchSettleTimerRef.current);
-          tabSwitchSettleTimerRef.current = null;
-        }
-        if (tabSwitchRetryTimerRef.current) {
-          clearInterval(tabSwitchRetryTimerRef.current);
-          tabSwitchRetryTimerRef.current = null;
-        }
-      }
-    };
-
-    container.addEventListener('wheel', onUserScrollStart, { passive: true });
-    container.addEventListener('touchstart', onUserScrollStart, { passive: true });
-    return () => {
-      container.removeEventListener('wheel', onUserScrollStart);
-      container.removeEventListener('touchstart', onUserScrollStart);
-    };
-  }, []);
-
-  // Reset restoration container reference on unmount of ReaderView
-  useEffect(() => {
-    return () => {
-      restoredContainerRef.current = null;
-      if (tabSwitchRetryTimerRef.current) {
-        clearInterval(tabSwitchRetryTimerRef.current);
-        tabSwitchRetryTimerRef.current = null;
-      }
-      if (tabSwitchSettleTimerRef.current) {
-        clearTimeout(tabSwitchSettleTimerRef.current);
-        tabSwitchSettleTimerRef.current = null;
-      }
-    };
-  }, []);
-
   // Handle Target Scroll Intent (Chapter jumping, Search jumping, Book TOC jumping, MAT jumping, Bookmarks, History)
   useEffect(() => {
     const currentTab = activeTabRef.current;
     if (
-      !targetScrollIntent ||
+      !paneScrollIntent ||
+      !isVisible ||
       !containerRef.current ||
       !currentTab ||
       currentTab.viewMode === 'toc' ||
@@ -2026,7 +2514,7 @@ export default function ReaderView() {
       return;
     }
 
-    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = targetScrollIntent;
+    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = paneScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
     const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
 
@@ -2584,13 +3072,17 @@ export default function ReaderView() {
                 targetEl.classList.add('pulse-highlight');
               }
               const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
-              if (foundPNum) setActiveParaNum(foundPNum);
+              if (foundPNum) {
+                setPaneParaNum(foundPNum);
+                if (isActive) setActiveParaNum(foundPNum);
+              }
+              hasInitialRestoredRef.current = true;
               saveTabScroll(activeTab.bookCode, offset);
               armParaJumpWatcher(
                 `${activeTab.bookCode}:ch${chapterIdx}:pi${paraIndex}:${Date.now()}`,
                 offset
               );
-              clearTargetScrollIntent();
+              clearTargetScrollIntent(activeTab.bookCode);
               setIsTargetScrollWaiting(false);
               return;
             }
@@ -2599,8 +3091,8 @@ export default function ReaderView() {
       }
 
       // 1.5. Target search query highlight (for direct URLs like /book/s0103m.mul/3?q=metteyyabuddhuppādo)
-      if ((paraIndex === undefined || paraIndex === null || paraIndex === '') && !paraNum && !page && (searchHighlight?.query || targetScrollIntent?.highlightQuery)) {
-        const queryTerm = (searchHighlight?.query || targetScrollIntent?.highlightQuery || '').trim();
+      if ((paraIndex === undefined || paraIndex === null || paraIndex === '') && !paraNum && !page && (searchHighlight?.query || paneScrollIntent?.highlightQuery)) {
+        const queryTerm = (searchHighlight?.query || paneScrollIntent?.highlightQuery || '').trim();
         if (queryTerm) {
           const chapterEl = (chapterIdx !== undefined && chapterIdx !== null)
             ? containerRef.current.querySelector(`[data-chapter="${chapterIdx}"]`)
@@ -2640,13 +3132,17 @@ export default function ReaderView() {
                 row.classList.add('pulse-highlight');
               }
               const foundPNum = row.getAttribute?.('data-para') || targetEl.getAttribute?.('data-para');
-              if (foundPNum) setActiveParaNum(foundPNum);
+              if (foundPNum) {
+                setPaneParaNum(foundPNum);
+                if (isActive) setActiveParaNum(foundPNum);
+              }
+              hasInitialRestoredRef.current = true;
               saveTabScroll(activeTab.bookCode, offset);
               armParaJumpWatcher(
                 `${activeTab.bookCode}:ch${chapterIdx}:q:${queryTerm}:${Date.now()}`,
                 offset
               );
-              clearTargetScrollIntent();
+              clearTargetScrollIntent(activeTab.bookCode);
               setIsTargetScrollWaiting(false);
               return;
             } else if (retries < effectiveMaxRetries - 5) {
@@ -2757,13 +3253,17 @@ export default function ReaderView() {
               targetEl.getAttribute?.('data-para') ||
               targetEl.closest?.('[data-para]')?.getAttribute?.('data-para') ||
               pbEl.getAttribute?.('data-para');
-            if (foundPNum) setActiveParaNum(foundPNum);
+            if (foundPNum) {
+              setPaneParaNum(foundPNum);
+              if (isActive) setActiveParaNum(foundPNum);
+            }
+            hasInitialRestoredRef.current = true;
             saveTabScroll(activeTab.bookCode, offset);
             armParaJumpWatcher(
               `${activeTab.bookCode}:page:${ed}:${cleanP}:${Date.now()}`,
               offset
             );
-            clearTargetScrollIntent();
+            clearTargetScrollIntent(activeTab.bookCode);
             setIsTargetScrollWaiting(false);
             return;
           }
@@ -2842,8 +3342,8 @@ export default function ReaderView() {
           }
         }
 
-        // Fallback: nearest paragraph <= targetInt
-        if (!el && !isNaN(targetInt)) {
+        // Fallback: nearest paragraph <= targetInt, else nearest paragraph > targetInt, else chapter start
+        if (!el) {
           const scope = (effectiveScopeChap !== undefined && effectiveScopeChap !== null)
             ? containerRef.current.querySelector(`[data-chapter="${effectiveScopeChap}"]`)
             : containerRef.current;
@@ -2851,20 +3351,40 @@ export default function ReaderView() {
             const allParas = scope.querySelectorAll('[data-para]');
             let bestEl = null;
             let bestDiff = Infinity;
-            for (const p of allParas) {
-              if (activeSub && p.getAttribute('data-sub-book') && p.getAttribute('data-sub-book') !== activeSub) {
-                continue;
-              }
-              const pNum = parseInt(p.getAttribute('data-para'), 10);
-              if (!isNaN(pNum) && pNum <= targetInt) {
-                const diff = targetInt - pNum;
-                if (diff < bestDiff) {
-                  bestDiff = diff;
-                  bestEl = p;
+            let bestAfterEl = null;
+            let bestAfterDiff = Infinity;
+            if (!isNaN(targetInt)) {
+              for (const p of allParas) {
+                if (activeSub && p.getAttribute('data-sub-book') && p.getAttribute('data-sub-book') !== activeSub) {
+                  continue;
+                }
+                const pNum = parseInt(p.getAttribute('data-para'), 10);
+                if (!isNaN(pNum)) {
+                  if (pNum <= targetInt) {
+                    const diff = targetInt - pNum;
+                    if (diff < bestDiff) {
+                      bestDiff = diff;
+                      bestEl = p;
+                    }
+                  } else {
+                    const afterDiff = pNum - targetInt;
+                    if (afterDiff < bestAfterDiff) {
+                      bestAfterDiff = afterDiff;
+                      bestAfterEl = p;
+                    }
+                  }
                 }
               }
             }
-            if (bestEl) el = bestEl;
+            if (bestEl) {
+              el = bestEl;
+            } else if (bestAfterEl) {
+              el = bestAfterEl;
+            } else if (effectiveScopeChap !== undefined && effectiveScopeChap !== null) {
+              el =
+                scope.querySelector('.reader-para-row[data-pindex], p[data-pindex]') ||
+                scope;
+            }
           }
         }
 
@@ -2904,7 +3424,11 @@ export default function ReaderView() {
             }
             const hostChapIdx = hostChapter ? parseInt(hostChapter.getAttribute('data-chapter'), 10) : targetChap;
             const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
-            if (foundPNum) setActiveParaNum(foundPNum);
+            if (foundPNum) {
+              setPaneParaNum(foundPNum);
+              if (isActive) setActiveParaNum(foundPNum);
+            }
+            hasInitialRestoredRef.current = true;
             saveTabScroll(activeTab.bookCode, offset);
             if (hostChapIdx !== undefined && !isNaN(hostChapIdx)) {
               saveTabPosition(activeTab.bookCode, hostChapIdx, foundPNum, offset);
@@ -2913,7 +3437,7 @@ export default function ReaderView() {
               `${activeTab.bookCode}:ch${chapterIdx}:pn${cleanPara}:${Date.now()}`,
               offset
             );
-            clearTargetScrollIntent();
+            clearTargetScrollIntent(activeTab.bookCode);
             setIsTargetScrollWaiting(false);
             return;
           }
@@ -2928,17 +3452,21 @@ export default function ReaderView() {
         (paraIndex === undefined || paraIndex === null || paraIndex === '') &&
         !page &&
         !searchHighlight?.query &&
-        !targetScrollIntent?.highlightQuery
+        !paneScrollIntent?.highlightQuery
       ) {
         if (chapterIdx === 0) {
           performProgrammaticScroll(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
+          hasInitialRestoredRef.current = true;
           saveTabScroll(activeTab.bookCode, 0);
           const firstP = containerRef.current.querySelector('[data-para]');
           if (firstP) {
             const pNum = firstP.getAttribute('data-para');
-            if (pNum) setActiveParaNum(pNum);
+            if (pNum) {
+              setPaneParaNum(pNum);
+              if (isActive) setActiveParaNum(pNum);
+            }
           }
-          clearTargetScrollIntent();
+          clearTargetScrollIntent(activeTab.bookCode);
           setIsTargetScrollWaiting(false);
           return;
         }
@@ -2959,16 +3487,13 @@ export default function ReaderView() {
           const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
           performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
-          // NOTE (Fix 1): no pulse-highlight on whole-chapter jumps — with translation
-          // layers enabled the entire chapter flashes and repaints expensively.
-          // Pulse is kept for precise targets (search/MAT/bookmark/GoTo/page jumps).
-
           // Detect first paragraph in the chapter
           const inP = target.querySelector ? target.querySelector('[data-para]') : null;
           if (inP) {
             const pNum = inP.getAttribute('data-para');
             if (pNum) {
-              setActiveParaNum(pNum);
+              setPaneParaNum(pNum);
+              if (isActive) setActiveParaNum(pNum);
             }
           } else {
             let nextEl = target.nextElementSibling;
@@ -2976,7 +3501,8 @@ export default function ReaderView() {
               if (nextEl.hasAttribute && nextEl.hasAttribute('data-para')) {
                 const pNum = nextEl.getAttribute('data-para');
                 if (pNum) {
-                  setActiveParaNum(pNum);
+                  setPaneParaNum(pNum);
+                  if (isActive) setActiveParaNum(pNum);
                   break;
                 }
               }
@@ -2984,7 +3510,8 @@ export default function ReaderView() {
               if (innerP) {
                 const pNum = innerP.getAttribute('data-para');
                 if (pNum) {
-                  setActiveParaNum(pNum);
+                  setPaneParaNum(pNum);
+                  if (isActive) setActiveParaNum(pNum);
                   break;
                 }
               }
@@ -2992,17 +3519,14 @@ export default function ReaderView() {
             }
           }
 
+          hasInitialRestoredRef.current = true;
           saveTabScroll(activeTab.bookCode, offset);
+          saveTabPosition(activeTab.bookCode, chapterIdx, null, offset);
 
-          // Drift correction: lazy translations streaming into chapters above this
-          // one can shift it after we measured (the scroll journey itself triggers
-          // those loads via the 800px observer margin). A guarded settle watcher
-          // re-verifies the landing until the surrounding content has stopped
-          // streaming; manual scrolling cancels it via the mount listener above.
           const jumpKey = `${activeTab.bookCode}:ch${chapterIdx}`;
           armChapterJumpWatcher(jumpKey, offset, chapterIdx);
 
-          clearTargetScrollIntent();
+          clearTargetScrollIntent(activeTab.bookCode);
           setIsTargetScrollWaiting(false);
           return;
         }
@@ -3011,7 +3535,7 @@ export default function ReaderView() {
       if (retries < effectiveMaxRetries) {
         scheduleAttemptScroll(50);
       } else {
-        clearTargetScrollIntent();
+        clearTargetScrollIntent(activeTab.bookCode);
         setIsTargetScrollWaiting(false);
       }
     };
@@ -3041,7 +3565,9 @@ export default function ReaderView() {
       setIsTargetScrollWaiting(false);
     };
   }, [
-    targetScrollIntent,
+    paneScrollIntent,
+    isVisible,
+    isActive,
     activeTab?.bookCode,
     activeTab?.viewMode,
     activeTab?.isTocView,
@@ -3061,9 +3587,9 @@ export default function ReaderView() {
   ]);
 
 
-  // Detect active edition page numbers across loaded chapters
+  // Detect active edition page numbers across loaded chapters in this pane
   const detectActiveEditionPages = useCallback(() => {
-    if (!containerRef.current || !activeTab) return;
+    if (!containerRef.current || !activeTab || !isVisible) return;
     const container = containerRef.current;
     const containerRect = container.getBoundingClientRect();
     const targetY = containerRect.top + 80;
@@ -3083,9 +3609,6 @@ export default function ReaderView() {
         firstSeen[ed] = page;
       }
 
-      // If span.pb is hidden with display:none (hide-pb setting), getBoundingClientRect() on pb returns 0.
-      // Measuring the host row element gives the exact viewport position in both visible and hidden modes,
-      // and in both paragraph mode and sentence mode!
       const hostEl = pb.closest('[data-pindex], .reader-para-row, .sent-pair, p, .chapter-divider') || pb.parentElement || pb;
       const rect = hostEl.getBoundingClientRect();
       if (rect.top <= targetY) {
@@ -3100,63 +3623,74 @@ export default function ReaderView() {
     }
 
     if (Object.keys(pages).length > 0) {
-      setActiveEditionPages((prev) => {
+      setPaneEditionPages((prev) => {
         const isDiff =
           Object.keys(pages).some((k) => prev[k] !== pages[k]) ||
           Object.keys(prev).some((k) => prev[k] !== pages[k]);
         return isDiff ? pages : prev;
       });
+      if (isActive) {
+        setActiveEditionPages((prev) => {
+          const isDiff =
+            Object.keys(pages).some((k) => prev[k] !== pages[k]) ||
+            Object.keys(prev).some((k) => prev[k] !== pages[k]);
+          return isDiff ? pages : prev;
+        });
+      }
     }
-  }, [activeTab, setActiveEditionPages]);
+  }, [activeTab, isVisible, isActive, setActiveEditionPages]);
 
   // Initial and chapter content change detection
   useEffect(() => {
+    if (!isVisible) return;
     const timer = setTimeout(() => {
       detectActiveEditionPages();
     }, 120);
     return () => clearTimeout(timer);
-  }, [activeTab?.bookCode, activeTab?.loadedChapters, detectActiveEditionPages]);
+  }, [isVisible, isActive, activeTab?.bookCode, activeTab?.loadedChapters, detectActiveEditionPages]);
 
-  // Direct fast scroll listener — preserves tab scroll & detects active paragraph
+  // Keep activeParaNum in sync when this pane becomes the active tab/column
+  useEffect(() => {
+    if (isActive && paneParaNum) {
+      setActiveParaNum(paneParaNum);
+    }
+  }, [isActive, paneParaNum, setActiveParaNum]);
+
+  // Direct fast scroll listener — preserves tab scroll, drives parallel column sync & detects active paragraph
   const handleScroll = useCallback(
     (e) => {
-      if (isTabSwitchingRef.current) return;
+      if (!isVisible || isTabSwitchingRef.current) return;
 
       const top = e.target.scrollTop;
 
-      // Detect manual user scroll to immediately cancel any pending settle watchers
       if (!isProgrammaticScrollRef.current) {
         cancelJump();
       }
 
-      // Immediately update memory scroll on every scroll event (only if tab restoration is settled)
-      if (
-        activeTab?.bookCode &&
-        activeTab.bookCode !== 'ai_chat' &&
-        restoredBookCodeRef.current === activeTab.bookCode
-      ) {
+      if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
         saveTabScroll(activeTab.bookCode, top);
+      }
+
+      if (isColumnsMode && isParallelSyncActive && !isProgrammaticScrollRef.current) {
+        onColumnScrollSync?.(activeTab.bookCode, top);
       }
 
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
       scrollTimeoutRef.current = setTimeout(() => {
-        if (isTabSwitchingRef.current || restoredBookCodeRef.current !== activeTab?.bookCode) return;
-        if (activeTab && containerRef.current) {
-
-          // Detect active paragraph in reading viewport.
-          // Unified reading-line offset (must match restore TOP_PAD = 60).
+        if (!isVisible || isTabSwitchingRef.current) return;
+        const curTab = activeTabRef.current;
+        if (curTab && containerRef.current) {
           const container = containerRef.current;
           const containerRect = container.getBoundingClientRect();
           const targetY = containerRect.top + 60;
 
-
-          const paraElements = container.querySelectorAll('p[data-pindex]');
+          const paraElements = container.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
           let foundParaNum = null;
           let foundPIndex = null;
           let foundSnippet = '';
-          let foundChapterIdx = activeTab.currentChapterIdx || 0;
+          let foundChapterIdx = curTab.currentChapterIdx || 0;
 
           for (const p of paraElements) {
             const rect = p.getBoundingClientRect();
@@ -3166,7 +3700,7 @@ export default function ReaderView() {
               if (!foundParaNum) {
                 let prev = p.previousElementSibling;
                 while (prev) {
-                  const prevNum = prev.getAttribute('data-para');
+                  const prevNum = prev.getAttribute?.('data-para');
                   if (prevNum) {
                     foundParaNum = prevNum;
                     break;
@@ -3175,28 +3709,25 @@ export default function ReaderView() {
                 }
               }
 
-              // Extract text snippet
               const text = p.textContent?.replace(/\s+/g, ' ').trim() || '';
               if (text) {
                 foundSnippet = text.length > 130 ? text.slice(0, 130) + '...' : text;
               }
 
-              // Detect chapter directly from enclosing chapter DOM block first
               const chapBlock = p.closest('[data-chapter]');
               if (chapBlock) {
                 const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
                 if (!isNaN(cIdx)) foundChapterIdx = cIdx;
-              } else if (foundParaNum && activeTab.sub_books_para_to_chapter && activeTab.sub_book) {
-                const subChap = activeTab.sub_books_para_to_chapter[activeTab.sub_book]?.[foundParaNum];
+              } else if (foundParaNum && curTab.sub_books_para_to_chapter && curTab.sub_book) {
+                const subChap = curTab.sub_books_para_to_chapter[curTab.sub_book]?.[foundParaNum];
                 if (subChap !== undefined) foundChapterIdx = subChap;
-              } else if (foundParaNum && activeTab.para_to_chapter?.[foundParaNum] !== undefined) {
-                foundChapterIdx = activeTab.para_to_chapter[foundParaNum];
+              } else if (foundParaNum && curTab.para_to_chapter?.[foundParaNum] !== undefined) {
+                foundChapterIdx = curTab.para_to_chapter[foundParaNum];
               }
               break;
             }
           }
 
-          // Also scan chapter blocks directly to handle chapter boundaries & headings
           const chapBlocks = container.querySelectorAll('[data-chapter]');
           for (const cb of chapBlocks) {
             const r = cb.getBoundingClientRect();
@@ -3209,27 +3740,26 @@ export default function ReaderView() {
             }
           }
 
-          if (restoredBookCodeRef.current === activeTab.bookCode) {
-            if (foundParaNum) {
+          if (foundParaNum) {
+            setPaneParaNum(foundParaNum);
+            if (isActive) {
               setActiveParaNum(foundParaNum);
             }
-
-            // Continuously save tab reading position (chapter, paragraph, scroll offset)
-            saveTabPosition(activeTab.bookCode, foundChapterIdx, foundParaNum, top);
           }
 
-          // Automatically record user's exact reading position into History
+          saveTabPosition(curTab.bookCode, foundChapterIdx, foundParaNum, top);
+
           addToHistory({
-            bookCode: activeTab.bookCode,
-            bookTitle: activeTab.title,
-            nikaya: activeTab.nikaya,
+            bookCode: curTab.bookCode,
+            bookTitle: curTab.title,
+            nikaya: curTab.nikaya,
             chapterIdx: foundChapterIdx,
-            chapterTitle: activeTab.chapters?.[foundChapterIdx]?.title || '',
+            chapterTitle: curTab.chapters?.[foundChapterIdx]?.title || '',
             paraNum: foundParaNum || undefined,
             paraIndex: foundPIndex ? parseInt(foundPIndex, 10) : undefined,
             snippet:
               foundSnippet ||
-              `${activeTab.title} — ${activeTab.chapters?.[foundChapterIdx]?.title || `Chapter ${foundChapterIdx + 1}`}${
+              `${curTab.title} — ${curTab.chapters?.[foundChapterIdx]?.title || `Chapter ${foundChapterIdx + 1}`}${
                 foundParaNum ? ` (Para ${foundParaNum})` : ''
               }`,
           });
@@ -3238,10 +3768,27 @@ export default function ReaderView() {
         }
       }, 120);
     },
-    [activeTab, saveTabScroll, saveTabPosition, setActiveParaNum, detectActiveEditionPages, isSidebarOpen, setIsHeaderVisible, addToHistory, cancelJump]
+    [
+      isVisible,
+      isActive,
+      isColumnsMode,
+      isParallelSyncActive,
+      activeTab,
+      saveTabScroll,
+      saveTabPosition,
+      setActiveParaNum,
+      detectActiveEditionPages,
+      addToHistory,
+      cancelJump,
+      onColumnScrollSync,
+    ]
   );
 
   const handleReaderClick = useCallback((e) => {
+    if (isColumnsMode && !isActive) {
+      activatePane(activeTab.bookCode);
+    }
+
     // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
     if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
       if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
@@ -3249,8 +3796,38 @@ export default function ReaderView() {
       }
     }
 
-    // 1. Ignore clicks on interactive controls (buttons, links, go-to markers)
-    if (e.target.closest('button, a, input, select, textarea, [data-goto-type]')) {
+    // 0.5 Handle Linked Definition "+N more" expand/collapse and chip preview modal
+    const moreBtn = e.target.closest('.linked-def-more-btn');
+    if (moreBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const row = moreBtn.closest('.linked-def-row');
+      const moreGroup = row?.querySelector('.linked-def-more-group');
+      if (moreGroup) {
+        const isHidden = moreGroup.classList.contains('hidden');
+        moreGroup.classList.toggle('hidden', !isHidden);
+        const count = moreBtn.getAttribute('data-more-count') || '';
+        moreBtn.textContent = isHidden ? 'Less' : `+${count} more`;
+      }
+      return;
+    }
+
+    const linkChip = e.target.closest('.linked-def-chip');
+    if (linkChip) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rawPayload = linkChip.getAttribute('data-link');
+      if (rawPayload) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(rawPayload));
+          setActiveLinkedItem({ ...parsed, sourceBookCode: activeTab.bookCode });
+        } catch (_) {}
+      }
+      return;
+    }
+
+    // 1. Ignore clicks on interactive controls (buttons, links, go-to markers, linked-def strips)
+    if (e.target.closest('.linked-def-row, button, a, input, select, textarea, [data-goto-type]')) {
       return;
     }
 
@@ -3271,6 +3848,7 @@ export default function ReaderView() {
         }
       }
       if (pNum) {
+        setPaneParaNum(pNum);
         setActiveParaNum(pNum);
       }
       const pIdx = pEl.getAttribute('data-pindex');
@@ -3306,7 +3884,7 @@ export default function ReaderView() {
       const selection = window.getSelection()?.toString()?.trim();
       // Only trigger if not dragging/selecting multiple words
       if (!selection || selection.length <= 1) {
-        clearClickedWordHighlight();
+        clearClickedWordHighlight(containerRef.current || document);
 
         let range = null;
         if (document.caretRangeFromPoint) {
@@ -3394,7 +3972,7 @@ export default function ReaderView() {
         }
       }
     }
-  }, [activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord]);
+  }, [isColumnsMode, isActive, activatePane, activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord, setActiveLinkedItem]);
 
   const handleReaderDoubleClick = useCallback((e) => {
     // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
@@ -3413,6 +3991,10 @@ export default function ReaderView() {
       return;
     }
 
+    if (e.target.closest('.linked-def-row, button, a, input, select, textarea, [data-goto-type]')) {
+      return;
+    }
+
     // 1. Check window selection first
     const selection = window.getSelection()?.toString()?.trim();
     let wordToLookup = '';
@@ -3426,7 +4008,7 @@ export default function ReaderView() {
         const range = sel.getRangeAt(0);
         node = range.startContainer;
         startOffset = range.startOffset;
-        clearClickedWordHighlight();
+        clearClickedWordHighlight(containerRef.current || document);
         const clonedRange = range.cloneRange();
         highlightRangeInReader(clonedRange);
         sel.removeAllRanges();
@@ -3457,7 +4039,7 @@ export default function ReaderView() {
       }
     } else {
       // 2. Extract word at click point
-      clearClickedWordHighlight();
+      clearClickedWordHighlight(containerRef.current || document);
 
       let range = null;
       if (document.caretRangeFromPoint) {
@@ -3537,7 +4119,12 @@ export default function ReaderView() {
   }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, activeTab, recordClickedWord]);
 
   const handleBreadcrumbClick = () => {
-    document.body.classList.remove('zen-mode');
+    if (isColumnsMode && !isActive) {
+      activatePane(activeTab.bookCode);
+    }
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('zen-mode');
+    }
     setIsSidebarOpen(true);
     setIsHeaderVisible(true);
   };
@@ -3581,8 +4168,15 @@ export default function ReaderView() {
     [activeTab, loadChapter, bufferAdjacentChapters]
   );
 
+  const handleLinksLoaded = useCallback(
+    (chapIdx, paragraphs) => {
+      onPaneLinksLoaded?.(activeTab.bookCode, chapIdx, paragraphs);
+    },
+    [onPaneLinksLoaded, activeTab?.bookCode]
+  );
+
   const editionStatsList = React.useMemo(() => {
-    if (!activeEditionPages || Object.keys(activeEditionPages).length === 0) return [];
+    if (!paneEditionPages || Object.keys(paneEditionPages).length === 0) return [];
     const EDITION_LABELS = {
       M: 'Myanmar',
       V: 'VRI',
@@ -3591,9 +4185,9 @@ export default function ReaderView() {
       O: 'Other',
     };
     const allEditions = ['M', 'V', 'P', 'T', 'O']
-      .filter((ed) => activeEditionPages[ed])
+      .filter((ed) => paneEditionPages[ed])
       .map((ed) => {
-        const rawPage = String(activeEditionPages[ed]);
+        const rawPage = String(paneEditionPages[ed]);
         let formatted = rawPage;
         if (rawPage.includes('.')) {
           const parts = rawPage.split('.');
@@ -3618,13 +4212,14 @@ export default function ReaderView() {
     const preferred = allEditions.find((item) => item.ed === defaultEd);
     if (preferred) return [preferred];
     return [allEditions[0]];
-  }, [activeEditionPages, settings?.defaultEditionPage]);
+  }, [paneEditionPages, settings?.defaultEditionPage]);
+
+  const effectiveParaNum = paneParaNum || activeTab?.lastParaNum || (isActive ? activeParaNum : null);
 
   const handleQuickBookmark = () => {
     if (!activeTab) return;
-    
-    // Find current paragraph & snippet robustly
-    let currentPara = activeParaNum;
+
+    let currentPara = effectiveParaNum;
     let currentChapIdx = activeTab.currentChapterIdx || 0;
     let paraSnippet = '';
 
@@ -3638,7 +4233,7 @@ export default function ReaderView() {
           if (!pNum) {
             let prev = p.previousElementSibling;
             while (prev) {
-              pNum = prev.getAttribute('data-para');
+              pNum = prev.getAttribute?.('data-para');
               if (pNum) break;
               prev = prev.previousElementSibling;
             }
@@ -3652,27 +4247,19 @@ export default function ReaderView() {
     }
 
     if (typeof document !== 'undefined' && currentPara) {
-      const pEl =
-        containerRef.current?.querySelector(`[data-para="${currentPara}"]`) ||
-        document.querySelector(`[data-para="${currentPara}"]`);
+      const pEl = containerRef.current?.querySelector(`[data-para="${currentPara}"]`);
       const chapBlock = pEl?.closest('[data-chapter]');
       if (chapBlock) {
         const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
         if (!isNaN(cIdx)) currentChapIdx = cIdx;
       }
-    }
-
-    const currentChap = activeTab.chapters?.[currentChapIdx];
-
-    if (typeof document !== 'undefined' && currentPara) {
-      const pEl =
-        containerRef.current?.querySelector(`[data-para="${currentPara}"]`) ||
-        document.querySelector(`[data-para="${currentPara}"]`);
       if (pEl) {
         paraSnippet = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
         if (paraSnippet.length > 130) paraSnippet = paraSnippet.slice(0, 130) + '...';
       }
     }
+
+    const currentChap = activeTab.chapters?.[currentChapIdx];
 
     const isAlreadyBookmarked = bookmarks.some(
       (b) =>
@@ -3707,43 +4294,60 @@ export default function ReaderView() {
     }
   };
 
-  if (!activeTab) {
-    return (
-      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
-        <WelcomeView />
-      </main>
-    );
-  }
+  const layerInfo = useMemo(
+    () => getBookLayerInfo(activeTab?.bookCode, activeTab?.category),
+    [activeTab?.bookCode, activeTab?.category]
+  );
 
-  // AI Chat tab view
-  if (activeTab.type === 'ai_chat' || activeTab.bookCode === 'ai_chat' || activeTab.viewMode === 'ai_chat') {
-    return (
-      <main className="content-area flex-1 min-h-0 overflow-hidden relative flex flex-col bg-[var(--bg-primary)]">
-        <AiChatView initialQuery={activeTab.initialQuery} />
-      </main>
-    );
-  }
+  const wrapperClass = isVisible
+    ? `reader-pane flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)] ${
+        isColumnsMode
+          ? `border-r border-[var(--border-color)] last:border-r-0 ${
+              isActive ? 'reader-pane-active-col' : 'reader-pane-inactive-col'
+            }`
+          : ''
+      }`
+    : 'reader-pane hidden';
 
   // TOC view — when book opened without specific section
   if (activeTab.viewMode === 'toc' || activeTab.isTocView) {
     return (
-      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
-        <BookTocView />
-      </main>
+      <div className={wrapperClass} data-pane-code={activeTab.bookCode}>
+        <main
+          ref={setMainRef}
+          data-book-code={activeTab.bookCode}
+          data-active-pane={isActive ? 'true' : undefined}
+          className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
+          onClick={() => isColumnsMode && !isActive && activatePane(activeTab.bookCode)}
+        >
+          <BookTocView
+            tab={activeTab}
+            isColumnsMode={isColumnsMode}
+            onCloseColumn={(e) => closeTab(activeTab.bookCode, e)}
+          />
+        </main>
+      </div>
     );
   }
 
   if (activeTab.isLoading || (!activeTab.chapters?.length && !activeTab.html)) {
     return (
-      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
-        <MeditationLoader
-          bookTitle={activeTab.title}
-          bookCode={activeTab.bookCode}
-          chapterIdx={activeTab.currentChapterIdx}
-          paraNum={activeParaNum}
-          paliScript={settings?.paliScript}
-        />
-      </main>
+      <div className={wrapperClass} data-pane-code={activeTab.bookCode}>
+        <main
+          ref={setMainRef}
+          data-book-code={activeTab.bookCode}
+          data-active-pane={isActive ? 'true' : undefined}
+          className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
+        >
+          <MeditationLoader
+            bookTitle={activeTab.title}
+            bookCode={activeTab.bookCode}
+            chapterIdx={activeTab.currentChapterIdx}
+            paraNum={effectiveParaNum}
+            paliScript={settings?.paliScript}
+          />
+        </main>
+      </div>
     );
   }
 
@@ -3752,26 +4356,50 @@ export default function ReaderView() {
     (b) =>
       b.bookCode === activeTab.bookCode &&
       b.chapterIdx === (activeTab.currentChapterIdx || 0) &&
-      (activeParaNum ? String(b.paraNum) === String(activeParaNum) : true)
+      (effectiveParaNum ? String(b.paraNum) === String(effectiveParaNum) : true)
   );
 
-  const isContentHeaderHidden = !isHeaderVisible && !isSidebarOpen;
+  const isContentHeaderHidden = !isHeaderVisible && !isSidebarOpen && !isColumnsMode;
 
   return (
-    <div className="reader-view-panel flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
-      {/* Dynamic Auto-Hiding Breadcrumbs Bar (Outside of main scroll area to prevent jitter/shaking) */}
+    <div
+      className={wrapperClass}
+      data-pane-code={activeTab.bookCode}
+      onMouseDown={() => {
+        onColumnUserInteract?.(activeTab.bookCode);
+        if (isColumnsMode && !isActive) {
+          activatePane(activeTab.bookCode);
+        }
+      }}
+    >
+      {/* Dynamic Auto-Hiding Breadcrumbs Bar & Quick Alongside (Mūla / Aṭṭha / Ṭīkā) Controls */}
       <div
         ref={contentHeaderRef}
-        className={`content-header z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-xs select-none shrink-0 ${
-          isContentHeaderHidden ? 'hidden-scroll' : ''
-        }`}
+        className={`content-header z-30 transition-all duration-200 flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 border-b text-xs select-none shrink-0 ${
+          isColumnsMode && isActive
+            ? 'bg-[var(--bg-secondary)] border-[var(--accent)]/50'
+            : 'bg-[var(--bg-secondary)] border-[var(--border-color)]'
+        } ${isContentHeaderHidden ? 'hidden-scroll' : ''}`}
       >
         <div
-          className="breadcrumbs truncate text-xs flex-1 flex items-center gap-1.5 cursor-pointer"
+          className="breadcrumbs truncate text-xs flex-1 flex items-center gap-1.5 cursor-pointer min-w-0"
           onClick={handleBreadcrumbClick}
           title="Click to reveal full navigation and sidebar"
         >
-          {(activeTab.nikaya || activeTab.category) && (
+          {layerInfo.label && (
+            <span
+              className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 border ${
+                layerInfo.layer === 'mula'
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                  : layerInfo.layer === 'attha'
+                    ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                    : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+              }`}
+            >
+              {layerInfo.label}
+            </span>
+          )}
+          {!isColumnsMode && (activeTab.nikaya || activeTab.category) && (
             <>
               <span
                 onClick={handleNikayaClick}
@@ -3804,12 +4432,40 @@ export default function ReaderView() {
           )}
         </div>
 
-        {/* Right Controls: Live Edition Page Stats + Quick Bookmark */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Subtle Live Page Statistics for all editions */}
+        {/* Right Controls: Quick Open Alongside (Mūla / Aṭṭha / Ṭīkā) + Live Edition Page Stats + Quick Bookmark */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {layerInfo.siblingLayers.length > 0 && (
+            <div className="hidden sm:flex items-center gap-1 mr-0.5" role="group" aria-label="Open commentary alongside">
+              {layerInfo.siblingLayers.map((sib) => (
+                <button
+                  key={sib.layer}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    jumpToMat(sib.layer, {
+                      alongside: true,
+                      sourceBookCode: activeTab.bookCode,
+                      sourceParaNum: effectiveParaNum,
+                      sourceChapterIdx: activeTab.currentChapterIdx,
+                    });
+                  }}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border-color)] hover:border-[var(--accent)] transition cursor-pointer"
+                  title={`Open ${sib.label} alongside at paragraph ${effectiveParaNum || 1}`}
+                >
+                  <span className="opacity-70">+</span>
+                  <span>{sib.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {editionStatsList.length > 0 && (
             <div
-              onClick={() => openGoToModal('page', null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isColumnsMode && !isActive) activatePane(activeTab.bookCode);
+                openGoToModal('page', null);
+              }}
               className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)]/60 hover:border-[var(--border-color)] transition cursor-pointer shrink-0 select-none font-mono"
               title="Current Reading Page across Editions • Click to Go to Page"
             >
@@ -3822,6 +4478,7 @@ export default function ReaderView() {
                     <span
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isColumnsMode && !isActive) activatePane(activeTab.bookCode);
                         openGoToModal('page', ed);
                       }}
                       className="inline-flex items-center gap-0.5 hover:text-[var(--accent)] hover:underline transition"
@@ -3839,15 +4496,17 @@ export default function ReaderView() {
             </div>
           )}
 
-
           {/* Quick Bookmark Button in Breadcrumb Header */}
           <button
             className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
-            onClick={handleQuickBookmark}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleQuickBookmark();
+            }}
             title={
               isCurrentBookmarked
-                ? `Bookmarked${activeParaNum ? ` (Para ${activeParaNum})` : ''} — Click to remove`
-                : `Bookmark this place${activeParaNum ? ` (Para ${activeParaNum})` : ''}`
+                ? `Bookmarked${effectiveParaNum ? ` (Para ${effectiveParaNum})` : ''} — Click to remove`
+                : `Bookmark this place${effectiveParaNum ? ` (Para ${effectiveParaNum})` : ''}`
             }
           >
             {isCurrentBookmarked ? (
@@ -3858,14 +4517,30 @@ export default function ReaderView() {
           </button>
 
           {/* Recent Opened Books Button in Breadcrumb Header */}
-          <button
-            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
-            onClick={() => setIsHistoryOpen(true)}
-            title="Recent opened books"
-            aria-label="Recent opened books"
-          >
-            <History size={14} />
-          </button>
+          {!isColumnsMode && (
+            <button
+              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+              onClick={() => setIsHistoryOpen(true)}
+              title="Recent opened books"
+              aria-label="Recent opened books"
+            >
+              <History size={14} />
+            </button>
+          )}
+
+          {isColumnsMode && (
+            <button
+              className="p-1 rounded text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-card)] transition shrink-0 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeTab(activeTab.bookCode, e);
+              }}
+              title="Close column"
+              aria-label="Close column"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -3894,124 +4569,645 @@ export default function ReaderView() {
         <main
           className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden"
           tabIndex={0}
-          ref={containerRef}
+          ref={setMainRef}
+          data-book-code={activeTab.bookCode}
+          data-active-pane={isActive ? 'true' : undefined}
           onScroll={handleScroll}
         >
-        {/* Dynamic Translation Colors CSS Rules */}
-        {settings?.translationColors && Object.keys(settings.translationColors).length > 0 && (
-          <style
-            dangerouslySetInnerHTML={{
-              __html: Object.entries(settings.translationColors)
-                .map(([langKey, colors]) => {
-                  if (!colors) return '';
-                  const code = LANG_KEY_TO_CODE[langKey] || langKey;
-                  const bg = formatCssColor(colors.bg);
-                  const border = formatCssColor(colors.border);
-                  const text = formatCssColor(colors.text);
-                  const cssRules = [];
-                  if (bg) {
-                    cssRules.push(`background-color: ${bg} !important;`);
-                  }
-                  if (border) {
-                    cssRules.push(`border-left-color: ${border} !important;`);
-                  }
-                  const blockCss =
-                    cssRules.length > 0
-                      ? `
-                    .reader-trans-block[data-trans-lang="${langKey}"],
-                    .reader-trans-block[data-trans-lang="${code}"] {
-                      ${cssRules.join('\n')}
-                    }
-                  `
-                      : '';
-                  const textCss = text
-                    ? `
-                    .reader-trans-block[data-trans-lang="${langKey}"] .reader-trans-content,
-                    .reader-trans-block[data-trans-lang="${code}"] .reader-trans-content,
-                    .reader-trans-block[data-trans-lang="${langKey}"] .reader-nissaya-meaning,
-                    .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
-                    .reader-trans-block[data-trans-lang="${langKey}"] p,
-                    .reader-trans-block[data-trans-lang="${code}"] p {
-                      color: ${text} !important;
-                    }
-                  `
-                    : '';
-                  return blockCss + textCss;
-                })
-                .join('\n'),
-            }}
-          />
-        )}
-
-        {/* Lazy-Loaded Chapter Content Stream */}
-        <div
-          className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6"
-          onClick={handleReaderClick}
-          onDoubleClick={handleReaderDoubleClick}
-        >
+          {/* Lazy-Loaded Chapter Content Stream */}
           <div
-            className="reader-container w-full"
-            style={{
-              maxWidth:
-                (settings?.translationDisplayMode === 'side' || settings?.translationDisplayMode === 'side_rev') &&
-                ((isPaliEnabled && activeLangs.length > 0) || (!isPaliEnabled && activeLangs.length >= 2))
-                  ? '1400px'
-                  : 'var(--reader-max-width, 880px)',
-            }}
+            className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6"
+            onClick={handleReaderClick}
+            onDoubleClick={handleReaderDoubleClick}
           >
-            {activeTab.chapters && activeTab.chapters.length > 0 ? (
-              activeTab.chapters.map((chap) => (
-                <ChapterBlock
-                  key={`${activeTab.bookCode}_${chap.chapter_index}`}
-                  chapter={chap}
-                  bookCode={activeTab.bookCode}
-                  html={activeTab.loadedChapters?.[chap.chapter_index]}
-                  isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
-                  onVisible={handleChapterVisible}
-                  isCurrentOrTarget={
-                    activeTab.currentChapterIdx === chap.chapter_index ||
-                    targetScrollIntent?.chapterIdx === chap.chapter_index ||
-                    (chap.chapter_index === 0 && (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) && !targetScrollIntent?.chapterIdx)
-                  }
-                  paliScript={settings?.paliScript}
-                  searchHighlight={searchHighlight}
-                  highlightSearchTerms={settings?.highlightSearchTerms ?? true}
-                  activeLangs={activeLangs}
-                  orderedLayers={orderedLayers}
-                  isPaliEnabled={isPaliEnabled}
-                  translationDisplayMode={settings?.translationDisplayMode || 'stack'}
-                  translationColors={settings?.translationColors}
-                  sentenceMode={settings?.translationGranularity === 'sentence'}
+            <div
+              className="reader-container w-full"
+              style={{
+                maxWidth: isColumnsMode
+                  ? '100%'
+                  : (settings?.translationDisplayMode === 'side' || settings?.translationDisplayMode === 'side_rev') &&
+                      ((isPaliEnabled && activeLangs.length > 0) || (!isPaliEnabled && activeLangs.length >= 2))
+                    ? '1400px'
+                    : 'var(--reader-max-width, 880px)',
+              }}
+            >
+              {activeTab.chapters && activeTab.chapters.length > 0 ? (
+                activeTab.chapters.map((chap) => (
+                  <ChapterBlock
+                    key={`${activeTab.bookCode}_${chap.chapter_index}`}
+                    chapter={chap}
+                    bookCode={activeTab.bookCode}
+                    html={activeTab.loadedChapters?.[chap.chapter_index]}
+                    isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
+                    onVisible={handleChapterVisible}
+                    isCurrentOrTarget={
+                      activeTab.currentChapterIdx === chap.chapter_index ||
+                      paneScrollIntent?.chapterIdx === chap.chapter_index ||
+                      (chap.chapter_index === 0 &&
+                        (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) &&
+                        !paneScrollIntent?.chapterIdx)
+                    }
+                    paliScript={settings?.paliScript}
+                    searchHighlight={searchHighlight}
+                    highlightSearchTerms={settings?.highlightSearchTerms ?? true}
+                    activeLangs={activeLangs}
+                    orderedLayers={orderedLayers}
+                    isPaliEnabled={isPaliEnabled}
+                    translationDisplayMode={settings?.translationDisplayMode || 'stack'}
+                    translationColors={settings?.translationColors}
+                    sentenceMode={settings?.translationGranularity === 'sentence'}
+                    showBookLinks={settings?.showBookLinks !== false}
+                    isParallelSyncActive={isColumnsMode && isParallelSyncActive}
+                    onLinksLoaded={handleLinksLoaded}
+                    theme={settings?.theme || 'classic'}
+                  />
+                ))
+              ) : (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: (function () {
+                      if (!activeTab.html) return '';
+                      let processed = activeTab.html;
+                      if (settings?.paliScript && settings.paliScript !== 'roman') {
+                        processed = transliterateHtml(processed, settings.paliScript);
+                      }
+                      const isPali = isSearchPali(searchHighlight);
+                      if (
+                        (settings?.highlightSearchTerms ?? true) &&
+                        searchHighlight?.query &&
+                        searchHighlight.query.trim() &&
+                        isPali
+                      ) {
+                        processed = highlightHtmlText(
+                          processed,
+                          searchHighlight.query.trim(),
+                          settings?.paliScript,
+                          searchHighlight.paraIndex,
+                          searchHighlight.paraNum
+                        );
+                      }
+                      return processed;
+                    })(),
+                  }}
                 />
-              ))
-            ) : (
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: (function () {
-                    if (!activeTab.html) return '';
-                    let processed = activeTab.html;
-                    if (settings?.paliScript && settings.paliScript !== 'roman') {
-                      processed = transliterateHtml(processed, settings.paliScript);
-                    }
-                    const isPali = isSearchPali(searchHighlight);
-                    if ((settings?.highlightSearchTerms ?? true) && searchHighlight?.query && searchHighlight.query.trim() && isPali) {
-                      processed = highlightHtmlText(
-                        processed,
-                        searchHighlight.query.trim(),
-                        settings?.paliScript,
-                        searchHighlight.paraIndex,
-                        searchHighlight.paraNum
-                      );
-                    }
-                    return processed;
-                  })(),
-                }}
-              />
-            )}
+              )}
+            </div>
           </div>
-        </div>
         </main>
       </div>
+    </div>
+  );
+});
+
+export default function ReaderView() {
+  const {
+    openTabs = [],
+    activeTab,
+    activeBookCode,
+    activatePane,
+    closeTab,
+    jumpToMat,
+    loadChapter,
+    bufferAdjacentChapters,
+    saveTabScroll,
+    getSavedScroll,
+    targetScrollIntent,
+    tabScrollIntents,
+    clearTargetScrollIntent,
+    setIsSidebarOpen,
+    isSidebarOpen,
+    isHeaderVisible,
+    setIsHeaderVisible,
+    addBookmark,
+    removeBookmark,
+    isBookmarked,
+    bookmarks = [],
+    activeParaNum,
+    setActiveParaNum,
+    activeEditionPages,
+    setActiveEditionPages,
+    openGoToModal,
+    addToHistory,
+    saveTabPosition,
+    searchHighlight,
+    openBook,
+    setIsHistoryOpen,
+  } = useTabs();
+
+  const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
+  const [activeLinkedItem, setActiveLinkedItem] = useState(null);
+  const { settings } = useThemeSettings();
+  const pulseAnimation = Boolean(settings?.pulseAnimation);
+
+  const isPaliEnabled = settings?.translations?.pali !== false;
+
+  const orderedLayers = useMemo(() => {
+    const order = settings?.translationOrder || [];
+    const layers = [];
+    for (const id of order) {
+      if (id === 'pali') {
+        if (isPaliEnabled) {
+          layers.push({ id: 'pali', type: 'pali' });
+        }
+      } else if (settings?.translations?.[id] && LANG_KEY_TO_CODE[id]) {
+        layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
+      }
+    }
+    if (isPaliEnabled && !layers.some((l) => l.id === 'pali')) {
+      layers.unshift({ id: 'pali', type: 'pali' });
+    }
+    if (settings?.translations) {
+      for (const [id, enabled] of Object.entries(settings.translations)) {
+        if (id !== 'pali' && enabled && LANG_KEY_TO_CODE[id] && !layers.some((l) => l.id === id)) {
+          layers.push({ id, type: 'trans', lang: LANG_KEY_TO_CODE[id] });
+        }
+      }
+    }
+    return layers;
+  }, [settings?.translations, settings?.translationOrder, isPaliEnabled]);
+
+  const activeLangs = useMemo(() => {
+    const langs = [];
+    for (const layer of orderedLayers) {
+      if (layer.type === 'trans' && !langs.includes(layer.lang)) {
+        langs.push(layer.lang);
+      }
+    }
+    return langs;
+  }, [orderedLayers]);
+
+  const sentenceMode = settings?.translationGranularity === 'sentence';
+  const hasTransLayers = useMemo(() => orderedLayers.some((l) => l.type === 'trans'), [orderedLayers]);
+
+  const clickedWordsByBookRef = useRef({});
+  const paneDomRefs = useRef({});
+  const paneLinksByBookRef = useRef({});
+  const driverBookCodeRef = useRef(null);
+  const syncRafRef = useRef(null);
+
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CLICKED_WORDS);
+      if (saved) {
+        clickedWordsByBookRef.current = JSON.parse(saved);
+      }
+    } catch (e) {}
+  }, []);
+
+  const recordClickedWord = useCallback((bookCode, record) => {
+    if (!bookCode || !record) return;
+    clickedWordsByBookRef.current[bookCode] = record;
+    try {
+      localStorage.setItem(STORAGE_KEY_CLICKED_WORDS, JSON.stringify(clickedWordsByBookRef.current));
+    } catch (e) {}
+  }, []);
+
+  const registerPaneRef = useCallback((bookCode, node) => {
+    if (!bookCode) return;
+    if (node) {
+      paneDomRefs.current[bookCode] = node;
+    } else {
+      delete paneDomRefs.current[bookCode];
+    }
+  }, []);
+
+  const handlePaneLinksLoaded = useCallback((bookCode, chapIdx, paragraphs) => {
+    if (!bookCode) return;
+    if (!paneLinksByBookRef.current[bookCode]) {
+      paneLinksByBookRef.current[bookCode] = {};
+    }
+    paneLinksByBookRef.current[bookCode][chapIdx] = paragraphs;
+  }, []);
+
+  const bookTabs = useMemo(
+    () =>
+      openTabs.length > 0
+        ? openTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat')
+        : activeTab && activeTab.type !== 'ai_chat' && activeTab.bookCode !== 'ai_chat'
+          ? [activeTab]
+          : [],
+    [openTabs, activeTab]
+  );
+
+  const isWideScreen = viewportWidth >= 900;
+  const maxColumns = viewportWidth >= 1100 ? 3 : 2;
+  const isAiActive =
+    activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat' || activeTab?.viewMode === 'ai_chat';
+  const isColumnsMode =
+    settings?.tabView === 'columns' &&
+    isWideScreen &&
+    bookTabs.length > 1 &&
+    !isAiActive;
+  const isParallelSyncActive = settings?.syncScroll === true;
+
+  const visibleColumnBookCodes = useMemo(() => {
+    if (!activeTab || isAiActive) return new Set();
+    if (!isColumnsMode) {
+      return new Set([activeTab.bookCode]);
+    }
+    if (bookTabs.length <= maxColumns) {
+      return new Set(bookTabs.map((t) => t.bookCode));
+    }
+    const activeIdx = Math.max(
+      0,
+      bookTabs.findIndex((t) => t.bookCode === (activeBookCode || activeTab.bookCode))
+    );
+    let start = maxColumns === 2 ? activeIdx : Math.max(0, activeIdx - 1);
+    if (start + maxColumns > bookTabs.length) {
+      start = Math.max(0, bookTabs.length - maxColumns);
+    }
+    return new Set(bookTabs.slice(start, start + maxColumns).map((t) => t.bookCode));
+  }, [activeTab, activeBookCode, isAiActive, isColumnsMode, bookTabs, maxColumns]);
+
+  const handleColumnUserInteract = useCallback((bookCode) => {
+    driverBookCodeRef.current = bookCode;
+  }, []);
+
+  // Synchronized column scrolling: map the driver column's reading line (scrollTop + 60)
+  // to each follower column using monotonic anchor interpolation.
+  const handleColumnScrollSync = useCallback(
+    (srcBookCode, srcScrollTop) => {
+      if (!isColumnsMode || !isParallelSyncActive) return;
+      if (driverBookCodeRef.current && driverBookCodeRef.current !== srcBookCode) return;
+
+      if (syncRafRef.current) {
+        cancelAnimationFrame(syncRafRef.current);
+      }
+
+      syncRafRef.current = requestAnimationFrame(() => {
+        syncRafRef.current = null;
+        const srcContainer = paneDomRefs.current[srcBookCode];
+        const srcTab = bookTabs.find((t) => t.bookCode === srcBookCode);
+        if (!srcContainer || !srcTab) return;
+
+        const TOP_PAD = 60;
+        const srcReadingY = srcScrollTop + TOP_PAD;
+
+        for (const dstTab of bookTabs) {
+          if (dstTab.bookCode === srcBookCode || !visibleColumnBookCodes.has(dstTab.bookCode)) {
+            continue;
+          }
+          const dstContainer = paneDomRefs.current[dstTab.bookCode];
+          if (!dstContainer) continue;
+
+          const chain = buildParallelAnchors(
+            srcContainer,
+            dstContainer,
+            srcTab,
+            dstTab,
+            paneLinksByBookRef.current[srcBookCode],
+            paneLinksByBookRef.current[dstTab.bookCode]
+          );
+
+          if (chain.length > 0) {
+            const dstReadingY = interpolateMonotonicY(chain, srcReadingY);
+            if (dstReadingY !== null && Number.isFinite(dstReadingY)) {
+              const maxDstScroll = Math.max(0, dstContainer.scrollHeight - dstContainer.clientHeight);
+              const nextDstScroll = Math.max(0, Math.min(maxDstScroll, dstReadingY - TOP_PAD));
+              if (Math.abs(dstContainer.scrollTop - nextDstScroll) > 2) {
+                dstContainer.scrollTop = nextDstScroll;
+                saveTabScroll(dstTab.bookCode, nextDstScroll);
+              }
+            }
+          } else {
+            const cRect = srcContainer.getBoundingClientRect();
+            const targetViewportY = cRect.top + TOP_PAD;
+            const paraEls = srcContainer.querySelectorAll('.chapter-content-block [data-para]');
+            let currentPara = null;
+            let srcChapIdx = srcTab.currentChapterIdx ?? 0;
+            for (const p of paraEls) {
+              if (p.getBoundingClientRect().bottom >= targetViewportY) {
+                currentPara = p.getAttribute('data-para');
+                const chEl = p.closest?.('[data-chapter]');
+                if (chEl) {
+                  const parsedCh = parseInt(chEl.getAttribute('data-chapter'), 10);
+                  if (!isNaN(parsedCh)) srcChapIdx = parsedCh;
+                }
+                break;
+              }
+            }
+            const dstLayer = getBookLayerInfo(dstTab.bookCode, dstTab.category).layer;
+            const srcSub = srcTab.sub_book || srcTab.chapter_to_sub_book?.[srcChapIdx];
+            const matInfo =
+              (currentPara &&
+                srcSub &&
+                srcTab.sub_books_para_to_mat?.[srcSub]?.[currentPara]?.[dstLayer]) ||
+              (currentPara && srcTab.para_to_mat?.[currentPara]?.[dstLayer]) ||
+              srcTab.chapter_to_mat?.[srcChapIdx]?.[dstLayer] ||
+              srcTab.chapter_to_mat?.[String(srcChapIdx)]?.[dstLayer];
+            const targetPara = matInfo?.para || currentPara;
+            const matBook = matInfo?.book || matInfo?.book_code;
+            const matChap = matInfo?.chapter ?? matInfo?.chapter_index;
+            const dstSub = dstTab.sub_book;
+            const dstChapIdx =
+              matBook === dstTab.bookCode && matChap !== undefined && matChap !== null
+                ? matChap
+                : (targetPara &&
+                    dstSub &&
+                    dstTab.sub_books_para_to_chapter?.[dstSub]?.[targetPara]) ??
+                  (targetPara ? dstTab.para_to_chapter?.[targetPara] : undefined);
+            if (
+              dstChapIdx !== undefined &&
+              dstChapIdx !== null &&
+              !dstTab.loadedChapters?.[dstChapIdx] &&
+              !dstTab.loadingChapters?.[dstChapIdx]
+            ) {
+              loadChapter(dstTab.bookCode, dstChapIdx);
+              bufferAdjacentChapters(dstTab.bookCode, dstChapIdx);
+            }
+          }
+        }
+      });
+    },
+    [
+      isColumnsMode,
+      isParallelSyncActive,
+      bookTabs,
+      visibleColumnBookCodes,
+      saveTabScroll,
+      loadChapter,
+      bufferAdjacentChapters,
+    ]
+  );
+
+  // Keyboard navigation support for the active pane (PageUp, PageDown, ArrowUp, ArrowDown, Home, End, Space)
+  useEffect(() => {
+    const handleNavigationKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName?.toLowerCase();
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        activeEl?.isContentEditable ||
+        activeEl?.closest?.('[contenteditable="true"]') ||
+        activeEl?.closest?.('aside, .app-sidebar, [role="dialog"]')
+      ) {
+        return;
+      }
+
+      if ((tag === 'button' || tag === 'a') && (e.key === ' ' || e.key === 'Enter')) {
+        return;
+      }
+      if (
+        (tag === 'button' || tag === 'a') &&
+        activeEl?.closest?.('[role="menu"], [role="listbox"], [role="combobox"]')
+      ) {
+        return;
+      }
+
+      const hasModal = document.querySelector(
+        '.modal-backdrop, [role="dialog"], .fixed.inset-0.z-50, .fixed.inset-0.z-\\[9999\\]'
+      );
+      if (hasModal) return;
+
+      const curCode = activeTab?.bookCode;
+      const container = (curCode && paneDomRefs.current[curCode]) || null;
+      if (!container) return;
+
+      driverBookCodeRef.current = curCode;
+
+      const clientHeight = container.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const pageStep = Math.max(120, Math.round(clientHeight * 0.85));
+      const lineStep = 80;
+
+      if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+        e.preventDefault();
+        container.scrollBy({
+          top: pageStep,
+          behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
+        });
+      } else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+        e.preventDefault();
+        container.scrollBy({
+          top: -pageStep,
+          behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
+        });
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        container.scrollBy({ top: lineStep, behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        container.scrollBy({ top: -lineStep, behavior: 'smooth' });
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        container.scrollTo({ top: 0, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleNavigationKeyDown, { passive: false });
+    return () => window.removeEventListener('keydown', handleNavigationKeyDown);
+  }, [activeTab?.bookCode, settings?.scrollMotion]);
+
+  const translationStyleRules = useMemo(() => {
+    if (
+      !orderedLayers.some((l) => l.type === 'trans') &&
+      !(settings?.translationColors && Object.keys(settings.translationColors).length > 0)
+    ) {
+      return '';
+    }
+    const currentTheme = settings?.theme || 'classic';
+    const customMap = settings?.translationColors || {};
+    const activeTransLayers = orderedLayers.filter((l) => l.type === 'trans');
+    const handledKeys = new Set();
+    const rules = [];
+
+    activeTransLayers.forEach((layer, slotIdx) => {
+      const slotDefaults = getDefaultTranslationColorsForTheme(currentTheme, slotIdx);
+      const custom = customMap[layer.id] || customMap[layer.lang] || {};
+      const code = LANG_KEY_TO_CODE[layer.id] || layer.lang;
+      handledKeys.add(layer.id);
+      handledKeys.add(code);
+      const bg = formatCssColor(custom.bg);
+      const border = formatCssColor(custom.border) || slotDefaults.border;
+      const text = formatCssColor(custom.text) || slotDefaults.text;
+
+      if (bg) {
+        rules.push(`
+        .reader-trans-block[data-trans-lang="${layer.id}"],
+        .reader-trans-block[data-trans-lang="${code}"] {
+          background-color: ${bg} !important;
+        }`);
+      }
+      if (border) {
+        rules.push(`
+        body:not(.hide-trans-borders) .reader-trans-block[data-trans-lang="${layer.id}"],
+        body:not(.hide-trans-borders) .reader-trans-block[data-trans-lang="${code}"] {
+          border-left-color: ${border} !important;
+        }`);
+      }
+      if (text) {
+        rules.push(`
+        .reader-trans-block[data-trans-lang="${layer.id}"],
+        .reader-trans-block[data-trans-lang="${code}"],
+        .reader-trans-block[data-trans-lang="${layer.id}"] .reader-trans-content,
+        .reader-trans-block[data-trans-lang="${code}"] .reader-trans-content,
+        .reader-trans-block[data-trans-lang="${layer.id}"] .reader-nissaya-meaning,
+        .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
+        .reader-trans-block[data-trans-lang="${layer.id}"] p,
+        .reader-trans-block[data-trans-lang="${code}"] p {
+          color: ${text} !important;
+        }`);
+      }
+    });
+
+    Object.entries(customMap).forEach(([langKey, colors]) => {
+      if (!colors || handledKeys.has(langKey)) return;
+      const code = LANG_KEY_TO_CODE[langKey] || langKey;
+      const bg = formatCssColor(colors.bg);
+      const border = formatCssColor(colors.border);
+      const text = formatCssColor(colors.text);
+      if (bg) {
+        rules.push(`
+        .reader-trans-block[data-trans-lang="${langKey}"],
+        .reader-trans-block[data-trans-lang="${code}"] {
+          background-color: ${bg} !important;
+        }`);
+      }
+      if (border) {
+        rules.push(`
+        body:not(.hide-trans-borders) .reader-trans-block[data-trans-lang="${langKey}"],
+        body:not(.hide-trans-borders) .reader-trans-block[data-trans-lang="${code}"] {
+          border-left-color: ${border} !important;
+        }`);
+      }
+      if (text) {
+        rules.push(`
+        .reader-trans-block[data-trans-lang="${langKey}"],
+        .reader-trans-block[data-trans-lang="${code}"],
+        .reader-trans-block[data-trans-lang="${langKey}"] .reader-trans-content,
+        .reader-trans-block[data-trans-lang="${code}"] .reader-trans-content,
+        .reader-trans-block[data-trans-lang="${langKey}"] .reader-nissaya-meaning,
+        .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
+        .reader-trans-block[data-trans-lang="${langKey}"] p,
+        .reader-trans-block[data-trans-lang="${code}"] p {
+          color: ${text} !important;
+        }`);
+      }
+    });
+
+    return rules.join('\n');
+  }, [orderedLayers, settings?.translationColors, settings?.theme]);
+
+  if (!activeTab) {
+    return (
+      <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
+        <WelcomeView />
+      </main>
+    );
+  }
+
+  return (
+    <div className="reader-view-panel flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
+      {translationStyleRules && <style dangerouslySetInnerHTML={{ __html: translationStyleRules }} />}
+
+      {/* AI Chat View (rendered when active, while keeping book panes mounted in background) */}
+      {isAiActive && (
+        <main className="content-area flex-1 min-h-0 overflow-hidden relative flex flex-col bg-[var(--bg-primary)]">
+          <AiChatView initialQuery={activeTab.initialQuery} />
+        </main>
+      )}
+
+      {/* Persistent Per-Tab Book Panes (Single / Tabbed / Parallel Columns) */}
+      <div
+        className={
+          isAiActive
+            ? 'hidden'
+            : `reader-panes-host flex-1 min-h-0 flex ${isColumnsMode ? 'flex-row reader-columns-grid' : 'flex-col'}`
+        }
+      >
+        {bookTabs.map((tab) => {
+          const isPaneVisible = visibleColumnBookCodes.has(tab.bookCode);
+          const isPaneActive = tab.bookCode === activeTab.bookCode;
+          const paneIntent =
+            tabScrollIntents?.[tab.bookCode] ||
+            (targetScrollIntent &&
+            (targetScrollIntent.bookCode === tab.bookCode || (!targetScrollIntent.bookCode && isPaneActive))
+              ? targetScrollIntent
+              : null);
+
+          return (
+            <ReaderPane
+              key={tab.bookCode}
+              tab={tab}
+              isVisible={isPaneVisible}
+              isActive={isPaneActive}
+              isColumnsMode={isColumnsMode}
+              isParallelSyncActive={isParallelSyncActive}
+              paneScrollIntent={paneIntent}
+              clearTargetScrollIntent={clearTargetScrollIntent}
+              loadChapter={loadChapter}
+              bufferAdjacentChapters={bufferAdjacentChapters}
+              saveTabScroll={saveTabScroll}
+              getSavedScroll={getSavedScroll}
+              saveTabPosition={saveTabPosition}
+              activatePane={activatePane}
+              closeTab={closeTab}
+              jumpToMat={jumpToMat}
+              openBook={openBook}
+              openGoToModal={openGoToModal}
+              addBookmark={addBookmark}
+              removeBookmark={removeBookmark}
+              bookmarks={bookmarks}
+              activeParaNum={activeParaNum}
+              setActiveParaNum={setActiveParaNum}
+              setActiveEditionPages={setActiveEditionPages}
+              addToHistory={addToHistory}
+              setIsHistoryOpen={setIsHistoryOpen}
+              isSidebarOpen={isSidebarOpen}
+              setIsSidebarOpen={setIsSidebarOpen}
+              isHeaderVisible={isHeaderVisible}
+              setIsHeaderVisible={setIsHeaderVisible}
+              searchHighlight={searchHighlight}
+              settings={settings}
+              orderedLayers={orderedLayers}
+              activeLangs={activeLangs}
+              isPaliEnabled={isPaliEnabled}
+              sentenceMode={sentenceMode}
+              hasTransLayers={hasTransLayers}
+              pulseAnimation={pulseAnimation}
+              openDictionary={openDictionary}
+              clickToLookupEnabled={clickToLookupEnabled}
+              clickLookupMode={clickLookupMode}
+              recordClickedWord={recordClickedWord}
+              clickedWordsByBookRef={clickedWordsByBookRef}
+              setActiveLinkedItem={setActiveLinkedItem}
+              registerPaneRef={registerPaneRef}
+              onColumnUserInteract={handleColumnUserInteract}
+              onColumnScrollSync={handleColumnScrollSync}
+              onPaneLinksLoaded={handlePaneLinksLoaded}
+            />
+          );
+        })}
+      </div>
+
+      {activeLinkedItem && (
+        <LinkedDefinitionModal
+          link={activeLinkedItem}
+          activeLangs={activeLangs}
+          currentScript={settings?.paliScript || 'roman'}
+          onClose={() => setActiveLinkedItem(null)}
+        />
+      )}
     </div>
   );
 }

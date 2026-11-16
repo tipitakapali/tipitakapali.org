@@ -5,6 +5,7 @@ import { TabProvider } from '../context/TabContext';
 import { TtsProvider } from '../context/TtsContext';
 import { DictionaryProvider } from '../context/DictionaryContext';
 import WebMcpRegistration from '../components/WebMcpRegistration';
+import AiTranslationNoticeBanner from '../components/AiTranslationNoticeBanner';
 
 export const metadata = {
   metadataBase: new URL('https://tipitakapali.org'),
@@ -173,6 +174,7 @@ export default function RootLayout({ children }) {
             <TtsProvider>
               <DictionaryProvider>
                 {children}
+                <AiTranslationNoticeBanner />
               </DictionaryProvider>
             </TtsProvider>
           </TabProvider>

@@ -8,7 +8,7 @@
  * - Reduced Motion / Instant mode: direct 0ms jump
  */
 
-let activeAnimationId = null;
+const activeAnimationByContainer = new WeakMap();
 
 export function smartScrollTo(container, targetTop, options = {}) {
   if (!container) return;
@@ -23,10 +23,11 @@ export function smartScrollTo(container, targetTop, options = {}) {
   const currentTop = container.scrollTop;
   const distance = Math.abs(destination - currentTop);
 
-  // Cancel any ongoing scroll animation
-  if (activeAnimationId) {
-    cancelAnimationFrame(activeAnimationId);
-    activeAnimationId = null;
+  // Cancel any ongoing scroll animation for this specific container
+  const prevAnimId = activeAnimationByContainer.get(container);
+  if (prevAnimId) {
+    cancelAnimationFrame(prevAnimId);
+    activeAnimationByContainer.delete(container);
   }
 
   // 1. Instant / Zero Motion preference
@@ -78,14 +79,16 @@ export function smartScrollTo(container, targetTop, options = {}) {
     container.scrollTop = initialScroll + diff * ease;
 
     if (progress < 1) {
-      activeAnimationId = requestAnimationFrame(step);
+      const nextId = requestAnimationFrame(step);
+      activeAnimationByContainer.set(container, nextId);
     } else {
-      activeAnimationId = null;
+      activeAnimationByContainer.delete(container);
       if (onComplete) onComplete();
     }
   }
 
-  activeAnimationId = requestAnimationFrame(step);
+  const firstId = requestAnimationFrame(step);
+  activeAnimationByContainer.set(container, firstId);
 }
 
 export function smartScrollIntoView(targetEl, container, options = {}) {

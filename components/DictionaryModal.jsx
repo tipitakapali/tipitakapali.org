@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { useDictionary, DEFAULT_DICT_ORDER, DEFAULT_DICT_ENABLED } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
+import { useTabs } from '../context/TabContext';
+import BoldDefinitionSection from './BoldDefinitionSection';
 import { typeVelthuis, convertAnyToRoman, convertPaliScript, cleanDictionaryQuery } from '../services/transliterate';
 import { fetchDictionaryInflection } from '../services/api';
 import { restoreMinifiedLinks } from '../services/dpdFeedback';
@@ -531,6 +533,7 @@ export default function DictionaryModal() {
   const [isResizing, setIsResizing] = useState(false);
 
   const currentScript = settings?.paliScript || 'roman';
+  const { openBook, openAlongside } = useTabs();
 
   // Load saved dimensions from localStorage
   useEffect(() => {
@@ -607,6 +610,7 @@ export default function DictionaryModal() {
   const DICT_TABS = useMemo(() => {
     const rawTabs = [
       { id: 'dpd', label: 'DPD', desc: 'Digital Pāḷi Dictionary', count: lookupData?.counts?.dpd || 0 },
+      { id: 'bold_def', label: 'Bold Def', desc: 'Bold Definitions across Tipiṭaka', count: lookupData?.counts?.bold_def || 0 },
       { id: 'abd', label: 'အဘိဓာန်', desc: 'Tipiṭaka Pāḷi-Myanmar Dictionary', count: lookupData?.counts?.abd || 0 },
 	    { id: 'pts', label: 'PTS', desc: 'Pāḷi Text Society PED', count: lookupData?.counts?.pts || 0 },
       { id: 'psd', label: 'සිංහල', desc: 'Pāḷi-Sinhala Dictionary', count: lookupData?.counts?.psd || 0 },
@@ -1183,7 +1187,7 @@ export default function DictionaryModal() {
       // Don't trigger if clicked inside buttons, inputs, links, resizers, feedback boxes, audio, or jump bar
       if (
         e.target.closest(
-          'button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback, .dict-meanings-jump-bar, .dict-summary-row'
+          'button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback, .dict-meanings-jump-bar, .dict-summary-row, .bold-def-nonlookup'
         )
       ) {
         return;
@@ -1207,6 +1211,7 @@ export default function DictionaryModal() {
   const currentTabResults = useMemo(() => {
     if (!lookupData) return [];
     if (activeDictTab === 'dpd') return lookupData.dpd || [];
+    if (activeDictTab === 'bold_def') return lookupData.bold_def || [];
     if (activeDictTab === 'pts') return lookupData.pts || [];
     if (activeDictTab === 'abd') return lookupData.abd || [];
     if (activeDictTab === 'psd') return lookupData.psd || [];
@@ -1214,6 +1219,37 @@ export default function DictionaryModal() {
     if (activeDictTab === 'splitter') return lookupData.splitter || [];
     return [];
   }, [lookupData, activeDictTab]);
+
+  const handleOpenBoldPassage = useCallback((item) => {
+    if (!item?.book_code) return;
+    openBook(item.book_code, {
+      targetChapterIdx: item.chapter_index,
+      targetParaIndex: item.para_index,
+      targetParaNum: item.para_num,
+      targetLineId: item.line_id,
+    });
+    if (dockMode === 'modal') {
+      closeDictionary();
+    }
+  }, [openBook, dockMode, closeDictionary]);
+
+  const handleOpenBoldAlongside = useCallback((item) => {
+    if (!item?.book_code) return;
+    const opts = {
+      targetChapterIdx: item.chapter_index,
+      targetParaIndex: item.para_index,
+      targetParaNum: item.para_num,
+      targetLineId: item.line_id,
+    };
+    if (typeof openAlongside === 'function') {
+      openAlongside(item.book_code, opts);
+    } else {
+      openBook(item.book_code, opts);
+    }
+    if (dockMode === 'modal') {
+      closeDictionary();
+    }
+  }, [openAlongside, openBook, dockMode, closeDictionary]);
 
   if (!isOpen) return null;
 
@@ -1498,7 +1534,7 @@ export default function DictionaryModal() {
         {/* ========================================================= */}
         {/* Other Dictionaries: Jump to Meaning Bar (1, 2, 3...)      */}
         {/* ========================================================= */}
-        {!isLoading && activeDictTab !== 'dpd' && currentTabResults.length > 1 && (
+        {!isLoading && activeDictTab !== 'dpd' && activeDictTab !== 'bold_def' && currentTabResults.length > 1 && (
           <div className="dict-meanings-jump-bar mb-3 bg-[var(--bg-secondary)] border border-[var(--border-color)]/80 rounded-xl p-2.5 sm:p-3 shadow-2xs space-y-2">
             {/* Header with Meaning Count & Jump Title */}
             <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[var(--border-color)]/50">
@@ -1636,7 +1672,18 @@ export default function DictionaryModal() {
         {/* ========================================================= */}
         {/* Results List                                              */}
         {/* ========================================================= */}
-        {!isLoading && currentTabResults.length > 0 && (
+        {!isLoading && activeDictTab === 'bold_def' && currentTabResults.length > 0 && (
+          <BoldDefinitionSection
+            results={currentTabResults}
+            queryWord={queryWord}
+            searchPrefix={lookupData?.bold_def_prefix || ''}
+            currentScript={currentScript}
+            onOpenPassage={handleOpenBoldPassage}
+            onOpenAlongside={handleOpenBoldAlongside}
+          />
+        )}
+
+        {!isLoading && activeDictTab !== 'bold_def' && currentTabResults.length > 0 && (
           <div className="space-y-3">
             {currentTabResults.map((item, idx) => {
               const rawHtml = item.html || '';

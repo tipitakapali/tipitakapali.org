@@ -256,13 +256,28 @@ class TipitakaLocalServer {
       if (segments[2] == 'lookup') {
         final rawWord = params['w'] ?? params['word'] ?? params['q'] ?? '';
         final dictType = params['dict'] ?? params['dictionary'] ?? 'all';
-        final resp = await api.lookupDict(rawWord, dictType: dictType);
+        final langs = params['langs'] ?? params['lang'];
+        final resp = await api.lookupDict(
+          rawWord,
+          dictType: dictType,
+          langs: langs,
+        );
         return _toShelfResponse(resp, noCache: true);
       }
       if (segments[2] == 'inf') {
         final q = params['w'] ?? params['id'] ?? params['word'] ?? '';
         return _toShelfResponse(api.lookupInflection(q), noCache: true);
       }
+    }
+
+    // Linked definitions contextual preview: /api/links/preview
+    if (segments.length == 3 &&
+        segments[1] == 'links' &&
+        segments[2] == 'preview') {
+      return _toShelfResponse(
+        await api.getLinkedPreview(query),
+        noCache: true,
+      );
     }
 
     // Legacy HTML endpoints: /api/{dpd,pts,abd,psd,sans,inf}
@@ -339,6 +354,16 @@ class TipitakaLocalServer {
           return _toShelfResponse(
             api.getBookTranslation(code, chapIdx, query),
             noCache: true,
+          );
+        }
+      }
+      if (segments.length == 6 &&
+          segments[3] == 'chapter' &&
+          segments[5] == 'links') {
+        final chapIdx = int.tryParse(segments[4]);
+        if (chapIdx != null) {
+          return _toShelfResponse(
+            await api.getChapterLinks(code, chapIdx),
           );
         }
       }

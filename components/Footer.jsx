@@ -71,7 +71,11 @@ export default function Footer() {
           <button
             onClick={() => {
               if (typeof document !== 'undefined') {
-                const container = document.querySelector('main.content-area') || document.querySelector('.content-area') || document.querySelector('main');
+                const container =
+                  document.querySelector('main.content-area[data-active-pane="true"]') ||
+                  document.querySelector('main.content-area') ||
+                  document.querySelector('.content-area') ||
+                  document.querySelector('main');
                 if (container) {
                   const containerRect = container.getBoundingClientRect();
                   const targetY = containerRect.top + 100;

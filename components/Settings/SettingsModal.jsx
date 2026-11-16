@@ -595,6 +595,15 @@ export default function SettingsModal() {
                       />
                       <span>Traditional Tipitaka Indents</span>
                     </label>
+                    <label className="flex items-center gap-2.5 text-xs text-[var(--text-primary)] cursor-pointer mt-2">
+                      <input
+                        type="checkbox"
+                        checked={settings.showBookLinks !== false}
+                        onChange={(e) => updateSetting('showBookLinks', e.target.checked)}
+                        className="accent-[var(--accent)] rounded"
+                      />
+                      <span>Linked Definitions (M ↔ A ↔ Ṭ)</span>
+                    </label>
                   </div>
                 </div>
 
@@ -752,6 +761,56 @@ export default function SettingsModal() {
                       className="accent-[var(--accent)] w-4 h-4 rounded"
                     />
                   </label>
+                  <div className="p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-semibold">Tab View Mode</div>
+                        <div className="text-[10.5px] text-[var(--text-muted)]">
+                          Choose how opened books and commentaries (Mūla / Aṭṭhakathā / Ṭīkā) are arranged
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'single', label: 'Single Tab', desc: 'Replace active tab' },
+                        { id: 'tabbed', label: 'Multi-Tabs', desc: 'Keep tabs in bar' },
+                        { id: 'columns', label: 'Parallel Columns', desc: 'Side-by-side (≥900px)' },
+                      ].map((mode) => {
+                        const isSelected = (settings.tabView || 'columns') === mode.id;
+                        return (
+                          <button
+                            key={mode.id}
+                            type="button"
+                            onClick={() => updateSetting('tabView', mode.id)}
+                            className={`p-2 rounded-lg border text-left transition cursor-pointer ${
+                              isSelected
+                                ? 'border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)] font-bold'
+                                : 'border-[var(--border-color)] bg-[var(--bg-secondary)]/50 text-[var(--text-primary)] hover:border-gray-400'
+                            }`}
+                          >
+                            <div className="text-xs font-semibold">{mode.label}</div>
+                            <div className="text-[10px] opacity-75 mt-0.5">{mode.desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
+                    <div className="flex flex-col pr-2">
+                      <span className="text-xs font-semibold">Scroll linked columns together (Mūla / Aṭṭhakathā / Ṭīkā)</span>
+                      <span className="text-[10.5px] text-[var(--text-muted)] mt-0.5">
+                        In Parallel Columns view, automatically synchronize scrolling across connected root and commentary texts.
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.syncScroll === true}
+                      onChange={(e) => updateSetting('syncScroll', e.target.checked)}
+                      className="accent-[var(--accent)] w-4 h-4 rounded shrink-0"
+                    />
+                  </label>
+
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
                     <div className="flex flex-col pr-2">
                       <span className="text-xs font-semibold">Open MAT links in new browser window</span>

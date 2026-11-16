@@ -297,9 +297,10 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('AI Translation Language'), findsOneWidget);
-      // Default selection is "None - Pāḷi text only".
-      expect(find.text('None - Pāḷi text only'), findsOneWidget);
-      expect(find.text('AI English Translation'), findsNothing);
+      expect(find.textContaining('AI Translation Note:'), findsOneWidget);
+      // Default selection is English ('en').
+      expect(find.text('🇬🇧 English (English)'), findsOneWidget);
+      expect(find.text('AI English Translation'), findsOneWidget);
 
       // In-App FTS index card, Browse all additional packs button, and
       // pre-built FTS DB downloads must not appear on onboarding.
@@ -321,12 +322,9 @@ void main() {
           reason: 'Dictionary ${dict.id} should be compulsory on onboarding',
         );
       }
-      expect(state.selectedLanguageCode, DownloadController.noLanguageCode);
+      expect(state.selectedLanguageCode, DownloadController.defaultLanguageCode);
       expect(state.manifest!.languages['en']?.translationDb.compulsory, isFalse);
-      expect(
-        state.selectedOptionalIds.any((id) => id.startsWith('translation_')),
-        isFalse,
-      );
+      expect(state.selectedOptionalIds.contains('translation_en'), isTrue);
       expect(
         state.selectedOptionalIds.any((id) => id.startsWith('fts_')),
         isFalse,
@@ -341,40 +339,13 @@ void main() {
           )
           .fold<int>(0, (sum, a) => sum + a.estimatedDownloadBytes);
 
-      final baseBytes = calcPendingBytes(state);
       final enSizeBytes =
           state.manifest!.languages['en']!.translationDb.estimatedDownloadBytes;
       final viSizeBytes =
           state.manifest!.languages['vi']!.translationDb.estimatedDownloadBytes;
+      final enBytes = calcPendingBytes(state);
+      final baseBytes = enBytes - enSizeBytes;
       expect(baseBytes, greaterThan(0));
-      expect(
-        find.textContaining('Download All (${formatBytes(baseBytes)})'),
-        findsOneWidget,
-      );
-
-      // Open dropdown (showing "None - Pāḷi text only" above all languages with
-      // country flags) and choose English.
-      await tester.ensureVisible(find.text('None - Pāḷi text only'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('None - Pāḷi text only'));
-      await tester.pumpAndSettle();
-
-      // Verify "None - Pāḷi text only" is rendered above the language options.
-      final noneTop =
-          tester.getTopLeft(find.text('None - Pāḷi text only').last).dy;
-      final enMenuTop =
-          tester.getTopLeft(find.text('🇬🇧 English (English)').last).dy;
-      expect(noneTop, lessThan(enMenuTop));
-
-      await tester.tap(find.text('🇬🇧 English (English)').last);
-      await tester.pumpAndSettle();
-
-      final enState = container.read(downloadControllerProvider);
-      final enBytes = calcPendingBytes(enState);
-      expect(enState.selectedLanguageCode, 'en');
-      expect(enState.selectedOptionalIds.contains('translation_en'), isTrue);
-      expect(enBytes, baseBytes + enSizeBytes);
-      expect(find.text('AI English Translation'), findsOneWidget);
       expect(find.textContaining('translation_en.db'), findsOneWidget);
       expect(
         find.textContaining('Download All (${formatBytes(enBytes)})'),
@@ -382,6 +353,8 @@ void main() {
       );
 
       // Switch to Vietnamese via dropdown and verify total recalculates.
+      await tester.ensureVisible(find.text('🇬🇧 English (English)'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('🇬🇧 English (English)'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('🇻🇳 Vietnamese (Tiếng Việt)').last);
@@ -398,7 +371,7 @@ void main() {
         findsOneWidget,
       );
 
-      // Switch back to "None - Pāḷi text only" and verify total download returns to baseBytes.
+      // Switch to "None - Pāḷi text only" and verify total download drops to baseBytes.
       await tester.tap(find.text('🇻🇳 Vietnamese (Tiếng Việt)'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('None - Pāḷi text only').last);
@@ -879,6 +852,9 @@ void main() {
       );
       expect(combinedSeed, contains('"english"'));
       expect(combinedSeed, contains('"laos"'));
+
+      final explicitNoneSeed = buildOnboardingTranslationSeedScript('none');
+      expect(explicitNoneSeed, contains('translations.english = false'));
     },
   );
 
