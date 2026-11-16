@@ -981,7 +981,7 @@ void main() {
       final bdb = sqlite3.open(p.join(tmpDir.path, BoldDefinitionIndexService.dbFilename), mode: OpenMode.readOnly);
       try {
         final ver = bdb.select("SELECT value FROM meta WHERE key = 'schema_version'").first['value'];
-        expect(ver, '3');
+        expect(ver, '4');
       } finally {
         bdb.close();
       }

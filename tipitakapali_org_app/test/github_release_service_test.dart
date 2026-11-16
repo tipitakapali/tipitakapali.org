@@ -215,7 +215,8 @@ void main() {
       final remoteMap = jsonDecode(bundledRaw) as Map<String, dynamic>;
       final coreMap = remoteMap['core'] as Map<String, dynamic>;
       final tipitakaMap = coreMap['tipitaka'] as Map<String, dynamic>;
-      tipitakaMap['version'] = 2;
+      final bundledVersion = (tipitakaMap['version'] as int?) ?? 1;
+      tipitakaMap['version'] = bundledVersion + 1;
       tipitakaMap['updated'] = '2026-12-01';
 
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -243,7 +244,7 @@ void main() {
       );
       final onlineResult = await onlineService.fetchOfficialRelease();
       expect(onlineResult.fetchedLive, isTrue);
-      expect(onlineResult.manifest.core['tipitaka']?.version, 2);
+      expect(onlineResult.manifest.core['tipitaka']?.version, bundledVersion + 1);
       expect(onlineResult.manifest.core['tipitaka']?.updated, '2026-12-01');
       expect(onlineResult.manifest.core['tipitaka']?.compulsory, isTrue);
 
@@ -254,7 +255,7 @@ void main() {
       );
       final offlineResult = await offlineService.fetchOfficialRelease();
       expect(offlineResult.fetchedLive, isFalse);
-      expect(offlineResult.manifest.core['tipitaka']?.version, 1);
+      expect(offlineResult.manifest.core['tipitaka']?.version, bundledVersion);
     },
   );
 

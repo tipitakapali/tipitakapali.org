@@ -14,19 +14,36 @@ class TipitakaCoreReader {
     r'^(.+?):c(\d+):n[^:]*:p(\d+)$',
   );
 
+  static final Expando<Set<String>> _tableNamesCache = Expando<Set<String>>();
+  static final Expando<Map<String, Set<String>>> _tableColumnsCache =
+      Expando<Map<String, Set<String>>>();
+
   static Set<String> tableAndViewNames(Database db) {
+    final cached = _tableNamesCache[db];
+    if (cached != null) return cached;
     final rows = db.select(
       "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') "
       "AND name NOT LIKE 'sqlite_%'",
     );
-    return rows.map((r) => r['name'].toString()).toSet();
+    final set = rows.map((r) => r['name'].toString()).toSet();
+    _tableNamesCache[db] = set;
+    return set;
   }
 
   static Set<String> tableColumns(Database db, String tableName) {
+    var map = _tableColumnsCache[db];
+    if (map == null) {
+      map = {};
+      _tableColumnsCache[db] = map;
+    }
+    final cached = map[tableName];
+    if (cached != null) return cached;
     final safe = '"${tableName.replaceAll('"', '""')}"';
     try {
       final rows = db.select('PRAGMA table_info($safe)');
-      return rows.map((r) => r['name'].toString()).toSet();
+      final set = rows.map((r) => r['name'].toString()).toSet();
+      map[tableName] = set;
+      return set;
     } catch (_) {
       return const {};
     }

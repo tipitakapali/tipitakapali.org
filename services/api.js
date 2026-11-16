@@ -1,9 +1,37 @@
 // Client-Side Memory Cache Toggle: Enabled for instant sub-millisecond tab switching & navigation
 export const ENABLE_CLIENT_CACHE = true;
 
+// When deployed on a dynamic VPS, set NEXT_PUBLIC_PREFER_VPS_API=true so the
+// reader fetches lightweight per-chapter payloads instead of multi-MB whole-book
+// static JSON bundles.
+const PREFER_VPS_API = process.env.NEXT_PUBLIC_PREFER_VPS_API === 'true';
+
+// Bounded LRU limits so long reading sessions / multi-tab browsing do not bloat
+// browser tab memory.
+const MAX_CACHE_ENTRIES = 60;
+const MAX_STATIC_MAP_ENTRIES = 8;
+
 // Client-side Memory Cache & Request Deduplication for Ultra-Fast Navigation
 const cache = new Map();
 const pendingRequests = new Map();
+
+function setBoundedCache(map, key, value, maxEntries) {
+  if (map.has(key)) {
+    map.delete(key);
+  }
+  while (map.size >= maxEntries) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
+  map.set(key, value);
+}
+
+function touchBoundedCache(map, key, entry) {
+  map.delete(key);
+  map.set(key, entry);
+  return entry;
+}
 
 function makeAbortError() {
   const err = new Error('Aborted');
@@ -41,6 +69,7 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) 
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < ttlMs) {
+    touchBoundedCache(cache, key, cached);
     return cached.data;
   }
 
@@ -50,7 +79,7 @@ async function cachedFetch(key, fetcher, ttlMs = 10 * 60 * 1000, signal = null) 
 
   const promise = fetcher()
     .then((data) => {
-      cache.set(key, { data, timestamp: Date.now() });
+      setBoundedCache(cache, key, { data, timestamp: Date.now() }, MAX_CACHE_ENTRIES);
       pendingRequests.delete(key);
       return data;
     })
@@ -300,11 +329,12 @@ function isLocalDynamicHost() {
 }
 
 async function fetchMatStaticMap(cleanCode, mapName) {
-  if (isLocalDynamicHost()) return null;
+  if (PREFER_VPS_API || isLocalDynamicHost()) return null;
   const key = `${mapName}_${cleanCode}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = matStaticMapCache.get(key);
     if (cached && Date.now() - cached.timestamp < MAT_STATIC_MAP_TTL) {
+      touchBoundedCache(matStaticMapCache, key, cached);
       return cached.data;
     }
     if (matStaticMapPending.has(key)) {
@@ -317,7 +347,12 @@ async function fetchMatStaticMap(cleanCode, mapName) {
       if (!res.ok) return null;
       const data = await res.json();
       if (ENABLE_CLIENT_CACHE) {
-        matStaticMapCache.set(key, { data, timestamp: Date.now() });
+        setBoundedCache(
+          matStaticMapCache,
+          key,
+          { data, timestamp: Date.now() },
+          MAX_STATIC_MAP_ENTRIES
+        );
       }
       return data;
     } catch (_) {
@@ -675,11 +710,12 @@ const transStaticPending = new Map();
 const TRANS_STATIC_TTL = 24 * 60 * 60 * 1000;
 
 async function fetchBookTranslationStatic(cleanCode, lang) {
-  if (isLocalDynamicHost()) return null;
+  if (PREFER_VPS_API || isLocalDynamicHost()) return null;
   const key = `trans_static_${cleanCode}_${lang}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = transStaticCache.get(key);
     if (cached && Date.now() - cached.timestamp < TRANS_STATIC_TTL) {
+      touchBoundedCache(transStaticCache, key, cached);
       return cached.data;
     }
     if (transStaticPending.has(key)) {
@@ -698,7 +734,12 @@ async function fetchBookTranslationStatic(cleanCode, lang) {
       if (!res.ok) return null;
       const data = await res.json();
       if (ENABLE_CLIENT_CACHE) {
-        transStaticCache.set(key, { data, timestamp: Date.now() });
+        setBoundedCache(
+          transStaticCache,
+          key,
+          { data, timestamp: Date.now() },
+          MAX_STATIC_MAP_ENTRIES
+        );
       }
       return data;
     } catch (_) {
@@ -757,11 +798,12 @@ export function getCachedPaliSentences(bookCode, chapterIndex = null) {
 // VPS `?sentences=1` fallback (also covers local dev). Same book+lang cache
 // pattern as fetchBookTranslationStatic; only fetched on demand.
 async function fetchBookTranslationSentencesStatic(cleanCode, lang) {
-  if (isLocalDynamicHost()) return null;
+  if (PREFER_VPS_API || isLocalDynamicHost()) return null;
   const key = `trans_sent_static_${cleanCode}_${lang}`;
   if (ENABLE_CLIENT_CACHE) {
     const cached = transStaticCache.get(key);
     if (cached && Date.now() - cached.timestamp < TRANS_STATIC_TTL) {
+      touchBoundedCache(transStaticCache, key, cached);
       return cached.data;
     }
     if (transStaticPending.has(key)) {
@@ -774,7 +816,12 @@ async function fetchBookTranslationSentencesStatic(cleanCode, lang) {
       if (!res.ok) return null;
       const data = await res.json();
       if (ENABLE_CLIENT_CACHE) {
-        transStaticCache.set(key, { data, timestamp: Date.now() });
+        setBoundedCache(
+          transStaticCache,
+          key,
+          { data, timestamp: Date.now() },
+          MAX_STATIC_MAP_ENTRIES
+        );
       }
       return data;
     } catch (_) {
@@ -924,7 +971,7 @@ export async function fetchChapterTranslations(bookCode, chapterIndex, requested
   const result = { book_code: cleanCode, chapter_index: chapterIndex, languages: langArr, translations };
   if (options.sentences) result.sentences = sentences;
   if (ENABLE_CLIENT_CACHE) {
-    cache.set(compKey, { data: result, timestamp: Date.now() });
+    setBoundedCache(cache, compKey, { data: result, timestamp: Date.now() }, MAX_CACHE_ENTRIES);
   }
   return result;
 }

@@ -188,6 +188,25 @@ class _OnboardingWizardScreenState
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                     children: [
+                      Text(
+                        'Pāḷi Display Script',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'You can change this anytime in the reader Language Menu.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _PaliScriptSelectorCard(
+                        selectedScriptId: state.selectedPaliScript,
+                        onChanged: controller.setPaliScript,
+                      ),
+                      const SizedBox(height: 14),
+
                       // Required databases header
                       Text(
                         'Required Databases',
@@ -253,25 +272,6 @@ class _OnboardingWizardScreenState
                       ],
 
                       const SizedBox(height: 6),
-                      Text(
-                        'Pāḷi Display Script',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        'You can change this anytime in the reader Language Menu.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _PaliScriptSelectorCard(
-                        selectedScriptId: state.selectedPaliScript,
-                        onChanged: controller.setPaliScript,
-                      ),
-
-                      const SizedBox(height: 14),
                       Text(
                         'Optional AI Translation',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(

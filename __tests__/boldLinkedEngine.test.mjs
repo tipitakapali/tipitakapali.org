@@ -165,13 +165,13 @@ function createFixtureDir() {
   return { dir, db, tdb, engine };
 }
 
-test('BoldLinkedEngine builds schema_version=3, extracts quotes before nti, resolves sentence-level translations, and isolates cross-chapter para_num', () => {
+test('BoldLinkedEngine builds schema_version=4, extracts quotes before nti, resolves sentence-level translations, and isolates cross-chapter para_num', () => {
   const { dir, db, tdb, engine } = createFixtureDir();
   try {
     const bdb = engine.ensureBoldDb();
     assert.ok(bdb);
     const ver = bdb.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get()?.value;
-    assert.equal(ver, '3');
+    assert.equal(ver, '4');
 
     // 1. Quotes before nti (`‘‘Vutta’’nti` -> word='vuttaṃ', ending='ti'), sentence line_id=3 & sentence-level translation
     const vutta = engine.lookupBoldDef('vuttaṃ', ['en']);

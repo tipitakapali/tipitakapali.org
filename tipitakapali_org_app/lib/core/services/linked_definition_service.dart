@@ -359,6 +359,53 @@ class LinkedDefinitionService {
     return out.toList(growable: false);
   }
 
+  static bool _isBoundaryOrSpace(String s, int idx) {
+    if (idx < 0 || idx >= s.length) return true;
+    final code = s.codeUnitAt(idx);
+    return code == 0x20 || code == 0x09 || code == 0x0A || code == 0x0D;
+  }
+
+  static bool _hasTiSuffixAt(String s, int pos) {
+    if (pos >= s.length) return true;
+    final code = s.codeUnitAt(pos);
+    if (code == 0x20 || code == 0x09 || code == 0x0A || code == 0x0D) {
+      return true;
+    }
+    if (s.startsWith('ti', pos) || s.startsWith('tī', pos)) return true;
+    if (s.startsWith('nti', pos) || s.startsWith('ntī', pos)) return true;
+    return false;
+  }
+
+  static bool _hasNtTiAt(String s, int pos) {
+    return s.startsWith('nti', pos) || s.startsWith('ntī', pos);
+  }
+
+  static bool _containsPhraseFast(
+    String haystack,
+    String needle, {
+    required bool allowPrefixLetters,
+    required bool matchNtTiEnd,
+  }) {
+    var start = 0;
+    while (true) {
+      final idx = haystack.indexOf(needle, start);
+      if (idx == -1) return false;
+      final startOk = allowPrefixLetters || _isBoundaryOrSpace(haystack, idx - 1);
+      if (startOk) {
+        final after = idx + needle.length;
+        if (matchNtTiEnd) {
+          if (_hasNtTiAt(haystack, after)) return true;
+        } else if (_hasTiSuffixAt(haystack, after)) {
+          return true;
+        }
+      }
+      start = idx + 1;
+    }
+  }
+
+  static final RegExp _multiWsRe = RegExp(r'\s+');
+  static final RegExp _peSplitRe = RegExp(r'\s+pe\s+');
+
   static bool _matchesLineObj(
     ({
       int lineId,
@@ -376,51 +423,77 @@ class LinkedDefinitionService {
 
     if (candidate.contains(' ')) {
       final firstWordLen = candidate.indexOf(' ');
-      final startBound = firstWordLen >= 5 ? r'(?:^|\s|\p{L}+)' : r'(?:^|\s)';
+      final allowPrefix = firstWordLen >= 5;
       final haystacks = [
         line.normPhrase,
         line.normPhraseSpaced,
         line.normPhraseTi,
         line.normPhraseSpacedTi,
       ];
+      final ntStem = (candidate.endsWith('ṃ') && candidate.length >= 4)
+          ? candidate.substring(0, candidate.length - 1)
+          : null;
       for (final hay in haystacks) {
         if (hay.isEmpty) continue;
         for (final v in variants) {
-          final pattern = RegExp(
-            '$startBound${RegExp.escape(v)}(?:\$|\\s|n?t[iī])',
-            unicode: true,
-          );
-          if (pattern.hasMatch(hay)) return true;
+          if (_containsPhraseFast(
+            hay,
+            v,
+            allowPrefixLetters: allowPrefix,
+            matchNtTiEnd: false,
+          )) {
+            return true;
+          }
         }
-        if (candidate.endsWith('ṃ') && candidate.length >= 4) {
-          final stem = candidate.substring(0, candidate.length - 1);
-          final pattern = RegExp(
-            '$startBound${RegExp.escape(stem)}nt[iī](?:\$|\\s|\\p{L}*)',
-            unicode: true,
-          );
-          if (pattern.hasMatch(hay)) return true;
+        if (ntStem != null &&
+            _containsPhraseFast(
+              hay,
+              ntStem,
+              allowPrefixLetters: allowPrefix,
+              matchNtTiEnd: true,
+            )) {
+          return true;
         }
       }
       if (candidate.contains(' pe ')) {
         final peParts = candidate
-            .split(RegExp(r'\s+pe\s+'))
+            .split(_peSplitRe)
             .map((p) => p.trim())
             .where((p) => p.isNotEmpty)
             .toList(growable: false);
         if (peParts.length == 2 &&
             peParts[0].length >= 4 &&
             peParts[1].length >= 4) {
-          final peRe = RegExp(
-            '(?:^|\\s)${RegExp.escape(peParts[0])}\\b[\\s\\S]{1,160}\\b${RegExp.escape(peParts[1])}(?:\$|\\s|n?t[iī])',
-            unicode: true,
-          );
-          if (peRe.hasMatch(line.normPhrase) ||
-              peRe.hasMatch(line.normPhraseSpaced)) {
-            return true;
+          final p1 = peParts[0];
+          final p2 = peParts[1];
+          for (final hay in [line.normPhrase, line.normPhraseSpaced]) {
+            if (hay.isEmpty) continue;
+            var s = 0;
+            while (true) {
+              final i1 = hay.indexOf(p1, s);
+              if (i1 == -1) break;
+              if (_isBoundaryOrSpace(hay, i1 - 1) &&
+                  _isBoundaryOrSpace(hay, i1 + p1.length)) {
+                final searchFrom = i1 + p1.length + 1;
+                final maxEnd = (searchFrom + 160 + p2.length <= hay.length)
+                    ? searchFrom + 160 + p2.length
+                    : hay.length;
+                if (searchFrom < maxEnd) {
+                  final i2 = hay.indexOf(p2, searchFrom);
+                  if (i2 != -1 &&
+                      i2 <= searchFrom + 160 &&
+                      _isBoundaryOrSpace(hay, i2 - 1) &&
+                      _hasTiSuffixAt(hay, i2 + p2.length)) {
+                    return true;
+                  }
+                }
+              }
+              s = i1 + 1;
+            }
           }
         }
       }
-      final collapsed = candidate.replaceAll(RegExp(r'\s+'), '');
+      final collapsed = candidate.replaceAll(_multiWsRe, '');
       if (collapsed.length >= 5 && _matchesLineObj(line, collapsed)) {
         return true;
       }
@@ -540,6 +613,30 @@ class LinkedDefinitionService {
       };
     }
 
+    try {
+      if (TipitakaCoreReader.tableAndViewNames(boldDb).contains('chapter_links')) {
+        final cachedRows = boldDb.select(
+          'SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1',
+          [bookCode, chapterIndex],
+        );
+        if (cachedRows.isEmpty) {
+          return {
+            'book_code': bookCode,
+            'chapter_index': chapterIndex,
+            'paragraphs': const <String, dynamic>{},
+          };
+        }
+        final decoded = jsonDecode(cachedRows.first['paragraphs_json'].toString());
+        return {
+          'book_code': bookCode,
+          'chapter_index': chapterIndex,
+          'paragraphs': decoded is Map<String, dynamic>
+              ? decoded
+              : Map<String, dynamic>.from(decoded as Map),
+        };
+      }
+    } catch (_) {}
+
     Database? ownedSentDb;
     Database? sentDb = paliSentencesDbOverride;
     if (sentDb == null) {
@@ -551,7 +648,172 @@ class LinkedDefinitionService {
     }
 
     try {
-      final paraRows = tipiDb.select(
+      return _computeLinksForChapterSync(
+        tipiDb: tipiDb,
+        boldDb: boldDb,
+        sentDb: sentDb,
+        bookCode: bookCode,
+        chapterIndex: chapterIndex,
+      );
+    } finally {
+      ownedSentDb?.close();
+      ownedBoldDb?.close();
+      ownedTipiDb?.close();
+    }
+  }
+
+  /// Precomputes and stores `chapter_links` for all chapters in [tipiDb]
+  /// inside [boldDb] so runtime `getLinksForChapter` is a single SQL lookup.
+  static int prebuildChapterLinksSync({
+    required Database tipiDb,
+    required Database boldDb,
+    String? paliSentDbPath,
+  }) {
+    boldDb.execute('''
+      CREATE TABLE IF NOT EXISTS chapter_links (
+        book_code TEXT NOT NULL,
+        chapter_index INTEGER NOT NULL,
+        paragraphs_json TEXT NOT NULL,
+        PRIMARY KEY (book_code, chapter_index)
+      );
+    ''');
+
+    final chapCols = TipitakaCoreReader.tableColumns(tipiDb, 'chapters');
+    final chapRows = chapCols.contains('book_code')
+        ? tipiDb.select(
+            'SELECT book_code, chapter_index FROM chapters ORDER BY book_code, chapter_index',
+          )
+        : tipiDb.select(
+            'SELECT b.code AS book_code, c.chapter_index '
+            'FROM chapters c JOIN books b ON b.id = c.book_id '
+            'ORDER BY b.code, c.chapter_index',
+          );
+    if (chapRows.isEmpty) return 0;
+
+    Database? sentDb;
+    if (paliSentDbPath != null && File(paliSentDbPath).existsSync()) {
+      try {
+        sentDb = sqlite3.open(paliSentDbPath, mode: OpenMode.readOnly);
+      } catch (_) {}
+    }
+
+    final bookTitleCache = <String, String>{};
+    final reverseParaIndexCache =
+        <String, List<({int paraIndex, int chapterIndex})>>{};
+    final targetChapSentCache = <
+      String,
+      Map<
+        int,
+        List<({
+          int lineId,
+          String normLine,
+          String normPhrase,
+          String normPhraseSpaced,
+          String normPhraseTi,
+          String normPhraseSpacedTi,
+          Set<String> tokens,
+        })>
+      >
+    >{};
+    final targetParaTextCache = <
+      String,
+      List<({
+        int lineId,
+        String normLine,
+        String normPhrase,
+        String normPhraseSpaced,
+        String normPhraseTi,
+        String normPhraseSpacedTi,
+        Set<String> tokens,
+      })>
+    >{};
+
+    var inserted = 0;
+    final insertStmt = boldDb.prepare(
+      'INSERT OR REPLACE INTO chapter_links (book_code, chapter_index, paragraphs_json) VALUES (?, ?, ?);',
+    );
+    try {
+      boldDb.execute('BEGIN TRANSACTION;');
+      try {
+        for (final cr in chapRows) {
+          final bc = (cr['book_code'] ?? '').toString();
+          final ci = (cr['chapter_index'] as num).toInt();
+          if (bc.isEmpty) continue;
+          final payload = _computeLinksForChapterSync(
+            tipiDb: tipiDb,
+            boldDb: boldDb,
+            sentDb: sentDb,
+            bookCode: bc,
+            chapterIndex: ci,
+            bookTitleCache: bookTitleCache,
+            reverseParaIndexCache: reverseParaIndexCache,
+            targetChapSentCache: targetChapSentCache,
+            targetParaTextCache: targetParaTextCache,
+          );
+          final paras = payload['paragraphs'] as Map<String, dynamic>;
+          if (paras.isNotEmpty) {
+            insertStmt.execute([bc, ci, jsonEncode(paras)]);
+            inserted++;
+          }
+          if (targetChapSentCache.length > 48) {
+            targetChapSentCache.clear();
+            targetParaTextCache.clear();
+          }
+          if (reverseParaIndexCache.length > 4000) {
+            reverseParaIndexCache.clear();
+          }
+        }
+        boldDb.execute('COMMIT;');
+      } catch (e) {
+        try {
+          boldDb.execute('ROLLBACK;');
+        } catch (_) {}
+        rethrow;
+      }
+    } finally {
+      insertStmt.close();
+      sentDb?.close();
+    }
+    return inserted;
+  }
+
+  static Map<String, dynamic> _computeLinksForChapterSync({
+    required Database tipiDb,
+    required Database boldDb,
+    required Database? sentDb,
+    required String bookCode,
+    required int chapterIndex,
+    Map<String, String>? bookTitleCache,
+    Map<String, List<({int paraIndex, int chapterIndex})>>? reverseParaIndexCache,
+    Map<
+      String,
+      Map<
+        int,
+        List<({
+          int lineId,
+          String normLine,
+          String normPhrase,
+          String normPhraseSpaced,
+          String normPhraseTi,
+          String normPhraseSpacedTi,
+          Set<String> tokens,
+        })>
+      >
+    >? targetChapSentCache,
+    Map<
+      String,
+      List<({
+        int lineId,
+        String normLine,
+        String normPhrase,
+        String normPhraseSpaced,
+        String normPhraseTi,
+        String normPhraseSpacedTi,
+        Set<String> tokens,
+      })>
+    >? targetParaTextCache,
+  }) {
+    final paraRows = tipiDb.select(
         'SELECT para_index, para_num, pali_text, '
         'mula_book, mula_chapter, mula_para, '
         'attha_book, attha_chapter, attha_para, '
@@ -688,10 +950,10 @@ class LinkedDefinitionService {
       }
 
       // Cache resolved reverse target para_index + book_title in tipitaka.db
-      final bookTitleCache = <String, String>{};
+      final localBookTitleCache = bookTitleCache ?? <String, String>{};
       String getBookTitle(String code) {
-        return bookTitleCache.putIfAbsent(code, () {
-          final rows = tipiDb!.select(
+        return localBookTitleCache.putIfAbsent(code, () {
+          final rows = tipiDb.select(
             'SELECT title FROM books WHERE code = ? LIMIT 1',
             [code],
           );
@@ -699,25 +961,25 @@ class LinkedDefinitionService {
         });
       }
 
-      final reverseParaIndexCache =
-          <String, List<({int paraIndex, int chapterIndex})>>{};
+      final localReverseParaIndexCache =
+          reverseParaIndexCache ?? <String, List<({int paraIndex, int chapterIndex})>>{};
       List<({int paraIndex, int chapterIndex})> resolveTargetParas(
         String targetBook,
         int? targetChapter,
         String targetParaNum,
       ) {
         final key = '$targetBook|${targetChapter ?? -1}|$targetParaNum';
-        if (reverseParaIndexCache.containsKey(key)) {
-          return reverseParaIndexCache[key]!;
+        if (localReverseParaIndexCache.containsKey(key)) {
+          return localReverseParaIndexCache[key]!;
         }
         ResultSet rows = targetChapter != null
-            ? tipiDb!.select(
+            ? tipiDb.select(
                 'SELECT para_index, chapter_index FROM canon_paragraphs '
                 'WHERE book_code = ? AND chapter_index = ? AND para_num = ? '
                 'ORDER BY para_index ASC',
                 [targetBook, targetChapter, targetParaNum],
               )
-            : tipiDb!.select(
+            : tipiDb.select(
                 'SELECT para_index, chapter_index FROM canon_paragraphs '
                 'WHERE book_code = ? AND para_num = ? '
                 'ORDER BY para_index ASC',
@@ -755,11 +1017,11 @@ class LinkedDefinitionService {
               chapterIndex: (row['chapter_index'] as num).toInt(),
             ),
         ];
-        reverseParaIndexCache[key] = res;
+        localReverseParaIndexCache[key] = res;
         return res;
       }
 
-      final targetChapSentCache = <
+      final localTargetChapSentCache = targetChapSentCache ?? <
         String,
         Map<
           int,
@@ -774,7 +1036,7 @@ class LinkedDefinitionService {
           })>
         >
       >{};
-      final targetParaTextCache = <
+      final localTargetParaTextCache = targetParaTextCache ?? <
         String,
         List<({
           int lineId,
@@ -801,7 +1063,7 @@ class LinkedDefinitionService {
         int targetParaIdx,
       ) {
         final ck = '$targetBook|$targetChap';
-        final chapMap = targetChapSentCache.putIfAbsent(ck, () {
+        final chapMap = localTargetChapSentCache.putIfAbsent(ck, () {
           final rawMap = TipitakaCoreReader.readChapterSentences(
             sentDb,
             tipiDb,
@@ -820,10 +1082,10 @@ class LinkedDefinitionService {
         if (cached != null && cached.isNotEmpty) return cached;
 
         final pk = '$targetBook|$targetChap|$targetParaIdx';
-        return targetParaTextCache.putIfAbsent(pk, () {
+        return localTargetParaTextCache.putIfAbsent(pk, () {
           var txt = '';
           try {
-            final pRows = tipiDb!.select(
+            final pRows = tipiDb.select(
               'SELECT pali_text FROM canon_paragraphs '
               'WHERE book_code = ? AND chapter_index = ? AND para_index = ? LIMIT 1',
               [targetBook, targetChap, targetParaIdx],
@@ -834,7 +1096,7 @@ class LinkedDefinitionService {
           } catch (_) {}
           if (txt.isEmpty) {
             txt = TipitakaCoreReader.readChapterPaliTexts(
-                  tipiDb!,
+                  tipiDb,
                   targetBook,
                   targetChap,
                 )[targetParaIdx] ??
@@ -1108,16 +1370,11 @@ class LinkedDefinitionService {
         }
       }
 
-      return {
-        'book_code': bookCode,
-        'chapter_index': chapterIndex,
-        'paragraphs': paragraphsJson,
-      };
-    } finally {
-      ownedTipiDb?.close();
-      ownedBoldDb?.close();
-      ownedSentDb?.close();
-    }
+    return {
+      'book_code': bookCode,
+      'chapter_index': chapterIndex,
+      'paragraphs': paragraphsJson,
+    };
   }
 
   /// Loads a contextual preview around ([bookCode], [chapterIndex], [paraIndex])

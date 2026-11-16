@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import '../utils/pali_script_converter.dart';
+import 'linked_definition_service.dart';
 import 'tipitaka_core_reader.dart';
 
 class BoldDefinitionBuildResult {
@@ -93,7 +94,7 @@ class BoldDefinitionQueryResult {
 /// translations.
 class BoldDefinitionIndexService {
   static const String dbFilename = 'bold_definitions.db';
-  static const String schemaVersion = '3';
+  static const String schemaVersion = '4';
   static const int _maxDistinctWords = 25;
   static const int _maxOccurrencesPerWord = 5;
   static const int _shortSentenceThreshold = 100;
@@ -877,6 +878,11 @@ class BoldDefinitionIndexService {
       );
       dstDb.execute(
         'CREATE INDEX idx_bdef_book_ch_pnum ON bold_definitions(book_code, chapter_index, para_num);',
+      );
+      LinkedDefinitionService.prebuildChapterLinksSync(
+        tipiDb: coreDb,
+        boldDb: dstDb,
+        paliSentDbPath: hasDedicatedPs ? psPath : null,
       );
 
       final metaStmt = dstDb.prepare(

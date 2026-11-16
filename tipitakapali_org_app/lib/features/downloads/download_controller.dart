@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/fts/fts_index_service.dart';
 import '../../core/models/db_manifest.dart';
 import '../../core/models/db_update_info.dart';
+import '../../core/services/bold_definition_index_service.dart';
 import '../../core/services/github_release_service.dart';
 import '../../core/storage/db_storage_service.dart';
 import '../../core/utils/pali_script_converter.dart';
@@ -1095,7 +1096,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
         final installed = await _storage.listInstalledDatabases();
         if (_disposed) return (builtAny: builtAny, hadError: hadError);
 
-        final jobs = <({String? langCode, bool forceRebuild, String label, String filename})>[];
+        final jobs =
+            <({
+              String? langCode,
+              bool isBoldIndex,
+              bool forceRebuild,
+              String label,
+              String filename,
+            })>[];
         if (!installed.containsKey('tipitaka.db')) {
           return (builtAny: false, hadError: false);
         }
@@ -1104,9 +1112,21 @@ class DownloadController extends Notifier<DownloadCenterState> {
         if (force || forceTipitaka || !paliFtsValid) {
           jobs.add((
             langCode: null,
+            isBoldIndex: false,
             forceRebuild: force || forceTipitaka || !paliFtsValid,
             label: 'Pāḷi Canon',
             filename: 'fts_tipitaka.db',
+          ));
+        }
+
+        final boldIndexValid = BoldDefinitionIndexService.isUpToDate(dir.path);
+        if (force || forceTipitaka || !boldIndexValid) {
+          jobs.add((
+            langCode: null,
+            isBoldIndex: true,
+            forceRebuild: force || forceTipitaka || !boldIndexValid,
+            label: 'Bold Definitions',
+            filename: BoldDefinitionIndexService.dbFilename,
           ));
         }
 
@@ -1132,6 +1152,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
                 langCode.toUpperCase();
             jobs.add((
               langCode: langCode,
+              isBoldIndex: false,
               forceRebuild: shouldRebuildLang,
               label: '$langName Translation',
               filename: ftsFilename,
@@ -1175,7 +1196,28 @@ class DownloadController extends Notifier<DownloadCenterState> {
           );
 
           try {
-            if (job.langCode == null) {
+            if (job.isBoldIndex) {
+              emitProgress(
+                FtsBuildProgress(
+                  filename: job.filename,
+                  stage: FtsBuildStage.indexing,
+                  progress: 0.15,
+                  detail: 'Extracting bold definitions from Pāḷi Canon...',
+                ),
+              );
+              await BoldDefinitionIndexService().ensureBuilt(
+                dbDirPath: dir.path,
+                force: job.forceRebuild,
+              );
+              emitProgress(
+                FtsBuildProgress(
+                  filename: job.filename,
+                  stage: FtsBuildStage.completed,
+                  progress: 1.0,
+                  detail: 'Bold definitions ready.',
+                ),
+              );
+            } else if (job.langCode == null) {
               await _ftsService.buildPaliFtsIndex(
                 dbDirPath: dir.path,
                 force: job.forceRebuild,
@@ -1204,12 +1246,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
           } catch (e) {
             hadError = true;
             if (!_disposed) {
-              final prefix = job.langCode == null
+              final prefix = job.isBoldIndex
+                  ? 'Bold definitions indexing error'
+                  : job.langCode == null
                   ? 'Pāḷi FTS5 indexing error'
                   : 'Translation FTS5 (${job.langCode}) indexing error';
               state = state.copyWith(releaseWarning: '$prefix: $e');
             }
-            if (job.langCode == null) {
+            if (!job.isBoldIndex && job.langCode == null) {
               // Abort translation FTS jobs if core Pāḷi FTS failed.
               return (builtAny: builtAny, hadError: hadError);
             }

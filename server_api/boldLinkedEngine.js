@@ -14,7 +14,7 @@ const {
 } = require('./tipitakaCoreHelper');
 
 const BOLD_DB_FILENAME = 'bold_definitions.db';
-const SCHEMA_VERSION = '3';
+const SCHEMA_VERSION = '4';
 const MAX_DISTINCT_WORDS = 25;
 const MAX_OCCURRENCES_PER_WORD = 5;
 const SHORT_SENTENCE_THRESHOLD = 100;
@@ -267,6 +267,43 @@ function inflectionStem(word) {
 
 const TOKEN_SPLIT_RE = /[\s.,;:!?…—–\-_/\\()\[\]{}|<>+=*&^%$#@~§`‘’“”"'«»‹›„]+/;
 
+function isBoundaryOrSpace(s, idx) {
+  if (idx < 0 || idx >= s.length) return true;
+  const code = s.charCodeAt(idx);
+  return code === 32 || code === 9 || code === 10 || code === 13;
+}
+
+function hasTiSuffixAt(s, pos) {
+  if (pos >= s.length) return true;
+  const code = s.charCodeAt(pos);
+  if (code === 32 || code === 9 || code === 10 || code === 13) return true;
+  return (
+    s.startsWith('ti', pos) ||
+    s.startsWith('tī', pos) ||
+    s.startsWith('nti', pos) ||
+    s.startsWith('ntī', pos)
+  );
+}
+
+function hasNtTiAt(s, pos) {
+  return s.startsWith('nti', pos) || s.startsWith('ntī', pos);
+}
+
+function containsPhraseFast(haystack, needle, allowPrefixLetters, matchNtTiEnd) {
+  let start = 0;
+  while (true) {
+    const idx = haystack.indexOf(needle, start);
+    if (idx === -1) return false;
+    if (allowPrefixLetters || isBoundaryOrSpace(haystack, idx - 1)) {
+      const after = idx + needle.length;
+      if (matchNtTiEnd ? hasNtTiAt(haystack, after) : hasTiSuffixAt(haystack, after)) {
+        return true;
+      }
+    }
+    start = idx + 1;
+  }
+}
+
 function matchesInLine(lineOrNormText, lineTokensOrCandidate, maybeCandidate) {
   const line =
     typeof lineOrNormText === 'object' && lineOrNormText !== null && lineOrNormText.tokens
@@ -285,36 +322,51 @@ function matchesInLine(lineOrNormText, lineTokensOrCandidate, maybeCandidate) {
   const variants = vowelVariants(candidate);
   if (candidate.includes(' ')) {
     const firstWordLen = candidate.indexOf(' ');
-    const startBound = firstWordLen >= 5 ? '(?:^|\\s|\\p{L}+)' : '(?:^|\\s)';
+    const allowPrefix = firstWordLen >= 5;
     const haystacks = [
       line.normPhrase,
       line.normPhraseSpaced,
       line.normPhraseTi,
       line.normPhraseSpacedTi,
     ];
+    const ntStem =
+      candidate.endsWith('ṃ') && candidate.length >= 4 ? candidate.slice(0, -1) : null;
     for (const hay of haystacks) {
       if (!hay) continue;
       for (const v of variants) {
-        const esc = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        if (new RegExp(`${startBound}${esc}(?:$|\\s|n?t[iī])`, 'u').test(hay)) {
+        if (containsPhraseFast(hay, v, allowPrefix, false)) {
           return true;
         }
       }
-      if (candidate.endsWith('ṃ') && candidate.length >= 4) {
-        const stemEsc = candidate.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        if (new RegExp(`${startBound}${stemEsc}nt[iī](?:$|\\s|\\p{L}*)`, 'u').test(hay)) {
-          return true;
-        }
+      if (ntStem && containsPhraseFast(hay, ntStem, allowPrefix, true)) {
+        return true;
       }
     }
     if (candidate.includes(' pe ')) {
       const peParts = candidate.split(/\s+pe\s+/).map((p) => p.trim()).filter(Boolean);
       if (peParts.length === 2 && peParts[0].length >= 4 && peParts[1].length >= 4) {
-        const p1Esc = peParts[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const p2Esc = peParts[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const peRe = new RegExp(`(?:^|\\s)${p1Esc}\\b[\\s\\S]{1,160}\\b${p2Esc}(?:$|\\s|n?t[iī])`, 'u');
-        if (peRe.test(line.normPhrase) || peRe.test(line.normPhraseSpaced)) {
-          return true;
+        const p1 = peParts[0];
+        const p2 = peParts[1];
+        for (const hay of [line.normPhrase, line.normPhraseSpaced]) {
+          if (!hay) continue;
+          let s = 0;
+          while (true) {
+            const i1 = hay.indexOf(p1, s);
+            if (i1 === -1) break;
+            if (isBoundaryOrSpace(hay, i1 - 1) && isBoundaryOrSpace(hay, i1 + p1.length)) {
+              const searchFrom = i1 + p1.length + 1;
+              const i2 = hay.indexOf(p2, searchFrom);
+              if (
+                i2 !== -1 &&
+                i2 <= searchFrom + 160 &&
+                isBoundaryOrSpace(hay, i2 - 1) &&
+                hasTiSuffixAt(hay, i2 + p2.length)
+              ) {
+                return true;
+              }
+            }
+            s = i1 + 1;
+          }
         }
       }
     }
@@ -637,7 +689,14 @@ class BoldLinkedEngine {
         CREATE INDEX idx_bdef_loc ON bold_definitions(book_code, chapter_index, para_index, line_id);
         CREATE INDEX idx_bdef_book_pnum ON bold_definitions(book_code, para_num);
         CREATE INDEX idx_bdef_book_ch_pnum ON bold_definitions(book_code, chapter_index, para_num);
+        CREATE TABLE chapter_links (
+          book_code TEXT NOT NULL,
+          chapter_index INTEGER NOT NULL,
+          paragraphs_json TEXT NOT NULL,
+          PRIMARY KEY (book_code, chapter_index)
+        );
       `);
+      this._prebuildChapterLinks(dst);
       const metaInsert = dst.prepare('INSERT INTO meta (key, value) VALUES (?, ?)');
       metaInsert.run('schema_version', SCHEMA_VERSION);
       metaInsert.run('source_size', String(srcStat.size));
@@ -875,6 +934,61 @@ class BoldLinkedEngine {
     return { word: cleaned, search_prefix: prefix, hasResults: results.length > 0, results };
   }
 
+  _prebuildChapterLinks(bdb) {
+    if (!this.dbTipitaka) return 0;
+    let chapList = [];
+    try {
+      const chapCols = getColumnSet(this.dbTipitaka, 'chapters');
+      chapList = chapCols.has('book_code')
+        ? this.dbTipitaka
+            .prepare('SELECT book_code, chapter_index FROM chapters ORDER BY book_code, chapter_index')
+            .all()
+        : this.dbTipitaka
+            .prepare(
+              'SELECT b.code AS book_code, c.chapter_index FROM chapters c JOIN books b ON b.id = c.book_id ORDER BY b.code, c.chapter_index'
+            )
+            .all();
+    } catch (_) {
+      return 0;
+    }
+    if (chapList.length === 0) return 0;
+
+    const sharedState = {
+      bookTitleCache: new Map(),
+      revCache: new Map(),
+      targetChapSentCache: new Map(),
+      targetParaTextCache: new Map(),
+    };
+    const insertStmt = bdb.prepare(
+      'INSERT OR REPLACE INTO chapter_links (book_code, chapter_index, paragraphs_json) VALUES (?, ?, ?)'
+    );
+    let inserted = 0;
+    const tx = bdb.transaction(() => {
+      for (const ch of chapList) {
+        const payload = this._computeLinksForChapter(
+          bdb,
+          ch.book_code,
+          ch.chapter_index,
+          sharedState
+        );
+        if (payload && payload.paragraphs && Object.keys(payload.paragraphs).length > 0) {
+          insertStmt.run(ch.book_code, ch.chapter_index, JSON.stringify(payload.paragraphs));
+          inserted++;
+        }
+        // Keep shared target caches bounded during full-canon build
+        if (sharedState.targetChapSentCache.size > 48) {
+          sharedState.targetChapSentCache.clear();
+          sharedState.targetParaTextCache.clear();
+        }
+        if (sharedState.revCache.size > 4000) {
+          sharedState.revCache.clear();
+        }
+      }
+    });
+    tx();
+    return inserted;
+  }
+
   getLinksForChapter(bookCode, chapterIndex) {
     const cacheKey = `${bookCode}#${chapterIndex}`;
     if (this.chapterLinksCache.has(cacheKey)) {
@@ -884,6 +998,27 @@ class BoldLinkedEngine {
     const empty = { book_code: bookCode, chapter_index: chapterIndex, paragraphs: {} };
     const bdb = this.ensureBoldDb();
     if (!this.dbTipitaka || !bdb) return empty;
+
+    if (getTableSet(bdb).has('chapter_links')) {
+      const row = bdb
+        .prepare('SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1')
+        .get(bookCode, chapterIndex);
+      const res = row
+        ? { book_code: bookCode, chapter_index: chapterIndex, paragraphs: JSON.parse(row.paragraphs_json) }
+        : empty;
+      if (this.chapterLinksCache.size > 150) this.chapterLinksCache.clear();
+      this.chapterLinksCache.set(cacheKey, res);
+      return res;
+    }
+
+    const payload = this._computeLinksForChapter(bdb, bookCode, chapterIndex, null);
+    if (this.chapterLinksCache.size > 150) this.chapterLinksCache.clear();
+    this.chapterLinksCache.set(cacheKey, payload);
+    return payload;
+  }
+
+  _computeLinksForChapter(bdb, bookCode, chapterIndex, sharedState) {
+    const empty = { book_code: bookCode, chapter_index: chapterIndex, paragraphs: {} };
 
     const paraRows = this.dbTipitaka
       .prepare(
@@ -986,7 +1121,7 @@ class BoldLinkedEngine {
       }
     }
 
-    const bookTitleCache = new Map();
+    const bookTitleCache = sharedState ? sharedState.bookTitleCache : new Map();
     const getBookTitle = (code) => {
       if (bookTitleCache.has(code)) return bookTitleCache.get(code);
       const row = this.dbTipitaka.prepare('SELECT title FROM books WHERE code = ? LIMIT 1').get(code);
@@ -995,7 +1130,7 @@ class BoldLinkedEngine {
       return t;
     };
 
-    const revCache = new Map();
+    const revCache = sharedState ? sharedState.revCache : new Map();
     const resolveTargetParas = (targetBook, targetChapter, targetParaNum) => {
       const k = `${targetBook}|${targetChapter ?? -1}|${targetParaNum}`;
       if (revCache.has(k)) return revCache.get(k);
@@ -1028,8 +1163,8 @@ class BoldLinkedEngine {
       return res;
     };
 
-    const targetChapSentCache = new Map();
-    const targetParaTextCache = new Map();
+    const targetChapSentCache = sharedState ? sharedState.targetChapSentCache : new Map();
+    const targetParaTextCache = sharedState ? sharedState.targetParaTextCache : new Map();
     const getTargetParaLines = (targetBook, targetChapter, targetParaIdx) => {
       const ck = `${targetBook}|${targetChapter}`;
       if (!targetChapSentCache.has(ck)) {
@@ -1231,10 +1366,7 @@ class BoldLinkedEngine {
       }
     }
 
-    const payload = { book_code: bookCode, chapter_index: chapterIndex, paragraphs: paragraphsJson };
-    if (this.chapterLinksCache.size > 150) this.chapterLinksCache.clear();
-    this.chapterLinksCache.set(cacheKey, payload);
-    return payload;
+    return { book_code: bookCode, chapter_index: chapterIndex, paragraphs: paragraphsJson };
   }
 
   getLinkedPreview({ book, chapter = null, paraIndex = null, paraNum = null, lineId = null, word = null, langs = [] }) {

@@ -1095,7 +1095,7 @@ export const ChapterBlock = memo(function ChapterBlock({
   const [paliSentMap, setPaliSentMap] = React.useState(
     () => initialCachedPaliSent?.chapters?.[String(chapter.chapter_index)] || null
   );
-  const [chapterLinks, setChapterLinks] = React.useState(() => initialCachedLinks?.paragraphs || null);
+  const [chapterLinks, setChapterLinks] = React.useState(() => initialCachedLinks || null);
   const [isTransLoading, setIsTransLoading] = React.useState(false);
   const [isPaliSentLoading, setIsPaliSentLoading] = React.useState(false);
   const [transFetchedKey, setTransFetchedKey] = React.useState(() =>
@@ -1103,22 +1103,27 @@ export const ChapterBlock = memo(function ChapterBlock({
   );
   const [paliSentFetched, setPaliSentFetched] = React.useState(() => Boolean(initialCachedPaliSent));
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
+  const [isWithinDomWindow, setIsWithinDomWindow] = React.useState(true);
+  const measuredHeightRef = useRef(0);
 
   useEffect(() => {
     if (isCurrentOrTarget) {
       setIsNearViewport(true);
+      setIsWithinDomWindow(true);
     }
   }, [isCurrentOrTarget]);
 
-  // IntersectionObserver for lazy loading chapter HTML & lazy loading translations
+  // IntersectionObserver for lazy loading chapter HTML & lazy loading translations,
+  // plus a wider DOM virtualization window to shed far-off-screen chapter DOM nodes.
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') {
       setIsNearViewport(true);
+      setIsWithinDomWindow(true);
       return;
     }
     if (!blockRef.current) return;
 
-    const observer = new IntersectionObserver(
+    const loadObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (entry && entry.isIntersecting) {
@@ -1131,8 +1136,27 @@ export const ChapterBlock = memo(function ChapterBlock({
       { rootMargin: '800px 0px' } // Pre-load 800px before scrolling into view
     );
 
-    observer.observe(blockRef.current);
-    return () => observer.disconnect();
+    const domObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          setIsWithinDomWindow(true);
+        } else {
+          const h = blockRef.current?.offsetHeight || 0;
+          if (h > 0) measuredHeightRef.current = h;
+          setIsWithinDomWindow(false);
+        }
+      },
+      { rootMargin: '2500px 0px' } // Keep nearby chapters mounted; collapse far-off-screen DOM
+    );
+
+    loadObserver.observe(blockRef.current);
+    domObserver.observe(blockRef.current);
+    return () => {
+      loadObserver.disconnect();
+      domObserver.disconnect();
+    };
   }, [html, chapter.chapter_index, onVisible]);
 
   // Task 3: Lazy load translations ONLY when chapter is near viewport (or current/target) and active translation languages exist
@@ -1256,7 +1280,7 @@ export const ChapterBlock = memo(function ChapterBlock({
         ? getCachedChapterLinks(bookCode, chapter.chapter_index)
         : null;
     if (syncCached) {
-      const paras = syncCached?.paragraphs || null;
+      const paras = syncCached;
       setChapterLinks(paras);
       onLinksLoaded?.(chapter.chapter_index, paras);
       return;
@@ -1374,6 +1398,19 @@ export const ChapterBlock = memo(function ChapterBlock({
   ]);
 
   if (displayHtml) {
+    if (!isCurrentOrTarget && !isWithinDomWindow) {
+      return (
+        <div
+          ref={blockRef}
+          id={`chap-${chapter.chapter_index}`}
+          data-chapter={chapter.chapter_index}
+          data-virtualized="1"
+          className="chapter-content-block chapter-virtualized-placeholder"
+          style={{ minHeight: measuredHeightRef.current || 600 }}
+        />
+      );
+    }
+
     if (hasActiveTrans && isTransPending) {
       return (
         <div
@@ -4830,6 +4867,42 @@ export default function ReaderView() {
     return new Set(bookTabs.slice(start, start + maxColumns).map((t) => t.bookCode));
   }, [activeTab, activeBookCode, isAiActive, isColumnsMode, bookTabs, maxColumns]);
 
+  // Keep only active/visible panes + up to 2 most-recently-used background tabs
+  // mounted in DOM to cap memory usage across multi-tab sessions.
+  const [mruBookCodes, setMruBookCodes] = useState([]);
+  useEffect(() => {
+    const front = [];
+    for (const code of visibleColumnBookCodes) front.push(code);
+    if (activeTab?.bookCode && !isAiActive && !visibleColumnBookCodes.has(activeTab.bookCode)) {
+      front.push(activeTab.bookCode);
+    }
+    if (front.length === 0) return;
+    setMruBookCodes((prev) => {
+      const next = [...front, ...prev.filter((c) => !front.includes(c))].slice(0, 6);
+      if (next.length === prev.length && next.every((c, i) => c === prev[i])) {
+        return prev;
+      }
+      return next;
+    });
+  }, [visibleColumnBookCodes, activeTab?.bookCode, isAiActive]);
+
+  const mountedBookCodes = useMemo(() => {
+    const set = new Set(visibleColumnBookCodes);
+    if (activeTab?.bookCode && !isAiActive) {
+      set.add(activeTab.bookCode);
+    }
+    const maxMounted = Math.max(visibleColumnBookCodes.size + 2, 3);
+    for (const code of mruBookCodes) {
+      if (set.size >= maxMounted) break;
+      set.add(code);
+    }
+    for (const tab of bookTabs) {
+      if (set.size >= maxMounted) break;
+      set.add(tab.bookCode);
+    }
+    return set;
+  }, [visibleColumnBookCodes, activeTab?.bookCode, isAiActive, mruBookCodes, bookTabs]);
+
   const handleColumnUserInteract = useCallback((bookCode) => {
     driverBookCodeRef.current = bookCode;
   }, []);
@@ -5136,6 +5209,7 @@ export default function ReaderView() {
         }
       >
         {bookTabs.map((tab) => {
+          if (!mountedBookCodes.has(tab.bookCode)) return null;
           const isPaneVisible = visibleColumnBookCodes.has(tab.bookCode);
           const isPaneActive = tab.bookCode === activeTab.bookCode;
           const paneIntent =

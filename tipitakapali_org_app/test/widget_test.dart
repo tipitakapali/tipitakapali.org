@@ -273,7 +273,24 @@ void main() {
 
       expect(find.text('Welcome to TipitakaPali.org'), findsOneWidget);
       expect(find.textContaining('Synced:'), findsNothing);
+      expect(find.text('Pāḷi Display Script'), findsWidgets);
+      final scriptTopY =
+          tester.getTopLeft(find.text('Pāḷi Display Script').first).dy;
+      await tester.scrollUntilVisible(
+        find.text('Required Databases'),
+        60,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Required Databases'), findsOneWidget);
+      expect(
+        scriptTopY,
+        lessThan(tester.getTopLeft(find.text('Required Databases')).dy),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Pāḷi Dictionaries (All)'),
+        60,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Tipiṭaka Pāḷi Text (CST)'), findsOneWidget);
       expect(find.text('Pāḷi Dictionaries (All)'), findsOneWidget);
       // Individual dictionary internals must not clutter onboarding.
@@ -300,6 +317,11 @@ void main() {
       expect(find.textContaining('AI Translation Note:'), findsOneWidget);
       // Default selection is English ('en').
       expect(find.text('🇬🇧 English (English)'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('AI English Translation'),
+        60,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('AI English Translation'), findsOneWidget);
 
       // In-App FTS index card, Browse all additional packs button, and
@@ -411,6 +433,19 @@ void main() {
 
       final bundledRaw =
           File('assets/databases_manifest.json').readAsStringSync();
+      final bundledManifest = DatabaseManifest.fromJson(
+        jsonDecode(bundledRaw) as Map<String, dynamic>,
+      );
+      final metaPrefs = <String, Object>{
+        'onboarding_completed_v1': true,
+        'onboarding_in_progress_v1': false,
+        for (final asset in bundledManifest.compulsoryAssets)
+          'installed_asset_meta_${asset.filename}': jsonEncode({
+            'version': asset.version,
+            'updated': asset.updated,
+          }),
+      };
+      SharedPreferences.setMockInitialValues(metaPrefs);
       _createSampleTipitakaDb(p.join(tmp.path, 'tipitaka.db'));
       _seedRemainingCompulsoryDbs(tmp.path);
       _createSampleFtsDb(p.join(tmp.path, 'fts_tipitaka.db'));
@@ -640,13 +675,17 @@ void main() {
 
       final bundledRaw =
           File('assets/databases_manifest.json').readAsStringSync();
+      final bundledManifest = DatabaseManifest.fromJson(
+        jsonDecode(bundledRaw) as Map<String, dynamic>,
+      );
+      final currentTipitakaVersion = bundledManifest.core['tipitaka']?.version ?? 1;
       _createSampleTipitakaDb(p.join(tmp.path, 'tipitaka.db'));
       _seedRemainingCompulsoryDbs(tmp.path);
       _createSampleFtsDb(p.join(tmp.path, 'fts_tipitaka.db'));
 
       final updatedManifest = jsonDecode(bundledRaw) as Map<String, dynamic>;
       ((updatedManifest['core'] as Map<String, dynamic>)['tipitaka']
-          as Map<String, dynamic>)['version'] = 2;
+          as Map<String, dynamic>)['version'] = currentTipitakaVersion + 1;
       ((updatedManifest['core'] as Map<String, dynamic>)['tipitaka']
           as Map<String, dynamic>)['updated'] = '2026-12-01';
 
@@ -1095,6 +1134,11 @@ void main() {
           ),
         );
         await tester.pump(const Duration(milliseconds: 50));
+        await tester.scrollUntilVisible(
+          find.text('Tipiṭaka Pāḷi Text (CST)'),
+          60,
+          scrollable: find.byType(Scrollable).first,
+        );
 
         final statFinder = find.textContaining('/');
         expect(statFinder, findsWidgets);
@@ -1160,6 +1204,19 @@ void main() {
 
       final bundledRaw =
           File('assets/databases_manifest.json').readAsStringSync();
+      final bundledManifest = DatabaseManifest.fromJson(
+        jsonDecode(bundledRaw) as Map<String, dynamic>,
+      );
+      final metaPrefs = <String, Object>{
+        'onboarding_completed_v1': true,
+        'onboarding_in_progress_v1': false,
+        for (final asset in bundledManifest.compulsoryAssets)
+          'installed_asset_meta_${asset.filename}': jsonEncode({
+            'version': asset.version,
+            'updated': asset.updated,
+          }),
+      };
+      SharedPreferences.setMockInitialValues(metaPrefs);
       _createSampleTipitakaDb(p.join(tmp.path, 'tipitaka.db'));
       _seedRemainingCompulsoryDbs(tmp.path);
       _createSampleFtsDb(p.join(tmp.path, 'fts_tipitaka.db'));
