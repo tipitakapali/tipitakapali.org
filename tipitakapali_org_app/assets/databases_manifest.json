@@ -11,18 +11,18 @@
       "description": "CST4 217-book Mula, Atthakatha & Tika tree, rendered HTML chapters, TOC, and paragraph mappings.",
       "category": "core",
       "compulsory": true,
-      "version": 1,
-      "dbSize": 602218496,
+      "version": 2,
+      "dbSize": 181768192,
       "requiredTables": [
         "books",
         "chapters",
         "tree_nodes",
         "canon_paragraphs"
       ],
-      "updated": "2026-11-14",
-      "size": 119601641,
-      "checksum": "b9f485c2b42471e9e3501ce7153ad5a944f864db4ef1008a398cb0e436075941",
-      "zipSha256": "9b9195e2a36a52292deeca9ac503f45a986979b8b80fa6da41b22b662fd1ca46",
+      "updated": "2026-11-17",
+      "size": 110890844,
+      "checksum": "b472ed33952dadafaad9e644a2cd4d1ab38a43857b053ba405f9f0b535ea1d0d",
+      "zipSha256": "542e1a08fdda995dc9d8a8ab9caa51c6310c352d67daba60d766f7d00fcf7a2e",
       "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/tipitaka.db.zip"
     },
     "fts_tipitaka": {
