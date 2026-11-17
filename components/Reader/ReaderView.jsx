@@ -2194,6 +2194,7 @@ const ReaderPane = memo(function ReaderPane({
   isVisible,
   isActive,
   isColumnsMode,
+  useWindowScroll = false,
   isParallelSyncActive,
   paneScrollIntent,
   clearTargetScrollIntent,
@@ -2248,6 +2249,53 @@ const ReaderPane = memo(function ReaderPane({
   const attemptScrollTimerRef = useRef(null);
   const activeTabRef = useRef(tab);
   activeTabRef.current = tab;
+  const isHeaderVisibleRef = useRef(isHeaderVisible);
+  isHeaderVisibleRef.current = isHeaderVisible;
+  const lastScrollYRef = useRef(0);
+  const scrollDirectionRef = useRef(0);
+  const scrollTravelRef = useRef(0);
+
+  const getScrollTop = useCallback(() => {
+    if (useWindowScroll && typeof window !== 'undefined') {
+      return window.scrollY || document.documentElement.scrollTop || 0;
+    }
+    return containerRef.current?.scrollTop || 0;
+  }, [useWindowScroll]);
+
+  const setScrollTop = useCallback(
+    (top, behavior = 'auto') => {
+      const clamped = Math.max(0, top);
+      if (useWindowScroll && typeof window !== 'undefined') {
+        window.scrollTo({ top: clamped, behavior });
+        return;
+      }
+      const c = containerRef.current;
+      if (!c) return;
+      if (behavior === 'auto' || behavior === 'instant') {
+        c.scrollTop = clamped;
+      } else {
+        c.scrollTo({ top: clamped, behavior });
+      }
+    },
+    [useWindowScroll]
+  );
+
+  const getViewportBounds = useCallback(() => {
+    if (useWindowScroll && typeof window !== 'undefined') {
+      return {
+        top: 0,
+        height: window.innerHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
+    }
+    const c = containerRef.current;
+    if (!c) return { top: 0, height: 0, scrollHeight: 0 };
+    return {
+      top: c.getBoundingClientRect().top,
+      height: c.clientHeight,
+      scrollHeight: c.scrollHeight,
+    };
+  }, [useWindowScroll]);
   const activeTab = tab;
 
   // Tracks whether this tab pane has completed its initial load/hydration scroll restoration.
@@ -2280,10 +2328,12 @@ const ReaderPane = memo(function ReaderPane({
   const performProgrammaticScroll = useCallback((container, offset, options = {}) => {
     if (!container) return;
     isProgrammaticScrollRef.current = true;
+    lastScrollYRef.current = Math.max(0, offset);
     clearTimeout(programmaticScrollTimerRef.current);
     smartScrollTo(container, offset, {
       scrollMotion: options.scrollMotion || 'fast',
       onComplete: () => {
+        lastScrollYRef.current = Math.max(0, offset);
         programmaticScrollTimerRef.current = setTimeout(() => {
           isProgrammaticScrollRef.current = false;
         }, 150);
@@ -2395,13 +2445,14 @@ const ReaderPane = memo(function ReaderPane({
     // Restore exact pixel scrollTop synchronously before paint with ZERO drift timers or anchor snapping!
     if (hasInitialRestoredRef.current) {
       isTabSwitchingRef.current = true;
-      if (Math.abs(container.scrollTop - savedScroll) > 1) {
-        container.scrollTop = savedScroll;
+      lastScrollYRef.current = savedScroll;
+      if (Math.abs(getScrollTop() - savedScroll) > 1) {
+        setScrollTop(savedScroll, 'auto');
       }
       const rafId = requestAnimationFrame(() => {
         if (containerRef.current && !paneScrollIntent) {
-          if (Math.abs(containerRef.current.scrollTop - savedScroll) > 2) {
-            containerRef.current.scrollTop = savedScroll;
+          if (Math.abs(getScrollTop() - savedScroll) > 2) {
+            setScrollTop(savedScroll, 'auto');
           }
         }
         isTabSwitchingRef.current = false;
@@ -2447,9 +2498,11 @@ const ReaderPane = memo(function ReaderPane({
       const TOP_PAD = 60;
 
       if (savedScroll > 0) {
-        const maxScroll = Math.max(0, c.scrollHeight - c.clientHeight);
+        const { height, scrollHeight } = getViewportBounds();
+        const maxScroll = Math.max(0, scrollHeight - height);
         if (maxScroll >= savedScroll - 20) {
-          c.scrollTop = savedScroll;
+          lastScrollYRef.current = savedScroll;
+          setScrollTop(savedScroll, 'auto');
           hasInitialRestoredRef.current = true;
           return true;
         }
@@ -2467,10 +2520,12 @@ const ReaderPane = memo(function ReaderPane({
           chapEl.querySelector(`[data-pindex="${cleanPara}"]`) ||
           c.querySelector(`[data-para="${cleanPara}"]`);
         if (pEl) {
-          const cRect = c.getBoundingClientRect();
+          const { top: vpTop } = getViewportBounds();
+          const curTop = getScrollTop();
           const pRect = pEl.getBoundingClientRect();
-          const offset = Math.max(0, pRect.top - cRect.top + c.scrollTop - TOP_PAD);
-          c.scrollTop = offset;
+          const offset = Math.max(0, pRect.top - vpTop + curTop - TOP_PAD);
+          lastScrollYRef.current = offset;
+          setScrollTop(offset, 'auto');
           saveTabScroll(tab.bookCode, offset);
           hasInitialRestoredRef.current = true;
           return true;
@@ -2481,10 +2536,12 @@ const ReaderPane = memo(function ReaderPane({
       }
 
       if (effChap > 0) {
-        const cRect = c.getBoundingClientRect();
+        const { top: vpTop } = getViewportBounds();
+        const curTop = getScrollTop();
         const chRect = chapEl.getBoundingClientRect();
-        const offset = Math.max(0, chRect.top - cRect.top + c.scrollTop - TOP_PAD);
-        c.scrollTop = offset;
+        const offset = Math.max(0, chRect.top - vpTop + curTop - TOP_PAD);
+        lastScrollYRef.current = offset;
+        setScrollTop(offset, 'auto');
         saveTabScroll(tab.bookCode, offset);
       }
       hasInitialRestoredRef.current = true;
@@ -2897,12 +2954,14 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
           // If user scrolled away manually from landing point, stand down immediately!
-          if (cur.lastOffset !== null && Math.abs(container.scrollTop - cur.lastOffset) > 60) {
+          const curTop = getScrollTop();
+          const { top: vpTop, height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
+          if (cur.lastOffset !== null && Math.abs(curTop - cur.lastOffset) > 60) {
             paraJumpRef.current.key = null;
             return;
           }
           // Bottom-clamped targets can never reach top-60 — stand down.
-          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+          if (curTop + vpHeight >= vpScrollHeight - 4) {
             paraJumpRef.current.key = null;
             return;
           }
@@ -2913,12 +2972,11 @@ const ReaderPane = memo(function ReaderPane({
           }
           const hostChapter = target.closest ? target.closest('[data-chapter]') : null;
           const areaSettled = areaTranslationSettled(hostChapter);
-          const cRect = container.getBoundingClientRect();
           const rRect = target.getBoundingClientRect();
-          const diff = Math.abs(rRect.top - cRect.top - 60);
+          const diff = Math.abs(rRect.top - vpTop - 60);
           if (diff > TOL) {
             cur.stableCount = 0;
-            const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+            const fresh = Math.max(0, rRect.top - vpTop + curTop - 60);
             performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
             if (settings.pulseAnimation) {
               target.classList.remove('pulse-highlight');
@@ -2927,15 +2985,15 @@ const ReaderPane = memo(function ReaderPane({
             }
             saveTabScroll(activeTab.bookCode, fresh);
             cur.lastOffset = fresh;
-            cur.lastScrollHeight = container.scrollHeight;
+            cur.lastScrollHeight = vpScrollHeight;
             cur.timer = setTimeout(tick, GAP);
             return;
           }
           // In tolerance, but the layout may still be growing above the anchor
           // (payloads in flight, chapters inserting) — hold, don't settle yet.
           const layoutChanged =
-            cur.lastScrollHeight !== null && container.scrollHeight !== cur.lastScrollHeight;
-          cur.lastScrollHeight = container.scrollHeight;
+            cur.lastScrollHeight !== null && vpScrollHeight !== cur.lastScrollHeight;
+          cur.lastScrollHeight = vpScrollHeight;
           if (!areaSettled || layoutChanged) {
             cur.stableCount = 0;
             cur.timer = setTimeout(tick, GAP);
@@ -2984,7 +3042,9 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
           // If user scrolled away manually from landing point, stand down immediately!
-          if (cur.lastOffset !== null && Math.abs(container.scrollTop - cur.lastOffset) > 60) {
+          const curTop = getScrollTop();
+          const { top: vpTop, height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
+          if (cur.lastOffset !== null && Math.abs(curTop - cur.lastOffset) > 60) {
             chapterJumpRef.current.key = null;
             return;
           }
@@ -2996,28 +3056,27 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
           // Bottom-clamped targets can never reach top-60 — stand down.
-          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 4) {
+          if (curTop + vpHeight >= vpScrollHeight - 4) {
             chapterJumpRef.current.key = null;
             return;
           }
           const areaSettled = areaTranslationSettled(el, { includeHost: false });
-          const cRect = container.getBoundingClientRect();
           const rRect = el.getBoundingClientRect();
-          if (Math.abs(rRect.top - cRect.top - 60) > TOL) {
+          if (Math.abs(rRect.top - vpTop - 60) > TOL) {
             cur.stableCount = 0;
-            const fresh = Math.max(0, rRect.top - cRect.top + container.scrollTop - 60);
+            const fresh = Math.max(0, rRect.top - vpTop + curTop - 60);
             performProgrammaticScroll(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
             saveTabScroll(activeTab.bookCode, fresh);
             cur.lastOffset = fresh;
-            cur.lastScrollHeight = container.scrollHeight;
+            cur.lastScrollHeight = vpScrollHeight;
             cur.timer = setTimeout(tick, GAP);
             return;
           }
           // In tolerance, but content may still be growing above the anchor
           // (payloads in flight, chapters inserting) — hold, don't settle yet.
           const layoutChanged =
-            cur.lastScrollHeight !== null && container.scrollHeight !== cur.lastScrollHeight;
-          cur.lastScrollHeight = container.scrollHeight;
+            cur.lastScrollHeight !== null && vpScrollHeight !== cur.lastScrollHeight;
+          cur.lastScrollHeight = vpScrollHeight;
           if (!areaSettled || layoutChanged) {
             cur.stableCount = 0;
             cur.timer = setTimeout(tick, GAP);
@@ -3097,10 +3156,10 @@ const ReaderPane = memo(function ReaderPane({
                 return;
               }
 
-              const containerRect = containerRef.current.getBoundingClientRect();
+              const { top: vpTop } = getViewportBounds();
               const rect = targetEl.getBoundingClientRect();
-              const currentScroll = containerRef.current.scrollTop;
-              const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+              const currentScroll = getScrollTop();
+              const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -3157,10 +3216,10 @@ const ReaderPane = memo(function ReaderPane({
 
               const row = hitEl.closest('.reader-para-row') || hitEl.closest('p') || hitEl;
               const targetEl = hitEl.getClientRects().length > 0 ? hitEl : row;
-              const containerRect = containerRef.current.getBoundingClientRect();
+              const { top: vpTop } = getViewportBounds();
               const rect = targetEl.getBoundingClientRect();
-              const currentScroll = containerRef.current.scrollTop;
-              const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+              const currentScroll = getScrollTop();
+              const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -3275,10 +3334,10 @@ const ReaderPane = memo(function ReaderPane({
               return;
             }
 
-            const containerRect = containerRef.current.getBoundingClientRect();
+            const { top: vpTop } = getViewportBounds();
             const rect = targetEl.getBoundingClientRect();
-            const currentScroll = containerRef.current.scrollTop;
-            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+            const currentScroll = getScrollTop();
+            const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
@@ -3448,10 +3507,10 @@ const ReaderPane = memo(function ReaderPane({
               return;
             }
 
-            const containerRect = containerRef.current.getBoundingClientRect();
+            const { top: vpTop } = getViewportBounds();
             const rect = targetEl.getBoundingClientRect();
-            const currentScroll = containerRef.current.scrollTop;
-            const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+            const currentScroll = getScrollTop();
+            const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
@@ -3518,10 +3577,10 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
 
-          const containerRect = containerRef.current.getBoundingClientRect();
+          const { top: vpTop } = getViewportBounds();
           const rect = target.getBoundingClientRect();
-          const currentScroll = containerRef.current.scrollTop;
-          const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+          const currentScroll = getScrollTop();
+          const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
           performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           // Detect first paragraph in the chapter
@@ -3628,8 +3687,8 @@ const ReaderPane = memo(function ReaderPane({
   const detectActiveEditionPages = useCallback(() => {
     if (!containerRef.current || !activeTab || !isVisible) return;
     const container = containerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const targetY = containerRect.top + 80;
+    const { top: vpTop } = getViewportBounds();
+    const targetY = vpTop + 80;
 
     const pbElements = container.querySelectorAll('span.pb[data-ed][data-page]');
     if (pbElements.length === 0) return;
@@ -3675,7 +3734,7 @@ const ReaderPane = memo(function ReaderPane({
         });
       }
     }
-  }, [activeTab, isVisible, isActive, setActiveEditionPages]);
+  }, [activeTab, isVisible, isActive, setActiveEditionPages, getViewportBounds]);
 
   // Initial and chapter content change detection
   useEffect(() => {
@@ -3693,15 +3752,44 @@ const ReaderPane = memo(function ReaderPane({
     }
   }, [isActive, paneParaNum, setActiveParaNum]);
 
-  // Direct fast scroll listener — preserves tab scroll, drives parallel column sync & detects active paragraph
-  const handleScroll = useCallback(
-    (e) => {
+  // Direct fast scroll listener — auto-toggles header/footer, preserves tab scroll, drives parallel sync & detects active paragraph
+  const processScrollTop = useCallback(
+    (top) => {
       if (!isVisible || isTabSwitchingRef.current) return;
 
-      const top = e.target.scrollTop;
+      const prevTop = lastScrollYRef.current;
+      const delta = top - prevTop;
+      lastScrollYRef.current = top;
 
       if (!isProgrammaticScrollRef.current) {
         cancelJump();
+        if (top <= 24) {
+          scrollDirectionRef.current = 0;
+          scrollTravelRef.current = 0;
+          if (!isHeaderVisibleRef.current) setIsHeaderVisible?.(true);
+        } else if (delta > 0) {
+          if (scrollDirectionRef.current !== 1) {
+            scrollDirectionRef.current = 1;
+            scrollTravelRef.current = 0;
+          }
+          scrollTravelRef.current += delta;
+          if (top > 64 && scrollTravelRef.current >= 36 && isHeaderVisibleRef.current) {
+            setIsHeaderVisible?.(false);
+          }
+        } else if (delta < 0) {
+          const { height, scrollHeight } = getViewportBounds();
+          const atBottomBounce = scrollHeight > height && top + height >= scrollHeight - 6;
+          if (!atBottomBounce) {
+            if (scrollDirectionRef.current !== -1) {
+              scrollDirectionRef.current = -1;
+              scrollTravelRef.current = 0;
+            }
+            scrollTravelRef.current += -delta;
+            if (scrollTravelRef.current >= 24 && !isHeaderVisibleRef.current) {
+              setIsHeaderVisible?.(true);
+            }
+          }
+        }
       }
 
       if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
@@ -3720,8 +3808,8 @@ const ReaderPane = memo(function ReaderPane({
         const curTab = activeTabRef.current;
         if (curTab && containerRef.current) {
           const container = containerRef.current;
-          const containerRect = container.getBoundingClientRect();
-          const targetY = containerRect.top + 60;
+          const { top: vpTop } = getViewportBounds();
+          const targetY = vpTop + 60;
 
           const paraElements = container.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
           let foundParaNum = null;
@@ -3818,8 +3906,27 @@ const ReaderPane = memo(function ReaderPane({
       addToHistory,
       cancelJump,
       onColumnScrollSync,
+      getViewportBounds,
+      setIsHeaderVisible,
     ]
   );
+
+  const handleScroll = useCallback(
+    (e) => {
+      processScrollTop(e.target.scrollTop);
+    },
+    [processScrollTop]
+  );
+
+  useEffect(() => {
+    if (!useWindowScroll || !isVisible || typeof window === 'undefined') return;
+    lastScrollYRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    const onWinScroll = () => {
+      processScrollTop(window.scrollY || document.documentElement.scrollTop || 0);
+    };
+    window.addEventListener('scroll', onWinScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onWinScroll);
+  }, [useWindowScroll, isVisible, processScrollTop]);
 
   const handleReaderClick = useCallback((e) => {
     if (isColumnsMode && !isActive) {
@@ -4159,9 +4266,6 @@ const ReaderPane = memo(function ReaderPane({
     if (isColumnsMode && !isActive) {
       activatePane(activeTab.bookCode);
     }
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('zen-mode');
-    }
     setIsSidebarOpen(true);
     setIsHeaderVisible(true);
   };
@@ -4337,7 +4441,9 @@ const ReaderPane = memo(function ReaderPane({
   );
 
   const wrapperClass = isVisible
-    ? `reader-pane flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)] ${
+    ? `reader-pane flex-1 min-w-0 min-h-0 flex flex-col relative ${
+        useWindowScroll ? '' : 'overflow-hidden '
+      }bg-[var(--bg-primary)] ${
         isColumnsMode
           ? `border-r border-[var(--border-color)] last:border-r-0 ${
               isActive ? 'reader-pane-active-col' : 'reader-pane-inactive-col'
@@ -4604,12 +4710,16 @@ const ReaderPane = memo(function ReaderPane({
           </div>
         )}
         <main
-          className="content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden"
+          className={
+            useWindowScroll
+              ? 'content-area flex-1 relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden'
+              : 'content-area flex-1 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)] outline-none focus:outline-hidden'
+          }
           tabIndex={0}
           ref={setMainRef}
           data-book-code={activeTab.bookCode}
           data-active-pane={isActive ? 'true' : undefined}
-          onScroll={handleScroll}
+          onScroll={useWindowScroll ? undefined : handleScroll}
         >
           {/* Lazy-Loaded Chapter Content Stream */}
           <div
@@ -5053,35 +5163,40 @@ export default function ReaderView() {
 
       driverBookCodeRef.current = curCode;
 
-      const clientHeight = container.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const useWin = !isColumnsMode && !isAiActive && typeof window !== 'undefined';
+      const scroller = useWin ? window : container;
+      const clientHeight = useWin
+        ? window.innerHeight
+        : container.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 800);
+      const maxScrollHeight = useWin ? document.documentElement.scrollHeight : container.scrollHeight;
       const pageStep = Math.max(120, Math.round(clientHeight * 0.85));
       const lineStep = 80;
 
       if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
         e.preventDefault();
-        container.scrollBy({
+        scroller.scrollBy({
           top: pageStep,
           behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
         });
       } else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
         e.preventDefault();
-        container.scrollBy({
+        scroller.scrollBy({
           top: -pageStep,
           behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
         });
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        container.scrollBy({ top: lineStep, behavior: 'smooth' });
+        scroller.scrollBy({ top: lineStep, behavior: 'smooth' });
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        container.scrollBy({ top: -lineStep, behavior: 'smooth' });
+        scroller.scrollBy({ top: -lineStep, behavior: 'smooth' });
       } else if (e.key === 'Home') {
         e.preventDefault();
-        container.scrollTo({ top: 0, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
+        scroller.scrollTo({ top: 0, behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth' });
       } else if (e.key === 'End') {
         e.preventDefault();
-        container.scrollTo({
-          top: container.scrollHeight,
+        scroller.scrollTo({
+          top: maxScrollHeight,
           behavior: settings?.scrollMotion === 'instant' ? 'instant' : 'smooth',
         });
       }
@@ -5189,8 +5304,16 @@ export default function ReaderView() {
     );
   }
 
+  const isPanelWindowScroll = !isColumnsMode && !isAiActive && Boolean(activeTab?.bookCode);
+
   return (
-    <div className="reader-view-panel flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
+    <div
+      className={
+        isPanelWindowScroll
+          ? 'reader-view-panel flex-1 min-h-0 flex flex-col relative bg-[var(--bg-primary)]'
+          : 'reader-view-panel flex-1 min-h-0 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]'
+      }
+    >
       {translationStyleRules && <style dangerouslySetInnerHTML={{ __html: translationStyleRules }} />}
 
       {/* AI Chat View (rendered when active, while keeping book panes mounted in background) */}
@@ -5226,6 +5349,7 @@ export default function ReaderView() {
               isVisible={isPaneVisible}
               isActive={isPaneActive}
               isColumnsMode={isColumnsMode}
+              useWindowScroll={!isColumnsMode && !isAiActive}
               isParallelSyncActive={isParallelSyncActive}
               paneScrollIntent={paneIntent}
               clearTargetScrollIntent={clearTargetScrollIntent}

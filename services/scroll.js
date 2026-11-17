@@ -10,6 +10,26 @@
 
 const activeAnimationByContainer = new WeakMap();
 
+function shouldUseWindow(container) {
+  if (typeof window === 'undefined' || !container) return false;
+  if (container === window) return true;
+  return Boolean(
+    document.body?.classList?.contains('window-scroll') &&
+      typeof container.matches === 'function' &&
+      container.matches('main.content-area')
+  );
+}
+
+function getContainerScrollTop(container, useWin) {
+  if (useWin) return window.scrollY || document.documentElement.scrollTop || 0;
+  return container.scrollTop;
+}
+
+function setContainerScrollTop(container, useWin, top) {
+  if (useWin) window.scrollTo(0, top);
+  else container.scrollTop = top;
+}
+
 export function smartScrollTo(container, targetTop, options = {}) {
   if (!container) return;
 
@@ -19,15 +39,17 @@ export function smartScrollTo(container, targetTop, options = {}) {
     onComplete = null,
   } = options;
 
+  const useWin = shouldUseWindow(container);
+  const animKey = useWin ? window : container;
   const destination = Math.max(0, targetTop - offset);
-  const currentTop = container.scrollTop;
+  const currentTop = getContainerScrollTop(container, useWin);
   const distance = Math.abs(destination - currentTop);
 
   // Cancel any ongoing scroll animation for this specific container
-  const prevAnimId = activeAnimationByContainer.get(container);
+  const prevAnimId = activeAnimationByContainer.get(animKey);
   if (prevAnimId) {
     cancelAnimationFrame(prevAnimId);
-    activeAnimationByContainer.delete(container);
+    activeAnimationByContainer.delete(animKey);
   }
 
   // 1. Instant / Zero Motion preference
@@ -37,14 +59,18 @@ export function smartScrollTo(container, targetTop, options = {}) {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (scrollMotion === 'instant' || isReducedMotion || distance < 3) {
-    container.scrollTop = destination;
+    setContainerScrollTop(container, useWin, destination);
     if (onComplete) onComplete();
     return;
   }
 
   // 2. Standard native smooth (if explicitly requested)
   if (scrollMotion === 'smooth') {
-    container.scrollTo({ top: destination, behavior: 'smooth' });
+    if (useWin) {
+      window.scrollTo({ top: destination, behavior: 'smooth' });
+    } else {
+      container.scrollTo({ top: destination, behavior: 'smooth' });
+    }
     if (onComplete) {
       setTimeout(onComplete, Math.min(450, Math.max(150, Math.round(distance / 6))));
     }
@@ -58,13 +84,13 @@ export function smartScrollTo(container, targetTop, options = {}) {
   let startTop = currentTop;
   if (distance > 2500) {
     startTop = destination > currentTop ? destination - 450 : destination + 450;
-    container.scrollTop = startTop;
+    setContainerScrollTop(container, useWin, startTop);
   }
 
   const animDistance = Math.abs(destination - startTop);
   const duration = Math.min(220, Math.max(100, Math.round(Math.sqrt(animDistance) * 7.5)));
   const startTime = performance.now();
-  const initialScroll = container.scrollTop;
+  const initialScroll = getContainerScrollTop(container, useWin);
   const diff = destination - initialScroll;
 
   function easeOutQuad(t) {
@@ -76,27 +102,28 @@ export function smartScrollTo(container, targetTop, options = {}) {
     const progress = Math.min(1, elapsed / duration);
     const ease = easeOutQuad(progress);
 
-    container.scrollTop = initialScroll + diff * ease;
+    setContainerScrollTop(container, useWin, initialScroll + diff * ease);
 
     if (progress < 1) {
       const nextId = requestAnimationFrame(step);
-      activeAnimationByContainer.set(container, nextId);
+      activeAnimationByContainer.set(animKey, nextId);
     } else {
-      activeAnimationByContainer.delete(container);
+      activeAnimationByContainer.delete(animKey);
       if (onComplete) onComplete();
     }
   }
 
   const firstId = requestAnimationFrame(step);
-  activeAnimationByContainer.set(container, firstId);
+  activeAnimationByContainer.set(animKey, firstId);
 }
 
 export function smartScrollIntoView(targetEl, container, options = {}) {
   if (!targetEl || !container) return;
-  const containerRect = container.getBoundingClientRect();
+  const useWin = shouldUseWindow(container);
+  const containerTop = useWin ? 0 : container.getBoundingClientRect().top;
   const rect = targetEl.getBoundingClientRect();
-  const currentScroll = container.scrollTop;
+  const currentScroll = getContainerScrollTop(container, useWin);
   const topPadding = options.topPadding !== undefined ? options.topPadding : 60;
-  const targetTop = rect.top - containerRect.top + currentScroll - topPadding;
+  const targetTop = rect.top - containerTop + currentScroll - topPadding;
   smartScrollTo(container, targetTop, options);
 }

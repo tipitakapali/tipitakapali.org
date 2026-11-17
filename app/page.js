@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback, useMemo, Suspense } from 'react';
-import { Minimize2 } from 'lucide-react';
 
 import Header from '../components/Header';
 import BookTabsBar from '../components/BookTabsBar';
@@ -20,11 +19,9 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
-  const { openBook, openAiChatTab, openSearchModal, updateUrlParams, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound, isBookmarkOpen, setIsBookmarkOpen, isHistoryOpen, setIsHistoryOpen } = useTabs();
-  const { settings, isZenMode, setIsZenMode } = useThemeSettings();
+  const { openBook, openAiChatTab, openSearchModal, updateUrlParams, openTabs, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound, isBookmarkOpen, setIsBookmarkOpen, isHistoryOpen, setIsHistoryOpen } = useTabs();
+  const { settings } = useThemeSettings();
   const hasInitializedRef = useRef(false);
-
-  const isEkaActive = isZenMode;
 
 
 
@@ -280,117 +277,76 @@ export function MainAppContent({ params: rawParams }) {
     }
   }, [openBook, openAiChatTab, openSearchModal, updateUrlParams, params]);
 
-  // Full exit Eka mode handler — restores app header, book tabs bar, breadcrumbs, and footer (leaves sidebar as-is)
-  const handleExitZen = useCallback(() => {
-    setIsZenMode(false);
-    setIsHeaderVisible(true);
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('zen-mode');
-    }
-  }, [setIsZenMode, setIsHeaderVisible]);
-
-  // Keyboard shortcut to exit Eka mode
-  useEffect(() => {
-    if (!isEkaActive) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        handleExitZen();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEkaActive, handleExitZen]);
-
-  // Red alert + halo on the exit button when Eka mode is entered.
-  // Restores to the normal calm button after 3 seconds.
-  const [ekaAlert, setEkaAlert] = useState(false);
-  useEffect(() => {
-    if (!isEkaActive) return;
-    setEkaAlert(true);
-    const t = setTimeout(() => setEkaAlert(false), 3000);
-    return () => clearTimeout(t);
-  }, [isEkaActive]);
-
   const isAiTab = activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat';
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    onResize();
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const bookTabCount = useMemo(
+    () => (openTabs || []).filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat').length,
+    [openTabs]
+  );
+  const isColumnsActive =
+    settings?.tabView === 'columns' && viewportWidth >= 900 && bookTabCount > 1 && !isAiTab;
+  const useWindowScroll = !isNotFound && !isAiTab && !isColumnsActive && Boolean(activeTab?.bookCode);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.classList.toggle('window-scroll', useWindowScroll);
+    document.body.classList.toggle('window-scroll', useWindowScroll);
+    return () => {
+      document.documentElement.classList.remove('window-scroll');
+      document.body.classList.remove('window-scroll');
+    };
+  }, [useWindowScroll]);
 
   if (isNotFound) {
     return <NotFound />;
   }
 
   return (
-    <div className="h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div
+      className={
+        useWindowScroll
+          ? 'min-h-screen min-h-[100dvh] w-full max-w-full flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]'
+          : 'h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]'
+      }
+    >
       <title>{pageTitle}</title>
       <Header />
-      <div className="app-main-flex flex flex-1 min-h-0 overflow-hidden overflow-x-clip relative w-full max-w-full" style={{ overflowX: 'clip' }}>
+      <div
+        className={
+          useWindowScroll
+            ? 'app-main-flex flex flex-1 min-h-0 overflow-x-clip relative w-full max-w-full'
+            : 'app-main-flex flex flex-1 min-h-0 overflow-hidden overflow-x-clip relative w-full max-w-full'
+        }
+        style={{ overflowX: 'clip' }}
+      >
         <NavigationTree />
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-full" style={{ order: 10 }}>
+        <div
+          className={
+            useWindowScroll
+              ? 'flex flex-col flex-1 min-w-0 w-full max-w-full'
+              : 'flex flex-col flex-1 min-h-0 overflow-hidden w-full max-w-full'
+          }
+          style={{ order: 10 }}
+        >
           <BookTabsBar />
-          <div className="app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full">
+          <div
+            className={
+              useWindowScroll
+                ? 'app-body flex-1 flex relative w-full max-w-full'
+                : 'app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full'
+            }
+          >
             <ReaderView />
-            {/* Floating Exit Eka Mode Button - Aligned near the text reading column */}
-            {isEkaActive && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4 sm:px-6 z-40">
-                <div
-                  className="w-full flex justify-end pointer-events-none"
-                  style={{ maxWidth: 'var(--reader-max-width, 880px)' }}
-                >
-                  <span className="relative inline-flex pointer-events-none">
-                    {ekaAlert && (
-                      <>
-                        <span aria-hidden="true" className="eka-halo" />
-                        <span aria-hidden="true" className="eka-ping" />
-                        <span aria-hidden="true" className="eka-ping" style={{ animationDelay: '0.5s' }} />
-                        <span aria-hidden="true" className="eka-ping" style={{ animationDelay: '1s' }} />
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleExitZen}
-                      className={`pointer-events-auto w-9 h-9 rounded-full backdrop-blur-md border flex items-center justify-center cursor-pointer select-none group mr-1 sm:mr-0 transition-all ${
-                        ekaAlert
-                          ? 'bg-[var(--accent)] border-[var(--accent)] text-white opacity-100 shadow-[0_0_36px_color-mix(in_srgb,var(--accent)_75%,transparent)] scale-125'
-                          : 'bg-[var(--bg-card)]/90 hover:bg-[var(--accent)] hover:text-white hover:border-[var(--accent)] border-[var(--border-color)] text-[var(--accent)] shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 opacity-80 hover:opacity-100'
-                      }`}
-                      title="Exit Eka Mode (Esc)"
-                      aria-label="Exit Eka Mode"
-                    >
-                      <Minimize2 size={ekaAlert ? 20 : 16} className="group-hover:rotate-90 transition-transform duration-300" />
-                    </button>
-                  </span>
-                </div>
-                <style>{`
-                  .eka-halo {
-                    position: absolute;
-                    inset: -28px;
-                    border-radius: 9999px;
-                    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 34%, transparent) 0%, color-mix(in srgb, var(--accent) 14%, transparent) 55%, transparent 74%);
-                    pointer-events: none;
-                    animation: ekaHalo 1.5s ease-in-out infinite;
-                  }
-                  @keyframes ekaHalo {
-                    0%, 100% { opacity: 0.65; transform: scale(1); }
-                    50% { opacity: 1; transform: scale(1.1); }
-                  }
-                  .eka-ping {
-                    position: absolute;
-                    inset: -8px;
-                    border-radius: 9999px;
-                    border: 4px solid color-mix(in srgb, var(--accent) 85%, transparent);
-                    opacity: 0;
-                    pointer-events: none;
-                    animation: ekaPing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-                  }
-                  @keyframes ekaPing {
-                    0% { transform: scale(1); opacity: 0.9; }
-                    100% { transform: scale(4.5); opacity: 0; }
-                  }
-                  @media (prefers-reduced-motion: reduce) {
-                    .eka-halo, .eka-ping { animation: none !important; }
-                    .eka-ping { display: none; }
-                  }
-                `}</style>
-              </div>
-            )}
           </div>
           {!isAiTab && activeTab?.bookCode && <Footer />}
         </div>

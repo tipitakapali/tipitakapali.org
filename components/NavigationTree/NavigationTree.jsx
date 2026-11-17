@@ -365,7 +365,7 @@ export default function NavigationTree() {
       {/* Mobile Backdrop Overlay */}
       {isSidebarOpen && dockPosition !== 'float' && (
         <div
-          className="fixed inset-0 bg-black/45 z-40 sm:hidden animate-fade-in"
+          className="fixed inset-0 bg-black/45 z-40 md:hidden animate-fade-in"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

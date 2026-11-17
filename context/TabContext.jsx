@@ -276,7 +276,7 @@ export function toLangKey(langOrDb) {
 export function TabProvider({ children }) {
 
 
-  const { setIsZenMode, updateSetting, settings } = useThemeSettings();
+  const { updateSetting, settings } = useThemeSettings();
 
   const [openTabs, setOpenTabs] = useState([]);
   const [activeBookCode, setActiveBookCode] = useState(null);
@@ -711,9 +711,7 @@ export function TabProvider({ children }) {
   const openAiChatTab = useCallback(
     (options = {}) => {
       setIsNotFound(false);
-      setIsZenMode(false);
       if (typeof document !== 'undefined') {
-        document.body.classList.remove('zen-mode');
         document.title = 'Ani Assistant | Tipiṭaka Pāḷi';
       }
 
@@ -747,7 +745,7 @@ export function TabProvider({ children }) {
       persistTabs(nextTabs, 'ai_chat');
       updateUrlParams({ book: 'ai_chat' });
     },
-    [persistTabs, setIsZenMode, updateUrlParams]
+    [persistTabs, updateUrlParams]
   );
 
   useEffect(() => {
@@ -815,19 +813,6 @@ export function TabProvider({ children }) {
 
       const currentTabs = openTabsRef.current;
       const existingTabIndex = currentTabs.findIndex((t) => t.bookCode === cleanCode);
-
-      if (options.zenMode === true) {
-        setIsZenMode(true);
-        setIsSidebarOpen(false);
-        if (typeof document !== 'undefined') {
-          document.body.classList.add('zen-mode');
-        }
-      } else {
-        setIsZenMode(false);
-        if (typeof document !== 'undefined') {
-          document.body.classList.remove('zen-mode');
-        }
-      }
 
       if (activeBookCodeRef.current && activeBookCodeRef.current !== cleanCode && typeof document !== 'undefined') {
         const container = getActiveContentArea(activeBookCodeRef.current);
@@ -1668,15 +1653,12 @@ export function TabProvider({ children }) {
           setActiveBookCode(null);
           setTreeSelectedNode(null);
           updateUrlParams({ book: null, chapter: null, q: null, search: null });
-          if (typeof document !== 'undefined') {
-            document.body.classList.remove('zen-mode');
-          }
         }
       } else {
         persistTabs(newTabs, activeBookCodeRef.current);
       }
     },
-    [updateUrlParams, persistTabs, setActiveParaNum, setIsZenMode, setIsSidebarOpen]
+    [updateUrlParams, persistTabs, setActiveParaNum, setIsSidebarOpen]
   );
 
   // Close other tabs except bookCode
@@ -1720,12 +1702,8 @@ export function TabProvider({ children }) {
     setTreeSelectedNode(null);
     updateUrlParams({ book: null, chapter: null, q: null, search: null });
     persistTabs([], null);
-    setIsZenMode(false);
     setIsSidebarOpen(false);
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('zen-mode');
-    }
-  }, [updateUrlParams, persistTabs, setIsZenMode, setIsSidebarOpen]);
+  }, [updateUrlParams, persistTabs, setIsSidebarOpen]);
 
   // Close tabs to the left of bookCode
   const closeLeftTabs = useCallback(
@@ -2010,12 +1988,8 @@ export function TabProvider({ children }) {
     setIsSidebarOpen(next);
     if (next) {
       setIsHeaderVisible(true);
-      setIsZenMode(false);
-      if (typeof document !== 'undefined') {
-        document.body.classList.remove('zen-mode');
-      }
     }
-  }, [setIsZenMode, setIsHeaderVisible]);
+  }, [setIsHeaderVisible]);
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 

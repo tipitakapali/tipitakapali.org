@@ -587,23 +587,6 @@ html, body {
   pointer-events: none !important;
 }
 
-/* Eka Mode (Header, Tabs Bar, Breadcrumbs & Footer Hidden) */
-body.zen-mode .app-header {
-  display: none !important;
-}
-
-body.zen-mode .book-tabs-bar {
-  display: none !important;
-}
-
-body.zen-mode .content-header {
-  display: none !important;
-}
-
-body.zen-mode .app-footer {
-  display: none !important;
-}
-
 
 /* Display Toggles */
 body.hide-pb span.pb, body.hide-pb .pb { display: none !important; }
@@ -3595,17 +3578,13 @@ footer.app-footer.hidden-footer,
 
   aside.app-sidebar {
     position: fixed;
-    height: calc(100vh - var(--header-height) - var(--footer-height));
-    top: var(--header-height);
+    height: calc(100dvh - 50px);
+    top: 50px;
     left: 0;
     width: 84vw;
     max-width: 320px;
     z-index: 50;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
-  }
-  body.zen-mode aside.app-sidebar {
-    height: 100vh;
-    top: 0;
   }
   aside.app-sidebar.collapsed {
     transform: translateX(-100%);
@@ -5068,5 +5047,109 @@ h3.linked-def-cat-attha,
 h3.linked-def-cat-tika {
   color: var(--linked-cat-color);
 }
+
+/* Document-level window scrolling for mobile browser chrome collapse + zero-shift auto-hide bars */
+html.window-scroll,
+body.window-scroll {
+  height: auto !important;
+  min-height: 100dvh !important;
+  overflow: visible !important;
+  display: block !important;
+}
+
+body.window-scroll .app-main-flex,
+body.window-scroll .app-body,
+body.window-scroll .reader-view-panel,
+body.window-scroll .reader-pane,
+body.window-scroll main.content-area {
+  overflow: visible !important;
+}
+
+body.window-scroll .app-main-flex {
+  overflow-x: clip !important;
+}
+
+@media (min-width: 769px) {
+  body.window-scroll aside.app-sidebar,
+  body.window-scroll aside.dict-dock-panel,
+  body.window-scroll div.dict-dock-panel {
+    position: sticky;
+    top: 52px;
+    height: calc(100dvh - 52px);
+    align-self: flex-start;
+    transition: top 0.28s cubic-bezier(0.4, 0, 0.2, 1), height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body.window-scroll:has(.app-header.hidden-header) aside.dict-dock-panel,
+  body.window-scroll:has(.app-header.hidden-header) div.dict-dock-panel {
+    top: 0;
+    height: 100dvh;
+  }
+}
+
+body.window-scroll .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+body.window-scroll .app-header.hidden-header {
+  margin-top: 0 !important;
+  transform: translateY(-100%) !important;
+}
+
+body.window-scroll .book-tabs-bar {
+  position: sticky;
+  top: 50px;
+  z-index: 45;
+}
+
+@media (min-width: 640px) {
+  body.window-scroll .book-tabs-bar {
+    top: 52px;
+  }
+}
+
+body.window-scroll .book-tabs-bar.hidden-tabs-bar {
+  margin-top: 0 !important;
+  height: var(--tabs-height) !important;
+  padding-top: 6px !important;
+  padding-bottom: 0 !important;
+  transform: translateY(calc(-100% - 54px)) !important;
+}
+
+body.window-scroll .content-header {
+  position: sticky;
+  top: calc(50px + var(--tabs-height, 38px));
+  z-index: 30;
+}
+
+@media (min-width: 640px) {
+  body.window-scroll .content-header {
+    top: calc(52px + var(--tabs-height, 38px));
+  }
+}
+
+body.window-scroll .content-header.hidden-scroll {
+  margin-top: 0 !important;
+  max-height: 42px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  transform: translateY(calc(-100% - 92px)) !important;
+}
+
+body.window-scroll footer.app-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+}
+
+body.window-scroll footer.app-footer.hidden-footer,
+body.window-scroll .app-footer.hidden-footer {
+  margin-bottom: 0 !important;
+  transform: translateY(100%) !important;
+}
+
 
 

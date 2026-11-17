@@ -25,7 +25,7 @@ export default function BookTabsBar() {
     setIsSidebarOpen,
     setIsHeaderVisible,
   } = useTabs();
-  const { settings, updateSetting, isZenMode, setIsZenMode } = useThemeSettings();
+  const { settings, updateSetting } = useThemeSettings();
 
   const isHidden = !isHeaderVisible && !isSidebarOpen;
   const tabView = settings?.tabView || 'columns';
@@ -133,15 +133,6 @@ export default function BookTabsBar() {
     if (tabsScrollRef.current && e.deltaY !== 0) {
       e.preventDefault();
       tabsScrollRef.current.scrollLeft += e.deltaY;
-    }
-  };
-
-  const handleOpenNavAndExitZen = () => {
-    setIsZenMode(false);
-    setIsSidebarOpen(true);
-    setIsHeaderVisible(true);
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('zen-mode');
     }
   };
 

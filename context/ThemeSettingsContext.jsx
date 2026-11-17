@@ -136,7 +136,6 @@ const ThemeSettingsContext = createContext();
 
 export function ThemeSettingsProvider({ children }) {
   const [settings, setSettingsState] = useState(DEFAULT_SETTINGS);
-  const [isZenMode, setIsZenMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -267,10 +266,6 @@ export function ThemeSettingsProvider({ children }) {
     } catch (e) {}
   };
 
-  const toggleZenMode = () => {
-    setIsZenMode((prev) => !prev);
-  };
-
   const openSettingsModal = () => setIsSettingsOpen(true);
   const closeSettingsModal = () => setIsSettingsOpen(false);
 
@@ -306,8 +301,7 @@ export function ThemeSettingsProvider({ children }) {
     document.body.classList.toggle('hide-footnotes', !settings.showFootnotes);
     document.body.classList.toggle('hide-chap-heading', !settings.showChapterHeadings);
     document.body.classList.toggle('no-indent', !settings.paragraphIndent);
-    document.body.classList.toggle('zen-mode', isZenMode);
-  }, [settings, isZenMode, isMounted]);
+  }, [settings, isMounted]);
 
   // Prime script & reader fonts to avoid FOIT/layout shift when switching scripts or fonts
   useEffect(() => {
@@ -352,14 +346,11 @@ export function ThemeSettingsProvider({ children }) {
     <ThemeSettingsContext.Provider
       value={{
         settings,
-        isZenMode,
         isSettingsOpen,
         isMounted,
         updateSetting,
         updateSettings,
         resetToDefaults,
-        toggleZenMode,
-        setIsZenMode,
         openSettingsModal,
         closeSettingsModal,
         isLanguageMenuOpen,

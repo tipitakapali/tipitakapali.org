@@ -11,7 +11,7 @@ import { AVAILABLE_TRANSLATION_COUNT } from '../LanguageMenu';
 
 export default function WelcomeView() {
   const { recentHistory, setIsHistoryOpen, setIsSidebarOpen, openBook, openAiChatTab } = useTabs();
-  const { settings, setIsZenMode, openLanguageMenu } = useThemeSettings();
+  const { settings, openLanguageMenu } = useThemeSettings();
   const { openDictionary } = useDictionary();
   const [dictQuery, setDictQuery] = useState('');
 
@@ -25,12 +25,8 @@ export default function WelcomeView() {
   const desktopSrc = isLightBadge ? '/download-for-desktop-light.svg' : '/download-for-desktop.svg';
 
   const handleOpenTree = () => {
-    setIsZenMode(false);
     setIsSidebarOpen(true);
     setIsHeaderVisible(true);
-    if (typeof document !== 'undefined') {
-      document.body.classList.remove('zen-mode');
-    }
   };
 
   const handleDictSearch = (e) => {

@@ -1,8 +1,33 @@
 /** @type {import('next').NextConfig} */
+const os = require('os');
 const isExport = process.env.NEXT_EXPORT === 'true' || process.env.STATIC_EXPORT === 'true';
 
+function getLocalDevOrigins() {
+  const origins = new Set([
+    'localhost',
+    '127.0.0.1',
+    'localhost:3000',
+    '127.0.0.1:3000',
+    '85.190.97.158',
+    '85.190.97.158:3000',
+    '*.local',
+  ]);
+  try {
+    const nets = os.networkInterfaces();
+    for (const iface of Object.values(nets)) {
+      for (const addr of iface || []) {
+        if (addr && addr.family === 'IPv4' && addr.address) {
+          origins.add(addr.address);
+          origins.add(`${addr.address}:3000`);
+        }
+      }
+    }
+  } catch (_) {}
+  return Array.from(origins);
+}
+
 const nextConfig = {
-  allowedDevOrigins: ['localhost', '127.0.0.1', 'localhost:3000', '127.0.0.1:3000', '85.190.97.158', '85.190.97.158:3000'],
+  allowedDevOrigins: getLocalDevOrigins(),
   reactStrictMode: true,
   images: {
     unoptimized: true,

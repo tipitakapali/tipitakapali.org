@@ -9,7 +9,6 @@ import {
   Navigation,
   ScrollText,
   Type,
-  Maximize2,
   AlignLeft,
   AlignJustify,
   Volume2,
@@ -38,7 +37,7 @@ export default function Footer() {
     isSidebarOpen,
     setIsSidebarOpen,
   } = useTabs();
-  const { settings, updateSetting, updateSettings, setIsZenMode } = useThemeSettings();
+  const { settings, updateSetting, updateSettings } = useThemeSettings();
   const { startReadAloud, isActive: isTtsActive, isSupported: isTtsSupported } = useTts();
 
 
@@ -152,22 +151,6 @@ export default function Footer() {
               <span className="hidden min-[560px]:inline">Read</span>
             </button>
           )}
-
-          {/* Eka Mode / Expand Button */}
-          <button
-            onClick={() => {
-              setIsZenMode(true);
-              setIsSidebarOpen(false);
-              if (typeof document !== 'undefined') {
-                document.body.classList.add('zen-mode');
-              }
-            }}
-            className="footer-nav-btn inline-flex items-center justify-center gap-1.5 px-1.5 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold leading-none cursor-pointer shrink-0"
-            title="Enter Eka Mode (Distraction-free reading)"
-          >
-            <Maximize2 size={13} className="text-[var(--accent)] shrink-0" />
-            <span className="hidden min-[560px]:inline">Eka</span>
-          </button>
         </div>
       </footer>
 

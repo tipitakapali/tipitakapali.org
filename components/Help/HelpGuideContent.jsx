@@ -707,7 +707,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
               <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono font-bold text-[11px] text-[var(--accent)]">? or F1</kbd>
             </div>
             <div className="p-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-between">
-              <span>Eka Mode (Exit) / Close Modals</span>
+              <span>Close Modals / Dialogs</span>
               <kbd className="px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-color)] font-mono font-bold text-[11px] text-[var(--accent)]">Esc</kbd>
             </div>
 
