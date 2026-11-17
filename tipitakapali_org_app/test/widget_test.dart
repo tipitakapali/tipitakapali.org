@@ -177,16 +177,37 @@ void _seedRemainingCompulsoryDbs(String dirPath) {
     'abhidhan_tipitakapali.db',
     'ap_bh_mw_sanskrit.db',
     'palisinh.db',
+    'bold_definitions.db',
   ];
   for (final name in filenames) {
     final db = sqlite3.open(p.join(dirPath, name));
     try {
-      db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY);');
+      db.execute(
+        'CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);',
+      );
       db.execute('CREATE TABLE IF NOT EXISTS misc (key TEXT, val TEXT);');
       db.execute(
         'CREATE TABLE IF NOT EXISTS synonyms (headword TEXT, body TEXT);',
       );
       db.execute('CREATE TABLE IF NOT EXISTS zmisc (key TEXT, val TEXT);');
+      if (name == 'bold_definitions.db') {
+        db.execute(
+          'CREATE TABLE IF NOT EXISTS bold_definitions (id INTEGER PRIMARY KEY);',
+        );
+        db.execute(
+          'CREATE TABLE IF NOT EXISTS chapter_links '
+          '(book_code TEXT NOT NULL, chapter_index INTEGER NOT NULL, paragraphs_json TEXT NOT NULL, PRIMARY KEY (book_code, chapter_index));',
+        );
+        db.execute('INSERT OR IGNORE INTO bold_definitions (id) VALUES (1);');
+        final tipiFile = File(p.join(dirPath, 'tipitaka.db'));
+        final tipiSize = tipiFile.existsSync() ? tipiFile.lengthSync() : 0;
+        db.execute(
+          "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '4');",
+        );
+        db.execute(
+          "INSERT OR REPLACE INTO meta (key, value) VALUES ('source_size', '$tipiSize');",
+        );
+      }
     } finally {
       db.close();
     }

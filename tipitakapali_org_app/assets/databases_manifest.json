@@ -244,6 +244,27 @@
       "checksum": "fc9da06c05d6f86148b5dcf73b6c204cee3ebf43fa14a4ad0c21aa7dce6425fb",
       "zipSha256": "67c6a8397174c4dd62ec0b9fc99fbdd59d1e4e7a702358dc964218d5d3fcfbdd",
       "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/palisinh.db.zip"
+    },
+    "bold_definitions": {
+      "id": "bold_definitions",
+      "filename": "bold_definitions.db",
+      "assetName": "bold_definitions.db.zip",
+      "title": "Bold Definitions & Cross-Links Index",
+      "description": "Pre-indexed bold Pali definitions and precomputed Mula-Atthakatha-Tika chapter links.",
+      "category": "dictionary",
+      "compulsory": true,
+      "version": 1,
+      "dbSize": 410525696,
+      "requiredTables": [
+        "bold_definitions",
+        "chapter_links",
+        "meta"
+      ],
+      "updated": "2026-11-17",
+      "size": 51113074,
+      "checksum": "e4d5fe2fe881d4cf4b0a3134ef0bd9ff10fe3e34fb7d209f9998bed9adc94183",
+      "zipSha256": "181e8a4d6042084da54aa647ac2e16f5cc597013dc69b06790f6b10dc6800ef3",
+      "url": "https://github.com/tipitakapali/tipitakapali.org/releases/download/db/bold_definitions.db.zip"
     }
   },
   "languages": {

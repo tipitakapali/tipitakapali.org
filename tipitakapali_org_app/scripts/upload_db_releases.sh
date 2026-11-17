@@ -157,7 +157,28 @@ if repo:
         release_missing = True
 
 if not manifest_only:
-    for entry in collect_entries(manifest):
+    # Ensure bold_definitions.db is pre-built with schema_version=4 & chapter_links
+    # when tipitaka.db is present and bold_definitions.db matches the filter.
+    rebuild_bold_script = os.path.normpath(
+        os.path.join(app_dir, "..", "server_api", "rebuild_bold_db.js")
+    )
+    if (
+        matches_filter("bold_definitions.db")
+        and os.path.exists(os.path.join(db_dir, "tipitaka.db"))
+        and os.path.exists(rebuild_bold_script)
+        and not dry_run
+    ):
+        subprocess.run(
+            ["node", rebuild_bold_script, "--db-dir", db_dir],
+            check=True,
+        )
+
+    entries = list(collect_entries(manifest))
+    # Package and upload bold_definitions.db first so the release has the
+    # pre-indexed dictionary archive before dependent core/optional zips.
+    entries.sort(key=lambda e: (0 if e.get("filename") == "bold_definitions.db" else 1))
+
+    for entry in entries:
         filename = entry["filename"]
         if not matches_filter(filename):
             continue

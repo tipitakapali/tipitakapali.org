@@ -416,10 +416,10 @@ class BoldDefinitionIndexService {
       };
       if (meta['schema_version'] != schemaVersion) return false;
       if (meta['source_size'] != '${stat.size}') return false;
-      if (meta['source_mtime'] !=
-          '${stat.modified.millisecondsSinceEpoch}') {
-        return false;
-      }
+      final linkTbl = db.select(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chapter_links' LIMIT 1",
+      );
+      if (linkTbl.isEmpty) return false;
       final cnt =
           (db.select('SELECT COUNT(*) AS c FROM bold_definitions').first['c']
                   as num)
