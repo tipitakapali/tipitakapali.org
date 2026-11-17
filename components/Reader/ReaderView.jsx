@@ -24,6 +24,80 @@ import {
   prefetchLinkedPreviewsBatch,
 } from '../../services/api';
 
+export function computeAnchorScrollTarget({
+  elementTopViewport = 0,
+  viewportTop = 0,
+  currentScroll = 0,
+  stickyInset = 56,
+}) {
+  return Math.max(0, elementTopViewport - viewportTop + currentScroll - stickyInset);
+}
+
+export function computeBlockCompensationDelta({
+  rectTopAfter = 0,
+  rectHeightAfter = 0,
+  subRatio = 0,
+  anchorViewportYBefore = 0,
+}) {
+  const safeRatio = Math.max(0, Math.min(1, Number.isFinite(subRatio) ? subRatio : 0));
+  const currentAnchorY = rectTopAfter + safeRatio * Math.max(0, rectHeightAfter);
+  return currentAnchorY - anchorViewportYBefore;
+}
+
+export function selectClickedWordAnchor(container, bandTop = 0, bandBottom = Infinity) {
+  if (!container?.querySelector) return null;
+  const clickedEl = container.querySelector('.reader-clicked-word, [data-clicked-word="true"]');
+  if (clickedEl && clickedEl.getBoundingClientRect) {
+    const cr = clickedEl.getBoundingClientRect();
+    if (cr.height > 0 && cr.bottom > bandTop && cr.top < bandBottom) {
+      return {
+        anchorEl: clickedEl,
+        subRatio: 0.5,
+        viewportY: cr.top + 0.5 * cr.height,
+      };
+    }
+  }
+  return null;
+}
+
+export function detectLiveSectionTitleFromElements(headings, thresholdY = 120) {
+  if (!headings || typeof headings[Symbol.iterator] !== 'function') return null;
+  const extractCleanHeadingText = (el) => {
+    if (el.querySelector && el.cloneNode) {
+      const hasNoise = el.querySelector('.note, .pb, .linked-def-row');
+      if (hasNoise) {
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll('.note, .pb, .linked-def-row').forEach((n) => n.remove());
+        return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+      }
+    }
+    return (el.textContent || '').replace(/\s+/g, ' ').trim();
+  };
+  let lastAbove = null;
+  let firstNear = null;
+  for (const el of headings) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') continue;
+    const rect = el.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) continue;
+    const rawText = extractCleanHeadingText(el);
+    if (!rawText) continue;
+    if (rect.top <= thresholdY + 48) {
+      lastAbove = rawText;
+    } else if (!firstNear && rect.top <= thresholdY + 260) {
+      firstNear = rawText;
+    } else if (rect.top > thresholdY + 260) {
+      break;
+    }
+  }
+  return lastAbove || firstNear || null;
+}
+
+export function getMaxColumnsForWidth(viewportWidth = 1280) {
+  if (viewportWidth >= 1440) return 4;
+  if (viewportWidth >= 1100) return 3;
+  return 2;
+}
+
 const TRANSLATION_METAS = {
   en: { label: 'English', flag: '🇬🇧' },
   vi: { label: 'Tiếng Việt', flag: '🇻🇳' },
@@ -1108,6 +1182,23 @@ export const ChapterBlock = memo(function ChapterBlock({
   const [isWithinDomWindow, setIsWithinDomWindow] = React.useState(true);
   const measuredHeightRef = useRef(0);
 
+  // Preserve rendered chapter height before transitioning into trans-loading or DOM virtualization
+  useLayoutEffect(() => {
+    const el = blockRef.current;
+    if (!el) return;
+    if (
+      !isWithinDomWindow ||
+      el.getAttribute('data-trans-loading') === '1' ||
+      el.getAttribute('data-virtualized') === '1'
+    ) {
+      return;
+    }
+    const h = el.offsetHeight || 0;
+    if (h > 0) {
+      measuredHeightRef.current = h;
+    }
+  });
+
   useEffect(() => {
     if (isCurrentOrTarget) {
       setIsNearViewport(true);
@@ -1420,6 +1511,7 @@ export const ChapterBlock = memo(function ChapterBlock({
           id={`chap-${chapter.chapter_index}`}
           data-chapter={chapter.chapter_index}
           data-trans-loading="1"
+          style={measuredHeightRef.current > 220 ? { minHeight: measuredHeightRef.current } : undefined}
           className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[220px]"
         >
           <div className="flex items-center gap-2.5 text-sm sm:text-base font-semibold text-[var(--text-primary)]">
@@ -2325,6 +2417,8 @@ const ReaderPane = memo(function ReaderPane({
   onColumnUserInteract,
   onColumnScrollSync,
   onPaneLinksLoaded,
+  isDictOpen = false,
+  dictDockMode = 'side',
 }) {
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
@@ -2341,6 +2435,16 @@ const ReaderPane = memo(function ReaderPane({
   const lastScrollYRef = useRef(0);
   const scrollDirectionRef = useRef(0);
   const scrollTravelRef = useRef(0);
+  const jumpResizeObserverRef = useRef(null);
+  const anchorPinRef = useRef({
+    active: false,
+    anchorEl: null,
+    subRatio: 0,
+    viewportY: 0,
+    deadline: 0,
+    resizing: false,
+  });
+  const [paneSectionTitle, setPaneSectionTitle] = useState(null);
 
   const getScrollTop = useCallback(() => {
     if (useWindowScroll && typeof window !== 'undefined') {
@@ -2383,6 +2487,29 @@ const ReaderPane = memo(function ReaderPane({
       scrollHeight: c.scrollHeight,
     };
   }, [useWindowScroll]);
+
+  const getTopReadingInset = useCallback(() => {
+    if (!useWindowScroll || typeof window === 'undefined' || typeof document === 'undefined') {
+      return 16;
+    }
+    let coveredBottom = 0;
+    const stickyEls = [
+      document.querySelector('.app-header'),
+      document.querySelector('.book-tabs-bar'),
+      contentHeaderRef.current || document.querySelector('.content-header'),
+    ];
+    for (const el of stickyEls) {
+      if (!el) continue;
+      const st = window.getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden') continue;
+      if (st.position !== 'sticky' && st.position !== 'fixed') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.height > 0 && rect.bottom > 0 && rect.top < 200) {
+        coveredBottom = Math.max(coveredBottom, rect.bottom);
+      }
+    }
+    return Math.max(56, Math.round(coveredBottom) + 14);
+  }, [useWindowScroll]);
   const activeTab = tab;
 
   // Tracks whether this tab pane has completed its initial load/hydration scroll restoration.
@@ -2397,6 +2524,8 @@ const ReaderPane = memo(function ReaderPane({
 
   const chapterJumpRef = useRef({ key: null, lastOffset: 0, timer: null });
   const paraJumpRef = useRef({ key: null, lastOffset: 0, timer: null, deadline: 0 });
+  const paneScrollIntentRef = useRef(paneScrollIntent);
+  paneScrollIntentRef.current = paneScrollIntent;
 
   const setMainRef = useCallback(
     (node) => {
@@ -2415,6 +2544,9 @@ const ReaderPane = memo(function ReaderPane({
   const performProgrammaticScroll = useCallback((container, offset, options = {}) => {
     if (!container) return;
     isProgrammaticScrollRef.current = true;
+    if (typeof window !== 'undefined') {
+      window.__tpoProgrammaticScroll = true;
+    }
     lastScrollYRef.current = Math.max(0, offset);
     clearTimeout(programmaticScrollTimerRef.current);
     smartScrollTo(container, offset, {
@@ -2423,6 +2555,9 @@ const ReaderPane = memo(function ReaderPane({
         lastScrollYRef.current = Math.max(0, offset);
         programmaticScrollTimerRef.current = setTimeout(() => {
           isProgrammaticScrollRef.current = false;
+          if (typeof window !== 'undefined') {
+            window.__tpoProgrammaticScroll = false;
+          }
         }, 150);
         if (options.onComplete) options.onComplete();
       },
@@ -2431,6 +2566,11 @@ const ReaderPane = memo(function ReaderPane({
 
   const cancelJump = useCallback(() => {
     isTabSwitchingRef.current = false;
+    anchorPinRef.current.active = false;
+    if (jumpResizeObserverRef.current) {
+      jumpResizeObserverRef.current.disconnect();
+      jumpResizeObserverRef.current = null;
+    }
     if (tabSwitchRetryTimerRef.current) {
       clearInterval(tabSwitchRetryTimerRef.current);
       tabSwitchRetryTimerRef.current = null;
@@ -2439,7 +2579,7 @@ const ReaderPane = memo(function ReaderPane({
       clearTimeout(attemptScrollTimerRef.current);
       attemptScrollTimerRef.current = null;
     }
-    if (paneScrollIntent) {
+    if (paneScrollIntentRef.current) {
       clearTargetScrollIntent(tab.bookCode);
     }
     setIsTargetScrollWaiting(false);
@@ -2454,30 +2594,214 @@ const ReaderPane = memo(function ReaderPane({
       clearTimeout(ps.timer);
       paraJumpRef.current = { key: null, lastOffset: 0, timer: null, deadline: 0 };
     }
-  }, [clearTargetScrollIntent, paneScrollIntent, tab.bookCode]);
+  }, [clearTargetScrollIntent, tab.bookCode]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const onUserInput = () => {
-      onColumnUserInteract?.(tab.bookCode);
-      cancelJump();
-    };
-    container.addEventListener('wheel', onUserInput, { passive: true });
-    container.addEventListener('touchstart', onUserInput, { passive: true });
-    container.addEventListener('mousedown', onUserInput, { passive: true });
     return () => {
+      if (jumpResizeObserverRef.current) {
+        jumpResizeObserverRef.current.disconnect();
+        jumpResizeObserverRef.current = null;
+      }
       clearTimeout(chapterJumpRef.current.timer);
       clearTimeout(paraJumpRef.current.timer);
       if (tabSwitchRetryTimerRef.current) {
         clearInterval(tabSwitchRetryTimerRef.current);
         tabSwitchRetryTimerRef.current = null;
       }
+    };
+  }, [tab.bookCode, isVisible]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onUserInput = (e) => {
+      if (e?.target?.closest?.('.modal-overlay, .search-modal, .dict-dock-panel')) return;
+      onColumnUserInteract?.(tab.bookCode);
+      cancelJump();
+    };
+    const onKeyDown = (e) => {
+      if (!useWindowScroll || !isVisible) return;
+      if (e?.target?.closest?.('input, textarea, select, [contenteditable="true"], .modal-overlay')) return;
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+        cancelJump();
+      }
+    };
+    container.addEventListener('wheel', onUserInput, { passive: true });
+    container.addEventListener('touchstart', onUserInput, { passive: true });
+    container.addEventListener('mousedown', onUserInput, { passive: true });
+    if (useWindowScroll && isVisible && typeof window !== 'undefined') {
+      window.addEventListener('wheel', onUserInput, { passive: true });
+      window.addEventListener('touchstart', onUserInput, { passive: true });
+      window.addEventListener('keydown', onKeyDown, { passive: true });
+    }
+    return () => {
       container.removeEventListener('wheel', onUserInput);
       container.removeEventListener('touchstart', onUserInput);
       container.removeEventListener('mousedown', onUserInput);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('wheel', onUserInput);
+        window.removeEventListener('touchstart', onUserInput);
+        window.removeEventListener('keydown', onKeyDown);
+      }
     };
-  }, [cancelJump, onColumnUserInteract, tab.bookCode, tab.isLoading, tab.viewMode]);
+  }, [cancelJump, onColumnUserInteract, tab.bookCode, tab.isLoading, tab.viewMode, useWindowScroll, isVisible]);
+
+  // Task 3: Reading-position anchor preservation across Left/Right dock open, close, resize, and sidebar toggles
+  const captureReadingAnchor = useCallback(
+    (source = '') => {
+      const container = containerRef.current;
+      if (!isVisible || !container || tab.viewMode === 'toc' || tab.isTocView || tab.isLoading || tab.bookCode === 'ai_chat') {
+        return;
+      }
+      if (isProgrammaticScrollRef.current || paneScrollIntent) return;
+
+      const { top: vpTop, height: vpHeight } = getViewportBounds();
+      const stickyInset = getTopReadingInset();
+      const bandTop = vpTop + stickyInset;
+      const bandBottom = vpTop + vpHeight - 16;
+
+      let anchorEl = null;
+      let subRatio = 0;
+      let viewportY = bandTop;
+
+      const clickedAnchor = selectClickedWordAnchor(container, bandTop, bandBottom);
+      if (clickedAnchor) {
+        anchorEl = clickedAnchor.anchorEl;
+        subRatio = clickedAnchor.subRatio;
+        viewportY = clickedAnchor.viewportY;
+      }
+
+      if (!anchorEl) {
+        if (getScrollTop() < 8) return;
+        const fineCandidates = container.querySelectorAll(
+          '.sent-pair, .reader-trans-block, p[data-pindex], .chapter-content-block h2, .chapter-content-block p'
+        );
+        const pickFromList = (list) => {
+          for (const el of list) {
+            const rect = el.getBoundingClientRect();
+            if (rect.height <= 0 && rect.width <= 0) continue;
+            if (rect.bottom > bandTop + 4 && rect.top < bandBottom) {
+              anchorEl = el;
+              const refY = Math.max(rect.top, Math.min(rect.bottom, bandTop + 20));
+              subRatio = rect.height > 0 ? Math.max(0, Math.min(1, (refY - rect.top) / rect.height)) : 0;
+              viewportY = refY;
+              return true;
+            }
+          }
+          return false;
+        };
+        if (!pickFromList(fineCandidates)) {
+          pickFromList(container.querySelectorAll('.reader-para-row'));
+        }
+      }
+
+      if (!anchorEl) return;
+      anchorPinRef.current = {
+        active: true,
+        anchorEl,
+        subRatio,
+        viewportY,
+        deadline: Date.now() + 1400,
+        resizing: source === 'dictionary-resize',
+      };
+    },
+    [isVisible, tab.viewMode, tab.isTocView, tab.isLoading, tab.bookCode, paneScrollIntent, getScrollTop, getViewportBounds, getTopReadingInset]
+  );
+
+  const applyAnchorCompensation = useCallback(() => {
+    const pin = anchorPinRef.current;
+    if (!pin.active || !pin.anchorEl || !pin.anchorEl.isConnected) {
+      pin.active = false;
+      return;
+    }
+    if (!pin.resizing && Date.now() > pin.deadline) {
+      pin.active = false;
+      return;
+    }
+    const rect = pin.anchorEl.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) return;
+    const delta = computeBlockCompensationDelta({
+      rectTopAfter: rect.top,
+      rectHeightAfter: rect.height,
+      subRatio: pin.subRatio,
+      anchorViewportYBefore: pin.viewportY,
+    });
+    if (Math.abs(delta) >= 0.75) {
+      const nextTop = Math.max(0, getScrollTop() + delta);
+      isProgrammaticScrollRef.current = true;
+      lastScrollYRef.current = nextTop;
+      setScrollTop(nextTop, 'auto');
+      if (activeTabRef.current?.bookCode && activeTabRef.current.bookCode !== 'ai_chat') {
+        saveTabScroll(activeTabRef.current.bookCode, nextTop);
+      }
+      clearTimeout(programmaticScrollTimerRef.current);
+      programmaticScrollTimerRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 120);
+    }
+  }, [getScrollTop, setScrollTop, saveTabScroll]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onBeforeShift = (e) => {
+      captureReadingAnchor(e?.detail?.source || '');
+    };
+    const onResizeShift = (e) => {
+      const phase = e?.detail?.phase;
+      if (phase === 'move') {
+        if (!anchorPinRef.current.active) {
+          captureReadingAnchor('dictionary-resize');
+        } else {
+          anchorPinRef.current.resizing = true;
+          anchorPinRef.current.deadline = Date.now() + 1400;
+        }
+        requestAnimationFrame(applyAnchorCompensation);
+      } else if (phase === 'end') {
+        anchorPinRef.current.resizing = false;
+        anchorPinRef.current.deadline = Date.now() + 300;
+        requestAnimationFrame(applyAnchorCompensation);
+      }
+    };
+    window.addEventListener('tipitaka:before-layout-shift', onBeforeShift);
+    window.addEventListener('tipitaka:layout-shift-resize', onResizeShift);
+    return () => {
+      window.removeEventListener('tipitaka:before-layout-shift', onBeforeShift);
+      window.removeEventListener('tipitaka:layout-shift-resize', onResizeShift);
+    };
+  }, [captureReadingAnchor, applyAnchorCompensation]);
+
+  useLayoutEffect(() => {
+    if (!anchorPinRef.current.active) return;
+    applyAnchorCompensation();
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      applyAnchorCompensation();
+      raf2 = requestAnimationFrame(applyAnchorCompensation);
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [isDictOpen, dictDockMode, isSidebarOpen, isColumnsMode, applyAnchorCompensation]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined' || !containerRef.current || !isVisible) return;
+    const inner = containerRef.current.querySelector('.reader-container') || containerRef.current;
+    let prevWidth = inner.getBoundingClientRect().width;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const nextWidth = entry?.contentRect?.width ?? inner.getBoundingClientRect().width;
+      if (Math.abs(nextWidth - prevWidth) > 0.5) {
+        prevWidth = nextWidth;
+        if (anchorPinRef.current.active) {
+          applyAnchorCompensation();
+        }
+      }
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [isVisible, applyAnchorCompensation]);
 
   // Restore clicked word highlight when pane becomes visible or chapters render
   useEffect(() => {
@@ -2578,48 +2902,81 @@ const ReaderPane = memo(function ReaderPane({
       bufferAdjacentChapters(tab.bookCode, targetChap);
     }
 
-    const tryInitialRestore = () => {
+    const tryInitialRestore = (allowStaleFallback = false) => {
       const c = containerRef.current;
       if (!c) return false;
       const effChap = getTargetChap();
-      const TOP_PAD = 60;
+      const TOP_PAD = getTopReadingInset();
+
+      const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
+      const chapReady = Boolean(chapEl && !chapEl.classList.contains('chapter-placeholder'));
+      const prevChapEl = effChap > 0 ? c.querySelector(`[data-chapter="${effChap - 1}"]`) : null;
+      const prevChapLoading =
+        Boolean(tab.loadingChapters?.[effChap - 1]) ||
+        Boolean(hasTransLayers && prevChapEl && !prevChapEl.classList.contains('chapter-placeholder') && prevChapEl.getAttribute('data-trans-loading') === '1');
+      const hostTransReady =
+        !hasTransLayers ||
+        (chapReady && chapEl.getAttribute('data-trans-settled') === '1' && !prevChapLoading);
 
       if (savedScroll > 0) {
-        const { height, scrollHeight } = getViewportBounds();
+        const { top: vpTop, height, scrollHeight } = getViewportBounds();
         const maxScroll = Math.max(0, scrollHeight - height);
-        if (maxScroll >= savedScroll - 20) {
+        const curTop = getScrollTop();
+        let savedMatchesTargetChapter = true;
+        if (tab?.fromSavedSession && effChap > 1 && chapReady && hostTransReady) {
+          const chRect = chapEl.getBoundingClientRect();
+          const chTopAbs = chRect.top - vpTop + curTop;
+          const chBottomAbs = chRect.bottom - vpTop + curTop;
+          if (savedScroll < chTopAbs - 220 || savedScroll > chBottomAbs + 220) {
+            savedMatchesTargetChapter = false;
+          }
+        }
+        if (maxScroll >= savedScroll - 20 && savedMatchesTargetChapter) {
+          if (tab?.fromSavedSession && !hostTransReady && !allowStaleFallback) {
+            return false;
+          }
           lastScrollYRef.current = savedScroll;
           setScrollTop(savedScroll, 'auto');
           hasInitialRestoredRef.current = true;
           return true;
         }
-        return false;
-      }
-
-      const chapEl = c.querySelector(`[data-chapter="${effChap}"]`);
-      if (!chapEl || chapEl.classList.contains('chapter-placeholder')) {
-        return false;
-      }
-
-      if (cleanPara) {
-        const pEl =
-          chapEl.querySelector(`[data-para="${cleanPara}"]`) ||
-          chapEl.querySelector(`[data-pindex="${cleanPara}"]`) ||
-          c.querySelector(`[data-para="${cleanPara}"]`);
-        if (pEl) {
-          const { top: vpTop } = getViewportBounds();
-          const curTop = getScrollTop();
-          const pRect = pEl.getBoundingClientRect();
-          const offset = Math.max(0, pRect.top - vpTop + curTop - TOP_PAD);
-          lastScrollYRef.current = offset;
-          setScrollTop(offset, 'auto');
-          saveTabScroll(tab.bookCode, offset);
-          hasInitialRestoredRef.current = true;
-          return true;
-        }
-        if (chapEl.querySelectorAll('[data-para], [data-pindex]').length === 0) {
+        if (!allowStaleFallback && (!chapReady || !hostTransReady)) {
           return false;
         }
+      }
+
+      if (!chapReady) {
+        return false;
+      }
+      if (!allowStaleFallback && !hostTransReady) {
+        return false;
+      }
+
+      const savedPIdx = tab?.lastParaIndex !== undefined && tab?.lastParaIndex !== null ? String(tab.lastParaIndex) : null;
+      const pEl =
+        (savedPIdx &&
+          (chapEl.querySelector(`.reader-para-row[data-pindex="${savedPIdx}"]`) ||
+            chapEl.querySelector(`[data-pindex="${savedPIdx}"]`) ||
+            c.querySelector(`[data-pindex="${savedPIdx}"]`))) ||
+        (cleanPara &&
+          (chapEl.querySelector(`[data-para="${cleanPara}"]`) ||
+            chapEl.querySelector(`[data-pindex="${cleanPara}"]`) ||
+            c.querySelector(`[data-para="${cleanPara}"]`))) ||
+        null;
+
+      if (pEl) {
+        const { top: vpTop } = getViewportBounds();
+        const curTop = getScrollTop();
+        const pRect = pEl.getBoundingClientRect();
+        const offset = Math.max(0, pRect.top - vpTop + curTop - TOP_PAD);
+        lastScrollYRef.current = offset;
+        setScrollTop(offset, 'auto');
+        saveTabScroll(tab.bookCode, offset);
+        hasInitialRestoredRef.current = true;
+        return true;
+      }
+      if (cleanPara && chapEl.querySelectorAll('[data-para], [data-pindex]').length === 0 && !allowStaleFallback) {
+        return false;
       }
 
       if (effChap > 0) {
@@ -2636,7 +2993,7 @@ const ReaderPane = memo(function ReaderPane({
     };
 
     isTabSwitchingRef.current = true;
-    if (tryInitialRestore()) {
+    if (tryInitialRestore(false)) {
       isTabSwitchingRef.current = false;
       return;
     }
@@ -2648,7 +3005,7 @@ const ReaderPane = memo(function ReaderPane({
     }
     tabSwitchRetryTimerRef.current = setInterval(() => {
       attempts++;
-      if (tryInitialRestore() || attempts >= maxAttempts) {
+      if (tryInitialRestore(attempts >= maxAttempts) || attempts >= maxAttempts) {
         hasInitialRestoredRef.current = true;
         isTabSwitchingRef.current = false;
         if (tabSwitchRetryTimerRef.current) {
@@ -2818,10 +3175,15 @@ const ReaderPane = memo(function ReaderPane({
         const targetIdx = hostEl ? Number(hostEl.getAttribute('data-chapter')) : null;
         if (targetIdx === null || Number.isNaN(targetIdx)) return true;
         const chapterEls = container.querySelectorAll('.chapter-content-block[data-chapter], .chapter-placeholder[data-chapter]');
+        const curLoadingChaps = activeTabRef.current?.loadingChapters || {};
         for (const chEl of chapterEls) {
           const idx = Number(chEl.getAttribute('data-chapter'));
           if (Number.isNaN(idx) || idx >= targetIdx) continue; // only chapters above the anchor
-          if (chEl.classList.contains('chapter-placeholder')) continue; // no content yet → cannot grow
+          if (curLoadingChaps[idx]) return false;
+          if (chEl.classList.contains('chapter-placeholder')) {
+            if (idx === targetIdx - 1 && targetIdx > 0 && paneScrollIntent) return false;
+            continue;
+          }
           if (chEl.getAttribute('data-trans-loading') === '1') return false;
         }
         return true;
@@ -2830,8 +3192,10 @@ const ReaderPane = memo(function ReaderPane({
       const targetChapEl = (chapterIdx !== undefined && chapterIdx !== null)
         ? containerRef.current?.querySelector(`.chapter-content-block[data-chapter="${chapterIdx}"], .chapter-placeholder[data-chapter="${chapterIdx}"]`)
         : null;
+      const prevChapLoading = Boolean(hasTransLayers && chapterIdx > 0 && activeTab.loadingChapters?.[chapterIdx - 1]);
       const isWaitingForContent =
         Boolean(activeTab.loadingChapters?.[chapterIdx]) ||
+        prevChapLoading ||
         (targetChapEl && targetChapEl.classList.contains('chapter-placeholder')) ||
         (hasTransLayers &&
           (!targetChapEl ||
@@ -2861,7 +3225,7 @@ const ReaderPane = memo(function ReaderPane({
           } else {
             const hits = row.querySelectorAll('mark.search-hit, .search-hit');
             for (const h of hits) {
-              if (h.closest('.reader-trans-block')) continue;
+              if (h.closest('.reader-trans-block:not(.reader-pali-trans-block)')) continue;
               if (visible(h)) {
                 return h.closest('.sent-pair') || h.closest('.pali-sent') || h;
               }
@@ -3044,41 +3408,48 @@ const ReaderPane = memo(function ReaderPane({
       // superseding it.
       const armParaJumpWatcher = (jumpKey, jumpOffset) => {
         clearTimeout(paraJumpRef.current.timer);
+        if (jumpResizeObserverRef.current) {
+          jumpResizeObserverRef.current.disconnect();
+          jumpResizeObserverRef.current = null;
+        }
         const state = {
           key: jumpKey,
           lastOffset: jumpOffset,
           timer: null,
-          deadline: Date.now() + 6000, // payloads stream before jump is executed, 6s guard is plenty
+          deadline: Date.now() + 8000,
           stableCount: 0,
           lastScrollHeight: null,
         };
         paraJumpRef.current = state;
-        const TOL = 24;
-        const GAP = 600;
+        const TOL = 16;
+        const GAP = 350;
+        let rafScheduleId = 0;
+
+        const stopWatcher = () => {
+          paraJumpRef.current.key = null;
+          clearTimeout(state.timer);
+          if (rafScheduleId) cancelAnimationFrame(rafScheduleId);
+          if (jumpResizeObserverRef.current) {
+            jumpResizeObserverRef.current.disconnect();
+            jumpResizeObserverRef.current = null;
+          }
+        };
+
         const tick = () => {
           const cur = paraJumpRef.current;
           if (!cur || cur.key !== jumpKey) return; // superseded
           const container = containerRef.current;
           if (!container) {
-            paraJumpRef.current.key = null;
+            stopWatcher();
             return;
           }
           if (Date.now() > cur.deadline) {
-            paraJumpRef.current.key = null;
+            stopWatcher();
             return;
           }
-          // If user scrolled away manually from landing point, stand down immediately!
           const curTop = getScrollTop();
           const { top: vpTop, height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
-          if (cur.lastOffset !== null && Math.abs(curTop - cur.lastOffset) > 60) {
-            paraJumpRef.current.key = null;
-            return;
-          }
-          // Bottom-clamped targets can never reach top-60 — stand down.
-          if (curTop + vpHeight >= vpScrollHeight - 4) {
-            paraJumpRef.current.key = null;
-            return;
-          }
+          const topInset = getTopReadingInset();
           const target = resolveParaTarget();
           if (!target) {
             cur.timer = setTimeout(tick, GAP);
@@ -3087,18 +3458,30 @@ const ReaderPane = memo(function ReaderPane({
           const hostChapter = target.closest ? target.closest('[data-chapter]') : null;
           const areaSettled = areaTranslationSettled(hostChapter);
           const rRect = target.getBoundingClientRect();
-          const diff = Math.abs(rRect.top - vpTop - 60);
+          const diff = Math.abs(rRect.top - vpTop - topInset);
           if (diff > TOL) {
             cur.stableCount = 0;
-            const fresh = Math.max(0, rRect.top - vpTop + curTop - 60);
-            performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
-            if (settings.pulseAnimation) {
-              target.classList.remove('pulse-highlight');
-              void target.offsetWidth;
-              target.classList.add('pulse-highlight');
+            const fresh = computeAnchorScrollTarget({
+              elementTopViewport: rRect.top,
+              viewportTop: vpTop,
+              currentScroll: curTop,
+              stickyInset: topInset,
+            });
+            if (curTop + vpHeight >= vpScrollHeight - 4 && fresh >= vpScrollHeight - vpHeight - 2 && rRect.top >= vpTop + topInset - 8) {
+              if (areaSettled) {
+                stopWatcher();
+                return;
+              }
+            } else {
+              performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
+              if (settings.pulseAnimation) {
+                target.classList.remove('pulse-highlight');
+                void target.offsetWidth;
+                target.classList.add('pulse-highlight');
+              }
+              saveTabScroll(activeTab.bookCode, fresh);
+              cur.lastOffset = fresh;
             }
-            saveTabScroll(activeTab.bookCode, fresh);
-            cur.lastOffset = fresh;
             cur.lastScrollHeight = vpScrollHeight;
             cur.timer = setTimeout(tick, GAP);
             return;
@@ -3115,13 +3498,33 @@ const ReaderPane = memo(function ReaderPane({
           }
           cur.stableCount += 1;
           if (cur.stableCount >= 2) {
-            paraJumpRef.current.key = null;
+            stopWatcher();
           } else {
             cur.timer = setTimeout(tick, GAP);
           }
         };
-        // First check after any in-flight smooth animation has finished (max ~450ms).
-        state.timer = setTimeout(tick, 900);
+
+        if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+          const inner = containerRef.current.querySelector('.reader-container') || containerRef.current;
+          const ro = new ResizeObserver(() => {
+            const cur = paraJumpRef.current;
+            if (!cur || cur.key !== jumpKey) return;
+            cur.stableCount = 0;
+            if (rafScheduleId) cancelAnimationFrame(rafScheduleId);
+            rafScheduleId = requestAnimationFrame(() => {
+              rafScheduleId = 0;
+              if (paraJumpRef.current?.key === jumpKey) {
+                clearTimeout(paraJumpRef.current.timer);
+                tick();
+              }
+            });
+          });
+          ro.observe(inner);
+          jumpResizeObserverRef.current = ro;
+        }
+
+        // First check after any in-flight smooth animation has finished.
+        state.timer = setTimeout(tick, 450);
       };
 
       // Chapter-jump settle watcher (sidebar chapter clicks / chapter-only
@@ -3132,62 +3535,79 @@ const ReaderPane = memo(function ReaderPane({
       // bottom-clamp or a newer jump supersede it.
       const armChapterJumpWatcher = (jumpKey, jumpOffset, chapIdx) => {
         clearTimeout(chapterJumpRef.current.timer);
+        if (jumpResizeObserverRef.current) {
+          jumpResizeObserverRef.current.disconnect();
+          jumpResizeObserverRef.current = null;
+        }
         const state = {
           key: jumpKey,
           lastOffset: jumpOffset,
           timer: null,
-          deadline: Date.now() + 6000,
+          deadline: Date.now() + 8000,
           stableCount: 0,
           lastScrollHeight: null,
         };
         chapterJumpRef.current = state;
-        const TOL = 24;
-        const GAP = 600;
+        const TOL = 16;
+        const GAP = 350;
+        let rafScheduleId = 0;
+
+        const stopWatcher = () => {
+          chapterJumpRef.current.key = null;
+          clearTimeout(state.timer);
+          if (rafScheduleId) cancelAnimationFrame(rafScheduleId);
+          if (jumpResizeObserverRef.current) {
+            jumpResizeObserverRef.current.disconnect();
+            jumpResizeObserverRef.current = null;
+          }
+        };
+
         const tick = () => {
           const cur = chapterJumpRef.current;
           if (!cur || cur.key !== jumpKey) return; // superseded
           const container = containerRef.current;
           if (!container) {
-            chapterJumpRef.current.key = null;
+            stopWatcher();
             return;
           }
           if (Date.now() > cur.deadline) {
-            chapterJumpRef.current.key = null;
+            stopWatcher();
             return;
           }
-          // If user scrolled away manually from landing point, stand down immediately!
           const curTop = getScrollTop();
           const { top: vpTop, height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
-          if (cur.lastOffset !== null && Math.abs(curTop - cur.lastOffset) > 60) {
-            chapterJumpRef.current.key = null;
-            return;
-          }
+          const topInset = getTopReadingInset();
           const el =
             container.querySelector(`#chap-${chapIdx}`) ||
             container.querySelector(`[data-chapter="${chapIdx}"]`);
           if (!el) {
-            chapterJumpRef.current.key = null;
-            return;
-          }
-          // Bottom-clamped targets can never reach top-60 — stand down.
-          if (curTop + vpHeight >= vpScrollHeight - 4) {
-            chapterJumpRef.current.key = null;
+            stopWatcher();
             return;
           }
           const areaSettled = areaTranslationSettled(el, { includeHost: false });
           const rRect = el.getBoundingClientRect();
-          if (Math.abs(rRect.top - vpTop - 60) > TOL) {
+          if (Math.abs(rRect.top - vpTop - topInset) > TOL) {
             cur.stableCount = 0;
-            const fresh = Math.max(0, rRect.top - vpTop + curTop - 60);
-            performProgrammaticScroll(container, fresh, { scrollMotion: settings?.scrollMotion || 'fast' });
-            saveTabScroll(activeTab.bookCode, fresh);
-            cur.lastOffset = fresh;
+            const fresh = computeAnchorScrollTarget({
+              elementTopViewport: rRect.top,
+              viewportTop: vpTop,
+              currentScroll: curTop,
+              stickyInset: topInset,
+            });
+            if (curTop + vpHeight >= vpScrollHeight - 4 && fresh >= vpScrollHeight - vpHeight - 2 && rRect.top >= vpTop + topInset - 8) {
+              if (areaSettled) {
+                stopWatcher();
+                return;
+              }
+            } else {
+              performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
+              saveTabScroll(activeTab.bookCode, fresh);
+              cur.lastOffset = fresh;
+            }
             cur.lastScrollHeight = vpScrollHeight;
             cur.timer = setTimeout(tick, GAP);
             return;
           }
-          // In tolerance, but content may still be growing above the anchor
-          // (payloads in flight, chapters inserting) — hold, don't settle yet.
           const layoutChanged =
             cur.lastScrollHeight !== null && vpScrollHeight !== cur.lastScrollHeight;
           cur.lastScrollHeight = vpScrollHeight;
@@ -3197,11 +3617,30 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
           cur.stableCount += 1;
-          if (cur.stableCount >= 2) chapterJumpRef.current.key = null;
+          if (cur.stableCount >= 2) stopWatcher();
           else cur.timer = setTimeout(tick, GAP);
         };
-        // First check after any in-flight smooth animation has finished (max ~450ms).
-        state.timer = setTimeout(tick, 900);
+
+        if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+          const inner = containerRef.current.querySelector('.reader-container') || containerRef.current;
+          const ro = new ResizeObserver(() => {
+            const cur = chapterJumpRef.current;
+            if (!cur || cur.key !== jumpKey) return;
+            cur.stableCount = 0;
+            if (rafScheduleId) cancelAnimationFrame(rafScheduleId);
+            rafScheduleId = requestAnimationFrame(() => {
+              rafScheduleId = 0;
+              if (chapterJumpRef.current?.key === jumpKey) {
+                clearTimeout(chapterJumpRef.current.timer);
+                tick();
+              }
+            });
+          });
+          ro.observe(inner);
+          jumpResizeObserverRef.current = ro;
+        }
+
+        state.timer = setTimeout(tick, 450);
       };
 
       // 1. Target paragraph by index (Highest Priority for Translation FTS, Pāḷi FTS, TOC, and para_index targets)
@@ -3273,7 +3712,7 @@ const ReaderPane = memo(function ReaderPane({
                 } else {
                   const hits = row.querySelectorAll('mark.search-hit, .search-hit');
                   for (const h of hits) {
-                    if (!h.closest('.reader-trans-block') && h.getClientRects().length > 0) {
+                    if (!h.closest('.reader-trans-block:not(.reader-pali-trans-block)') && h.getClientRects().length > 0) {
                       hitEl = h;
                       break;
                     }
@@ -3305,7 +3744,13 @@ const ReaderPane = memo(function ReaderPane({
               const { top: vpTop } = getViewportBounds();
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = getScrollTop();
-              const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
+              const topInset = getTopReadingInset();
+              const offset = computeAnchorScrollTarget({
+                elementTopViewport: rect.top,
+                viewportTop: vpTop,
+                currentScroll,
+                stickyInset: topInset,
+              });
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -3365,7 +3810,13 @@ const ReaderPane = memo(function ReaderPane({
               const { top: vpTop } = getViewportBounds();
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = getScrollTop();
-              const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
+              const topInset = getTopReadingInset();
+              const offset = computeAnchorScrollTarget({
+                elementTopViewport: rect.top,
+                viewportTop: vpTop,
+                currentScroll,
+                stickyInset: topInset,
+              });
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
               if (settings.pulseAnimation) {
@@ -3483,7 +3934,13 @@ const ReaderPane = memo(function ReaderPane({
             const { top: vpTop } = getViewportBounds();
             const rect = targetEl.getBoundingClientRect();
             const currentScroll = getScrollTop();
-            const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
+            const topInset = getTopReadingInset();
+            const offset = computeAnchorScrollTarget({
+              elementTopViewport: rect.top,
+              viewportTop: vpTop,
+              currentScroll,
+              stickyInset: topInset,
+            });
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
@@ -3656,7 +4113,13 @@ const ReaderPane = memo(function ReaderPane({
             const { top: vpTop } = getViewportBounds();
             const rect = targetEl.getBoundingClientRect();
             const currentScroll = getScrollTop();
-            const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
+            const topInset = getTopReadingInset();
+            const offset = computeAnchorScrollTarget({
+              elementTopViewport: rect.top,
+              viewportTop: vpTop,
+              currentScroll,
+              stickyInset: topInset,
+            });
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
@@ -3726,7 +4189,13 @@ const ReaderPane = memo(function ReaderPane({
           const { top: vpTop } = getViewportBounds();
           const rect = target.getBoundingClientRect();
           const currentScroll = getScrollTop();
-          const offset = Math.max(0, rect.top - vpTop + currentScroll - 60);
+          const topInset = getTopReadingInset();
+          const offset = computeAnchorScrollTarget({
+            elementTopViewport: rect.top,
+            viewportTop: vpTop,
+            currentScroll,
+            stickyInset: topInset,
+          });
           performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
           // Detect first paragraph in the chapter
@@ -3825,6 +4294,10 @@ const ReaderPane = memo(function ReaderPane({
     sentenceMode,
     settings?.scrollMotion,
     hasTransLayers,
+    useWindowScroll,
+    getScrollTop,
+    getViewportBounds,
+    getTopReadingInset,
     performProgrammaticScroll,
   ]);
 
@@ -3882,14 +4355,35 @@ const ReaderPane = memo(function ReaderPane({
     }
   }, [activeTab, isVisible, isActive, setActiveEditionPages, getViewportBounds]);
 
-  // Initial and chapter content change detection
+  // Initial and chapter content change detection (including async translation DOM hydration)
   useEffect(() => {
     if (!isVisible) return;
-    const timer = setTimeout(() => {
+    const runDetect = () => {
       detectActiveEditionPages();
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [isVisible, isActive, activeTab?.bookCode, activeTab?.loadedChapters, detectActiveEditionPages]);
+      if (containerRef.current) {
+        const { top: vpTop } = getViewportBounds();
+        const headings = containerRef.current.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
+        const detected = detectLiveSectionTitleFromElements(headings, vpTop + getTopReadingInset());
+        setPaneSectionTitle(detected);
+      }
+    };
+    const timer = setTimeout(runDetect, 120);
+    let moTimer = null;
+    let mo = null;
+    if (typeof MutationObserver !== 'undefined' && containerRef.current) {
+      const inner = containerRef.current.querySelector('.reader-container') || containerRef.current;
+      mo = new MutationObserver(() => {
+        clearTimeout(moTimer);
+        moTimer = setTimeout(runDetect, 80);
+      });
+      mo.observe(inner, { childList: true, subtree: true });
+    }
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(moTimer);
+      mo?.disconnect();
+    };
+  }, [isVisible, isActive, activeTab?.bookCode, activeTab?.currentChapterIdx, activeTab?.loadedChapters, paneScrollIntent, settings?.paliScript, detectActiveEditionPages, getViewportBounds, getTopReadingInset]);
 
   // Keep activeParaNum in sync when this pane becomes the active tab/column
   useEffect(() => {
@@ -3907,8 +4401,8 @@ const ReaderPane = memo(function ReaderPane({
       const delta = top - prevTop;
       lastScrollYRef.current = top;
 
-      if (!isProgrammaticScrollRef.current) {
-        cancelJump();
+      const isJumping = Boolean(isProgrammaticScrollRef.current || paraJumpRef.current.key || chapterJumpRef.current.key);
+      if (!isJumping) {
         if (top <= 24) {
           scrollDirectionRef.current = 0;
           scrollTravelRef.current = 0;
@@ -3955,7 +4449,11 @@ const ReaderPane = memo(function ReaderPane({
         if (curTab && containerRef.current) {
           const container = containerRef.current;
           const { top: vpTop } = getViewportBounds();
-          const targetY = vpTop + 60;
+          const targetY = vpTop + getTopReadingInset();
+
+          const headings = container.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
+          const detectedTitle = detectLiveSectionTitleFromElements(headings, targetY);
+          setPaneSectionTitle(detectedTitle);
 
           const paraElements = container.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
           let foundParaNum = null;
@@ -4018,7 +4516,7 @@ const ReaderPane = memo(function ReaderPane({
             }
           }
 
-          saveTabPosition(curTab.bookCode, foundChapterIdx, foundParaNum, top);
+          saveTabPosition(curTab.bookCode, foundChapterIdx, foundParaNum, top, foundPIndex);
 
           addToHistory({
             bookCode: curTab.bookCode,
@@ -4053,6 +4551,7 @@ const ReaderPane = memo(function ReaderPane({
       cancelJump,
       onColumnScrollSync,
       getViewportBounds,
+      getTopReadingInset,
       setIsHeaderVisible,
     ]
   );
@@ -4150,7 +4649,7 @@ const ReaderPane = memo(function ReaderPane({
       const text = pEl.textContent?.replace(/\s+/g, ' ').trim() || '';
       const snip = text.length > 130 ? text.slice(0, 130) + '...' : text;
 
-      saveTabPosition(activeTab.bookCode, chapIdx, pNum, containerRef.current?.scrollTop);
+      saveTabPosition(activeTab.bookCode, chapIdx, pNum, getScrollTop(), pIdx);
 
       addToHistory({
         bookCode: activeTab.bookCode,
@@ -4262,7 +4761,7 @@ const ReaderPane = memo(function ReaderPane({
         }
       }
     }
-  }, [isColumnsMode, isActive, activatePane, activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord, setActiveLinkedItem]);
+  }, [isColumnsMode, isActive, activatePane, activeTab, setActiveParaNum, saveTabPosition, getScrollTop, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord, setActiveLinkedItem]);
 
   const handleReaderMouseOver = useCallback(
     (e) => {
@@ -4461,10 +4960,15 @@ const ReaderPane = memo(function ReaderPane({
       containerRef.current.querySelector(`#chap-${activeTab.currentChapterIdx}`) ||
       containerRef.current.querySelector(`[data-chapter="${activeTab.currentChapterIdx}"]`);
     if (target) {
-      const containerRect = containerRef.current.getBoundingClientRect();
+      const { top: vpTop } = getViewportBounds();
       const rect = target.getBoundingClientRect();
-      const currentScroll = containerRef.current.scrollTop;
-      const offset = Math.max(0, rect.top - containerRect.top + currentScroll - 60);
+      const currentScroll = getScrollTop();
+      const offset = computeAnchorScrollTarget({
+        elementTopViewport: rect.top,
+        viewportTop: vpTop,
+        currentScroll,
+        stickyInset: getTopReadingInset(),
+      });
       smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
       // No pulse-highlight on whole-chapter jumps (see section 4 above).
     }
@@ -4676,7 +5180,13 @@ const ReaderPane = memo(function ReaderPane({
     );
   }
 
-  const currentChap = activeTab.chapters?.[activeTab.currentChapterIdx || 0];
+  const targetChapIdx = activeTab.currentChapterIdx || 0;
+  const currentChap =
+    activeTab.chapters?.find((c) => c.chapter_index === targetChapIdx) ||
+    activeTab.chapters?.[targetChapIdx];
+  const bookDisplayTitle = convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript);
+  const chapDisplayTitle = currentChap ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
+  const columnLiveTitle = paneSectionTitle || chapDisplayTitle || bookDisplayTitle;
   const isCurrentBookmarked = bookmarks.some(
     (b) =>
       b.bookCode === activeTab.bookCode &&
@@ -4709,8 +5219,20 @@ const ReaderPane = memo(function ReaderPane({
         <div
           className="breadcrumbs truncate text-xs flex-1 flex items-center gap-1.5 cursor-pointer min-w-0"
           onClick={handleBreadcrumbClick}
-          title="Click to reveal full navigation and sidebar"
+          title={
+            isColumnsMode
+              ? `${bookDisplayTitle}${columnLiveTitle && columnLiveTitle !== bookDisplayTitle ? ` • ${columnLiveTitle}` : ''}`
+              : 'Click to reveal full navigation and sidebar'
+          }
         >
+          {isColumnsMode && (
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                isActive ? 'bg-[var(--accent)]' : 'bg-[var(--text-muted)]/35'
+              }`}
+              aria-hidden="true"
+            />
+          )}
           {layerInfo.label && (
             <span
               className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 border ${
@@ -4721,46 +5243,73 @@ const ReaderPane = memo(function ReaderPane({
                     : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
               }`}
             >
-              {layerInfo.label}
+              {isColumnsMode ? layerInfo.label.charAt(0) : layerInfo.label}
             </span>
           )}
-          {!isColumnsMode && (activeTab.nikaya || activeTab.category) && (
+          {isColumnsMode ? (
             <>
-              <span
-                onClick={handleNikayaClick}
-                className="truncate opacity-75 hover:opacity-100 hover:text-[var(--accent)] cursor-pointer hover:underline transition-colors"
-                title="Scroll to top"
-              >
-                {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
-              </span>
-              <span className="opacity-40 select-none">›</span>
-            </>
-          )}
-          <span
-            onClick={handleBookClick}
-            className="current truncate font-semibold text-[var(--accent)] hover:underline cursor-pointer transition-colors"
-            title="Open book outline"
-          >
-            {convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript)}
-          </span>
-          {currentChap && capitalizePali(currentChap.title) !== capitalizePali(activeTab.title) && (
-            <>
-              <span className="opacity-40 select-none">›</span>
               <span
                 onClick={handleChapterBreadcrumbClick}
-                className="truncate text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer hover:underline transition-colors"
-                title="Scroll to chapter"
+                className="column-live-title truncate font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] hover:underline cursor-pointer transition-colors"
+                title={`${bookDisplayTitle}${columnLiveTitle !== bookDisplayTitle ? ` › ${columnLiveTitle}` : ''}`}
               >
-                {convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript)}
+                {columnLiveTitle}
               </span>
+              {columnLiveTitle !== bookDisplayTitle && (
+                <span
+                  onClick={handleBookClick}
+                  className="hidden 2xl:inline truncate text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:underline cursor-pointer shrink min-w-0"
+                  title={`Open ${bookDisplayTitle} outline`}
+                >
+                  · {bookDisplayTitle}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              {(activeTab.nikaya || activeTab.category) && (
+                <>
+                  <span
+                    onClick={handleNikayaClick}
+                    className="truncate opacity-75 hover:opacity-100 hover:text-[var(--accent)] cursor-pointer hover:underline transition-colors"
+                    title="Scroll to top"
+                  >
+                    {convertPaliScript(capitalizePali(activeTab.nikaya || activeTab.category), settings?.paliScript)}
+                  </span>
+                  <span className="opacity-40 select-none">›</span>
+                </>
+              )}
+              <span
+                onClick={handleBookClick}
+                className="current truncate font-semibold text-[var(--accent)] hover:underline cursor-pointer transition-colors"
+                title="Open book outline"
+              >
+                {bookDisplayTitle}
+              </span>
+              {currentChap && capitalizePali(currentChap.title) !== capitalizePali(activeTab.title) && (
+                <>
+                  <span className="opacity-40 select-none">›</span>
+                  <span
+                    onClick={handleChapterBreadcrumbClick}
+                    className="truncate text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer hover:underline transition-colors"
+                    title="Scroll to chapter"
+                  >
+                    {chapDisplayTitle}
+                  </span>
+                </>
+              )}
             </>
           )}
         </div>
 
         {/* Right Controls: Quick Open Alongside (Mūla / Aṭṭha / Ṭīkā) + Live Edition Page Stats + Quick Bookmark */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div className={`flex items-center shrink-0 ${isColumnsMode ? 'gap-0.5' : 'gap-1 sm:gap-1.5'}`}>
           {layerInfo.siblingLayers.length > 0 && (
-            <div className="hidden sm:flex items-center gap-1 mr-0.5" role="group" aria-label="Open commentary alongside">
+            <div
+              className={`hidden sm:flex items-center ${isColumnsMode ? 'gap-0.5' : 'gap-1 mr-0.5'}`}
+              role="group"
+              aria-label="Open commentary alongside"
+            >
               {layerInfo.siblingLayers.map((sib) => (
                 <button
                   key={sib.layer}
@@ -4774,7 +5323,9 @@ const ReaderPane = memo(function ReaderPane({
                       sourceChapterIdx: activeTab.currentChapterIdx,
                     });
                   }}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border-color)] hover:border-[var(--accent)] transition cursor-pointer"
+                  className={`inline-flex items-center gap-0.5 rounded text-[10px] font-semibold bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border-color)] hover:border-[var(--accent)] transition cursor-pointer ${
+                    isColumnsMode ? 'px-1 py-0.5' : 'px-1.5 py-0.5'
+                  }`}
                   title={`Open ${sib.label} alongside at paragraph ${effectiveParaNum || 1}`}
                 >
                   <span className="opacity-70">+</span>
@@ -4791,12 +5342,16 @@ const ReaderPane = memo(function ReaderPane({
                 if (isColumnsMode && !isActive) activatePane(activeTab.bookCode);
                 openGoToModal('page', null);
               }}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)]/60 hover:border-[var(--border-color)] transition cursor-pointer shrink-0 select-none font-mono"
+              className={`flex items-center rounded-md text-[10px] sm:text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-color)]/60 hover:border-[var(--border-color)] transition cursor-pointer shrink-0 select-none font-mono ${
+                isColumnsMode ? 'gap-1 px-1.5 py-0.5' : 'gap-1.5 px-2 py-0.5'
+              }`}
               title="Current Reading Page across Editions • Click to Go to Page"
             >
-              <span className="text-[9px] sm:text-[9.5px] font-sans font-semibold uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
-                P:
-              </span>
+              {!isColumnsMode && (
+                <span className="text-[9px] sm:text-[9.5px] font-sans font-semibold uppercase tracking-wider text-[var(--text-secondary)] opacity-70">
+                  P:
+                </span>
+              )}
               <div className="flex items-center gap-1">
                 {editionStatsList.map(({ ed, page, label }, idx) => (
                   <React.Fragment key={ed}>
@@ -4933,6 +5488,10 @@ const ReaderPane = memo(function ReaderPane({
                     isCurrentOrTarget={
                       activeTab.currentChapterIdx === chap.chapter_index ||
                       paneScrollIntent?.chapterIdx === chap.chapter_index ||
+                      (hasTransLayers &&
+                        paneScrollIntent?.chapterIdx !== undefined &&
+                        paneScrollIntent?.chapterIdx !== null &&
+                        chap.chapter_index === paneScrollIntent.chapterIdx - 1) ||
                       (chap.chapter_index === 0 &&
                         (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) &&
                         !paneScrollIntent?.chapterIdx)
@@ -5024,7 +5583,7 @@ export default function ReaderView() {
     setIsHistoryOpen,
   } = useTabs();
 
-  const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
+  const { openDictionary, clickToLookupEnabled, clickLookupMode, isOpen: isDictOpen, dockMode: dictDockMode } = useDictionary();
   const [activeLinkedItem, setActiveLinkedItem] = useState(null);
   const { settings } = useThemeSettings();
   const pulseAnimation = Boolean(settings?.pulseAnimation);
@@ -5131,7 +5690,7 @@ export default function ReaderView() {
   );
 
   const isWideScreen = viewportWidth >= 900;
-  const maxColumns = viewportWidth >= 1100 ? 3 : 2;
+  const maxColumns = getMaxColumnsForWidth(viewportWidth);
   const isAiActive =
     activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat' || activeTab?.viewMode === 'ai_chat';
   const isColumnsMode =
@@ -5153,7 +5712,7 @@ export default function ReaderView() {
       0,
       bookTabs.findIndex((t) => t.bookCode === (activeBookCode || activeTab.bookCode))
     );
-    let start = maxColumns === 2 ? activeIdx : Math.max(0, activeIdx - 1);
+    let start = maxColumns === 2 ? activeIdx : Math.max(0, activeIdx - Math.floor((maxColumns - 1) / 2));
     if (start + maxColumns > bookTabs.length) {
       start = Math.max(0, bookTabs.length - maxColumns);
     }
@@ -5580,6 +6139,8 @@ export default function ReaderView() {
               onColumnUserInteract={handleColumnUserInteract}
               onColumnScrollSync={handleColumnScrollSync}
               onPaneLinksLoaded={handlePaneLinksLoaded}
+              isDictOpen={isDictOpen}
+              dictDockMode={dictDockMode}
             />
           );
         })}

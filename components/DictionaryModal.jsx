@@ -652,11 +652,21 @@ export default function DictionaryModal() {
   const startResizingWidth = useCallback(
     (mouseDownEvent) => {
       mouseDownEvent.preventDefault();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-resize' } })
+        );
+      }
       setIsResizing(true);
       const startX = mouseDownEvent.clientX;
       const startWidth = dictWidth;
 
       const onMouseMove = (mouseMoveEvent) => {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('tipitaka:layout-shift-resize', { detail: { phase: 'move' } })
+          );
+        }
         let newWidth;
         if (dockMode === 'side' || dockMode === 'right') {
           newWidth = startWidth - (mouseMoveEvent.clientX - startX);
@@ -673,6 +683,11 @@ export default function DictionaryModal() {
 
       const onMouseUp = () => {
         setIsResizing(false);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('tipitaka:layout-shift-resize', { detail: { phase: 'end' } })
+          );
+        }
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         document.body.style.userSelect = '';

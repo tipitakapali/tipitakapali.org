@@ -256,8 +256,12 @@ export async function fetchBook(bookCode, options = {}) {
   if (options.tocOnly) {
     params.set('tocOnly', 'true');
   } else {
-    if (resolvedChapter !== undefined) params.set('chapter', resolvedChapter);
-    if (options.buffer !== undefined) params.set('buffer', options.buffer);
+    if (resolvedChapter !== undefined && resolvedChapter !== null && resolvedChapter !== '') {
+      params.set('chapter', resolvedChapter);
+    }
+    if (options.buffer !== undefined && options.buffer !== null) {
+      params.set('buffer', options.buffer);
+    }
     if (options.full) params.set('full', 'true');
   }
 

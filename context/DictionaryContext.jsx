@@ -261,6 +261,11 @@ export function DictionaryProvider({ children }) {
 
   const setDockMode = useCallback((mode) => {
     const validMode = ['left', 'modal', 'side', 'right'].includes(mode) ? mode : 'side';
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-dock', mode: validMode } })
+      );
+    }
     setDockModeState(validMode);
     try {
       localStorage.setItem(STORAGE_KEYS.DOCK_MODE, validMode);
@@ -661,6 +666,11 @@ export function DictionaryProvider({ children }) {
         return;
       }
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-open' } })
+      );
+    }
     setIsOpen(true);
     if (initialTab) {
       setDictTab(initialTab);
@@ -680,6 +690,9 @@ export function DictionaryProvider({ children }) {
 
   const closeDictionary = useCallback(() => {
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-close' } })
+      );
       window.__tipitaka_dict_just_closed = Date.now();
     }
     setIsOpen(false);

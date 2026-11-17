@@ -1,11 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { fetchBook, fetchChapter, fetchMat, fetchMatJump, lookupBookInfo, fetchBookTocOnly } from '../services/api';
 import { splitScriptCode } from '../services/transliterate';
 import { useThemeSettings } from './ThemeSettingsContext';
 
 const TabContext = createContext();
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 const STORAGE_KEYS = {
   TABS: 'tipitaka_saved_tabs_v3',
@@ -16,6 +18,128 @@ const STORAGE_KEYS = {
 };
 
 const MAX_TABS = 12;
+
+export function parseSavedTabsSnapshot(rawTabs, savedActiveCode = null) {
+  let parsed = rawTabs;
+  if (typeof rawTabs === 'string') {
+    try {
+      parsed = JSON.parse(rawTabs);
+    } catch (_) {
+      return { tabs: [], activeBookCode: null, scriptPrefixes: {} };
+    }
+  }
+  if (!Array.isArray(parsed)) {
+    return { tabs: [], activeBookCode: null, scriptPrefixes: {} };
+  }
+
+  const tabs = [];
+  const seen = new Set();
+  const scriptPrefixes = {};
+
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object' || typeof entry.bookCode !== 'string') continue;
+    const rawCode = entry.bookCode.trim().replace(/\.xml$/i, '');
+    if (!rawCode) continue;
+
+    const split = splitScriptCode(rawCode);
+    const cleanCode = split.bookCode || rawCode;
+    if (seen.has(cleanCode)) continue;
+    seen.add(cleanCode);
+
+    const scriptPrefix =
+      (typeof entry.scriptPrefix === 'string' && entry.scriptPrefix.trim()) ||
+      split.prefix ||
+      null;
+    if (scriptPrefix) {
+      scriptPrefixes[cleanCode] = scriptPrefix;
+    }
+
+    if (cleanCode === 'ai_chat' || entry.type === 'ai_chat') {
+      tabs.push({
+        bookCode: 'ai_chat',
+        type: 'ai_chat',
+        title: (typeof entry.title === 'string' && entry.title.trim()) || 'Ani Assistant',
+        viewMode: 'ai_chat',
+        isTocView: false,
+      });
+    } else {
+      const isToc = Boolean(entry.isTocView || entry.viewMode === 'toc');
+      const chapIdx =
+        typeof entry.currentChapterIdx === 'number' &&
+        Number.isFinite(entry.currentChapterIdx) &&
+        entry.currentChapterIdx >= 0
+          ? Math.floor(entry.currentChapterIdx)
+          : isToc
+          ? null
+          : 0;
+      const paraNum =
+        entry.lastParaNum !== undefined && entry.lastParaNum !== null && String(entry.lastParaNum).trim()
+          ? String(entry.lastParaNum).trim()
+          : undefined;
+      const parsedParaIndex =
+        entry.lastParaIndex !== undefined && entry.lastParaIndex !== null && entry.lastParaIndex !== ''
+          ? Number(entry.lastParaIndex)
+          : NaN;
+      const lastParaIndex = Number.isFinite(parsedParaIndex) && parsedParaIndex >= 0 ? Math.floor(parsedParaIndex) : undefined;
+
+      tabs.push({
+        bookCode: cleanCode,
+        type: 'book',
+        title: (typeof entry.title === 'string' && entry.title.trim()) || cleanCode,
+        nikaya: typeof entry.nikaya === 'string' ? entry.nikaya : '',
+        category: typeof entry.category === 'string' ? entry.category : '',
+        chapter_count: 1,
+        chapters: [],
+        toc: [],
+        loadedChapters: {},
+        loadingChapters: {},
+        isLoading: false,
+        needsHydration: true,
+        fromSavedSession: true,
+        currentChapterIdx: chapIdx,
+        lastParaNum: paraNum,
+        lastParaIndex,
+        viewMode: isToc ? 'toc' : 'reader',
+        isTocView: isToc,
+        ...(scriptPrefix ? { scriptPrefix } : {}),
+      });
+    }
+
+    if (tabs.length >= MAX_TABS) break;
+  }
+
+  let resolvedActive = null;
+  if (typeof savedActiveCode === 'string' && savedActiveCode.trim()) {
+    const cleanActive = splitScriptCode(savedActiveCode.trim().replace(/\.xml$/i, '')).bookCode;
+    if (tabs.some((t) => t.bookCode === cleanActive)) {
+      resolvedActive = cleanActive;
+    }
+  }
+  if (!resolvedActive && tabs.length > 0) {
+    resolvedActive = tabs[0].bookCode;
+  }
+
+  return { tabs, activeBookCode: resolvedActive, scriptPrefixes };
+}
+
+export function hasDeepLinkInLocation(loc = null) {
+  const targetLoc = loc || (typeof window !== 'undefined' ? window.location : null);
+  if (!targetLoc) return false;
+  const pathname = targetLoc.pathname || '';
+  if (pathname.startsWith('/book/') || pathname.startsWith('/chapter/')) {
+    return true;
+  }
+  const params = new URLSearchParams(targetLoc.search || '');
+  const tabParam = params.get('tab');
+  return Boolean(
+    params.get('book') ||
+    params.get('book_code') ||
+    params.get('q') ||
+    params.get('search') ||
+    tabParam === 'ai' ||
+    tabParam === 'ai_chat'
+  );
+}
 
 export function getActiveContentArea(bookCode = null) {
   if (typeof document === 'undefined') return null;
@@ -341,8 +465,11 @@ export function TabProvider({ children }) {
   activeParaNumRef.current = activeParaNum;
   isSidebarOpenRef.current = isSidebarOpen;
 
-  // Load saved bookmarks, history, and scroll positions from localStorage & handle mobile layout
-  useEffect(() => {
+  const restoredSessionRef = useRef(false);
+  const hydratingBooksRef = useRef(new Set());
+
+  // Restore saved bookmarks, history, scroll positions, and open tabs BEFORE child mount effects
+  useIsomorphicLayoutEffect(() => {
     if (typeof window === 'undefined') return;
 
     if (window.innerWidth < 768) {
@@ -357,7 +484,42 @@ export function TabProvider({ children }) {
       if (savedHistory) setRecentHistory(JSON.parse(savedHistory));
 
       const savedScrolls = localStorage.getItem(STORAGE_KEYS.SCROLL);
-      if (savedScrolls) tabScrollMemoryRef.current = JSON.parse(savedScrolls);
+      if (savedScrolls) {
+        const parsedScrolls = JSON.parse(savedScrolls);
+        if (parsedScrolls && typeof parsedScrolls === 'object') {
+          tabScrollMemoryRef.current = parsedScrolls;
+        }
+      }
+
+      const savedTabsRaw = localStorage.getItem(STORAGE_KEYS.TABS);
+      const savedActiveRaw = localStorage.getItem(STORAGE_KEYS.ACTIVE);
+      const snapshot = parseSavedTabsSnapshot(savedTabsRaw, savedActiveRaw);
+      if (snapshot.tabs.length > 0 && openTabsRef.current.length === 0) {
+        restoredSessionRef.current = true;
+        tabScriptPrefixRef.current = {
+          ...snapshot.scriptPrefixes,
+          ...tabScriptPrefixRef.current,
+        };
+        openTabsRef.current = snapshot.tabs;
+        setOpenTabs(snapshot.tabs);
+
+        const isDeepLinked = hasDeepLinkInLocation();
+        if (!isDeepLinked && snapshot.activeBookCode) {
+          activeBookCodeRef.current = snapshot.activeBookCode;
+          setActiveBookCode(snapshot.activeBookCode);
+          const activeRestored = snapshot.tabs.find((t) => t.bookCode === snapshot.activeBookCode);
+          if (activeRestored && activeRestored.type !== 'ai_chat') {
+            setTreeSelectedNode({
+              bookCode: activeRestored.bookCode,
+              chapterIdx: activeRestored.isTocView ? null : (activeRestored.currentChapterIdx ?? 0),
+            });
+            if (activeRestored.lastParaNum) {
+              activeParaNumRef.current = activeRestored.lastParaNum;
+              setActiveParaNum(activeRestored.lastParaNum);
+            }
+          }
+        }
+      }
     } catch (e) {
       console.warn('Failed to load storage items:', e);
     }
@@ -562,13 +724,28 @@ export function TabProvider({ children }) {
   const persistTabs = useCallback((tabs, activeCode) => {
     if (typeof window === 'undefined') return;
     try {
-      const minifiedTabs = tabs.map((t) => ({
-        bookCode: t.bookCode,
-        currentChapterIdx: t.currentChapterIdx ?? null,
-        lastParaNum: t.lastParaNum || (t.bookCode === activeBookCodeRef.current ? activeParaNumRef.current : undefined),
-        viewMode: t.viewMode || (t.isTocView ? 'toc' : undefined),
-        isTocView: t.isTocView || t.viewMode === 'toc' || false,
-      }));
+      const minifiedTabs = tabs.map((t) => {
+        const prefix = tabScriptPrefixRef.current[t.bookCode] || t.scriptPrefix;
+        const resolvedPara =
+          t.lastParaNum || (t.bookCode === activeBookCodeRef.current ? activeParaNumRef.current : undefined);
+        const resolvedParaIndex =
+          typeof t.lastParaIndex === 'number' && Number.isFinite(t.lastParaIndex)
+            ? t.lastParaIndex
+            : undefined;
+        return {
+          bookCode: t.bookCode,
+          type: t.type || (t.bookCode === 'ai_chat' ? 'ai_chat' : 'book'),
+          title: t.title || t.bookCode,
+          nikaya: t.nikaya || '',
+          category: t.category || '',
+          currentChapterIdx: t.currentChapterIdx ?? null,
+          lastParaNum: resolvedPara,
+          ...(resolvedParaIndex !== undefined ? { lastParaIndex: resolvedParaIndex } : {}),
+          viewMode: t.viewMode || (t.isTocView ? 'toc' : undefined),
+          isTocView: t.isTocView || t.viewMode === 'toc' || false,
+          ...(prefix ? { scriptPrefix: prefix } : {}),
+        };
+      });
       localStorage.setItem(STORAGE_KEYS.TABS, JSON.stringify(minifiedTabs));
       if (activeCode) {
         localStorage.setItem(STORAGE_KEYS.ACTIVE, activeCode);
@@ -578,8 +755,39 @@ export function TabProvider({ children }) {
     } catch (e) {}
   }, []);
 
+  const flushSessionPersistence = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (scrollPersistTimerRef.current) {
+      clearTimeout(scrollPersistTimerRef.current);
+      scrollPersistTimerRef.current = null;
+    }
+    try {
+      if (typeof document !== 'undefined') {
+        const isWindowMode = document.body.classList.contains('window-scroll');
+        const activeCode = activeBookCodeRef.current;
+        if (isWindowMode && activeCode && activeCode !== 'ai_chat') {
+          const wy = window.scrollY || document.documentElement.scrollTop || 0;
+          if (wy > 0 || tabScrollMemoryRef.current[activeCode] === undefined) {
+            tabScrollMemoryRef.current[activeCode] = wy;
+          }
+        }
+        const panes = document.querySelectorAll('main.content-area[data-book-code]');
+        for (const pane of panes) {
+          const code = pane.getAttribute('data-book-code');
+          if (!code || code === 'ai_chat') continue;
+          if (isWindowMode && code === activeCode) continue;
+          if (pane.offsetParent !== null && (pane.scrollTop > 0 || tabScrollMemoryRef.current[code] === undefined)) {
+            tabScrollMemoryRef.current[code] = pane.scrollTop;
+          }
+        }
+      }
+      localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+      persistTabs(openTabsRef.current, activeBookCodeRef.current);
+    } catch (_) {}
+  }, [persistTabs]);
+
   // Save exact tab position (chapter, paragraph, and pixel scroll)
-  const saveTabPosition = useCallback((bookCode, chapterIdx, paraNum, scrollTop) => {
+  const saveTabPosition = useCallback((bookCode, chapterIdx, paraNum, scrollTop, paraIndex = undefined) => {
     if (!bookCode) return;
     if (scrollTop !== undefined && scrollTop !== null) {
       tabScrollMemoryRef.current[bookCode] = scrollTop;
@@ -599,6 +807,12 @@ export function TabProvider({ children }) {
       }
     }
 
+    const parsedPIdx =
+      paraIndex !== undefined && paraIndex !== null && paraIndex !== ''
+        ? Number(paraIndex)
+        : NaN;
+    const cleanPIdx = Number.isFinite(parsedPIdx) && parsedPIdx >= 0 ? Math.floor(parsedPIdx) : undefined;
+
     setOpenTabs((prev) => {
       let hasChanged = false;
       const updated = prev.map((t) => {
@@ -617,12 +831,14 @@ export function TabProvider({ children }) {
                 undefined;
             }
           }
-          if (t.currentChapterIdx !== newChapIdx || t.lastParaNum !== newPara) {
+          const newPIdx = cleanPIdx !== undefined ? cleanPIdx : t.lastParaIndex;
+          if (t.currentChapterIdx !== newChapIdx || t.lastParaNum !== newPara || t.lastParaIndex !== newPIdx) {
             hasChanged = true;
             return {
               ...t,
               currentChapterIdx: newChapIdx,
               lastParaNum: newPara,
+              ...(newPIdx !== undefined ? { lastParaIndex: newPIdx } : {}),
             };
           }
         }
@@ -644,6 +860,15 @@ export function TabProvider({ children }) {
     const tab = openTabsRef.current.find((t) => t.bookCode === cleanCode);
     if (!tab) return;
     if (tab.loadedChapters?.[chapterIdx] || tab.loadingChapters?.[chapterIdx]) return;
+
+    openTabsRef.current = openTabsRef.current.map((t) =>
+      t.bookCode === cleanCode
+        ? {
+            ...t,
+            loadingChapters: { ...t.loadingChapters, [chapterIdx]: true },
+          }
+        : t
+    );
 
     setOpenTabs((prev) =>
       prev.map((t) =>
@@ -814,21 +1039,37 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const existingTabIndex = currentTabs.findIndex((t) => t.bookCode === cleanCode);
 
-      if (activeBookCodeRef.current && activeBookCodeRef.current !== cleanCode && typeof document !== 'undefined') {
-        const container = getActiveContentArea(activeBookCodeRef.current);
-        if (
-          container &&
-          container.offsetParent !== null &&
-          (container.scrollTop > 0 || tabScrollMemoryRef.current[activeBookCodeRef.current] === undefined)
-        ) {
-          tabScrollMemoryRef.current[activeBookCodeRef.current] = container.scrollTop;
+      const readPaneScrollOffset = (code) => {
+        if (typeof document === 'undefined' || !code) return null;
+        const isWin = document.body?.classList?.contains('window-scroll');
+        if (isWin && activeBookCodeRef.current === code && code !== 'ai_chat') {
+          return window.scrollY || document.documentElement.scrollTop || 0;
+        }
+        const c = getActiveContentArea(code);
+        if (c && c.offsetParent !== null) {
+          return c.scrollTop;
+        }
+        return null;
+      };
+
+      if (activeBookCodeRef.current && activeBookCodeRef.current !== cleanCode) {
+        const curScroll = readPaneScrollOffset(activeBookCodeRef.current);
+        if (curScroll !== null && (curScroll > 0 || tabScrollMemoryRef.current[activeBookCodeRef.current] === undefined)) {
+          tabScrollMemoryRef.current[activeBookCodeRef.current] = curScroll;
           try {
             localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
           } catch (e) {}
         }
       }
 
-      if (existingTabIndex !== -1) {
+      const existingTab = existingTabIndex !== -1 ? currentTabs[existingTabIndex] : null;
+      const existingNeedsBookLoad = Boolean(
+        existingTab &&
+        !isTocRequest &&
+        (existingTab.needsHydration || !Array.isArray(existingTab.chapters) || existingTab.chapters.length === 0)
+      );
+
+      if (existingTabIndex !== -1 && !existingNeedsBookLoad) {
         if (!keepActive) {
           setActiveBookCode((prev) => (prev !== cleanCode ? cleanCode : prev));
         }
@@ -873,6 +1114,7 @@ export function TabProvider({ children }) {
                             viewMode: 'toc',
                             isTocView: true,
                             isLoading: false,
+                            needsHydration: false,
                           }
                         : t
                     )
@@ -986,10 +1228,18 @@ export function TabProvider({ children }) {
           }
         }
 
+        const parsedPIdx =
+          options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== ''
+            ? Number(options.targetParaIndex)
+            : NaN;
+        const nextParaIndex = Number.isFinite(parsedPIdx) && parsedPIdx >= 0 ? Math.floor(parsedPIdx) : tab.lastParaIndex;
+
         const updatedExistingTab = {
           ...tab,
           currentChapterIdx: hasTargetChapter ? targetChapIdx : tab.currentChapterIdx,
           lastParaNum: effectivePara || tab.lastParaNum,
+          ...(nextParaIndex !== undefined ? { lastParaIndex: nextParaIndex } : {}),
+          fromSavedSession: false,
           viewMode: 'reader',
           isTocView: false,
         };
@@ -1000,11 +1250,15 @@ export function TabProvider({ children }) {
           activeCode: activeBookCodeRef.current,
         });
         setOpenTabs(nextTabs);
+        openTabsRef.current = nextTabs;
         persistTabs(nextTabs, effectiveActiveCode);
 
         if (hasTargetChapter) {
           if (!tab.loadedChapters?.[targetChapIdx]) {
             loadChapter(cleanCode, targetChapIdx);
+          }
+          if (targetChapIdx > 0 && !tab.loadedChapters?.[targetChapIdx - 1]) {
+            loadChapter(cleanCode, targetChapIdx - 1);
           }
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
@@ -1190,15 +1444,17 @@ export function TabProvider({ children }) {
       }
       const optimisticTab = {
         bookCode: cleanCode,
-        title: options.title || bookInfo?.title || cleanCode,
-        nikaya: options.nikaya || bookInfo?.nikaya || '',
-        category: options.category || bookInfo?.category || '',
+        title: options.title || existingTab?.title || bookInfo?.title || cleanCode,
+        nikaya: options.nikaya || existingTab?.nikaya || bookInfo?.nikaya || '',
+        category: options.category || existingTab?.category || bookInfo?.category || '',
         chapter_count: 1,
         chapters: [],
         toc: [],
         loadedChapters: {},
-        loadingChapters: { [targetChapIdx]: true },
+        loadingChapters: hasTargetChapter && targetChapIdx !== null && targetChapIdx !== undefined ? { [targetChapIdx]: true } : {},
         isLoading: true,
+        fromSavedSession: false,
+        needsHydration: false,
         currentChapterIdx: targetChapIdx,
         viewMode: 'reader',
         isTocView: false,
@@ -1214,15 +1470,53 @@ export function TabProvider({ children }) {
       if (!keepActive) {
         setActiveBookCode(cleanCode);
         const initialHash = rawParaNum ? `#para${rawParaNum}` : (options.targetParaNum ? `#para${options.targetParaNum}` : undefined);
-        updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, hash: initialHash });
+        updateUrlParams({
+          book: cleanCode,
+          chapter: hasTargetChapter && targetChapIdx !== null && targetChapIdx !== undefined ? targetChapIdx + 1 : null,
+          hash: initialHash,
+        });
       }
       persistTabs(nextTabsOptimistic, effectiveActiveCode);
 
       setLoadingBook(true);
       try {
+        // Pre-resolve target chapter cleanly before fetching chapters_data when jumping to a para/paraIndex
+        if (hasParaTarget && !hasTargetChapter) {
+          try {
+            const tocMeta = await fetchBookTocOnly(cleanCode);
+            if (tocMeta) {
+              if (options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== '') {
+                const chapFromIdx = getChapterIdxForParaIndex(tocMeta.chapters, options.targetParaIndex);
+                if (chapFromIdx !== null && chapFromIdx !== undefined) {
+                  targetChapIdx = chapFromIdx;
+                  hasTargetChapter = true;
+                }
+              }
+              if (!hasTargetChapter && rawParaNum && tocMeta.para_to_chapter) {
+                const preSub = options.targetSubBook || tocMeta.sub_book || null;
+                if (tocMeta.para_to_chapter[rawParaNum] !== undefined) {
+                  targetChapIdx = tocMeta.para_to_chapter[rawParaNum];
+                  hasTargetChapter = true;
+                } else {
+                  const resolved = resolveNearestChapterAndPara(
+                    tocMeta.para_to_chapter,
+                    rawParaNum,
+                    preSub,
+                    tocMeta.sub_books_para_to_chapter
+                  );
+                  if (resolved && resolved.chapterIdx !== undefined && resolved.chapterIdx !== null) {
+                    targetChapIdx = resolved.chapterIdx;
+                    hasTargetChapter = true;
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
         // First resolve chapter if targetParaNum is provided and we can pre-check or load metadata
         const bookData = await fetchBook(cleanCode, {
-          chapter: targetChapIdx,
+          chapter: targetChapIdx ?? 0,
           buffer: 1,
         });
 
@@ -1280,6 +1574,12 @@ export function TabProvider({ children }) {
           }
         }
 
+        const parsedNewPIdx =
+          options.targetParaIndex !== undefined && options.targetParaIndex !== null && options.targetParaIndex !== ''
+            ? Number(options.targetParaIndex)
+            : NaN;
+        const resolvedNewPIdx = Number.isFinite(parsedNewPIdx) && parsedNewPIdx >= 0 ? Math.floor(parsedNewPIdx) : undefined;
+
         const newTab = {
           bookCode: bookData.code,
           title: bookData.title,
@@ -1315,8 +1615,11 @@ export function TabProvider({ children }) {
 
           loadingChapters: {},
           isLoading: false,
-          currentChapterIdx: targetChapIdx,
+          needsHydration: false,
+          fromSavedSession: false,
+          currentChapterIdx: targetChapIdx ?? 0,
           lastParaNum: effectivePara || undefined,
+          ...(resolvedNewPIdx !== undefined ? { lastParaIndex: resolvedNewPIdx } : {}),
           viewMode: 'reader',
           isTocView: false,
         };
@@ -1337,9 +1640,13 @@ export function TabProvider({ children }) {
           activeCode: activeBookCodeRef.current,
         });
         setOpenTabs(nextTabs);
+        openTabsRef.current = nextTabs;
         persistTabs(nextTabs, effectiveActiveCode);
         if (!keepActive) {
           setActiveBookCode(cleanCode);
+        }
+        if (targetChapIdx !== null && targetChapIdx !== undefined && targetChapIdx > 0 && !bookData.chapters_data?.[targetChapIdx - 1]) {
+          loadChapter(cleanCode, targetChapIdx - 1);
         }
 
         const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
@@ -1390,22 +1697,23 @@ export function TabProvider({ children }) {
         } else if (!keepActive) {
           setSearchHighlight(null);
         }
+        const resolvedChapIdx = targetChapIdx ?? 0;
         if (!keepActive) {
           setTreeSelectedNode({
             bookCode: cleanCode,
-            chapterIdx: targetChapIdx,
+            chapterIdx: resolvedChapIdx,
           });
           const finalHash = effectivePara ? `#para${effectivePara}` : (rawParaNum ? `#para${rawParaNum}` : (options.targetParaNum ? `#para${options.targetParaNum}` : undefined));
-          updateUrlParams({ book: cleanCode, chapter: targetChapIdx + 1, hash: finalHash, q: qParam, l: lParam, search: null });
+          updateUrlParams({ book: cleanCode, chapter: (targetChapIdx ?? 0) + 1, hash: finalHash, q: qParam, l: lParam, search: null });
         }
-        bufferAdjacentChapters(cleanCode, targetChapIdx);
+        bufferAdjacentChapters(cleanCode, resolvedChapIdx);
 
         addToHistory({
           bookCode: cleanCode,
           bookTitle: newTab.title,
           nikaya: newTab.nikaya,
-          chapterIdx: targetChapIdx,
-          chapterTitle: newTab.chapters?.[targetChapIdx]?.title || '',
+          chapterIdx: resolvedChapIdx,
+          chapterTitle: newTab.chapters?.[resolvedChapIdx]?.title || '',
         });
       } catch (err) {
         console.warn(`[openBook] Failed to open book '${cleanCode}':`, err?.message || err);
@@ -1443,13 +1751,15 @@ export function TabProvider({ children }) {
       // fight the saved pixel on restore and cause the "shifts when switching
       // tabs" bug. Pixel memory is the source of truth for plain tab switches.
       if (outgoingCode && outgoingCode !== bookCode && typeof document !== 'undefined') {
+        const isWin = document.body?.classList?.contains('window-scroll');
         const container = getActiveContentArea(outgoingCode);
+        const currentScroll = isWin
+          ? (window.scrollY || document.documentElement.scrollTop || 0)
+          : (container && container.offsetParent !== null ? container.scrollTop : null);
         if (
-          container &&
-          container.offsetParent !== null &&
-          (container.scrollTop > 0 || tabScrollMemoryRef.current[outgoingCode] === undefined)
+          currentScroll !== null &&
+          (currentScroll > 0 || tabScrollMemoryRef.current[outgoingCode] === undefined)
         ) {
-          const currentScroll = container.scrollTop;
           tabScrollMemoryRef.current[outgoingCode] = currentScroll;
           try {
             localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
@@ -1494,50 +1804,86 @@ export function TabProvider({ children }) {
           });
           return;
         }
-        if (
+        const needsFullHydration =
+          Boolean(tab.needsHydration) ||
+          !Array.isArray(tab.chapters) ||
+          tab.chapters.length === 0 ||
           !tab.para_to_chapter ||
           Object.keys(tab.para_to_chapter).length === 0 ||
           !tab.page_to_chapter ||
-          Object.keys(tab.page_to_chapter).length === 0
-        ) {
-          fetchBook(bookCode, { chapter: tab.currentChapterIdx ?? 0 })
-            .then((bData) => {
-              if (bData) {
-                setOpenTabs((prev) =>
-                  prev.map((t) =>
-                    t.bookCode === bookCode
-                      ? {
-                          ...t,
-                          para_to_chapter: bData.para_to_chapter || {},
-                          para_to_index: bData.para_to_index || {},
-                          page_to_chapter: bData.page_to_chapter || {},
-                          page_to_para: bData.page_to_para || {},
-                          page_anchors: bData.page_anchors || {},
-                          para_range: bData.para_range || t.para_range,
-                          edition_ranges: bData.edition_ranges || t.edition_ranges,
-                          book_type: bData.book_type || t.book_type || 'Whole',
-                          sub_books: bData.sub_books || t.sub_books || null,
-                          sub_book: bData.sub_book || t.sub_book || null,
-                          chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
-                          sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
-                          attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
-                          tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
-                          split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
-                          chapter_to_mat: bData.chapter_to_mat || t.chapter_to_mat || null,
-                          para_to_mat: bData.para_to_mat || t.para_to_mat || null,
-                          sub_books_para_to_mat: bData.sub_books_para_to_mat || t.sub_books_para_to_mat || null,
-                          mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
-                          mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
-                          attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
-                          toc: bData.toc?.length ? bData.toc : t.toc,
-                          mat: bData.mat || t.mat,
-                        }
-                      : t
-                  )
-                );
+          Object.keys(tab.page_to_chapter).length === 0;
+
+        if (needsFullHydration && !hydratingBooksRef.current.has(bookCode)) {
+          hydratingBooksRef.current.add(bookCode);
+          const hydrateChap = tab.currentChapterIdx ?? 0;
+          if (!Array.isArray(tab.chapters) || tab.chapters.length === 0) {
+            setOpenTabs((prev) =>
+              prev.map((t) =>
+                t.bookCode === bookCode ? { ...t, isLoading: true } : t
+              )
+            );
+          }
+          fetchBook(bookCode, { chapter: hydrateChap, buffer: 1 })
+            .then(async (bData) => {
+              if (!bData) return;
+              const nextChaptersData = { ...(bData.chapters_data || {}) };
+              if (!nextChaptersData[hydrateChap]) {
+                try {
+                  const chRes = await fetchChapter(bookCode, hydrateChap);
+                  if (chRes && chRes.html) {
+                    nextChaptersData[hydrateChap] = chRes.html;
+                  }
+                } catch (_) {}
               }
+              setOpenTabs((prev) =>
+                prev.map((t) =>
+                  t.bookCode === bookCode
+                    ? {
+                        ...t,
+                        title: bData.title || t.title,
+                        nikaya: bData.nikaya || bData.category || t.nikaya,
+                        category: bData.category || t.category,
+                        chapter_count: bData.chapter_count || (bData.chapters ? bData.chapters.length : t.chapter_count),
+                        chapters: bData.chapters?.length ? bData.chapters : t.chapters,
+                        toc: bData.toc?.length ? bData.toc : t.toc,
+                        loadedChapters: { ...(t.loadedChapters || {}), ...nextChaptersData },
+                        isLoading: false,
+                        needsHydration: false,
+                        para_to_chapter: bData.para_to_chapter || t.para_to_chapter || {},
+                        para_to_index: bData.para_to_index || t.para_to_index || {},
+                        page_to_chapter: bData.page_to_chapter || t.page_to_chapter || {},
+                        page_to_para: bData.page_to_para || t.page_to_para || {},
+                        page_anchors: bData.page_anchors || t.page_anchors || {},
+                        para_range: bData.para_range || t.para_range,
+                        edition_ranges: bData.edition_ranges || t.edition_ranges,
+                        book_type: bData.book_type || t.book_type || 'Whole',
+                        sub_books: bData.sub_books || t.sub_books || null,
+                        sub_book: bData.sub_book || t.sub_book || null,
+                        chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                        sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
+                        attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
+                        tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
+                        split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                        chapter_to_mat: bData.chapter_to_mat || t.chapter_to_mat || null,
+                        para_to_mat: bData.para_to_mat || t.para_to_mat || null,
+                        sub_books_para_to_mat: bData.sub_books_para_to_mat || t.sub_books_para_to_mat || null,
+                        mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
+                        mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
+                        attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
+                        mat: bData.mat || t.mat,
+                      }
+                    : t
+                )
+              );
             })
-            .catch(() => {});
+            .catch(() => {
+              setOpenTabs((prev) =>
+                prev.map((t) => (t.bookCode === bookCode ? { ...t, isLoading: false } : t))
+              );
+            })
+            .finally(() => {
+              hydratingBooksRef.current.delete(bookCode);
+            });
         }
 
         let targetChap = tab.currentChapterIdx;
@@ -1983,6 +2329,9 @@ export function TabProvider({ children }) {
   }, []);
 
   const toggleSidebar = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'sidebar' } }));
+    }
     const next = !isSidebarOpenRef.current;
     isSidebarOpenRef.current = next;
     setIsSidebarOpen(next);
@@ -1990,6 +2339,212 @@ export function TabProvider({ children }) {
       setIsHeaderVisible(true);
     }
   }, [setIsHeaderVisible]);
+
+  const hydrateSessionTab = useCallback(
+    (tab) => {
+      if (!tab || tab.type === 'ai_chat' || tab.bookCode === 'ai_chat' || !tab.needsHydration) return;
+      const cleanCode = tab.bookCode;
+      if (hydratingBooksRef.current.has(cleanCode)) return;
+      hydratingBooksRef.current.add(cleanCode);
+
+      if (tab.isTocView || tab.viewMode === 'toc') {
+        setOpenTabs((prev) =>
+          prev.map((t) => (t.bookCode === cleanCode ? { ...t, isLoading: true } : t))
+        );
+        fetchBookTocOnly(cleanCode)
+          .then((bData) => {
+            if (!bData) return;
+            setOpenTabs((prev) =>
+              prev.map((t) =>
+                t.bookCode === cleanCode
+                  ? {
+                      ...t,
+                      title: bData.title || t.title,
+                      nikaya: bData.nikaya || bData.category || t.nikaya,
+                      category: bData.category || t.category,
+                      chapter_count: bData.chapter_count || (bData.chapters ? bData.chapters.length : 1),
+                      chapters: bData.chapters || [],
+                      toc: bData.toc || [],
+                      mat: bData.mat || t.mat,
+                      split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                      book_type: bData.book_type || t.book_type || 'Whole',
+                      isLoading: false,
+                      needsHydration: false,
+                    }
+                  : t
+              )
+            );
+          })
+          .catch(() => {
+            setOpenTabs((prev) =>
+              prev.map((t) => (t.bookCode === cleanCode ? { ...t, isLoading: false, needsHydration: false } : t))
+            );
+          })
+          .finally(() => {
+            hydratingBooksRef.current.delete(cleanCode);
+          });
+        return;
+      }
+
+      const targetChap = tab.currentChapterIdx ?? 0;
+      setOpenTabs((prev) =>
+        prev.map((t) =>
+          t.bookCode === cleanCode
+            ? { ...t, isLoading: true, loadingChapters: { ...t.loadingChapters, [targetChap]: true } }
+            : t
+        )
+      );
+
+      fetchBook(cleanCode, { chapter: targetChap, buffer: 1 })
+        .then(async (bData) => {
+          if (!bData) return;
+          const nextChaptersData = { ...(bData.chapters_data || {}) };
+          if (!nextChaptersData[targetChap]) {
+            try {
+              const chRes = await fetchChapter(cleanCode, targetChap);
+              if (chRes && chRes.html) nextChaptersData[targetChap] = chRes.html;
+            } catch (_) {}
+          }
+          setOpenTabs((prev) =>
+            prev.map((t) =>
+              t.bookCode === cleanCode
+                ? {
+                    ...t,
+                    title: bData.title || t.title,
+                    nikaya: bData.nikaya || bData.category || t.nikaya,
+                    category: bData.category || t.category,
+                    chapter_count: bData.chapter_count || (bData.chapters ? bData.chapters.length : 1),
+                    chapters: bData.chapters || [],
+                    toc: bData.toc || [],
+                    mat: bData.mat || t.mat,
+                    para_to_chapter: bData.para_to_chapter || {},
+                    para_to_index: bData.para_to_index || {},
+                    page_to_chapter: bData.page_to_chapter || {},
+                    page_to_para: bData.page_to_para || {},
+                    page_anchors: bData.page_anchors || {},
+                    para_range: bData.para_range || t.para_range,
+                    edition_ranges: bData.edition_ranges || t.edition_ranges,
+                    book_type: bData.book_type || t.book_type || 'Whole',
+                    sub_books: bData.sub_books || t.sub_books || null,
+                    sub_book: bData.sub_book || t.sub_book || null,
+                    chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                    sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
+                    attha_start_chapter: bData.attha_start_chapter !== undefined ? bData.attha_start_chapter : t.attha_start_chapter,
+                    tika_start_chapter: bData.tika_start_chapter !== undefined ? bData.tika_start_chapter : t.tika_start_chapter,
+                    split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
+                    chapter_to_mat: bData.chapter_to_mat || t.chapter_to_mat || null,
+                    para_to_mat: bData.para_to_mat || t.para_to_mat || null,
+                    sub_books_para_to_mat: bData.sub_books_para_to_mat || t.sub_books_para_to_mat || null,
+                    mula_chapter: bData.mula_chapter !== undefined ? bData.mula_chapter : (bData.mat?.mula_chapter ?? t.mula_chapter),
+                    mula_chapter_offset: bData.mula_chapter_offset !== undefined ? bData.mula_chapter_offset : (bData.mat?.mula_chapter_offset ?? t.mula_chapter_offset),
+                    attha_chapter_offset: bData.attha_chapter_offset !== undefined ? bData.attha_chapter_offset : (bData.mat?.attha_chapter_offset ?? t.attha_chapter_offset),
+                    loadedChapters: { ...(t.loadedChapters || {}), ...nextChaptersData },
+                    loadingChapters: { ...(t.loadingChapters || {}), [targetChap]: false },
+                    isLoading: false,
+                    needsHydration: false,
+                  }
+                : t
+            )
+          );
+          bufferAdjacentChapters(cleanCode, targetChap);
+        })
+        .catch(() => {
+          setOpenTabs((prev) =>
+            prev.map((t) =>
+              t.bookCode === cleanCode ? { ...t, isLoading: false, needsHydration: false } : t
+            )
+          );
+        })
+        .finally(() => {
+          hydratingBooksRef.current.delete(cleanCode);
+        });
+    },
+    [bufferAdjacentChapters]
+  );
+
+  // Sync URL for restored initial session & flush persistence on lifecycle events
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    window.__tpoFlushSession = flushSessionPersistence;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSessionPersistence();
+      }
+    };
+    const handlePageHide = () => {
+      flushSessionPersistence();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+
+    if (restoredSessionRef.current && !hasDeepLinkInLocation()) {
+      const currentTabs = openTabsRef.current;
+      const activeCode = activeBookCodeRef.current;
+      const activeTabObj = currentTabs.find((t) => t.bookCode === activeCode);
+      if (activeTabObj) {
+        if (activeTabObj.type === 'ai_chat' || activeTabObj.bookCode === 'ai_chat') {
+          updateUrlParams({ book: 'ai_chat' });
+        } else if (activeTabObj.isTocView || activeTabObj.viewMode === 'toc') {
+          updateUrlParams({ book: activeTabObj.bookCode, chapter: null, q: null, search: null });
+        } else {
+          const hashStr = activeTabObj.lastParaNum ? `#para${activeTabObj.lastParaNum}` : undefined;
+          updateUrlParams({
+            book: activeTabObj.bookCode,
+            chapter: (activeTabObj.currentChapterIdx ?? 0) + 1,
+            hash: hashStr,
+            q: null,
+            search: null,
+          });
+        }
+      }
+    }
+
+    return () => {
+      flushSessionPersistence();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+      if (window.__tpoFlushSession === flushSessionPersistence) {
+        delete window.__tpoFlushSession;
+      }
+    };
+  }, [flushSessionPersistence, updateUrlParams]);
+
+  // Reactively hydrate active tab and any visible columns with needsHydration=true
+  useEffect(() => {
+    if (typeof window === 'undefined' || openTabs.length === 0) return;
+
+    const bookTabs = openTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat');
+    const vw = window.innerWidth || 1280;
+    const isAiActive = activeBookCode === 'ai_chat';
+    const isColumnsMode = settings?.tabView === 'columns' && vw >= 900 && bookTabs.length > 1 && !isAiActive;
+
+    const toHydrate = [];
+    if (isColumnsMode) {
+      const maxCols = vw >= 1440 ? 4 : vw >= 1100 ? 3 : 2;
+      if (bookTabs.length <= maxCols) {
+        toHydrate.push(...bookTabs);
+      } else {
+        const activeIdx = Math.max(0, bookTabs.findIndex((t) => t.bookCode === activeBookCode));
+        let start = maxCols === 2 ? activeIdx : Math.max(0, activeIdx - Math.floor((maxCols - 1) / 2));
+        if (start + maxCols > bookTabs.length) {
+          start = Math.max(0, bookTabs.length - maxCols);
+        }
+        toHydrate.push(...bookTabs.slice(start, start + maxCols));
+      }
+    } else if (activeBookCode) {
+      const active = openTabs.find((t) => t.bookCode === activeBookCode);
+      if (active) toHydrate.push(active);
+    }
+
+    for (const tab of toHydrate) {
+      if (tab?.needsHydration && !tab.isLoading) {
+        hydrateSessionTab(tab);
+      }
+    }
+  }, [openTabs, activeBookCode, settings?.tabView, hydrateSessionTab]);
 
   const activeTab = openTabs.find((t) => t.bookCode === activeBookCode) || null;
 

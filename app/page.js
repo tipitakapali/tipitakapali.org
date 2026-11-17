@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, useMemo, Suspense } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, Suspense } from 'react';
 
 import Header from '../components/Header';
 import BookTabsBar from '../components/BookTabsBar';
@@ -297,7 +297,8 @@ export function MainAppContent({ params: rawParams }) {
     settings?.tabView === 'columns' && viewportWidth >= 900 && bookTabCount > 1 && !isAiTab;
   const useWindowScroll = !isNotFound && !isAiTab && !isColumnsActive && Boolean(activeTab?.bookCode);
 
-  useEffect(() => {
+  const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+  useIsoLayoutEffect(() => {
     if (typeof document === 'undefined') return;
     document.documentElement.classList.toggle('window-scroll', useWindowScroll);
     document.body.classList.toggle('window-scroll', useWindowScroll);

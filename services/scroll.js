@@ -9,6 +9,7 @@
  */
 
 const activeAnimationByContainer = new WeakMap();
+const activeSmoothCleanupByContainer = new WeakMap();
 
 function shouldUseWindow(container) {
   if (typeof window === 'undefined' || !container) return false;
@@ -45,11 +46,16 @@ export function smartScrollTo(container, targetTop, options = {}) {
   const currentTop = getContainerScrollTop(container, useWin);
   const distance = Math.abs(destination - currentTop);
 
-  // Cancel any ongoing scroll animation for this specific container
+  // Cancel any ongoing scroll animation or pending smooth completion for this container
   const prevAnimId = activeAnimationByContainer.get(animKey);
   if (prevAnimId) {
     cancelAnimationFrame(prevAnimId);
     activeAnimationByContainer.delete(animKey);
+  }
+  const prevSmoothCleanup = activeSmoothCleanupByContainer.get(animKey);
+  if (prevSmoothCleanup) {
+    prevSmoothCleanup();
+    activeSmoothCleanupByContainer.delete(animKey);
   }
 
   // 1. Instant / Zero Motion preference
@@ -66,13 +72,33 @@ export function smartScrollTo(container, targetTop, options = {}) {
 
   // 2. Standard native smooth (if explicitly requested)
   if (scrollMotion === 'smooth') {
+    let finished = false;
+    const scrollTarget = useWin ? window : container;
+    const fallbackMs = Math.min(900, Math.max(220, Math.round(distance / 3)));
+    let timerId = null;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (timerId !== null) clearTimeout(timerId);
+      scrollTarget.removeEventListener('scrollend', finish);
+      activeSmoothCleanupByContainer.delete(animKey);
+      if (onComplete) onComplete();
+    };
+
+    activeSmoothCleanupByContainer.set(animKey, () => {
+      finished = true;
+      if (timerId !== null) clearTimeout(timerId);
+      scrollTarget.removeEventListener('scrollend', finish);
+    });
+
+    scrollTarget.addEventListener('scrollend', finish, { once: true });
+    timerId = setTimeout(finish, fallbackMs);
+
     if (useWin) {
       window.scrollTo({ top: destination, behavior: 'smooth' });
     } else {
       container.scrollTo({ top: destination, behavior: 'smooth' });
-    }
-    if (onComplete) {
-      setTimeout(onComplete, Math.min(450, Math.max(150, Math.round(distance / 6))));
     }
     return;
   }

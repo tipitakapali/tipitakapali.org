@@ -89,7 +89,24 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _ensureServerAlive();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _flushWebSession();
     }
+  }
+
+  void _flushWebSession() {
+    final controller = _webViewController;
+    if (controller == null) return;
+    unawaited(
+      controller
+          .evaluateJavascript(
+            source:
+                'if (typeof window.__tpoFlushSession === "function") { window.__tpoFlushSession(); }',
+          )
+          .catchError((_) => null),
+    );
   }
 
   Future<void> _ensureServerAlive() async {

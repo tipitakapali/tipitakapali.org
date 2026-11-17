@@ -161,4 +161,45 @@ void main() {
       'vietnamese': true,
     }));
   });
+
+  test('WebLocalStorageStore persists opened tabs, active tab, and scroll positions across restart', () async {
+    final store1 = WebLocalStorageStore(explicitDirectory: tempDir, bootToken: 'b1');
+    await store1.ensureLoaded();
+
+    final savedTabs = jsonEncode([
+      {
+        'bookCode': 's0102m.mul',
+        'title': 'Mahāvaggapāḷi',
+        'nikaya': 'Dīghanikāyo',
+        'currentChapterIdx': 8,
+        'lastParaNum': '373',
+        'viewMode': 'reader',
+        'isTocView': false,
+      },
+      {
+        'bookCode': 's0102a.att',
+        'title': 'Mahāvagga-aṭṭhakathā',
+        'currentChapterIdx': 4,
+        'viewMode': 'reader',
+        'isTocView': false,
+      },
+    ]);
+    final savedScrolls = jsonEncode({'s0102m.mul': 1842.5, 's0102a.att': 420});
+
+    await store1.applyOperation({
+      'op': 'batch',
+      'ops': [
+        {'op': 'set', 'key': 'tipitaka_saved_tabs_v3', 'value': savedTabs},
+        {'op': 'set', 'key': 'tipitaka_active_book_v3', 'value': 's0102a.att'},
+        {'op': 'set', 'key': 'tipitaka_tab_scrolls_v3', 'value': savedScrolls},
+      ],
+    });
+
+    final store2 = WebLocalStorageStore(explicitDirectory: tempDir, bootToken: 'b2');
+    await store2.ensureLoaded();
+
+    expect(store2.entries['tipitaka_saved_tabs_v3'], equals(savedTabs));
+    expect(store2.entries['tipitaka_active_book_v3'], equals('s0102a.att'));
+    expect(store2.entries['tipitaka_tab_scrolls_v3'], equals(savedScrolls));
+  });
 }
