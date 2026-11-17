@@ -67,14 +67,14 @@ export const AVAILABLE_DICTIONARIES = [
 ];
 
 const STORAGE_KEYS = {
-  DOCK_MODE: 'tipitaka_dict_dock_mode',
-  FONT_SIZE: 'tipitaka_dict_font_size_multiplier',
-  CLICK_LOOKUP: 'tipitaka_dict_click_lookup',
-  CLICK_MODE: 'tipitaka_dict_click_mode',
-  LAST_TAB: 'tipitaka_dict_last_tab',
-  DICT_ORDER: 'tipitaka_dict_order_v2',
-  DICT_ENABLED: 'tipitaka_dict_enabled',
-  LOOKUP_HISTORY: 'tipitaka_dict_lookup_history',
+  DOCK_MODE: 'tipitaka_dict_dock_mode_v2',
+  FONT_SIZE: 'tipitaka_dict_font_size_multiplier_v2',
+  CLICK_LOOKUP: 'tipitaka_dict_click_lookup_v2',
+  CLICK_MODE: 'tipitaka_dict_click_mode_v2',
+  LAST_TAB: 'tipitaka_dict_last_tab_v2',
+  DICT_ORDER: 'tipitaka_dict_order_v3',
+  DICT_ENABLED: 'tipitaka_dict_enabled_v2',
+  LOOKUP_HISTORY: 'tipitaka_dict_lookup_history_v2',
 };
 
 export const DEFAULT_DICT_ORDER = ['dpd', 'bold_def', 'abd', 'pts', 'psd', 'sans', 'splitter'];
@@ -270,12 +270,12 @@ export function DictionaryProvider({ children }) {
     if (typeof window !== 'undefined') {
       if (validMode === 'left') {
         try {
-          localStorage.setItem('tipitaka_tree_dock', 'right');
+          localStorage.setItem('tipitaka_tree_dock_v2', 'right');
           window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'right' }));
         } catch (e) {}
       } else if (validMode === 'side' || validMode === 'right') {
         try {
-          localStorage.setItem('tipitaka_tree_dock', 'left');
+          localStorage.setItem('tipitaka_tree_dock_v2', 'left');
           window.dispatchEvent(new CustomEvent('tipitaka_tree_dock_change', { detail: 'left' }));
         } catch (e) {}
       }

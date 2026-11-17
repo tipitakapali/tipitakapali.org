@@ -14,7 +14,7 @@ export const DEFAULT_AI_SETTINGS = {
   customSystemPrompt: '',
 };
 
-export const AI_STORAGE_KEY = 'tipitaka_ai_settings_v2';
+export const AI_STORAGE_KEY = 'tipitaka_ai_settings_v3';
 
 export function getStoredAiSettings() {
   if (typeof window === 'undefined') return DEFAULT_AI_SETTINGS;

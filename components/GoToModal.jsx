@@ -26,7 +26,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
       return;
     }
     try {
-      const savedEd = localStorage.getItem('tipitaka_goto_edition');
+      const savedEd = localStorage.getItem('tipitaka_goto_edition_v2');
       if (savedEd && ['M', 'V', 'P', 'T', 'O'].includes(savedEd)) {
         setPageSystem(savedEd);
       }
@@ -460,7 +460,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
                           setPageSystem(sys.code);
                           setErrorMessage('');
                           try {
-                            localStorage.setItem('tipitaka_goto_edition', sys.code);
+                            localStorage.setItem('tipitaka_goto_edition_v2', sys.code);
                           } catch (e) {}
                         }}
                         className={`p-2 rounded-lg border text-left transition flex flex-col justify-between ${

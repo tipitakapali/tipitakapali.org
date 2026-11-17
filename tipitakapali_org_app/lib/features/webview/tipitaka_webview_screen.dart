@@ -954,7 +954,7 @@ class _ErrorView extends StatelessWidget {
 }
 
 /// Maps offline translation DB language codes to the web app's
-/// `tipitaka_advanced_settings_v6.translations` keys.
+/// `tipitaka_advanced_settings_v7.translations` keys.
 const Map<String, String> translationCodeToSettingsKey = <String, String>{
   'en': 'english',
   'vi': 'vietnamese',
@@ -996,7 +996,7 @@ String? resolveInstalledOnboardingLanguage(DownloadCenterState state) {
 }
 
 /// Builds an `AT_DOCUMENT_START` script that applies the onboarding translation
-/// language and/or Pāḷi display script once in `tipitaka_advanced_settings_v6`
+/// language and/or Pāḷi display script once in `tipitaka_advanced_settings_v7`
 /// before React mounts, while preserving future manual changes in the web
 /// Language Menu.
 @visibleForTesting
@@ -1019,9 +1019,9 @@ String buildOnboardingTranslationSeedScript(
   return '''
 (function() {
   try {
-    var SEED_KEY = 'tpo_onboarding_seeded_lang_v1';
-    var SEED_SCRIPT_KEY = 'tpo_onboarding_seeded_script_v1';
-    var SETTINGS_KEY = 'tipitaka_advanced_settings_v6';
+    var SEED_KEY = 'tpo_onboarding_seeded_lang_v2';
+    var SEED_SCRIPT_KEY = 'tpo_onboarding_seeded_script_v2';
+    var SETTINGS_KEY = 'tipitaka_advanced_settings_v7';
     var targetCode = ${jsonEncode((settingsKey != null || isExplicitNone) ? code : null)};
     var targetKey = ${jsonEncode(settingsKey)};
     var isExplicitNone = ${jsonEncode(isExplicitNone)};

@@ -36,8 +36,8 @@ import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
 import { getApiBase } from '../../services/api';
 
-const THREADS_STORAGE_KEY = 'tipitaka_ai_threads_v1';
-const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v1';
+const THREADS_STORAGE_KEY = 'tipitaka_ai_threads_v2';
+const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v2';
 
 const STARTER_PROMPTS = [
   {

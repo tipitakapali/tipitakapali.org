@@ -36,12 +36,12 @@ void main() {
       });
       await store1.applyOperation({
         'op': 'set',
-        'key': 'tipitaka_advanced_settings_v6',
+        'key': 'tipitaka_advanced_settings_v7',
         'value': settingsJson,
       });
       await store1.applyOperation({
         'op': 'set',
-        'key': 'tpo_onboarding_seeded_lang_v1',
+        'key': 'tpo_onboarding_seeded_lang_v2',
         'value': 'en',
       });
 
@@ -56,12 +56,12 @@ void main() {
       await store2.ensureLoaded();
 
       expect(
-        store2.entries['tipitaka_advanced_settings_v6'],
+        store2.entries['tipitaka_advanced_settings_v7'],
         equals(settingsJson),
       );
-      expect(store2.entries['tpo_onboarding_seeded_lang_v1'], equals('en'));
+      expect(store2.entries['tpo_onboarding_seeded_lang_v2'], equals('en'));
       final decoded = jsonDecode(
-        store2.entries['tipitaka_advanced_settings_v6']!,
+        store2.entries['tipitaka_advanced_settings_v7']!,
       ) as Map<String, dynamic>;
       expect(decoded['paliScript'], equals('myanmar'));
       expect(decoded['translationGranularity'], equals('sentence'));
@@ -120,13 +120,13 @@ void main() {
   test('buildLocalStoragePersistenceScript encodes snapshot and hooks safely', () {
     final script = buildLocalStoragePersistenceScript(
       const {
-        'tipitaka_advanced_settings_v6':
+        'tipitaka_advanced_settings_v7':
             '{"paliScript":"myanmar","translationGranularity":"sentence"}',
       },
       bootToken: 'token-123',
     );
     expect(script, contains('__tpoLsBoot=token-123'));
-    expect(script, contains('tipitaka_advanced_settings_v6'));
+    expect(script, contains('tipitaka_advanced_settings_v7'));
     expect(script, contains('myanmar'));
     expect(script, contains('sentence'));
     expect(script, contains('window.Storage.prototype'));

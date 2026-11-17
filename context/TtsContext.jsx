@@ -20,13 +20,13 @@ import {
 const TtsContext = createContext(null);
 
 const LS_KEYS = {
-  LANGS: 'tipitaka_tts_langs',
-  LANGS_FOR: 'tipitaka_tts_langs_for',
-  VOICES: 'tipitaka_tts_voices',
-  RATE: 'tipitaka_tts_rate',
-  PITCH: 'tipitaka_tts_pitch',
-  VOLUME: 'tipitaka_tts_volume',
-  FOLLOW: 'tipitaka_tts_follow',
+  LANGS: 'tipitaka_tts_langs_v2',
+  LANGS_FOR: 'tipitaka_tts_langs_for_v2',
+  VOICES: 'tipitaka_tts_voices_v2',
+  RATE: 'tipitaka_tts_rate_v2',
+  PITCH: 'tipitaka_tts_pitch_v2',
+  VOLUME: 'tipitaka_tts_volume_v2',
+  FOLLOW: 'tipitaka_tts_follow_v2',
 };
 
 function readJson(key, fallback) {

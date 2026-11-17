@@ -35,7 +35,7 @@ import HelpGuideContent from '../Help/HelpGuideContent';
 // Bookmarks are intentionally preserved when the reader is reset,
 // so users never lose the places they have saved. Keep this in sync
 // with STORAGE_KEYS.BOOKMARKS in context/TabContext.jsx.
-const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v2';
+const BOOKMARKS_STORAGE_KEY = 'tipitaka_bookmarks_v3';
 
 const TABS = [
   { id: 'backup', label: 'Reset', icon: RotateCcw },

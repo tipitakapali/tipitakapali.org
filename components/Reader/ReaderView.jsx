@@ -1479,7 +1479,7 @@ export const ChapterBlock = memo(function ChapterBlock({
   );
 });
 
-const STORAGE_KEY_CLICKED_WORDS = 'tipitaka_last_clicked_words_v1';
+const STORAGE_KEY_CLICKED_WORDS = 'tipitaka_last_clicked_words_v2';
 
 // Helper to clear any clicked word highlight in Reader
 function clearClickedWordHighlight(root = typeof document !== 'undefined' ? document : null) {

@@ -866,8 +866,8 @@ void main() {
       expect(buildOnboardingTranslationSeedScript('unknown_code'), isEmpty);
 
       final enScript = buildOnboardingTranslationSeedScript('en');
-      expect(enScript, contains('tipitaka_advanced_settings_v6'));
-      expect(enScript, contains('tpo_onboarding_seeded_lang_v1'));
+      expect(enScript, contains('tipitaka_advanced_settings_v7'));
+      expect(enScript, contains('tpo_onboarding_seeded_lang_v2'));
       expect(enScript, contains('"en"'));
       expect(enScript, contains('"english"'));
 
@@ -881,7 +881,7 @@ void main() {
         null,
         paliScript: 'myanmar',
       );
-      expect(scriptOnlySeed, contains('tpo_onboarding_seeded_script_v1'));
+      expect(scriptOnlySeed, contains('tpo_onboarding_seeded_script_v2'));
       expect(scriptOnlySeed, contains('"myanmar"'));
       expect(scriptOnlySeed, contains('parsed.paliScript = targetScript'));
 

@@ -54,18 +54,18 @@ export default function NavigationTree() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const savedDock = localStorage.getItem('tipitaka_tree_dock');
+      const savedDock = localStorage.getItem('tipitaka_tree_dock_v2');
       if (savedDock === 'left' || savedDock === 'right' || savedDock === 'float') {
         setDockPosition(savedDock);
       }
-      const savedWidth = localStorage.getItem('tipitaka_sidebar_width');
+      const savedWidth = localStorage.getItem('tipitaka_sidebar_width_v2');
       if (savedWidth) {
         const parsedW = parseInt(savedWidth, 10);
         if (!isNaN(parsedW) && parsedW >= 220 && parsedW <= 900) {
           setSidebarWidth(parsedW);
         }
       }
-      const savedFloatPos = localStorage.getItem('tipitaka_tree_float_pos');
+      const savedFloatPos = localStorage.getItem('tipitaka_tree_float_pos_v2');
       if (savedFloatPos) {
         const parsedPos = JSON.parse(savedFloatPos);
         if (parsedPos && parsedPos.width && parsedPos.height) {
@@ -194,7 +194,7 @@ export default function NavigationTree() {
   const handleSetDock = (newPos) => {
     setDockPosition(newPos);
     try {
-      localStorage.setItem('tipitaka_tree_dock', newPos);
+      localStorage.setItem('tipitaka_tree_dock_v2', newPos);
     } catch (e) {}
   };
 
@@ -217,7 +217,7 @@ export default function NavigationTree() {
         const clampedWidth = Math.max(220, Math.min(newWidth, maxW));
         setSidebarWidth(clampedWidth);
         try {
-          localStorage.setItem('tipitaka_sidebar_width', String(clampedWidth));
+          localStorage.setItem('tipitaka_sidebar_width_v2', String(clampedWidth));
         } catch (e) {}
       };
 
@@ -255,7 +255,7 @@ export default function NavigationTree() {
         setFloatPos((prev) => {
           const next = { ...prev, x: newX, y: newY };
           try {
-            localStorage.setItem('tipitaka_tree_float_pos', JSON.stringify(next));
+            localStorage.setItem('tipitaka_tree_float_pos_v2', JSON.stringify(next));
           } catch (e) {}
           return next;
         });
@@ -290,7 +290,7 @@ export default function NavigationTree() {
         setFloatPos((prev) => {
           const next = { ...prev, width: newW, height: newH };
           try {
-            localStorage.setItem('tipitaka_tree_float_pos', JSON.stringify(next));
+            localStorage.setItem('tipitaka_tree_float_pos_v2', JSON.stringify(next));
           } catch (e) {}
           return next;
         });

@@ -539,7 +539,7 @@ export default function DictionaryModal() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const savedW = localStorage.getItem('tipitaka_dict_dock_width');
+      const savedW = localStorage.getItem('tipitaka_dict_dock_width_v2');
       if (savedW) {
         const parsedW = parseInt(savedW, 10);
         if (!isNaN(parsedW) && parsedW >= 260 && parsedW <= 1000) {
@@ -555,7 +555,7 @@ export default function DictionaryModal() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const savedMeanings = localStorage.getItem('tipitaka_dict_meanings_expanded');
+      const savedMeanings = localStorage.getItem('tipitaka_dict_meanings_expanded_v2');
       if (savedMeanings !== null) {
         setIsMeaningsExpanded(savedMeanings === 'true');
       }
@@ -566,7 +566,7 @@ export default function DictionaryModal() {
     setIsMeaningsExpanded((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem('tipitaka_dict_meanings_expanded', String(next));
+        localStorage.setItem('tipitaka_dict_meanings_expanded_v2', String(next));
       } catch (e) {}
       return next;
     });
@@ -667,7 +667,7 @@ export default function DictionaryModal() {
         const clamped = Math.max(280, Math.min(newWidth, maxW));
         setDictWidth(clamped);
         try {
-          localStorage.setItem('tipitaka_dict_dock_width', String(clamped));
+          localStorage.setItem('tipitaka_dict_dock_width_v2', String(clamped));
         } catch (e) {}
       };
 

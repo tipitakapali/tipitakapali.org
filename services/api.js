@@ -143,7 +143,7 @@ export function lookupBookInfo(bookCode) {
   // 2. Try loading from tree cache if not yet indexed
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('tipitaka_tree_cache_v5');
+      const stored = localStorage.getItem('tipitaka_tree_cache_v6');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
@@ -176,7 +176,7 @@ export async function fetchTree() {
     // 2. Persistent browser cache (0ms instant render on refresh/revisit)
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('tipitaka_tree_cache_v5');
+        const stored = localStorage.getItem('tipitaka_tree_cache_v6');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -198,7 +198,7 @@ export async function fetchTree() {
       const data = await res.json();
       if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
         try {
-          localStorage.setItem('tipitaka_tree_cache_v5', JSON.stringify(data));
+          localStorage.setItem('tipitaka_tree_cache_v6', JSON.stringify(data));
         } catch (e) {}
       }
       indexTreeData(data);
@@ -215,7 +215,7 @@ export async function fetchBooks() {
 
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('tipitaka_books_cache_v1');
+        const stored = localStorage.getItem('tipitaka_books_cache_v2');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed && Array.isArray(parsed.books) && parsed.books.length > 0) {
@@ -233,7 +233,7 @@ export async function fetchBooks() {
     const data = await res.json();
     if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && data && Array.isArray(data.books)) {
       try {
-        localStorage.setItem('tipitaka_books_cache_v1', JSON.stringify(data));
+        localStorage.setItem('tipitaka_books_cache_v2', JSON.stringify(data));
       } catch (e) {}
     }
     return data;

@@ -29,7 +29,7 @@ const DEFAULT_TRANSLATION_ORDER = [
   'bengali',
 ];
 
-const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v6';
+const SETTINGS_STORAGE_KEY = 'tipitaka_advanced_settings_v7';
 
 // One-per-theme page background (matches --bg-primary in globals.css). iOS Safari tints
 // its chrome to this value. Key 'default' is the :root background (no data-theme attr set).

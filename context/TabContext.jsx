@@ -8,11 +8,11 @@ import { useThemeSettings } from './ThemeSettingsContext';
 const TabContext = createContext();
 
 const STORAGE_KEYS = {
-  TABS: 'tipitaka_saved_tabs_v2',
-  ACTIVE: 'tipitaka_active_book_v2',
-  SCROLL: 'tipitaka_tab_scrolls_v2',
-  BOOKMARKS: 'tipitaka_bookmarks_v2',
-  HISTORY: 'tipitaka_recent_history_v2',
+  TABS: 'tipitaka_saved_tabs_v3',
+  ACTIVE: 'tipitaka_active_book_v3',
+  SCROLL: 'tipitaka_tab_scrolls_v3',
+  BOOKMARKS: 'tipitaka_bookmarks_v3',
+  HISTORY: 'tipitaka_recent_history_v3',
 };
 
 const MAX_TABS = 12;

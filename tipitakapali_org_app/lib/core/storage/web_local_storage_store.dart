@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 /// Persists WebView `localStorage` entries on native disk so user choices
-/// (`tipitaka_advanced_settings_v6`, tabs, bookmarks, history, etc.) survive
+/// (`tipitaka_advanced_settings_v7`, tabs, bookmarks, history, etc.) survive
 /// app termination and localhost port changes across all platforms —
 /// especially macOS and iOS where `WKWebView` flushes `localStorage` lazily.
 class WebLocalStorageStore {
@@ -169,10 +169,10 @@ class WebLocalStorageStore {
     return changed;
   }
 
-  static const String advancedSettingsKey = 'tipitaka_advanced_settings_v6';
+  static const String advancedSettingsKey = 'tipitaka_advanced_settings_v7';
 
   /// Marks [settingsKey] (e.g. `'vietnamese'`, `'english'`) enabled in
-  /// `tipitaka_advanced_settings_v6.translations` and persists immediately so
+  /// `tipitaka_advanced_settings_v7.translations` and persists immediately so
   /// newly downloaded languages stay remembered across restarts.
   Future<void> enableTranslationSetting(String settingsKey) async {
     final trimmed = settingsKey.trim();

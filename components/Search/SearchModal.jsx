@@ -180,7 +180,7 @@ export function resolveDbFromLangParam(param, databases = DEFAULT_FTS_DATABASES)
   return 'fts_tipitaka.db';
 }
 
-const SEARCH_PREFS_KEY = 'tipitaka_search_prefs_v1';
+const SEARCH_PREFS_KEY = 'tipitaka_search_prefs_v2';
 
 export const SUPPORTED_CASES = [
   {

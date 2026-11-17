@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 
-const NOTICE_DISMISSED_KEY = 'tipitaka_ai_translation_notice_dismissed_v1';
+const NOTICE_DISMISSED_KEY = 'tipitaka_ai_translation_notice_dismissed_v2';
 const SHOW_WEB_AI_NOTICE = process.env.NEXT_PUBLIC_OFFLINE_APP !== 'true';
 
 /**
