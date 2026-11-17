@@ -83,6 +83,8 @@ function loadReaderViewExports({ useTabsMock, useThemeSettingsMock } = {}) {
       getCachedChapterTranslations: () => null,
       getCachedPaliSentences: () => null,
       getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
     },
   });
 }
@@ -249,8 +251,8 @@ test('LinkedDefinitionModal renders linked-def-passage-target highlight border a
     react: Object.assign({}, React, { __esModule: true, default: React }),
   });
 
-  // Default Classic theme first slot (#6d28d9) and custom override
-  assert.equal(resolveTranslationTextColor('en', 0, { theme: 'classic', translationColors: {} }), '#6d28d9');
+  // Default Classic theme first slot (#772e03) and custom override
+  assert.equal(resolveTranslationTextColor('en', 0, { theme: 'classic', translationColors: {} }), '#772e03');
   assert.equal(
     resolveTranslationTextColor('en', 0, { theme: 'classic', translationColors: { english: { text: '1d4ed8' } } }),
     '#1d4ed8'
@@ -263,6 +265,8 @@ test('LinkedDefinitionModal renders linked-def-passage-target highlight border a
   );
   assert.match(src, /linked-def-passage-target/);
   assert.match(src, /resolveTranslationTextColor/);
+  assert.match(src, /useLayoutEffect/);
+  assert.doesNotMatch(src, /behavior:\s*'smooth'/);
   const css = fs.readFileSync(
     path.resolve(path.dirname(new URL(import.meta.url).pathname), '../app/globals.css'),
     'utf8'

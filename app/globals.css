@@ -4951,15 +4951,14 @@ section.MWS {
   background-color: var(--accent-light);
 }
 
-/* Shared Reader-matched Typography & Target Highlight for Linked Definition Modal & Bold Definition Cards */
+/* Shared Reader-matched Typography & Target Highlight for Linked Definition Modal */
 .linked-def-passage-target {
   background-color: color-mix(in srgb, var(--accent) 7%, var(--bg-primary));
   border: 2px solid var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-.linked-def-pali-text,
-.bold-def-pali-text {
+.linked-def-pali-text {
   font-family: var(--font-reader);
   font-size: var(--font-size-base, 22px);
   line-height: var(--line-height-base, 1.85);
@@ -4968,10 +4967,28 @@ section.MWS {
   overflow-wrap: break-word;
 }
 
-.linked-def-trans-text,
-.bold-def-trans-text {
+.linked-def-trans-text {
   font-size: var(--trans-font-size-base, var(--font-size-base, 22px));
   line-height: calc(var(--line-height-base, 1.85) * 0.95);
+  color: var(--text-primary);
+  opacity: 0.92;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+/* Bold Definition cards match Dictionary font size (`--dict-font-size`) and reader background (`--bg-primary`) */
+.bold-def-pali-text {
+  font-family: var(--font-reader);
+  font-size: var(--dict-font-size, 15px);
+  line-height: 1.65;
+  color: var(--text-primary);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.bold-def-trans-text {
+  font-size: var(--dict-font-size, 15px);
+  line-height: 1.55;
   color: var(--text-primary);
   opacity: 0.92;
   white-space: pre-line;

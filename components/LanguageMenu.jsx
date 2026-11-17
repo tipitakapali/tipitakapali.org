@@ -287,7 +287,7 @@ export default function LanguageMenu() {
   }, [enabledLangIds]);
 
   const getDefaultSlotColor = (trans) => {
-    if (!trans) return '#6d28d9';
+    if (!trans) return '#772e03';
     if (trans.id !== 'pali' && enabledTransSlotMap.has(trans.id)) {
       return getDefaultTranslationSlotColor(
         settings.theme || 'classic',

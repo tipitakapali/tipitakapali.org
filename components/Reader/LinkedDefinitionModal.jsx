@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, BookOpen, ExternalLink, X, Layers, Columns } from 'lucide-react';
-import { fetchLinkedPreview } from '../../services/api';
+import { fetchLinkedPreview, getCachedLinkedPreview } from '../../services/api';
 import { convertPaliScript, cleanDictionaryQuery } from '../../services/transliterate';
 import { formatSafeTranslationHtml } from '../../services/translationFormat';
 import { useTabs } from '../../context/TabContext';
@@ -89,13 +89,25 @@ export default function LinkedDefinitionModal({
   const { openDictionary } = useDictionary();
   const { settings } = useThemeSettings() || {};
 
-  const [preview, setPreview] = useState(null);
-  const [loading, setLoading] = useState(Boolean(link?.target_book));
+  const langsKey = Array.isArray(activeLangs) ? activeLangs.filter(Boolean).join(',') : '';
+  const initialCachedPreview = link?.target_book
+    ? getCachedLinkedPreview({
+        book: link.target_book,
+        chapter: link.target_chapter,
+        paraIndex: link.target_para_index,
+        paraNum: link.target_para_num,
+        lineId: link.target_line_id,
+        word: link.word,
+        langs: langsKey ? langsKey.split(',') : [],
+      })
+    : null;
+
+  const [preview, setPreview] = useState(initialCachedPreview);
+  const [loading, setLoading] = useState(Boolean(link?.target_book) && !initialCachedPreview);
   const [error, setError] = useState(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const bodyRef = useRef(null);
   const targetRef = useRef(null);
-  const langsKey = Array.isArray(activeLangs) ? activeLangs.filter(Boolean).join(',') : '';
 
   useEffect(() => {
     if (!link) return;
@@ -117,11 +129,7 @@ export default function LinkedDefinitionModal({
       return;
     }
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchLinkedPreview({
+    const previewArgs = {
       book: link.target_book,
       chapter: link.target_chapter,
       paraIndex: link.target_para_index,
@@ -129,7 +137,20 @@ export default function LinkedDefinitionModal({
       lineId: link.target_line_id,
       word: link.word,
       langs: langsKey ? langsKey.split(',') : [],
-    })
+    };
+    const cachedNow = retryNonce === 0 ? getCachedLinkedPreview(previewArgs) : null;
+    if (cachedNow) {
+      setPreview(cachedNow);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchLinkedPreview(previewArgs)
       .then((data) => {
         if (cancelled) return;
         setPreview(data);
@@ -155,17 +176,14 @@ export default function LinkedDefinitionModal({
     retryNonce,
   ]);
 
-  useEffect(() => {
-    if (!loading && preview && targetRef.current && bodyRef.current) {
-      const container = bodyRef.current;
-      const target = targetRef.current;
-      requestAnimationFrame(() => {
-        const cRect = container.getBoundingClientRect();
-        const tRect = target.getBoundingClientRect();
-        const top = Math.max(0, tRect.top - cRect.top + container.scrollTop - 28);
-        container.scrollTo({ top, behavior: 'smooth' });
-      });
-    }
+  useLayoutEffect(() => {
+    if (loading || !preview || !targetRef.current || !bodyRef.current) return;
+    const container = bodyRef.current;
+    const target = targetRef.current;
+    const cRect = container.getBoundingClientRect();
+    const tRect = target.getBoundingClientRect();
+    const top = Math.max(0, tRect.top - cRect.top + container.scrollTop - 16);
+    container.scrollTop = top;
   }, [loading, preview]);
 
   if (!link) return null;
@@ -222,6 +240,7 @@ export default function LinkedDefinitionModal({
   };
 
   const lines = Array.isArray(preview?.lines) ? preview.lines : [];
+  const firstTargetIdx = lines.findIndex((l) => Boolean(l?.is_target));
 
   return (
     <div
@@ -282,7 +301,7 @@ export default function LinkedDefinitionModal({
         {/* Body */}
         <div
           ref={bodyRef}
-          className="linked-def-modal-body flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[var(--bg-primary)] text-[var(--text-primary)]"
+          className="linked-def-modal-body scroll-auto flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[var(--bg-primary)] text-[var(--text-primary)]"
         >
           {loading && (
             <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
@@ -330,7 +349,7 @@ export default function LinkedDefinitionModal({
             return (
               <div
                 key={`${line.para_index}-${line.line_id ?? 'p'}-${idx}`}
-                ref={isTarget ? targetRef : undefined}
+                ref={idx === firstTargetIdx ? targetRef : undefined}
                 data-target={isTarget ? '1' : undefined}
                 className={`rounded-xl p-3 sm:p-4 transition ${
                   isTarget

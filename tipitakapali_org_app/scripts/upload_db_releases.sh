@@ -135,6 +135,7 @@ today = datetime.date.today().isoformat()
 to_upload = []
 updated_names = []
 remote_assets = set()
+remote_checked = False
 release_missing = False
 
 if repo:
@@ -144,6 +145,7 @@ if repo:
         text=True,
     )
     if view_assets.returncode == 0:
+        remote_checked = True
         try:
             release_meta = json.loads(view_assets.stdout or "{}")
             remote_assets = {
@@ -153,8 +155,11 @@ if repo:
             }
         except json.JSONDecodeError:
             remote_assets = set()
+            remote_checked = False
     else:
-        release_missing = True
+        err_text = (view_assets.stderr or "").lower()
+        if "release not found" in err_text or "not found" in err_text:
+            release_missing = True
 
 if not manifest_only:
     # Ensure bold_definitions.db is pre-built with schema_version=4 & chapter_links
@@ -193,18 +198,20 @@ if not manifest_only:
         zip_path = os.path.join(out_dir, zip_name)
 
         prev_manifest_sha = (entry.get("checksum") or "").strip().lower()
-        prev_cache_sha = (cache.get(filename) or "").strip().lower()
         manifest_sha_changed = prev_manifest_sha != db_sha
-        cache_sha_changed = prev_cache_sha != db_sha
         missing_zip_metadata = not entry.get("zipSha256") or not entry.get("size")
-        remote_missing = bool(repo) and (zip_name not in remote_assets)
-        needs_zip = (
-            force
-            or manifest_sha_changed
-            or cache_sha_changed
-            or not os.path.exists(zip_path)
-            or missing_zip_metadata
+        remote_missing = (remote_checked and zip_name not in remote_assets) or release_missing
+
+        # Only consider a file changed when its SHA-256 differs from the manifest,
+        # zip metadata is missing, or --force was explicitly passed. Do NOT rebuild zips
+        # just because the local release_assets cache directory was cleared.
+        file_changed = force or manifest_sha_changed or missing_zip_metadata
+        needs_upload = file_changed or remote_missing
+        has_valid_local_zip = os.path.exists(zip_path) and (
+            not entry.get("zipSha256")
+            or sha256_file(zip_path).lower() == str(entry.get("zipSha256")).strip().lower()
         )
+        needs_zip = file_changed or (remote_missing and not has_valid_local_zip)
 
         if needs_zip:
             print(f"[zip] {filename} ({db_size / (1024*1024):.1f} MB) -> {zip_name}")
@@ -235,20 +242,25 @@ if not manifest_only:
             entry["checksum"] = db_sha
             if zip_sha:
                 entry["zipSha256"] = zip_sha
-        elif os.path.exists(zip_path):
-            entry["dbSize"] = db_size
-            entry["size"] = os.path.getsize(zip_path)
-            entry["checksum"] = db_sha
-            entry["zipSha256"] = sha256_file(zip_path).lower()
-            if remote_missing:
-                print(f"[upload] {zip_name} (missing on release '{tag}', reusing existing archive)")
-                to_upload.append(zip_path)
+        elif remote_missing and has_valid_local_zip:
+            print(f"[upload] {zip_name} (missing on release '{tag}', reusing existing archive)")
+            to_upload.append(zip_path)
+            cache[filename] = db_sha
+        elif cache.get(filename) != db_sha:
+            # Keep local hash cache in sync with unchanged manifest checksum without churning manifest/release.
+            cache[filename] = db_sha
 
-        if repo:
+        if repo and needs_upload:
             entry["url"] = f"https://github.com/{repo}/releases/download/{tag}/{zip_name}"
 
 manifest_after = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 manifest_changed = manifest_after != manifest_before
+cache_after = json.dumps(cache, indent=2, sort_keys=True) + "\n"
+cache_before = ""
+if os.path.exists(hash_cache_path):
+    with open(hash_cache_path, "r", encoding="utf-8") as f:
+        cache_before = f.read()
+cache_changed = cache_after != cache_before
 
 if not dry_run:
     if manifest_changed:
@@ -278,8 +290,8 @@ if git_root:
     )
     git_dirty_manifest = bool(st.stdout.strip())
 
-should_upload_release = bool(to_upload) or manifest_changed or manifest_only or release_missing
-if not should_upload_release and not git_dirty_manifest:
+should_upload_release = bool(to_upload) or manifest_changed or manifest_only
+if not should_upload_release and not git_dirty_manifest and not cache_changed:
     print("All matching DB archives and databases_manifest.json are already up to date.")
     sys.exit(0)
 
@@ -288,7 +300,7 @@ if dry_run:
     if should_upload_release:
         assets.append(os.path.basename(manifest_path))
     print("Dry run — release assets to upload:", assets)
-    if not no_push:
+    if not no_push and (manifest_changed or cache_changed or git_dirty_manifest):
         print("Dry run — would commit & push:", [rel_manifest, rel_cache])
     sys.exit(0)
 
@@ -325,9 +337,9 @@ if should_upload_release:
     print(f"Uploading {len(upload_files)} asset(s) to {repo}@{tag}...")
     subprocess.run(cmd, check=True)
 
-with open(hash_cache_path, "w", encoding="utf-8") as f:
-    json.dump(cache, f, indent=2, sort_keys=True)
-    f.write("\n")
+if cache_changed:
+    with open(hash_cache_path, "w", encoding="utf-8") as f:
+        f.write(cache_after)
 
 if not no_push and git_root:
     subprocess.run(

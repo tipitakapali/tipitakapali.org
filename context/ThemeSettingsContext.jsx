@@ -366,7 +366,7 @@ export function ThemeSettingsProvider({ children }) {
 
 export const THEME_TRANSLATION_PALETTES = {
   classic: [
-    '#6d28d9', // 1st: Violet 700 (requested)
+    '#772e03', // 1st: Deep Umber Brown (requested)
     '#1e3a8a', // 2nd: Navy Blue 900 (requested)
     '#0e7491', // 3rd: Deep Teal Cyan (requested)
     '#166534', // 4th: Forest Emerald
@@ -376,7 +376,7 @@ export const THEME_TRANSLATION_PALETTES = {
     '#334155', // 8th: Cool Slate
   ],
   default: [
-    '#6d28d9', // 1st: Violet 700
+    '#772e03', // 1st: Deep Umber Brown
     '#1e3a8a', // 2nd: Navy Blue 900
     '#0e7491', // 3rd: Deep Teal Cyan
     '#15803d', // 4th: Emerald 700
@@ -386,7 +386,7 @@ export const THEME_TRANSLATION_PALETTES = {
     '#334155', // 8th: Slate 700
   ],
   sepia: [
-    '#6d28d9', // 1st: Amethyst Violet
+    '#772e03', // 1st: Deep Umber Brown
     '#1e40af', // 2nd: Cobalt Blue
     '#0f766e', // 3rd: Jade Teal
     '#854d0e', // 4th: Ochre Bronze

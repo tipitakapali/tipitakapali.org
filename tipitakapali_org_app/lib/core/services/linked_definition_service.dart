@@ -1389,6 +1389,7 @@ class LinkedDefinitionService {
     String? word,
     List<String> enabledLangs = const [],
     Database? tipitakaDbOverride,
+    Database? boldDbOverride,
     Database? paliSentencesDbOverride,
     Database? Function(String langCode)? openTranslationDb,
   }) async {
@@ -1572,53 +1573,95 @@ class LinkedDefinitionService {
       final minParaIdx = windowParas.first.paraIndex;
       final maxParaIdx = windowParas.last.paraIndex;
 
-      // Load bold-preserved paragraph HTML from chapters.html as fallback/source.
-      final htmlByPara = <int, String>{};
-      try {
-        final chHtml = TipitakaCoreReader.readChapterHtml(
+      // Load sentence splits from pali_sentences.db via indexed range scan first
+      // so we avoid loading all chapter sentences or inflating full chapter HTML.
+      final sentByPara = <int, List<({int lineId, String sentence})>>{};
+      if (sentDb != null) {
+        try {
+          final rows = sentDb.select(
+            'SELECT para_index, line_id, sentence FROM pali_sentences '
+            'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? '
+            'ORDER BY para_index, line_id',
+            [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
+          );
+          for (final r in rows) {
+            final pidx = (r['para_index'] as num).toInt();
+            sentByPara.putIfAbsent(pidx, () => []).add((
+              lineId: (r['line_id'] as num).toInt(),
+              sentence: (r['sentence'] ?? '').toString(),
+            ));
+          }
+        } catch (_) {}
+      }
+      if (sentByPara.isEmpty) {
+        final chapSent = TipitakaCoreReader.readChapterSentences(
+          sentDb,
           tipiDb,
           bookCode,
           targetChapIdx,
         );
-        if (chHtml != null && chHtml.isNotEmpty) {
-          for (final pm in _pTagRe.allMatches(chHtml)) {
-            final attrs = pm.group(1) ?? '';
-            final pidxStr = _pindexAttrRe.firstMatch(attrs)?.group(1);
-            if (pidxStr == null) continue;
-            final pidx = int.tryParse(pidxStr);
-            if (pidx == null || pidx < minParaIdx || pidx > maxParaIdx) continue;
-            var cleaned = (pm.group(2) ?? '')
-                .replaceAll(_pbSpanRe, ' ')
-                .replaceAll(_paranumRe, ' ')
-                .replaceAllMapped(_bldTagRe, (m) {
-                  final inner = (m.group(1) ?? '').replaceAll(RegExp(r'<[^>]+>'), '');
-                  return '<b>$inner</b>';
-                })
-                .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ')
-                .replaceAll(_anyTagExceptBRe, '')
-                .replaceAll(RegExp(r'\s+'), ' ')
-                .trim();
-            if (cleaned.isNotEmpty) {
-              htmlByPara[pidx] = cleaned;
-            }
+        for (final e in chapSent.entries) {
+          if (e.key >= minParaIdx && e.key <= maxParaIdx) {
+            sentByPara[e.key] = [
+              for (final s in e.value) (lineId: s.lineId, sentence: s.text),
+            ];
           }
         }
-      } catch (_) {}
+      }
 
-      // Load sentence splits from pali_sentences.db or tipitaka.db pack.
-      final sentByPara = <int, List<({int lineId, String sentence})>>{};
-      final chapSent = TipitakaCoreReader.readChapterSentences(
-        sentDb,
-        tipiDb,
-        bookCode,
-        targetChapIdx,
+      // Indexed bold highlight hints from bold_definitions (avoids inflating full chapter HTML)
+      final boldLineHtmlByKey = <String, String>{};
+      if (boldDbOverride != null) {
+        try {
+          final bRows = boldDbOverride.select(
+            'SELECT para_index, line_id, sentence_html FROM bold_definitions '
+            'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ?',
+            [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
+          );
+          for (final br in bRows) {
+            final sh = br['sentence_html']?.toString() ?? '';
+            if (sh.contains('<b>')) {
+              boldLineHtmlByKey['${br['para_index']}:${br['line_id']}'] = sh;
+            }
+          }
+        } catch (_) {}
+      }
+
+      final needsHtmlFallback = windowParas.any(
+        (wp) => (sentByPara[wp.paraIndex]?.isEmpty ?? true),
       );
-      for (final e in chapSent.entries) {
-        if (e.key >= minParaIdx && e.key <= maxParaIdx) {
-          sentByPara[e.key] = [
-            for (final s in e.value) (lineId: s.lineId, sentence: s.text),
-          ];
-        }
+      final htmlByPara = <int, String>{};
+      if (needsHtmlFallback) {
+        try {
+          final chHtml = TipitakaCoreReader.readChapterHtml(
+            tipiDb,
+            bookCode,
+            targetChapIdx,
+          );
+          if (chHtml != null && chHtml.isNotEmpty) {
+            for (final pm in _pTagRe.allMatches(chHtml)) {
+              final attrs = pm.group(1) ?? '';
+              final pidxStr = _pindexAttrRe.firstMatch(attrs)?.group(1);
+              if (pidxStr == null) continue;
+              final pidx = int.tryParse(pidxStr);
+              if (pidx == null || pidx < minParaIdx || pidx > maxParaIdx) continue;
+              var cleaned = (pm.group(2) ?? '')
+                  .replaceAll(_pbSpanRe, ' ')
+                  .replaceAll(_paranumRe, ' ')
+                  .replaceAllMapped(_bldTagRe, (m) {
+                    final inner = (m.group(1) ?? '').replaceAll(RegExp(r'<[^>]+>'), '');
+                    return '<b>$inner</b>';
+                  })
+                  .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ')
+                  .replaceAll(_anyTagExceptBRe, '')
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .trim();
+              if (cleaned.isNotEmpty) {
+                htmlByPara[pidx] = cleaned;
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       // Load translations for every requested enabled language.
@@ -1743,7 +1786,8 @@ class LinkedDefinitionService {
                 paliHtml: _highlightSentenceWithBold(
                   s.sentence,
                   normWord,
-                  htmlByPara[wp.paraIndex],
+                  boldLineHtmlByKey['${wp.paraIndex}:${s.lineId}'] ??
+                      htmlByPara[wp.paraIndex],
                   isTarget: isTarget,
                 ),
                 translations: trans,

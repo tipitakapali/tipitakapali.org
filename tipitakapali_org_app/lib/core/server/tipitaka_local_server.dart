@@ -270,12 +270,28 @@ class TipitakaLocalServer {
       }
     }
 
-    // Linked definitions contextual preview: /api/links/preview
+    // Linked definitions contextual preview: /api/links/preview & /api/links/previews
     if (segments.length == 3 &&
         segments[1] == 'links' &&
         segments[2] == 'preview') {
       return _toShelfResponse(
         await api.getLinkedPreview(query),
+        noCache: true,
+      );
+    }
+    if (segments.length == 3 &&
+        segments[1] == 'links' &&
+        segments[2] == 'previews') {
+      final raw = await request.readAsString();
+      var decoded = <String, dynamic>{};
+      if (raw.trim().isNotEmpty) {
+        try {
+          final obj = jsonDecode(raw);
+          if (obj is Map<String, dynamic>) decoded = obj;
+        } catch (_) {}
+      }
+      return _toShelfResponse(
+        await api.getLinkedPreviewsBatch(decoded),
         noCache: true,
       );
     }

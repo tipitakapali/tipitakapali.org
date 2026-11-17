@@ -1022,10 +1022,7 @@ export async function fetchChapterLinks(bookCode, chapterIndex, options = {}) {
   );
 }
 
-export async function fetchLinkedPreview(
-  { book, chapter, paraIndex, paraNum, lineId, word, langs } = {},
-  options = {}
-) {
+function buildLinkedPreviewSpec({ book, chapter, paraIndex, paraNum, lineId, word, langs } = {}) {
   let cleanCode = splitScriptCode((book || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
@@ -1048,20 +1045,41 @@ export async function fetchLinkedPreview(
   }
 
   const qs = params.toString();
+  return { cleanCode, qs, cacheKey: `linked_preview_${qs}` };
+}
+
+export function getCachedLinkedPreview(args = {}) {
+  if (!ENABLE_CLIENT_CACHE) return null;
+  const spec = buildLinkedPreviewSpec(args);
+  if (!spec) return null;
+  const cached = cache.get(spec.cacheKey);
+  if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+    return cached.data;
+  }
+  return null;
+}
+
+export async function fetchLinkedPreview(
+  { book, chapter, paraIndex, paraNum, lineId, word, langs } = {},
+  options = {}
+) {
+  const spec = buildLinkedPreviewSpec({ book, chapter, paraIndex, paraNum, lineId, word, langs });
+  if (!spec) return null;
+
   const base = getApiBase();
 
   return cachedFetch(
-    `linked_preview_${qs}`,
+    spec.cacheKey,
     async () => {
       const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timer = timeoutCtrl ? setTimeout(() => timeoutCtrl.abort(), 15000) : null;
       try {
         const res = await fetch(
-          `${base}/api/links/preview?${qs}`,
+          `${base}/api/links/preview?${spec.qs}`,
           timeoutCtrl ? { signal: timeoutCtrl.signal } : undefined
         );
         if (!res.ok) {
-          let msg = `Linked preview not found for ${cleanCode} (HTTP ${res.status})`;
+          let msg = `Linked preview not found for ${spec.cleanCode} (HTTP ${res.status})`;
           try {
             const errJson = await res.json();
             if (errJson?.error) msg = errJson.error;
@@ -1081,4 +1099,77 @@ export async function fetchLinkedPreview(
     30 * 60 * 1000,
     options.signal
   );
+}
+
+export function prefetchLinkedPreview(args = {}) {
+  const spec = buildLinkedPreviewSpec(args);
+  if (!spec) return;
+  if (cache.has(spec.cacheKey) || pendingRequests.has(spec.cacheKey)) return;
+  fetchLinkedPreview(args).catch(() => {});
+}
+
+const _prefetchedPreviewBatches = new Set();
+
+export async function prefetchLinkedPreviewsBatch(paragraphsMap, langs = []) {
+  if (!ENABLE_CLIENT_CACHE || !paragraphsMap || typeof paragraphsMap !== 'object') return;
+  const langList = Array.isArray(langs) ? langs.filter(Boolean) : [];
+  const itemsToFetch = [];
+  const seenKeys = new Set();
+
+  for (const paraLinks of Object.values(paragraphsMap)) {
+    if (!Array.isArray(paraLinks)) continue;
+    for (const lnk of paraLinks) {
+      if (!lnk?.target_book) continue;
+      const spec = buildLinkedPreviewSpec({
+        book: lnk.target_book,
+        chapter: lnk.target_chapter,
+        paraIndex: lnk.target_para_index,
+        paraNum: lnk.target_para_num,
+        lineId: lnk.target_line_id,
+        word: lnk.word,
+        langs: langList,
+      });
+      if (!spec || seenKeys.has(spec.cacheKey) || cache.has(spec.cacheKey) || _prefetchedPreviewBatches.has(spec.cacheKey)) {
+        continue;
+      }
+      seenKeys.add(spec.cacheKey);
+      _prefetchedPreviewBatches.add(spec.cacheKey);
+      itemsToFetch.push({
+        key: spec.cacheKey,
+        book: spec.cleanCode,
+        chapter: lnk.target_chapter ?? null,
+        paraIndex: lnk.target_para_index ?? null,
+        paraNum: lnk.target_para_num ?? null,
+        lineId: lnk.target_line_id ?? null,
+        word: lnk.word || null,
+      });
+    }
+  }
+
+  if (itemsToFetch.length === 0) return;
+
+  const base = getApiBase();
+  const CHUNK_SIZE = 30;
+  // Cap pre-warm chunks per chapter so a giant commentary doesn't saturate bandwidth
+  for (let i = 0; i < Math.min(itemsToFetch.length, 60); i += CHUNK_SIZE) {
+    const chunk = itemsToFetch.slice(i, i + CHUNK_SIZE);
+    try {
+      const res = await fetch(`${base}/api/links/previews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: chunk, langs: langList }),
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      const results = data?.results || {};
+      const now = Date.now();
+      for (const [k, preview] of Object.entries(results)) {
+        if (preview) {
+          setBoundedCache(cache, k, { data: preview, timestamp: now }, MAX_CACHE_ENTRIES);
+        }
+      }
+    } catch (_) {
+      break;
+    }
+  }
 }

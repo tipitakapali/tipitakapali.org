@@ -56,6 +56,7 @@ class TipitakaWebApi {
   final Map<String, Map<String, dynamic>> _bookMetaCache = {};
   final Map<String, List<Map<String, dynamic>>> _tocCache = {};
   final Map<String, Map<String, dynamic>> _chapterLinksCache = {};
+  final Map<String, Map<String, dynamic>> _linkedPreviewCache = {};
   bool _boldIndexVerified = false;
 
   static const Map<String, String> _langNameToCode = {
@@ -122,6 +123,7 @@ class TipitakaWebApi {
     _bookMetaCache.clear();
     _tocCache.clear();
     _chapterLinksCache.clear();
+    _linkedPreviewCache.clear();
     _boldIndexVerified = false;
   }
 
@@ -2094,6 +2096,12 @@ class TipitakaWebApi {
     final lineId = int.tryParse(query['lineId'] ?? query['line_id'] ?? '');
     final word = query['word'];
     final langList = _resolveLangCodes(query['langs'] ?? query['lang']);
+    final cacheKey =
+        '$cleanCode|${chapterIdx ?? ''}|${paraIdx ?? ''}|${paraNum ?? ''}|${lineId ?? ''}|${word ?? ''}|${langList.join(',')}';
+    final cached = _linkedPreviewCache[cacheKey];
+    if (cached != null) {
+      return ApiResponse(cached);
+    }
 
     final preview = await linkedDefinitionService.getLinkedPreview(
       dbDirPath: dbDirectoryPath,
@@ -2105,6 +2113,7 @@ class TipitakaWebApi {
       word: word,
       enabledLangs: langList,
       tipitakaDbOverride: _openDb('tipitaka.db'),
+      boldDbOverride: _openFreshBoldDb(),
       paliSentencesDbOverride: _openDb('pali_sentences.db'),
       openTranslationDb: (code) => _openDb('translation_$code.db'),
     );
@@ -2113,7 +2122,77 @@ class TipitakaWebApi {
         'Linked passage not found for $cleanCode',
       );
     }
-    return ApiResponse(preview.toJson());
+    final json = preview.toJson();
+    if (_linkedPreviewCache.length >= 400) {
+      _linkedPreviewCache.remove(_linkedPreviewCache.keys.first);
+    }
+    _linkedPreviewCache[cacheKey] = json;
+    return ApiResponse(json);
+  }
+
+  Future<ApiResponse> getLinkedPreviewsBatch(Map<String, dynamic> body) async {
+    final rawItems = body['items'];
+    if (rawItems is! List || rawItems.isEmpty) {
+      return const ApiResponse({'results': <String, dynamic>{}});
+    }
+    final rawLangs = body['langs'] ?? body['lang'];
+    final langStr = rawLangs is List
+        ? rawLangs.map((e) => e.toString()).join(',')
+        : (rawLangs?.toString() ?? '');
+    final langList = _resolveLangCodes(langStr);
+    final results = <String, dynamic>{};
+
+    for (final item in rawItems.take(60)) {
+      if (item is! Map) continue;
+      final rawBook = (item['book'] ?? item['bookCode'] ?? '').toString();
+      final cleanCode = _parseBookCode(rawBook).code;
+      if (cleanCode.isEmpty) continue;
+      final chapterIdx = item['chapter'] is num
+          ? (item['chapter'] as num).toInt()
+          : int.tryParse(item['chapter']?.toString() ?? '');
+      final paraIdx = item['paraIndex'] is num
+          ? (item['paraIndex'] as num).toInt()
+          : int.tryParse(item['paraIndex']?.toString() ?? '');
+      final paraNum = item['paraNum']?.toString();
+      final lineId = item['lineId'] is num
+          ? (item['lineId'] as num).toInt()
+          : int.tryParse(item['lineId']?.toString() ?? '');
+      final word = item['word']?.toString();
+      final resultKey = item['key']?.toString() ?? cleanCode;
+      final cacheKey =
+          '$cleanCode|${chapterIdx ?? ''}|${paraIdx ?? ''}|${paraNum ?? ''}|${lineId ?? ''}|${word ?? ''}|${langList.join(',')}';
+
+      final cached = _linkedPreviewCache[cacheKey];
+      if (cached != null) {
+        results[resultKey] = cached;
+        continue;
+      }
+
+      final preview = await linkedDefinitionService.getLinkedPreview(
+        dbDirPath: dbDirectoryPath,
+        bookCode: cleanCode,
+        chapterIndex: chapterIdx,
+        paraIndex: paraIdx,
+        paraNum: paraNum,
+        lineId: lineId,
+        word: word,
+        enabledLangs: langList,
+        tipitakaDbOverride: _openDb('tipitaka.db'),
+        boldDbOverride: _openFreshBoldDb(),
+        paliSentencesDbOverride: _openDb('pali_sentences.db'),
+        openTranslationDb: (code) => _openDb('translation_$code.db'),
+      );
+      if (preview != null) {
+        final json = preview.toJson();
+        if (_linkedPreviewCache.length >= 400) {
+          _linkedPreviewCache.remove(_linkedPreviewCache.keys.first);
+        }
+        _linkedPreviewCache[cacheKey] = json;
+        results[resultKey] = json;
+      }
+    }
+
+    return ApiResponse({'results': results});
   }
 
   Future<ApiResponse> lookupDict(

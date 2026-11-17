@@ -422,6 +422,45 @@ class BoldLinkedEngine {
     this.translationEngine = translationEngine;
     this.boldDb = null;
     this.chapterLinksCache = new Map();
+    this.previewCache = new Map();
+    this._stmtCache = new WeakMap();
+  }
+
+  _prep(db, sql) {
+    if (!db) return null;
+    let map = this._stmtCache.get(db);
+    if (!map) {
+      map = new Map();
+      this._stmtCache.set(db, map);
+    }
+    let stmt = map.get(sql);
+    if (!stmt) {
+      stmt = db.prepare(sql);
+      map.set(sql, stmt);
+    }
+    return stmt;
+  }
+
+  _readParaRangeSentences(paliSentDb, book, chapIdx, minParaIdx, maxParaIdx) {
+    if (paliSentDb) {
+      try {
+        const rows = this._prep(
+          paliSentDb,
+          'SELECT para_index, line_id, sentence FROM pali_sentences ' +
+            'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ' +
+            'ORDER BY para_index, line_id'
+        ).all(book, chapIdx, minParaIdx, maxParaIdx);
+        if (rows.length > 0) {
+          const map = new Map();
+          for (const r of rows) {
+            if (!map.has(r.para_index)) map.set(r.para_index, []);
+            map.get(r.para_index).push({ lineId: r.line_id, text: r.sentence });
+          }
+          return map;
+        }
+      } catch (_) {}
+    }
+    return readChapterSentences(this.dbTipitaka, paliSentDb, book, chapIdx);
   }
 
   getBoldDbPath() {
@@ -1371,7 +1410,16 @@ class BoldLinkedEngine {
 
   getLinkedPreview({ book, chapter = null, paraIndex = null, paraNum = null, lineId = null, word = null, langs = [] }) {
     if (!this.dbTipitaka || !book) return null;
-    const bRow = this.dbTipitaka.prepare('SELECT title FROM books WHERE code = ? LIMIT 1').get(book);
+    const normLangs = Array.isArray(langs) ? langs.filter(Boolean) : [];
+    const cacheKey = `${book}|${chapter ?? ''}|${paraIndex ?? ''}|${paraNum ?? ''}|${lineId ?? ''}|${word || ''}|${normLangs.join(',')}`;
+    if (this.previewCache.has(cacheKey)) {
+      const cached = this.previewCache.get(cacheKey);
+      this.previewCache.delete(cacheKey);
+      this.previewCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    const bRow = this._prep(this.dbTipitaka, 'SELECT title FROM books WHERE code = ? LIMIT 1').get(book);
     if (!bRow) return null;
     const bookTitle = bRow.title || book;
     const category = categoryFromBookCode(book);
@@ -1386,27 +1434,24 @@ class BoldLinkedEngine {
     if (targetParaIdx === null && targetParaNum) {
       let rows =
         targetChapIdx !== null
-          ? this.dbTipitaka.prepare('SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetChapIdx, targetParaNum)
-          : this.dbTipitaka.prepare('SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetParaNum);
+          ? this._prep(this.dbTipitaka, 'SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetChapIdx, targetParaNum)
+          : this._prep(this.dbTipitaka, 'SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetParaNum);
       if (rows.length === 0 && targetChapIdx !== null) {
-        rows = this.dbTipitaka.prepare('SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetParaNum);
+        rows = this._prep(this.dbTipitaka, 'SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_num = ? ORDER BY para_index ASC').all(book, targetParaNum);
       }
       const pFirst = parseInt(String(targetParaNum).split('-')[0], 10);
       if (rows.length === 0 && !isNaN(pFirst) && targetChapIdx !== null) {
-        rows = this.dbTipitaka.prepare('SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_first <= ? AND para_last >= ? ORDER BY para_index ASC').all(book, targetChapIdx, pFirst, pFirst);
+        rows = this._prep(this.dbTipitaka, 'SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_first <= ? AND para_last >= ? ORDER BY para_index ASC').all(book, targetChapIdx, pFirst, pFirst);
       }
       if (rows.length === 0 && !isNaN(pFirst)) {
-        rows = this.dbTipitaka.prepare('SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_first <= ? AND para_last >= ? ORDER BY para_index ASC').all(book, pFirst, pFirst);
+        rows = this._prep(this.dbTipitaka, 'SELECT chapter_index, para_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_first <= ? AND para_last >= ? ORDER BY para_index ASC').all(book, pFirst, pFirst);
       }
       if (rows.length > 0) {
         let picked = rows[0];
         if (rows.length > 1 && normWord) {
-          const candChapSentCache = new Map();
           for (const candRow of rows) {
-            if (!candChapSentCache.has(candRow.chapter_index)) {
-              candChapSentCache.set(candRow.chapter_index, readChapterSentences(this.dbTipitaka, paliSentDb, book, candRow.chapter_index));
-            }
-            const sents = candChapSentCache.get(candRow.chapter_index).get(candRow.para_index) || [];
+            const paraSentsMap = this._readParaRangeSentences(paliSentDb, book, candRow.chapter_index, candRow.para_index, candRow.para_index);
+            const sents = paraSentsMap.get(candRow.para_index) || [];
             if (sents.some((s) => matchesInLine(buildLineNorm(s.text, s.lineId), normWord))) {
               picked = candRow;
               break;
@@ -1418,7 +1463,7 @@ class BoldLinkedEngine {
         targetParaNum = picked.para_num;
       }
     } else if (targetParaIdx !== null) {
-      const row = this.dbTipitaka.prepare('SELECT chapter_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_index = ? LIMIT 1').get(book, targetParaIdx);
+      const row = this._prep(this.dbTipitaka, 'SELECT chapter_index, para_num FROM canon_paragraphs WHERE book_code = ? AND para_index = ? LIMIT 1').get(book, targetParaIdx);
       if (row) {
         if (targetChapIdx === null) targetChapIdx = row.chapter_index;
         if (!targetParaNum) targetParaNum = row.para_num;
@@ -1430,56 +1475,84 @@ class BoldLinkedEngine {
 
     let headingTitle = null;
     try {
-      const tocRow = this.dbTipitaka.prepare('SELECT title FROM book_toc WHERE book_code = ? AND para_index <= ? ORDER BY para_index DESC LIMIT 1').get(book, targetParaIdx);
+      const tocRow = this._prep(this.dbTipitaka, 'SELECT title FROM book_toc WHERE book_code = ? AND para_index <= ? ORDER BY para_index DESC LIMIT 1').get(book, targetParaIdx);
       headingTitle = tocRow?.title || null;
     } catch (_) {}
 
-    const beforeParas = this.dbTipitaka.prepare('SELECT para_index, para_num, pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index <= ? ORDER BY para_index DESC LIMIT 7').all(book, targetChapIdx, targetParaIdx).reverse();
-    const afterParas = this.dbTipitaka.prepare('SELECT para_index, para_num, pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index > ? ORDER BY para_index ASC LIMIT 10').all(book, targetChapIdx, targetParaIdx);
+    const beforeParas = this._prep(this.dbTipitaka, 'SELECT para_index, para_num, pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index <= ? ORDER BY para_index DESC LIMIT 7').all(book, targetChapIdx, targetParaIdx).reverse();
+    const afterParas = this._prep(this.dbTipitaka, 'SELECT para_index, para_num, pali_text FROM canon_paragraphs WHERE book_code = ? AND chapter_index = ? AND para_index > ? ORDER BY para_index ASC LIMIT 10').all(book, targetChapIdx, targetParaIdx);
     const windowParas = [...beforeParas, ...afterParas];
     if (windowParas.length === 0) return null;
 
-    const pack = readChapterPack(this.dbTipitaka, book, targetChapIdx);
     const minParaIdx = windowParas[0].para_index;
     const maxParaIdx = windowParas[windowParas.length - 1].para_index;
 
-    const htmlByPara = new Map();
-    try {
-      const hasHtmlZ = getColumnSet(this.dbTipitaka, 'chapters').has('html_z');
-      const chRow = this.dbTipitaka.prepare(
-        hasHtmlZ
-          ? 'SELECT html, html_z FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1'
-          : 'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1'
-      ).get(book, targetChapIdx);
-      const chHtml = chRow ? decodeTextOrZlib(chRow.html, hasHtmlZ ? chRow.html_z : null) : null;
-      if (chHtml) {
-        const pTagRe = /<p\b([^>]*)>([\s\S]*?)<\/p>/gi;
-        const pindexRe = /\bdata-pindex="(\d+)"/i;
-        let pm;
-        while ((pm = pTagRe.exec(chHtml)) !== null) {
-          const pStr = pindexRe.exec(pm[1] || '')?.[1];
-          if (!pStr) continue;
-          const pidx = parseInt(pStr, 10);
-          if (pidx < minParaIdx || pidx > maxParaIdx) continue;
-          const cleaned = cleanParagraphToHtmlWithB(pm[2] || '');
-          if (cleaned) htmlByPara.set(pidx, cleaned);
-        }
-      }
-    } catch (_) {}
+    const sentByPara = this._readParaRangeSentences(paliSentDb, book, targetChapIdx, minParaIdx, maxParaIdx);
 
-    const sentByPara = readChapterSentences(this.dbTipitaka, paliSentDb, book, targetChapIdx);
+    // Pull indexed <b>...</b> bold definitions for window lines without inflating full chapter HTML
+    const boldLineHtmlByKey = new Map();
+    const bdb = this.ensureBoldDb();
+    if (bdb) {
+      try {
+        const bRows = this._prep(
+          bdb,
+          'SELECT para_index, line_id, sentence_html FROM bold_definitions WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ?'
+        ).all(book, targetChapIdx, minParaIdx, maxParaIdx);
+        for (const br of bRows) {
+          if (br.sentence_html && br.sentence_html.includes('<b>')) {
+            boldLineHtmlByKey.set(`${br.para_index}:${br.line_id}`, br.sentence_html);
+          }
+        }
+      } catch (_) {}
+    }
+
+    const needsHtmlFallback = windowParas.some((wp) => {
+      const sents = sentByPara.get(wp.para_index);
+      return !sents || sents.length === 0;
+    });
+    const htmlByPara = new Map();
+    let lazyPack = null;
+    const getLazyPack = () => {
+      if (!lazyPack) lazyPack = readChapterPack(this.dbTipitaka, book, targetChapIdx);
+      return lazyPack;
+    };
+    if (needsHtmlFallback) {
+      try {
+        const hasHtmlZ = getColumnSet(this.dbTipitaka, 'chapters').has('html_z');
+        const chRow = this._prep(
+          this.dbTipitaka,
+          hasHtmlZ
+            ? 'SELECT html, html_z FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1'
+            : 'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ? LIMIT 1'
+        ).get(book, targetChapIdx);
+        const chHtml = chRow ? decodeTextOrZlib(chRow.html, hasHtmlZ ? chRow.html_z : null) : null;
+        if (chHtml) {
+          const pTagRe = /<p\b([^>]*)>([\s\S]*?)<\/p>/gi;
+          const pindexRe = /\bdata-pindex="(\d+)"/i;
+          let pm;
+          while ((pm = pTagRe.exec(chHtml)) !== null) {
+            const pStr = pindexRe.exec(pm[1] || '')?.[1];
+            if (!pStr) continue;
+            const pidx = parseInt(pStr, 10);
+            if (pidx < minParaIdx || pidx > maxParaIdx) continue;
+            const cleaned = cleanParagraphToHtmlWithB(pm[2] || '');
+            if (cleaned) htmlByPara.set(pidx, cleaned);
+          }
+        }
+      } catch (_) {}
+    }
 
     const loadedLangs = [];
     const paraTransByLang = new Map();
     const sentTransByLang = new Map();
-    if (this.translationEngine && Array.isArray(langs) && langs.length > 0) {
-      for (const rawLang of langs) {
+    if (this.translationEngine && normLangs.length > 0) {
+      for (const rawLang of normLangs) {
         const code = this.translationEngine.ensureLanguage(rawLang);
         if (!code) continue;
         const entry = this.translationEngine.databases.get(code);
         if (!entry) continue;
         try {
-          const pRows = entry.db.prepare('SELECT para_index, translation, sentences_json FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index').all(book, targetChapIdx, minParaIdx, maxParaIdx);
+          const pRows = this._prep(entry.db, 'SELECT para_index, translation, sentences_json FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index').all(book, targetChapIdx, minParaIdx, maxParaIdx);
           const pMap = new Map();
           const sMap = new Map();
           for (const pr of pRows) {
@@ -1507,7 +1580,7 @@ class BoldLinkedEngine {
           }
           if (sMap.size === 0) {
             try {
-              const stRows = entry.db.prepare('SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index, line_id').all(book, targetChapIdx, minParaIdx, maxParaIdx);
+              const stRows = this._prep(entry.db, 'SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index, line_id').all(book, targetChapIdx, minParaIdx, maxParaIdx);
               for (const sr of stRows) {
                 const txt = String(sr.translation || '').trim();
                 if (!txt) continue;
@@ -1613,11 +1686,12 @@ class BoldLinkedEngine {
               }
             }
           }
+          const boldHintHtml = boldLineHtmlByKey.get(`${wp.para_index}:${s.lineId}`) || htmlByPara.get(wp.para_index);
           lines.push({
             para_index: wp.para_index,
             ...(wp.para_num ? { para_num: wp.para_num } : {}),
             line_id: s.lineId,
-            pali_html: highlightSentence(s.text, htmlByPara.get(wp.para_index), isTarget),
+            pali_html: highlightSentence(s.text, boldHintHtml, isTarget),
             translations: trans,
             is_target: isTarget,
           });
@@ -1628,7 +1702,7 @@ class BoldLinkedEngine {
           const pt = paraTransByLang.get(lang)?.get(wp.para_index);
           if (pt) trans[lang] = pt;
         }
-        const paliFallback = wp.pali_text || pack.paliMap.get(wp.para_index) || '';
+        const paliFallback = wp.pali_text || getLazyPack().paliMap.get(wp.para_index) || '';
         lines.push({
           para_index: wp.para_index,
           ...(wp.para_num ? { para_num: wp.para_num } : {}),
@@ -1647,7 +1721,7 @@ class BoldLinkedEngine {
       }
     }
 
-    return {
+    const result = {
       book_code: book,
       book_title: bookTitle,
       category,
@@ -1659,6 +1733,39 @@ class BoldLinkedEngine {
       translation_langs: loadedLangs,
       lines,
     };
+
+    if (this.previewCache.size >= 800) {
+      const firstKey = this.previewCache.keys().next().value;
+      if (firstKey !== undefined) this.previewCache.delete(firstKey);
+    }
+    this.previewCache.set(cacheKey, result);
+    return result;
+  }
+
+  getLinkedPreviewsBatch(items = [], langs = []) {
+    const out = {};
+    if (!Array.isArray(items) || items.length === 0) return out;
+    const capped = items.slice(0, 60);
+    for (const item of capped) {
+      if (!item || !item.book) continue;
+      let cleanBook = String(item.book).replace('.xml', '');
+      const chapSuffixMatch = cleanBook.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+      if (chapSuffixMatch) cleanBook = chapSuffixMatch[1];
+      const key = item.key || cleanBook;
+      const preview = this.getLinkedPreview({
+        book: cleanBook,
+        chapter: item.chapter !== undefined && item.chapter !== null ? Number(item.chapter) : null,
+        paraIndex: item.paraIndex !== undefined && item.paraIndex !== null ? Number(item.paraIndex) : null,
+        paraNum: item.paraNum || null,
+        lineId: item.lineId !== undefined && item.lineId !== null ? Number(item.lineId) : null,
+        word: item.word || null,
+        langs,
+      });
+      if (preview) {
+        out[key] = preview;
+      }
+    }
+    return out;
   }
 }
 

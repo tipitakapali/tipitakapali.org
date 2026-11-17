@@ -803,4 +803,26 @@ void main() {
       await upstream.close(force: true);
     }
   });
+
+  test('serves GET /api/links/preview and batched POST /api/links/previews', () async {
+    final batchRes = await _httpPostJson(baseUri, '/api/links/previews', {
+      'items': [
+        {
+          'key': 'p1',
+          'book': 's0101m.mul',
+          'chapter': 0,
+          'paraIndex': 0,
+          'word': 'evaṃ',
+        },
+      ],
+      'langs': ['en'],
+    });
+    expect(batchRes.statusCode, 200);
+    final batchJson = jsonDecode(batchRes.body) as Map<String, dynamic>;
+    final results = batchJson['results'] as Map<String, dynamic>;
+    expect(results.containsKey('p1'), isTrue);
+    final p1 = results['p1'] as Map<String, dynamic>;
+    expect(p1['book_code'], 's0101m.mul');
+    expect((p1['lines'] as List).any((l) => l['is_target'] == true), isTrue);
+  });
 }

@@ -20,6 +20,8 @@ import {
   getCachedChapterTranslations,
   getCachedPaliSentences,
   getCachedChapterLinks,
+  prefetchLinkedPreview,
+  prefetchLinkedPreviewsBatch,
 } from '../../services/api';
 
 const TRANSLATION_METAS = {
@@ -2846,7 +2848,34 @@ const ReaderPane = memo(function ReaderPane({
         if (!container) return null;
         const visible = (el) =>
           el && el.getClientRects && el.getClientRects().length > 0 ? el : null;
+        const hasSearchQuery = Boolean((searchHighlight?.query || paneScrollIntent?.highlightQuery || '').trim());
+        const pickSearchHitInRow = (row) => {
+          if (!hasSearchQuery || !row || !row.querySelector) return null;
+          if (isTransTarget) {
+            const hitInTrans =
+              row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] mark.search-hit`) ||
+              row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] .search-hit`);
+            if (visible(hitInTrans)) {
+              return hitInTrans.closest('.sent-pair') || hitInTrans.closest('.reader-trans-block') || hitInTrans;
+            }
+          } else {
+            const hits = row.querySelectorAll('mark.search-hit, .search-hit');
+            for (const h of hits) {
+              if (h.closest('.reader-trans-block')) continue;
+              if (visible(h)) {
+                return h.closest('.sent-pair') || h.closest('.pali-sent') || h;
+              }
+            }
+          }
+          const anyHit = row.querySelector('mark.search-hit, .search-hit');
+          if (visible(anyHit)) {
+            return anyHit.closest('.sent-pair') || anyHit.closest('.reader-trans-block') || anyHit;
+          }
+          return null;
+        };
         const pickTransOrRow = (row, scopeForChapter) => {
+          const hitTarget = pickSearchHitInRow(row);
+          if (hitTarget) return hitTarget;
           if (isTransTarget) {
             const transEl =
               (row.querySelector &&
@@ -3222,7 +3251,7 @@ const ReaderPane = memo(function ReaderPane({
               targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
             }
 
-            // Target specific sentence line if lineId is specified
+            // Target specific sentence line if lineId is specified, otherwise jump to matched search-hit line inside multi-sentence rows
             if (lineId) {
               const row = el.closest('.reader-para-row') || el;
               const sentLineEl =
@@ -3231,6 +3260,38 @@ const ReaderPane = memo(function ReaderPane({
                 row?.querySelector?.(`.pali-sent[data-line="${lineId}"]`);
               if (sentLineEl && sentLineEl.getClientRects().length > 0) {
                 targetEl = sentLineEl;
+              }
+            } else {
+              const row = el.closest('.reader-para-row') || el;
+              const hasSearchQuery = Boolean((searchHighlight?.query || paneScrollIntent?.highlightQuery || '').trim());
+              if (hasSearchQuery && row?.querySelector) {
+                let hitEl = null;
+                if (isTransTarget) {
+                  hitEl =
+                    row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] mark.search-hit`) ||
+                    row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] .search-hit`);
+                } else {
+                  const hits = row.querySelectorAll('mark.search-hit, .search-hit');
+                  for (const h of hits) {
+                    if (!h.closest('.reader-trans-block') && h.getClientRects().length > 0) {
+                      hitEl = h;
+                      break;
+                    }
+                  }
+                }
+                if (!hitEl) {
+                  hitEl = row.querySelector('mark.search-hit, .search-hit');
+                }
+                if (hitEl && hitEl.getClientRects().length > 0) {
+                  const lineBlock =
+                    hitEl.closest('.sent-pair') ||
+                    hitEl.closest('.pali-sent') ||
+                    hitEl.closest('.reader-trans-block') ||
+                    hitEl;
+                  if (lineBlock && lineBlock.getClientRects().length > 0) {
+                    targetEl = lineBlock;
+                  }
+                }
               }
             }
 
@@ -4203,6 +4264,30 @@ const ReaderPane = memo(function ReaderPane({
     }
   }, [isColumnsMode, isActive, activatePane, activeTab, setActiveParaNum, saveTabPosition, addToHistory, clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, openDictionary, recordClickedWord, setActiveLinkedItem]);
 
+  const handleReaderMouseOver = useCallback(
+    (e) => {
+      const linkChip = e.target.closest?.('.linked-def-chip');
+      if (!linkChip) return;
+      const rawPayload = linkChip.getAttribute('data-link');
+      if (!rawPayload) return;
+      try {
+        const parsed = JSON.parse(decodeURIComponent(rawPayload));
+        if (parsed?.target_book) {
+          prefetchLinkedPreview({
+            book: parsed.target_book,
+            chapter: parsed.target_chapter,
+            paraIndex: parsed.target_para_index,
+            paraNum: parsed.target_para_num,
+            lineId: parsed.target_line_id,
+            word: parsed.word,
+            langs: activeLangs,
+          });
+        }
+      } catch (_) {}
+    },
+    [activeLangs]
+  );
+
   const handleReaderDoubleClick = useCallback((e) => {
     // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
     if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
@@ -4397,8 +4482,11 @@ const ReaderPane = memo(function ReaderPane({
   const handleLinksLoaded = useCallback(
     (chapIdx, paragraphs) => {
       onPaneLinksLoaded?.(activeTab.bookCode, chapIdx, paragraphs);
+      if (isActive && paragraphs && Object.keys(paragraphs).length > 0) {
+        prefetchLinkedPreviewsBatch?.(paragraphs, activeLangs);
+      }
     },
-    [onPaneLinksLoaded, activeTab?.bookCode]
+    [onPaneLinksLoaded, activeTab?.bookCode, isActive, activeLangs]
   );
 
   const editionStatsList = React.useMemo(() => {
@@ -4819,6 +4907,7 @@ const ReaderPane = memo(function ReaderPane({
           <div
             className="reader-wrapper flex-1 flex justify-center px-3 sm:px-6"
             onClick={handleReaderClick}
+            onMouseOver={handleReaderMouseOver}
             onDoubleClick={handleReaderDoubleClick}
           >
             <div

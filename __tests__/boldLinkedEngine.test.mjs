@@ -433,6 +433,14 @@ test('multi-paragraph para_num resolution, CST phrase/hyphen/ti/pe normalization
     });
     assert.ok(prev2 && prev2.target_para_index === 21 && prev2.target_line_id === 1);
 
+    // (e) Batch previews endpoint helper resolves & caches multiple targets in one pass
+    const batch = engine.getLinkedPreviewsBatch([
+      { key: 'k1', book: 's0101a.att', chapter: 0, paraIndex: 20, lineId: 1, word: 'samena' },
+      { key: 'k2', book: 's0101a.att', chapter: 0, paraNum: '1', word: 'mayāti atthe satī' },
+    ]);
+    assert.ok(batch.k1 && batch.k1.target_para_index === 20);
+    assert.ok(batch.k2 && batch.k2.target_para_index === 21);
+
     engine.boldDb?.close();
   } finally {
     try { db.close(); } catch (_) {}

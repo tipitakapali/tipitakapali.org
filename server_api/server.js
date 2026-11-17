@@ -789,6 +789,26 @@ function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-wh
     return preview;
   });
 
+  // Batched linked-definition previews for instant modal open from VPS
+  fastify.post('/api/links/previews', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=3600, stale-while-revalidate=86400');
+    const body = req.body || {};
+    const items = Array.isArray(body.items) ? body.items : [];
+    const langsRaw = body.langs || body.lang || '';
+    const langs =
+      Array.isArray(langsRaw)
+        ? langsRaw.map((s) => String(s).trim()).filter(Boolean)
+        : langsRaw === 'all'
+        ? translationEngine.getAvailableLanguages().map((l) => l.code)
+        : String(langsRaw).split(',').map((s) => s.trim()).filter(Boolean);
+
+    if (items.length === 0) {
+      return { results: {} };
+    }
+    const results = boldLinkedEngine.getLinkedPreviewsBatch(items, langs);
+    return { results };
+  });
+
   // Per-book Pāḷi sentence splits for sentence display mode. Reads either
   // standalone pali_sentences.db or unified chapter_text_pack inside tipitaka.db.
   const paliSentencesCache = new Map();
