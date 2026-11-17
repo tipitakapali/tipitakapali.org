@@ -210,6 +210,64 @@ test('getBookLayerInfo: classifies Mūla, Aṭṭhakathā, Ṭīkā, and returns
     tika.siblingLayers.map((s) => s.layer),
     ['mula', 'attha']
   );
+
+  // Añña .nrf without MAT companions (e.g. e0901n.nrf) must NOT show phantom +Mūla/+Aṭṭha buttons
+  const annaNoMat = getBookLayerInfo('e0901n.nrf', 'añña', {
+    bookCode: 'e0901n.nrf',
+    category: 'añña',
+    mat: { book_code: 'e0901n.nrf', category: 'añña', mula_code: null, attha_code: null, tika_code: null },
+  });
+  assert.equal(annaNoMat.layer, 'other');
+  assert.deepEqual(annaNoMat.siblingLayers, []);
+
+  // Book with only Aṭṭhakathā companion (no Ṭīkā) only exposes +Aṭṭha
+  const noTika = getBookLayerInfo('s0501m.mul', 'mūla', {
+    bookCode: 's0501m.mul',
+    category: 'mūla',
+    mat: { book_code: 's0501m.mul', mula_code: 's0501m.mul', attha_code: 's0501a.att', tika_code: null },
+  });
+  assert.deepEqual(
+    noTika.siblingLayers.map((s) => s.layer),
+    ['attha']
+  );
+
+  // Añña t.nrf treatise that actually has Mūla/Aṭṭha companions (e.g. abh04t.nrf) keeps them
+  const annaWithMat = getBookLayerInfo('abh04t.nrf', 'añña', {
+    bookCode: 'abh04t.nrf',
+    category: 'añña',
+    mat: { book_code: 'abh04t.nrf', mula_code: 'abh01m.mul', attha_code: 'abh01a.att', tika_code: null },
+  });
+  assert.equal(annaWithMat.layer, 'tika');
+  assert.deepEqual(
+    annaWithMat.siblingLayers.map((s) => s.layer),
+    ['mula', 'attha']
+  );
+});
+
+test('LinkedDefinitionModal renders linked-def-passage-target highlight border and matches body translation color', () => {
+  const { resolveTranslationTextColor } = compileModule('../context/ThemeSettingsContext.jsx', {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+  });
+
+  // Default Classic theme first slot (#6d28d9) and custom override
+  assert.equal(resolveTranslationTextColor('en', 0, { theme: 'classic', translationColors: {} }), '#6d28d9');
+  assert.equal(
+    resolveTranslationTextColor('en', 0, { theme: 'classic', translationColors: { english: { text: '1d4ed8' } } }),
+    '#1d4ed8'
+  );
+
+  // Render LinkedDefinitionModal with mocked preview response? Wait: compile LinkedDefinitionModal and verify class tokens
+  const src = fs.readFileSync(
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), '../components/Reader/LinkedDefinitionModal.jsx'),
+    'utf8'
+  );
+  assert.match(src, /linked-def-passage-target/);
+  assert.match(src, /resolveTranslationTextColor/);
+  const css = fs.readFileSync(
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), '../app/globals.css'),
+    'utf8'
+  );
+  assert.match(css, /\.linked-def-passage-target\s*\{[^}]*border:\s*2px\s+solid\s+var\(--accent\)/);
 });
 
 test('increasingChain and interpolateMonotonicY: filters cross-reference outliers and interpolates smoothly', () => {

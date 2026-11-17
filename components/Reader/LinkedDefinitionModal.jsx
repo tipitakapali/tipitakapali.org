@@ -7,6 +7,7 @@ import { convertPaliScript, cleanDictionaryQuery } from '../../services/translit
 import { formatSafeTranslationHtml } from '../../services/translationFormat';
 import { useTabs } from '../../context/TabContext';
 import { useDictionary } from '../../context/DictionaryContext';
+import { useThemeSettings, resolveTranslationTextColor } from '../../context/ThemeSettingsContext';
 
 const CATEGORY_LABELS = {
   mūla: 'Mūla',
@@ -86,6 +87,7 @@ export default function LinkedDefinitionModal({
 }) {
   const { openBook, openAlongside } = useTabs();
   const { openDictionary } = useDictionary();
+  const { settings } = useThemeSettings() || {};
 
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(Boolean(link?.target_book));
@@ -280,7 +282,7 @@ export default function LinkedDefinitionModal({
         {/* Body */}
         <div
           ref={bodyRef}
-          className="flex-1 overflow-y-auto p-4 space-y-3 text-sm"
+          className="linked-def-modal-body flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[var(--bg-primary)] text-[var(--text-primary)]"
         >
           {loading && (
             <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-[var(--text-muted)]">
@@ -311,23 +313,32 @@ export default function LinkedDefinitionModal({
           {!loading && !error && lines.map((line, idx) => {
             const isTarget = Boolean(line.is_target);
             const paliHtml = formatPaliInlineHtml(line.pali_html, currentScript);
-            const translations =
+            const paliColor = resolveTranslationTextColor('pali', 0, settings);
+            const rawTranslations =
               line.translations && typeof line.translations === 'object'
                 ? Object.entries(line.translations).filter(([, v]) => v && String(v).trim())
                 : [];
+            const langRank = new Map(
+              (Array.isArray(activeLangs) ? activeLangs : []).map((l, i) => [String(l).toLowerCase(), i])
+            );
+            const translations = [...rawTranslations].sort(([a], [b]) => {
+              const ra = langRank.get(String(a).toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+              const rb = langRank.get(String(b).toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+              return ra - rb;
+            });
 
             return (
               <div
                 key={`${line.para_index}-${line.line_id ?? 'p'}-${idx}`}
                 ref={isTarget ? targetRef : undefined}
                 data-target={isTarget ? '1' : undefined}
-                className={`rounded-xl p-3 border transition ${
+                className={`rounded-xl p-3 sm:p-4 transition ${
                   isTarget
-                    ? 'bg-[var(--accent-light)]/55 border-[var(--accent)] shadow-xs'
-                    : 'bg-[var(--bg-card)] border-[var(--border-color)]/70 opacity-85 hover:opacity-100'
+                    ? 'linked-def-passage-target'
+                    : 'border bg-[var(--bg-primary)] border-[var(--border-color)]/60'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="flex items-center gap-1.5 text-[10.5px] font-mono text-[var(--text-muted)]">
                     {line.para_num && <span>§ {line.para_num}</span>}
                     {line.line_id && <span>• line {line.line_id}</span>}
@@ -342,23 +353,35 @@ export default function LinkedDefinitionModal({
 
                 <div
                   onClick={handlePaliBodyClick}
-                  className="text-[14.5px] leading-relaxed text-[var(--text-primary)] cursor-pointer"
+                  className="linked-def-pali-text text-[var(--text-primary)] cursor-pointer"
+                  style={paliColor ? { color: paliColor } : undefined}
                   dangerouslySetInnerHTML={{ __html: paliHtml }}
                 />
 
                 {translations.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-[var(--border-color)]/45 space-y-1">
-                    {translations.map(([langCode, txt]) => (
-                      <div key={langCode} className="flex items-start gap-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">
-                        <span className="uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-0.5">
-                          {langCode}
-                        </span>
-                        <span
-                          className="min-w-0 flex-1"
-                          dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
-                        />
-                      </div>
-                    ))}
+                  <div className="mt-2.5 pt-2.5 border-t border-[var(--border-color)]/45 space-y-1.5">
+                    {translations.map(([langCode, txt], tIdx) => {
+                      const slotIdx = langRank.has(String(langCode).toLowerCase())
+                        ? langRank.get(String(langCode).toLowerCase())
+                        : tIdx;
+                      const transColor = resolveTranslationTextColor(langCode, slotIdx, settings);
+                      return (
+                        <div
+                          key={langCode}
+                          data-trans-lang={langCode}
+                          className="linked-def-trans-row flex items-start gap-2"
+                        >
+                          <span className="uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-1">
+                            {langCode}
+                          </span>
+                          <span
+                            className="linked-def-trans-text min-w-0 flex-1"
+                            style={transColor ? { color: transColor } : undefined}
+                            dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

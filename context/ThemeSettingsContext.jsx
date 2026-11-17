@@ -442,6 +442,79 @@ export function getDefaultTranslationColorsForTheme(theme = 'classic', slotIndex
   };
 }
 
+const TRANSLATION_CODE_TO_KEY = {
+  en: 'english',
+  vi: 'vietnamese',
+  my: 'myanmar',
+  my_nissaya: 'my_nissaya',
+  si: 'sinhala',
+  zh: 'chinese',
+  km: 'khmer',
+  th: 'thai',
+  lo: 'lao',
+  ta: 'tamil',
+  hi: 'hindi',
+  de: 'german',
+  ja: 'japanese',
+  ko: 'korean',
+  id: 'indonesian',
+  ne: 'nepali',
+  be: 'bengali',
+  es: 'spanish',
+  fr: 'french',
+  pt: 'portuguese',
+  ru: 'russian',
+  cs: 'czech',
+  mr: 'marathi',
+};
+
+function formatThemeCssColor(val) {
+  if (!val || typeof val !== 'string') return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+  if (/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
+    return `#${trimmed}`;
+  }
+  return trimmed;
+}
+
+/** Resolve the effective text color for a translation language matching ReaderView rules. */
+export function resolveTranslationTextColor(langCode, slotIndex = null, settings = null) {
+  const theme = settings?.theme || 'classic';
+  const rawKey = String(langCode || '').trim().toLowerCase();
+  const fullKey = TRANSLATION_CODE_TO_KEY[rawKey] || rawKey;
+  const customMap = settings?.translationColors || {};
+
+  if (rawKey === 'pali') {
+    return formatThemeCssColor(customMap?.pali?.text) || '';
+  }
+
+  const custom = customMap[fullKey] || customMap[rawKey] || {};
+  const customText = formatThemeCssColor(custom.text);
+  if (customText) return customText;
+
+  let resolvedIdx = typeof slotIndex === 'number' && slotIndex >= 0 ? slotIndex : null;
+  if (resolvedIdx === null) {
+    const order = Array.isArray(settings?.translationOrder)
+      ? settings.translationOrder
+      : DEFAULT_TRANSLATION_ORDER;
+    const enabledMap = settings?.translations || DEFAULT_SETTINGS.translations;
+    const activeTransKeys = [];
+    for (const id of order) {
+      if (id !== 'pali' && enabledMap[id]) activeTransKeys.push(id);
+    }
+    for (const [id, on] of Object.entries(enabledMap)) {
+      if (id !== 'pali' && on && !activeTransKeys.includes(id)) {
+        activeTransKeys.push(id);
+      }
+    }
+    const found = activeTransKeys.indexOf(fullKey);
+    resolvedIdx = found >= 0 ? found : 0;
+  }
+
+  return getDefaultTranslationSlotColor(theme, resolvedIdx);
+}
+
 export function useThemeSettings() {
   const context = useContext(ThemeSettingsContext);
   if (!context) {

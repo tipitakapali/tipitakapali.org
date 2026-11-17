@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, ChevronDown, ChevronUp, ExternalLink, Sparkles, Columns } from 'lucide-react';
 import { convertPaliScript } from '../services/transliterate';
 import { formatSafeTranslationHtml } from '../services/translationFormat';
+import { useThemeSettings, resolveTranslationTextColor } from '../context/ThemeSettingsContext';
 
 const INITIAL_VISIBLE_COUNT = 4;
 
@@ -72,6 +73,7 @@ export default function BoldDefinitionSection({
   onOpenPassage,
   onOpenAlongside,
 }) {
+  const { settings } = useThemeSettings() || {};
   const [expanded, setExpanded] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -182,7 +184,7 @@ export default function BoldDefinitionSection({
             <div
               key={`${item.book_code}-${item.chapter_index}-${item.para_index}-${item.word}-${idx}`}
               id={`dict-entry-${idx}`}
-              className="bold-def-card dict-entry-item rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 space-y-2 shadow-2xs hover:border-[var(--accent-border)] transition"
+              className="bold-def-card dict-entry-item rounded-xl border border-[var(--border-color)]/75 bg-[var(--bg-primary)] p-3 sm:p-3.5 space-y-2.5 shadow-2xs hover:border-[var(--accent-border)] transition"
             >
               {/* Card Header */}
               <div className="bold-def-nonlookup flex items-start justify-between gap-2">
@@ -240,10 +242,10 @@ export default function BoldDefinitionSection({
               </div>
 
               {/* Pāḷi Context + Highlighted Sentence (tap any word to lookup via DictionaryModal click handler) */}
-              <div className="space-y-1 text-[13.5px] leading-relaxed text-[var(--text-primary)]">
+              <div className="bold-def-pali-text space-y-1.5 text-[var(--text-primary)]">
                 {beforeHtml && (
                   <div
-                    className="text-[12.5px] text-[var(--text-muted)] italic opacity-85"
+                    className="text-[var(--text-secondary)] italic opacity-80"
                     dangerouslySetInnerHTML={{ __html: beforeHtml }}
                   />
                 )}
@@ -253,7 +255,7 @@ export default function BoldDefinitionSection({
                 />
                 {afterHtml && (
                   <div
-                    className="text-[12.5px] text-[var(--text-muted)] italic opacity-85"
+                    className="text-[var(--text-secondary)] italic opacity-80"
                     dangerouslySetInnerHTML={{ __html: afterHtml }}
                   />
                 )}
@@ -261,18 +263,26 @@ export default function BoldDefinitionSection({
 
               {/* Active Translations */}
               {translations.length > 0 && (
-                <div className="bold-def-nonlookup pt-1.5 border-t border-[var(--border-color)]/50 space-y-1">
-                  {translations.map(([langCode, txt]) => (
-                    <div key={langCode} className="flex items-start gap-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">
-                      <span className="uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-0.5">
-                        {langCode}
-                      </span>
-                      <span
-                        className="min-w-0 flex-1"
-                        dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
-                      />
-                    </div>
-                  ))}
+                <div className="bold-def-nonlookup pt-2 border-t border-[var(--border-color)]/50 space-y-1.5">
+                  {translations.map(([langCode, txt]) => {
+                    const transColor = resolveTranslationTextColor(langCode, null, settings);
+                    return (
+                      <div
+                        key={langCode}
+                        data-trans-lang={langCode}
+                        className="bold-def-trans-row flex items-start gap-2"
+                      >
+                        <span className="uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-1">
+                          {langCode}
+                        </span>
+                        <span
+                          className="bold-def-trans-text min-w-0 flex-1"
+                          style={transColor ? { color: transColor } : undefined}
+                          dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

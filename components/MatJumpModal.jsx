@@ -66,7 +66,7 @@ export default function MatJumpModal({ isOpen, onClose }) {
 
   const isCurrentMula = currentCategory.includes('mūla') || currentCode.endsWith('.mul');
   const isCurrentAttha = currentCategory.includes('aṭṭhakathā') || currentCode.endsWith('.att');
-  const isCurrentTika = currentCategory.includes('ṭīkā') || currentCode.endsWith('.tik');
+  const isCurrentTika = currentCategory.includes('ṭīkā') || currentCode.endsWith('.tik') || currentCode.endsWith('t.nrf');
 
   const baseCode = currentCode.split('.')[0] || '';
   const prefix = (baseCode.length > 2 && 'matn'.includes(baseCode.slice(-2, -1)))

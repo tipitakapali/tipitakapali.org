@@ -2287,16 +2287,29 @@ export function TabProvider({ children }) {
         }
       }
 
-      if (!targetCode) {
+      // Only fall back to filename heuristics if no MAT table metadata was resolved for this tab,
+      // AND verify the synthesized candidate book actually exists in the tree catalog.
+      const hasResolvedMatTable = Boolean(
+        mat &&
+          (mat.book_code !== undefined ||
+            mat.mula_code !== undefined ||
+            mat.attha_code !== undefined ||
+            mat.tika_code !== undefined)
+      );
+      if (!targetCode && !hasResolvedMatTable) {
         const base = sourceTab.bookCode.split('.')[0];
         const prefix = (base.length > 2 && 'matn'.includes(base.slice(-2, -1)))
           ? base.slice(0, -2)
           : (base.length > 1 && 'matn'.includes(base.slice(-1)))
           ? base.slice(0, -1)
           : base;
-        if (targetLayer === 'mula') targetCode = `${prefix}m.mul`;
-        else if (targetLayer === 'attha') targetCode = `${prefix}a.att`;
-        else if (targetLayer === 'tika') targetCode = `${prefix}t.tik`;
+        let candidate = null;
+        if (targetLayer === 'mula') candidate = `${prefix}m.mul`;
+        else if (targetLayer === 'attha') candidate = `${prefix}a.att`;
+        else if (targetLayer === 'tika') candidate = `${prefix}t.tik`;
+        if (candidate && lookupBookInfo(candidate)) {
+          targetCode = candidate;
+        }
       }
 
       if (!targetCode || targetCode === sourceTab.bookCode) return;

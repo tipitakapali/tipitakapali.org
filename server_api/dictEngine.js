@@ -32,7 +32,32 @@ function resolveDbPath(filename) {
 // Database references
 const dbs = {};
 const tableChars = {};
+const stmtCache = new Map();
 let goldendict = null;
+
+function prepareCached(dbKey, sql) {
+  const key = `${dbKey}:${sql}`;
+  let stmt = stmtCache.get(key);
+  if (!stmt) {
+    stmt = dbs[dbKey].prepare(sql);
+    stmtCache.set(key, stmt);
+  }
+  return stmt;
+}
+
+function groupWordsByPartition(words, dbKey, useSplitter = false) {
+  const groups = new Map();
+  for (const w of words) {
+    const fchar = getFChar(w, dbKey, useSplitter);
+    let list = groups.get(fchar);
+    if (!list) {
+      list = [];
+      groups.set(fchar, list);
+    }
+    list.push(w);
+  }
+  return groups;
+}
 
 // Initialize databases
 const DB_FILES = {
@@ -72,6 +97,8 @@ function initDictDatabases() {
           PRAGMA synchronous = NORMAL;
           PRAGMA temp_store = MEMORY;
           PRAGMA query_only = 1;
+          PRAGMA cache_size = -16000;
+          PRAGMA mmap_size = 268435456;
         `);
         dbs[key] = db;
         tableChars[key] = getTableCharsFromDb(db);
@@ -192,7 +219,7 @@ function getSynonyms(word) {
   }
   try {
     const fchar = getFChar(word, 'SYN', false);
-    const rows = dbs.SYN.prepare(`SELECT word FROM ${fchar} WHERE synonym = ?`).all(word);
+    const rows = prepareCached('SYN', `SELECT word FROM "${fchar}" WHERE synonym = ?`).all(word);
     const result = rows.map((r) => r.word);
     if (synCache.size >= SYN_CACHE_MAX) {
       const firstKey = synCache.keys().next().value;
@@ -209,7 +236,7 @@ function getSynonyms(word) {
 function lookupSingleDPD(word, cachedSyns = null) {
   if (word.startsWith('##')) {
     try {
-      const row = dbs.DPD.prepare("SELECT word, defi FROM misc WHERE word = ? LIMIT 1").get(word);
+      const row = prepareCached('DPD', 'SELECT word, defi FROM misc WHERE word = ? LIMIT 1').get(word);
       if (row) {
         return [{ word: row.word, isExact: true, html: restoreMinifiedLinksAndFeedback(row.defi) }];
       }
@@ -225,10 +252,13 @@ function lookupSingleDPD(word, cachedSyns = null) {
   const exactMatches = [];
   const relatedMatches = [];
 
-  for (const w of wordsToQuery) {
-    const fchar = getFChar(w, 'DPD', false);
+  for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'DPD', false)) {
     try {
-      const rows = dbs.DPD.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(w);
+      const placeholders = groupWords.map(() => '?').join(',');
+      const rows = prepareCached(
+        'DPD',
+        `SELECT word, defi FROM "${fchar}" WHERE word IN (${placeholders})`
+      ).all(...groupWords);
       for (const r of rows) {
         let df = restoreDpdDefi(r.defi);
         const isExact = r.word.toLowerCase() === word;
@@ -240,7 +270,7 @@ function lookupSingleDPD(word, cachedSyns = null) {
         }
       }
     } catch (e) {
-      console.error('[DictEngine] DPD lookup error for', w, 'table:', fchar, e.message);
+      console.error('[DictEngine] DPD lookup error for', groupWords.join(','), 'table:', fchar, e.message);
     }
   }
 
@@ -294,10 +324,13 @@ function lookupSinglePTS(word, cachedSyns = null) {
   const exactMatches = [];
   const relatedMatches = [];
 
-  for (const w of wordsToQuery) {
-    const fchar = getFChar(w, 'PTS', false);
+  for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'PTS', false)) {
     try {
-      const rows = dbs.PTS.prepare(`SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(w);
+      const placeholders = groupWords.map(() => '?').join(',');
+      const rows = prepareCached(
+        'PTS',
+        `SELECT word, defi FROM "${fchar}" WHERE word IN (${placeholders})`
+      ).all(...groupWords);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
         const html = `<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">${r.word}</span><br>${r.defi}</div>`;
@@ -344,10 +377,13 @@ function lookupSingleABD(word, cachedSyns = null) {
   const exactMatches = [];
   const relatedMatches = [];
 
-  for (const w of wordsToQuery) {
-    const fchar = getFChar(w, 'ABD', false);
+  for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'ABD', false)) {
     try {
-      const rows = dbs.ABD.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(w);
+      const placeholders = groupWords.map(() => '?').join(',');
+      const rows = prepareCached(
+        'ABD',
+        `SELECT word, defi FROM "${fchar}" WHERE word IN (${placeholders})`
+      ).all(...groupWords);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
         const html = `<div class="tmmAbhidhan"><span class="${isExact ? 'pm2w' : 'pm1w'}">${r.word}</span><br>${r.defi}</div>`;
@@ -394,10 +430,13 @@ function lookupSinglePSD(word, cachedSyns = null) {
   const exactMatches = [];
   const relatedMatches = [];
 
-  for (const w of wordsToQuery) {
-    const fchar = getFChar(w, 'PSD', false);
+  for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'PSD', false)) {
     try {
-      const rows = dbs.PSD.prepare(`SELECT word, defi, source FROM ${fchar} WHERE word = ?`).all(w);
+      const placeholders = groupWords.map(() => '?').join(',');
+      const rows = prepareCached(
+        'PSD',
+        `SELECT word, defi, source FROM "${fchar}" WHERE word IN (${placeholders})`
+      ).all(...groupWords);
       for (const r of rows) {
         const isExact = r.word.toLowerCase() === word;
         let df = r.defi;
@@ -446,7 +485,7 @@ function lookupSingleSANS(word) {
   const matches = [];
 
   try {
-    const rows = dbs.SANS.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(word);
+    const rows = prepareCached('SANS', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(word);
     for (const r of rows) {
       const isExact = r.word.toLowerCase() === word;
       let df = r.defi;
@@ -490,7 +529,7 @@ function lookupSingleSplitter(word) {
   const results = [];
 
   try {
-    const rows = dbs.SPLI.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).all(word);
+    const rows = prepareCached('SPLI', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(word);
     for (const r of rows) {
       const elements = (r.defi || '').split('@').filter((x) => x && x.trim().length > 0);
       const decHtml = elements
@@ -556,7 +595,7 @@ function lookupINF(rawQuery) {
   const fchar = getFChar(clean, 'DPD', false);
 
   try {
-    const row = dbs.INF.prepare(`SELECT word, defi FROM ${fchar} WHERE word = ?`).get(clean);
+    const row = prepareCached('INF', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).get(clean);
     if (row && row.defi) {
       return { word: row.word, query: rawQuery, html: row.defi };
     }
@@ -565,7 +604,7 @@ function lookupINF(rawQuery) {
     if (clean.includes('_')) {
       const baseWord = clean.split('_')[0];
       const baseFChar = getFChar(baseWord, 'DPD', false);
-      const baseRow = dbs.INF.prepare(`SELECT word, defi FROM ${baseFChar} WHERE word = ?`).get(baseWord);
+      const baseRow = prepareCached('INF', `SELECT word, defi FROM "${baseFChar}" WHERE word = ?`).get(baseWord);
       if (baseRow && baseRow.defi) {
         return { word: baseRow.word, query: rawQuery, html: baseRow.defi };
       }
@@ -770,6 +809,7 @@ function lookupAll(rawWord) {
 }
 
 function closeDatabases() {
+  stmtCache.clear();
   for (const [key, dbInstance] of Object.entries(dbs)) {
     try {
       if (dbInstance && typeof dbInstance.close === 'function') {

@@ -1820,7 +1820,86 @@ function restoreClickedWordHighlight(bookCode, record, container = document) {
 }
 
 // Determine Mūla / Aṭṭhakathā / Ṭīkā layer and sibling layers for quick "Open Alongside" controls
-export function getBookLayerInfo(bookCode = '', category = '') {
+function collectAvailableMatLayers(tabOrMat, ownLayer, bookCode) {
+  if (!tabOrMat || typeof tabOrMat !== 'object') return null;
+
+  const codeRaw = String(bookCode || tabOrMat.bookCode || '').trim();
+  const mat =
+    tabOrMat.mat !== undefined
+      ? tabOrMat.mat
+      : (tabOrMat.mula_code !== undefined ||
+          tabOrMat.attha_code !== undefined ||
+          tabOrMat.tika_code !== undefined)
+      ? tabOrMat
+      : null;
+
+  const splitTargets = tabOrMat.split_targets || mat?.split_targets || null;
+  const subBooks = tabOrMat.sub_books || mat?.sub_books || null;
+  const chapterToMat = tabOrMat.chapter_to_mat || null;
+  const paraToMat = tabOrMat.para_to_mat || null;
+
+  const hasExplicitMetadata =
+    (tabOrMat.mat !== undefined && (tabOrMat.mat !== null || Boolean(tabOrMat.matResolved))) ||
+    Boolean(splitTargets) ||
+    Boolean(subBooks) ||
+    Boolean(chapterToMat) ||
+    Boolean(paraToMat);
+
+  if (!hasExplicitMetadata) return null;
+
+  const available = new Set();
+  const addIfTarget = (layerName, targetCode) => {
+    const cleanTarget = String(targetCode || '').trim();
+    if (!cleanTarget || (codeRaw && cleanTarget === codeRaw)) return;
+    available.add(layerName);
+  };
+
+  if (mat) {
+    addIfTarget('mula', mat.mula_code);
+    addIfTarget('attha', mat.attha_code);
+    addIfTarget('tika', mat.tika_code);
+  }
+
+  if (splitTargets && typeof splitTargets === 'object') {
+    for (const l of ['mula', 'attha', 'tika']) {
+      if (Array.isArray(splitTargets[l]) && splitTargets[l].some((r) => r?.code && r.code !== codeRaw)) {
+        available.add(l);
+      }
+    }
+  }
+
+  if (subBooks && typeof subBooks === 'object') {
+    for (const sub of Object.values(subBooks)) {
+      if (!sub || typeof sub !== 'object') continue;
+      addIfTarget('mula', sub.mula_code);
+      addIfTarget('attha', sub.attha_code);
+      addIfTarget('tika', sub.tika_code);
+    }
+  }
+
+  if (chapterToMat && typeof chapterToMat === 'object') {
+    for (const chEntry of Object.values(chapterToMat)) {
+      if (!chEntry || typeof chEntry !== 'object') continue;
+      addIfTarget('mula', chEntry.mula?.book);
+      addIfTarget('attha', chEntry.attha?.book);
+      addIfTarget('tika', chEntry.tika?.book);
+    }
+  }
+
+  if (paraToMat && typeof paraToMat === 'object') {
+    for (const pEntry of Object.values(paraToMat)) {
+      if (!pEntry || typeof pEntry !== 'object') continue;
+      addIfTarget('mula', pEntry.mula?.book);
+      addIfTarget('attha', pEntry.attha?.book);
+      addIfTarget('tika', pEntry.tika?.book);
+    }
+  }
+
+  available.delete(ownLayer);
+  return available;
+}
+
+export function getBookLayerInfo(bookCode = '', category = '', tabOrMat = null) {
   const code = String(bookCode || '').toLowerCase();
   const cat = String(category || '').toLowerCase();
   let layer = 'other';
@@ -1838,7 +1917,7 @@ export function getBookLayerInfo(bookCode = '', category = '') {
   } else if (
     code.endsWith('.tik') ||
     code.includes('t.tik') ||
-    code.endsWith('.nrf') ||
+    code.endsWith('t.nrf') ||
     cat.includes('ṭīkā') ||
     cat.includes('tika')
   ) {
@@ -1853,10 +1932,16 @@ export function getBookLayerInfo(bookCode = '', category = '') {
     { layer: 'tika', label: 'Ṭīkā', short: 'Ṭ' },
   ];
 
-  const siblingLayers =
-    layer === 'mula' || layer === 'attha' || layer === 'tika'
-      ? allMatLayers.filter((item) => item.layer !== layer)
-      : [];
+  const availableSet = collectAvailableMatLayers(tabOrMat, layer, bookCode);
+  let siblingLayers;
+  if (availableSet !== null) {
+    siblingLayers = allMatLayers.filter((item) => item.layer !== layer && availableSet.has(item.layer));
+  } else {
+    siblingLayers =
+      layer === 'mula' || layer === 'attha' || layer === 'tika'
+        ? allMatLayers.filter((item) => item.layer !== layer)
+        : [];
+  }
 
   return { layer, label, shortLabel, siblingLayers };
 }
@@ -4436,8 +4521,17 @@ const ReaderPane = memo(function ReaderPane({
   };
 
   const layerInfo = useMemo(
-    () => getBookLayerInfo(activeTab?.bookCode, activeTab?.category),
-    [activeTab?.bookCode, activeTab?.category]
+    () => getBookLayerInfo(activeTab?.bookCode, activeTab?.category, activeTab),
+    [
+      activeTab?.bookCode,
+      activeTab?.category,
+      activeTab?.mat,
+      activeTab?.split_targets,
+      activeTab?.sub_books,
+      activeTab?.chapter_to_mat,
+      activeTab?.para_to_mat,
+      activeTab?.chapters?.length,
+    ]
   );
 
   const wrapperClass = isVisible
@@ -5252,7 +5346,9 @@ export default function ReaderView() {
         .reader-trans-block[data-trans-lang="${layer.id}"] .reader-nissaya-meaning,
         .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
         .reader-trans-block[data-trans-lang="${layer.id}"] p,
-        .reader-trans-block[data-trans-lang="${code}"] p {
+        .reader-trans-block[data-trans-lang="${code}"] p,
+        .linked-def-trans-row[data-trans-lang="${layer.id}"] .linked-def-trans-text,
+        .linked-def-trans-row[data-trans-lang="${code}"] .linked-def-trans-text {
           color: ${text} !important;
         }`);
       }
@@ -5287,7 +5383,9 @@ export default function ReaderView() {
         .reader-trans-block[data-trans-lang="${langKey}"] .reader-nissaya-meaning,
         .reader-trans-block[data-trans-lang="${code}"] .reader-nissaya-meaning,
         .reader-trans-block[data-trans-lang="${langKey}"] p,
-        .reader-trans-block[data-trans-lang="${code}"] p {
+        .reader-trans-block[data-trans-lang="${code}"] p,
+        .linked-def-trans-row[data-trans-lang="${langKey}"] .linked-def-trans-text,
+        .linked-def-trans-row[data-trans-lang="${code}"] .linked-def-trans-text {
           color: ${text} !important;
         }`);
       }

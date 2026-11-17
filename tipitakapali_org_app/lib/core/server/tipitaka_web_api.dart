@@ -184,7 +184,10 @@ class TipitakaWebApi {
 
     try {
       final db = sqlite3.open(filePath, mode: OpenMode.readOnly);
-      db.execute('PRAGMA temp_store = MEMORY; PRAGMA query_only = 1;');
+      db.execute(
+        'PRAGMA temp_store = MEMORY; PRAGMA query_only = 1; '
+        'PRAGMA cache_size = -8000; PRAGMA mmap_size = 67108864;',
+      );
       _dbs[filename] = db;
       return db;
     } catch (_) {
@@ -1738,16 +1741,25 @@ class TipitakaWebApi {
     final exact = <Map<String, dynamic>>[];
     final related = <Map<String, dynamic>>[];
 
+    final grouped = <String, List<String>>{};
     for (final w in wordsToQuery) {
       final fchar = _getFChar(w, 'DPD', db);
-      final safe = '"${fchar.replaceAll('"', '""')}"';
+      grouped.putIfAbsent(fchar, () => <String>[]).add(w);
+    }
+    for (final entry in grouped.entries) {
+      final safe = '"${entry.key.replaceAll('"', '""')}"';
+      final groupWords = entry.value;
+      final placeholders = List.filled(groupWords.length, '?').join(',');
       try {
-        final rows = db.select('SELECT word, defi FROM $safe WHERE word = ?', [w]);
+        final rows = db.select(
+          'SELECT word, defi FROM $safe WHERE word IN ($placeholders)',
+          groupWords,
+        );
         for (final r in rows) {
           var df = dpdFamilyTemplates.restoreDpdDefi(
             (r['defi'] ?? '').toString(),
           );
-          final hw = (r['word'] ?? w).toString();
+          final hw = (r['word'] ?? '').toString();
           final isExact = hw.toLowerCase() == word;
           if (isExact) {
             df = df.replaceAll('class=p1w', 'class=p2w');
@@ -1771,16 +1783,22 @@ class TipitakaWebApi {
     if (db == null) return const [];
     final exact = <Map<String, dynamic>>[];
     final related = <Map<String, dynamic>>[];
+    final grouped = <String, List<String>>{};
     for (final w in wordsToQuery) {
       final fchar = _getFChar(w, dbKey, db);
-      final safe = '"${fchar.replaceAll('"', '""')}"';
+      grouped.putIfAbsent(fchar, () => <String>[]).add(w);
+    }
+    for (final entry in grouped.entries) {
+      final safe = '"${entry.key.replaceAll('"', '""')}"';
+      final groupWords = entry.value;
+      final placeholders = List.filled(groupWords.length, '?').join(',');
       try {
         final sql = dbKey == 'PSD'
-            ? 'SELECT word, defi, source FROM $safe WHERE word = ?'
-            : 'SELECT word, defi FROM $safe WHERE word = ?';
-        final rows = db.select(sql, [w]);
+            ? 'SELECT word, defi, source FROM $safe WHERE word IN ($placeholders)'
+            : 'SELECT word, defi FROM $safe WHERE word IN ($placeholders)';
+        final rows = db.select(sql, groupWords);
         for (final r in rows) {
-          final hw = (r['word'] ?? w).toString();
+          final hw = (r['word'] ?? '').toString();
           final isExact = hw.toLowerCase() == word;
           final item = formatter(r, isExact);
           if (isExact) {
