@@ -4958,6 +4958,18 @@ section.MWS {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+.linked-def-passage-target.linked-def-target-inactive {
+  background-color: color-mix(in srgb, var(--accent) 4%, var(--bg-primary));
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: none;
+}
+
+.linked-def-line-selected {
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--bg-primary));
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .linked-def-pali-text {
   font-family: var(--font-reader);
   font-size: var(--font-size-base, 22px);

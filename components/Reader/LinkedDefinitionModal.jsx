@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowLeft, BookOpen, ExternalLink, X, Layers, Columns } from 'lucide-react';
+import { ArrowRight, ArrowLeft, BookOpen, Check, ExternalLink, X, Layers, Columns } from 'lucide-react';
 import { fetchLinkedPreview, getCachedLinkedPreview } from '../../services/api';
 import { convertPaliScript, cleanDictionaryQuery } from '../../services/transliterate';
 import { formatSafeTranslationHtml } from '../../services/translationFormat';
@@ -55,6 +55,51 @@ function toDisplayPali(text, currentScript) {
     : text;
 }
 
+export function getLinkedLineKey(line, idx = 0) {
+  if (!line || typeof line !== 'object') return `line-${idx}`;
+  return `${line.para_index ?? 'p'}-${line.line_id ?? 'p'}-${idx}`;
+}
+
+export function buildLinkedOpenOptions(preview, link, selectedLine = null) {
+  const targetBook = preview?.book_code || link?.target_book || null;
+  if (!targetBook) return null;
+
+  const baseParaIndex = preview?.target_para_index ?? link?.target_para_index;
+  const baseLineId = preview?.target_line_id ?? link?.target_line_id ?? null;
+  const baseChapterIdx = preview?.chapter_index ?? link?.target_chapter;
+
+  const activeLine = selectedLine || null;
+  const targetParaIndex =
+    activeLine && activeLine.para_index !== undefined && activeLine.para_index !== null
+      ? activeLine.para_index
+      : baseParaIndex;
+  const sameParaAsDefault =
+    baseParaIndex === undefined ||
+    baseParaIndex === null ||
+    String(targetParaIndex) === String(baseParaIndex);
+
+  const targetParaNum = activeLine
+    ? activeLine.para_num || (sameParaAsDefault ? link?.target_para_num : undefined)
+    : link?.target_para_num;
+  const targetLineId = activeLine
+    ? activeLine.line_id !== undefined && activeLine.line_id !== null
+      ? activeLine.line_id
+      : null
+    : baseLineId;
+
+  return {
+    targetBook,
+    opts: {
+      ...(sameParaAsDefault && baseChapterIdx !== undefined && baseChapterIdx !== null
+        ? { targetChapterIdx: baseChapterIdx }
+        : {}),
+      ...(targetParaIndex !== undefined && targetParaIndex !== null ? { targetParaIndex } : {}),
+      ...(targetParaNum ? { targetParaNum } : {}),
+      ...(targetLineId !== undefined && targetLineId !== null ? { targetLineId } : {}),
+    },
+  };
+}
+
 function extractClickedWord(e) {
   if (typeof document === 'undefined') return '';
   let range = null;
@@ -106,8 +151,20 @@ export default function LinkedDefinitionModal({
   const [loading, setLoading] = useState(Boolean(link?.target_book) && !initialCachedPreview);
   const [error, setError] = useState(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [selectedLineKey, setSelectedLineKey] = useState(null);
   const bodyRef = useRef(null);
   const targetRef = useRef(null);
+
+  useEffect(() => {
+    setSelectedLineKey(null);
+  }, [
+    link?.target_book,
+    link?.target_chapter,
+    link?.target_para_index,
+    link?.target_para_num,
+    link?.target_line_id,
+    link?.word,
+  ]);
 
   useEffect(() => {
     if (!link) return;
@@ -199,35 +256,48 @@ export default function LinkedDefinitionModal({
     CATEGORY_LABELS[rawCategory.toLowerCase()] || rawCategory;
   const catClass = getLinkedCategoryClass(rawCategory);
 
-  const handleOpenInReader = () => {
-    const targetBook = preview?.book_code || link.target_book;
-    if (!targetBook) return;
-    openBook(targetBook, {
-      targetChapterIdx: preview?.chapter_index ?? link.target_chapter,
-      targetParaIndex: preview?.target_para_index ?? link.target_para_index,
-      targetParaNum: link.target_para_num,
-      targetLineId: preview?.target_line_id ?? link.target_line_id,
-    });
+  const lines = Array.isArray(preview?.lines) ? preview.lines : [];
+  const firstTargetIdx = lines.findIndex((l) => Boolean(l?.is_target));
+  const defaultTargetLine = firstTargetIdx >= 0 ? lines[firstTargetIdx] : null;
+  const selectedLineObj =
+    (selectedLineKey && lines.find((l, i) => getLinkedLineKey(l, i) === selectedLineKey)) ||
+    defaultTargetLine ||
+    null;
+  const activeSelectionKey = selectedLineObj
+    ? getLinkedLineKey(selectedLineObj, lines.indexOf(selectedLineObj))
+    : null;
+  const hasCustomLineSelected = Boolean(
+    selectedLineKey &&
+    defaultTargetLine &&
+    activeSelectionKey !== getLinkedLineKey(defaultTargetLine, firstTargetIdx)
+  );
+
+  const openPayload = buildLinkedOpenOptions(preview, link, selectedLineObj);
+
+  const openLineInReader = (lineOverride = null) => {
+    const payload = buildLinkedOpenOptions(preview, link, lineOverride || selectedLineObj);
+    if (!payload) return;
+    openBook(payload.targetBook, payload.opts);
     onClose?.();
   };
 
-  const handleOpenAlongside = () => {
-    const targetBook = preview?.book_code || link.target_book;
-    if (!targetBook) return;
+  const openLineAlongside = (lineOverride = null) => {
+    const payload = buildLinkedOpenOptions(preview, link, lineOverride || selectedLineObj);
+    if (!payload) return;
     const opts = {
-      targetChapterIdx: preview?.chapter_index ?? link.target_chapter,
-      targetParaIndex: preview?.target_para_index ?? link.target_para_index,
-      targetParaNum: link.target_para_num,
-      targetLineId: preview?.target_line_id ?? link.target_line_id,
+      ...payload.opts,
       sourceBookCode: link.sourceBookCode || null,
     };
     if (typeof openAlongside === 'function') {
-      openAlongside(targetBook, opts);
+      openAlongside(payload.targetBook, opts);
     } else {
-      openBook(targetBook, opts);
+      openBook(payload.targetBook, opts);
     }
     onClose?.();
   };
+
+  const handleOpenInReader = () => openLineInReader(null);
+  const handleOpenAlongside = () => openLineAlongside(null);
 
   const handlePaliBodyClick = (e) => {
     if (e.target.closest('button, a')) return;
@@ -238,9 +308,6 @@ export default function LinkedDefinitionModal({
       openDictionary(clean);
     }
   };
-
-  const lines = Array.isArray(preview?.lines) ? preview.lines : [];
-  const firstTargetIdx = lines.findIndex((l) => Boolean(l?.is_target));
 
   return (
     <div
@@ -330,7 +397,9 @@ export default function LinkedDefinitionModal({
           )}
 
           {!loading && !error && lines.map((line, idx) => {
+            const lineKey = getLinkedLineKey(line, idx);
             const isTarget = Boolean(line.is_target);
+            const isSelected = activeSelectionKey === lineKey;
             const paliHtml = formatPaliInlineHtml(line.pali_html, currentScript);
             const paliColor = resolveTranslationTextColor('pali', 0, settings);
             const rawTranslations =
@@ -346,28 +415,76 @@ export default function LinkedDefinitionModal({
               return ra - rb;
             });
 
+            const cardClass = isSelected
+              ? isTarget
+                ? 'linked-def-passage-target linked-def-line-selected'
+                : 'linked-def-line-selected'
+              : isTarget
+                ? 'linked-def-passage-target linked-def-target-inactive'
+                : 'border bg-[var(--bg-primary)] border-[var(--border-color)]/60 hover:border-[var(--accent)]/45';
+
             return (
               <div
-                key={`${line.para_index}-${line.line_id ?? 'p'}-${idx}`}
+                key={lineKey}
                 ref={idx === firstTargetIdx ? targetRef : undefined}
                 data-target={isTarget ? '1' : undefined}
-                className={`rounded-xl p-3 sm:p-4 transition ${
-                  isTarget
-                    ? 'linked-def-passage-target'
-                    : 'border bg-[var(--bg-primary)] border-[var(--border-color)]/60'
-                }`}
+                data-selected={isSelected ? '1' : undefined}
+                onClick={(e) => {
+                  if (e.target.closest('button, a, .linked-def-pali-text')) return;
+                  const sel = window.getSelection()?.toString()?.trim();
+                  if (sel && sel.length > 0) return;
+                  setSelectedLineKey(lineKey);
+                }}
+                className={`rounded-xl p-3 sm:p-4 transition group ${cardClass}`}
               >
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div
+                  className="flex items-center justify-between gap-2 mb-1.5 cursor-pointer"
+                  onClick={() => setSelectedLineKey(lineKey)}
+                >
                   <div className="flex items-center gap-1.5 text-[10.5px] font-mono text-[var(--text-muted)]">
                     {line.para_num && <span>§ {line.para_num}</span>}
                     {line.line_id && <span>• line {line.line_id}</span>}
                   </div>
-                  {isTarget && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--accent)]">
-                      <Layers size={10} />
-                      <span>Linked Passage</span>
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isTarget && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--accent)]">
+                        <Layers size={10} />
+                        <span>Linked Passage</span>
+                      </span>
+                    )}
+                    {isSelected && (!isTarget || hasCustomLineSelected) && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/35">
+                        <Check size={10} />
+                        <span>Selected</span>
+                      </span>
+                    )}
+                    {!isSelected && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLineKey(lineKey);
+                        }}
+                        className="linked-def-line-select-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer"
+                        title="Select this line for Open in Reader / Open Alongside"
+                      >
+                        <span>Select</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLineInReader(line);
+                      }}
+                      className="linked-def-line-open-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition cursor-pointer"
+                      title={`Open this line${line.para_num ? ` (§ ${line.para_num})` : ''} in Reader`}
+                      aria-label={`Open line ${line.line_id ?? idx + 1} in Reader`}
+                    >
+                      <BookOpen size={10} />
+                      <span>Open</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div
@@ -411,8 +528,9 @@ export default function LinkedDefinitionModal({
         {/* Footer */}
         <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex items-center justify-between gap-3 shrink-0">
           <span className="text-[11px] font-mono text-[var(--text-muted)] truncate">
-            {preview?.book_code || link.target_book}
-            {link.target_para_num ? ` · § ${link.target_para_num}` : ''}
+            {openPayload?.targetBook || preview?.book_code || link.target_book}
+            {openPayload?.opts?.targetParaNum ? ` · § ${openPayload.opts.targetParaNum}` : ''}
+            {openPayload?.opts?.targetLineId ? ` · line ${openPayload.opts.targetLineId}` : ''}
           </span>
 
           <div className="flex items-center gap-2 shrink-0">

@@ -272,6 +272,78 @@ test('LinkedDefinitionModal renders linked-def-passage-target highlight border a
     'utf8'
   );
   assert.match(css, /\.linked-def-passage-target\s*\{[^}]*border:\s*2px\s+solid\s+var\(--accent\)/);
+  assert.match(css, /\.linked-def-line-selected\s*\{[^}]*border:\s*2px\s+solid\s+var\(--accent\)/);
+
+  const noopComp = () => null;
+  const { buildLinkedOpenOptions, getLinkedLineKey } = compileModule('../components/Reader/LinkedDefinitionModal.jsx', {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    'lucide-react': new Proxy({}, { get: () => noopComp }),
+    '../../services/api': { fetchLinkedPreview: async () => null, getCachedLinkedPreview: () => null },
+    '../../services/transliterate': { convertPaliScript: (s) => s, cleanDictionaryQuery: (s) => s },
+    '../../services/translationFormat': { formatSafeTranslationHtml: (s) => s },
+    '../../context/TabContext': { useTabs: () => ({ openBook: () => {}, openAlongside: () => {} }) },
+    '../../context/DictionaryContext': { useDictionary: () => ({ openDictionary: () => {} }) },
+    '../../context/ThemeSettingsContext': {
+      useThemeSettings: () => ({ settings: {} }),
+      resolveTranslationTextColor,
+    },
+  });
+
+  const preview = {
+    book_code: 's0102a.att',
+    chapter_index: 8,
+    target_para_index: 1374,
+    target_line_id: 2,
+  };
+  const link = {
+    target_book: 's0102a.att',
+    target_chapter: 8,
+    target_para_index: 1374,
+    target_para_num: '373',
+    target_line_id: 2,
+  };
+
+  // Default target line keeps original coordinates
+  assert.deepEqual(buildLinkedOpenOptions(preview, link, null), {
+    targetBook: 's0102a.att',
+    opts: {
+      targetChapterIdx: 8,
+      targetParaIndex: 1374,
+      targetParaNum: '373',
+      targetLineId: 2,
+    },
+  });
+
+  // Other line in same paragraph preserves targetChapterIdx and overrides line_id
+  assert.deepEqual(
+    buildLinkedOpenOptions(preview, link, { para_index: 1374, para_num: '373', line_id: 4 }),
+    {
+      targetBook: 's0102a.att',
+      opts: {
+        targetChapterIdx: 8,
+        targetParaIndex: 1374,
+        targetParaNum: '373',
+        targetLineId: 4,
+      },
+    }
+  );
+
+  // Adjacent paragraph line omits targetChapterIdx so openBook resolves chapter from para_index
+  assert.deepEqual(
+    buildLinkedOpenOptions(preview, link, { para_index: 1377, para_num: '375', line_id: 1 }),
+    {
+      targetBook: 's0102a.att',
+      opts: {
+        targetParaIndex: 1377,
+        targetParaNum: '375',
+        targetLineId: 1,
+      },
+    }
+  );
+
+  assert.equal(getLinkedLineKey({ para_index: 1377, line_id: 1 }, 3), '1377-1-3');
+  assert.match(src, /linked-def-line-open-btn/);
+  assert.match(src, /linked-def-line-select-btn/);
 });
 
 test('increasingChain and interpolateMonotonicY: filters cross-reference outliers and interpolates smoothly', () => {
