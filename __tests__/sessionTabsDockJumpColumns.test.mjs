@@ -737,3 +737,164 @@ test('Task 1 behavioral simulation: openBook preserves loadingChapters[targetCha
     globalThis.window = prevWin;
   }
 });
+
+test('Task 1 (+Aṭṭha column open): jumpToMat preserves window-scroll offset and ReaderView transfers scroll on useWindowScroll transition', async () => {
+  const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const readerSrc = fs.readFileSync(path.join(rootDir, 'components/Reader/ReaderView.jsx'), 'utf8');
+
+  // ReaderView transfers savedScroll when useWindowScroll toggles (e.g. 1 pane -> 2 columns)
+  // BEFORE anchorPinRef compensation runs, and guards scroll listeners with useWindowScrollRef.current
+  const transitionIdx = readerSrc.indexOf('if (prevUseWindowScrollRef.current === useWindowScroll) return;');
+  const anchorCompIdx = readerSrc.indexOf('if (!anchorPinRef.current.active) return;');
+  assert.ok(transitionIdx !== -1 && anchorCompIdx !== -1, 'Both layout effects must exist');
+  assert.ok(
+    transitionIdx < anchorCompIdx,
+    'useWindowScroll transition scroll transfer must run BEFORE anchor compensation layout effect'
+  );
+  assert.match(readerSrc, /if\s*\(useWindowScrollRef\.current\)\s*return;/);
+  assert.match(readerSrc, /if\s*\(!useWindowScrollRef\.current\)\s*return;/);
+
+  // Behavioral simulation: Mūla is open in window-scroll mode scrolled to window.scrollY = 1850 at para 6,
+  // user clicks +Aṭṭha -> jumpToMat saves 1850 (not container.scrollTop = 0), emits before-layout-shift,
+  // and opens Aṭṭha alongside while keeping Mūla active.
+  let stateSlots = [];
+  let slotIdx = 0;
+  let capturedCtx = null;
+  const dispatchedEvents = [];
+
+  const mockReact = {
+    __esModule: true,
+    default: null,
+    createElement: (_type, props) => ({ props }),
+    createContext: () => ({
+      Provider: ({ value }) => {
+        capturedCtx = value;
+        return null;
+      },
+    }),
+    useContext: () => ({}),
+    useState: (init) => {
+      const idx = slotIdx++;
+      if (!(idx in stateSlots)) {
+        stateSlots[idx] = typeof init === 'function' ? init() : init;
+      }
+      const setter = (upd) => {
+        stateSlots[idx] = typeof upd === 'function' ? upd(stateSlots[idx]) : upd;
+      };
+      return [stateSlots[idx], setter];
+    },
+    useRef: (init) => {
+      const idx = slotIdx++;
+      if (!(idx in stateSlots)) {
+        stateSlots[idx] = { current: init };
+      }
+      return stateSlots[idx];
+    },
+    useCallback: (fn) => fn,
+    useEffect: () => {},
+    useLayoutEffect: () => {},
+    useMemo: (fn) => fn(),
+  };
+  mockReact.default = mockReact;
+
+  const { TabProvider } = compileModule('../context/TabContext.jsx', {
+    react: mockReact,
+    '../services/api': {
+      fetchBookTocOnly: async () => ({ code: 's0101a.att', chapters: [{ chapter_index: 0 }, { chapter_index: 1 }] }),
+      fetchBook: async (code) =>
+        code === 's0101m.mul'
+          ? {
+              code: 's0101m.mul',
+              title: 'Sīlakkhandhavaggapāḷi',
+              chapter_count: 13,
+              chapters: [{ chapter_index: 0, title: '1. Brahmajālasuttaṃ' }],
+              toc: [],
+              para_to_chapter: { '1': 0, '6': 0 },
+              para_to_mat: { '6': { attha: { book: 's0101a.att', chapter: 1, para: '6' } } },
+              mat: { book_code: 's0101m.mul', mula_code: 's0101m.mul', attha_code: 's0101a.att' },
+              chapters_data: { 0: '<p data-para="6" data-pindex="5">Para 6</p>' },
+            }
+          : {
+              code: 's0101a.att',
+              title: 'Sīlakkhandhavagga-aṭṭhakathā',
+              chapter_count: 13,
+              chapters: [
+                { chapter_index: 0, title: 'Nidāna' },
+                { chapter_index: 1, title: 'Brahmajālasuttavaṇṇanā' },
+              ],
+              toc: [],
+              para_to_chapter: { '6': 1 },
+              mat: { book_code: 's0101a.att', mula_code: 's0101m.mul', attha_code: 's0101a.att' },
+              chapters_data: { 1: '<p data-para="6" data-pindex="12">Para 6 Attha</p>' },
+            },
+      fetchChapter: async () => ({ html: '<p>Chapter</p>' }),
+      fetchMat: async () => ({ book_code: 's0101m.mul', mula_code: 's0101m.mul', attha_code: 's0101a.att' }),
+      fetchMatJump: async () => ({ attha: { book: 's0101a.att', chapter: 1, para: '6' } }),
+      lookupBookInfo: (c) => ({ title: c, nikaya: 'Dīghanikāyo', category: 'Mūla' }),
+    },
+    './ThemeSettingsContext': {
+      useThemeSettings: () => ({ settings: { tabView: 'columns', syncScroll: false }, updateSetting: () => {} }),
+    },
+  });
+
+  const renderProvider = () => {
+    slotIdx = 0;
+    const el = TabProvider({ children: null });
+    capturedCtx = el.props?.value || capturedCtx;
+  };
+  renderProvider();
+
+  await capturedCtx.openBook('s0101m.mul', { targetChapterIdx: 0 });
+  renderProvider();
+
+  const prevWin = globalThis.window;
+  const prevDoc = globalThis.document;
+  const prevCustomEvent = globalThis.CustomEvent;
+  globalThis.CustomEvent = class CustomEvent {
+    constructor(type, init = {}) {
+      this.type = type;
+      this.detail = init.detail;
+    }
+  };
+  globalThis.window = {
+    innerWidth: 1280,
+    scrollY: 1850,
+    location: new URL('http://localhost:3000/book/s0101m.mul/1'),
+    history: { replaceState: () => {} },
+    dispatchEvent: (ev) => dispatchedEvents.push(ev),
+  };
+  globalThis.document = {
+    documentElement: { scrollTop: 1850 },
+    body: { classList: { contains: (cls) => cls === 'window-scroll' } },
+    querySelector: () => ({ scrollTop: 0, offsetParent: {} }),
+  };
+
+  try {
+    await capturedCtx.jumpToMat('attha', {
+      alongside: true,
+      sourceBookCode: 's0101m.mul',
+      sourceParaNum: '6',
+      sourceChapterIdx: 0,
+    });
+    renderProvider();
+
+    assert.equal(
+      capturedCtx.getSavedScroll('s0101m.mul'),
+      1850,
+      'jumpToMat must preserve window.scrollY (1850) instead of overwriting with main.scrollTop (0)'
+    );
+    assert.ok(
+      dispatchedEvents.some((ev) => ev.type === 'tipitaka:before-layout-shift' && ev.detail?.shiftsLayout === true),
+      'openAlongside must emit tipitaka:before-layout-shift so reading anchor is captured before column reflow'
+    );
+    assert.equal(capturedCtx.activeBookCode, 's0101m.mul', 'Mūla must remain active column');
+    assert.deepEqual(
+      capturedCtx.openTabs.map((t) => t.bookCode),
+      ['s0101m.mul', 's0101a.att']
+    );
+  } finally {
+    globalThis.window = prevWin;
+    globalThis.document = prevDoc;
+    globalThis.CustomEvent = prevCustomEvent;
+  }
+});

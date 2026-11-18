@@ -60,6 +60,21 @@ export function selectClickedWordAnchor(container, bandTop = 0, bandBottom = Inf
   return null;
 }
 
+export function isPointInsideRangeRects(range, clientX, clientY, tolerance = 4) {
+  if (!range || typeof range.getClientRects !== 'function') return true;
+  const rects = range.getClientRects();
+  if (!rects || rects.length === 0) return true;
+  const nonZeroRects = Array.from(rects).filter((r) => r.width > 0 || r.height > 0);
+  if (nonZeroRects.length === 0) return true;
+  return nonZeroRects.some(
+    (r) =>
+      clientX >= r.left - tolerance &&
+      clientX <= r.right + tolerance &&
+      clientY >= r.top - tolerance &&
+      clientY <= r.bottom + tolerance
+  );
+}
+
 export function detectLiveSectionTitleFromElements(headings, thresholdY = 120) {
   if (!headings || typeof headings[Symbol.iterator] !== 'function') return null;
   const extractCleanHeadingText = (el) => {
@@ -2431,6 +2446,9 @@ const ReaderPane = memo(function ReaderPane({
   const attemptScrollTimerRef = useRef(null);
   const activeTabRef = useRef(tab);
   activeTabRef.current = tab;
+  const useWindowScrollRef = useRef(useWindowScroll);
+  useWindowScrollRef.current = useWindowScroll;
+  const prevUseWindowScrollRef = useRef(useWindowScroll);
   const isHeaderVisibleRef = useRef(isHeaderVisible);
   isHeaderVisibleRef.current = isHeaderVisible;
   const lastScrollYRef = useRef(0);
@@ -2789,6 +2807,56 @@ const ReaderPane = memo(function ReaderPane({
     };
   }, [captureReadingAnchor, applyAnchorCompensation]);
 
+  // Transfer scroll position cleanly when switching between window-scroll (single pane)
+  // and independent column scroll (<main overflow-y-auto>) so opening/closing columns
+  // never resets an already-scrolled pane back to the top.
+  useLayoutEffect(() => {
+    if (prevUseWindowScrollRef.current === useWindowScroll) return;
+    prevUseWindowScrollRef.current = useWindowScroll;
+
+    const container = containerRef.current;
+    const isReaderReady =
+      Boolean(isVisible && container && tab?.bookCode && tab.bookCode !== 'ai_chat') &&
+      tab.viewMode !== 'toc' &&
+      !tab.isTocView &&
+      !tab.isLoading;
+    if (!isReaderReady) return;
+
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('window-scroll', useWindowScroll);
+      document.body.classList.toggle('window-scroll', useWindowScroll);
+    }
+
+    if (paneScrollIntent) return;
+
+    const savedScroll = getSavedScroll(tab.bookCode);
+    const targetScroll = savedScroll > 0 ? savedScroll : (lastScrollYRef.current > 0 ? lastScrollYRef.current : 0);
+    if (targetScroll > 0 || Math.abs(getScrollTop() - targetScroll) > 1) {
+      isProgrammaticScrollRef.current = true;
+      lastScrollYRef.current = targetScroll;
+      setScrollTop(targetScroll, 'auto');
+      if (targetScroll !== savedScroll && tab?.bookCode && tab.bookCode !== 'ai_chat') {
+        saveTabScroll(tab.bookCode, targetScroll);
+      }
+      clearTimeout(programmaticScrollTimerRef.current);
+      programmaticScrollTimerRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 150);
+    }
+  }, [
+    useWindowScroll,
+    isVisible,
+    tab?.bookCode,
+    tab?.viewMode,
+    tab?.isTocView,
+    tab?.isLoading,
+    paneScrollIntent,
+    getSavedScroll,
+    getScrollTop,
+    setScrollTop,
+    saveTabScroll,
+  ]);
+
   useLayoutEffect(() => {
     if (!anchorPinRef.current.active) return;
     applyAnchorCompensation();
@@ -2802,7 +2870,7 @@ const ReaderPane = memo(function ReaderPane({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isDictOpen, dictDockMode, isDictPinned, isSidebarOpen, isColumnsMode, applyAnchorCompensation]);
+  }, [isDictOpen, dictDockMode, isDictPinned, isSidebarOpen, isColumnsMode, useWindowScroll, applyAnchorCompensation]);
 
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined' || !containerRef.current || !isVisible) return;
@@ -4577,6 +4645,7 @@ const ReaderPane = memo(function ReaderPane({
 
   const handleScroll = useCallback(
     (e) => {
+      if (useWindowScrollRef.current) return;
       processScrollTop(e.target.scrollTop);
     },
     [processScrollTop]
@@ -4586,6 +4655,7 @@ const ReaderPane = memo(function ReaderPane({
     if (!useWindowScroll || !isVisible || typeof window === 'undefined') return;
     lastScrollYRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     const onWinScroll = () => {
+      if (!useWindowScrollRef.current) return;
       processScrollTop(window.scrollY || document.documentElement.scrollTop || 0);
     };
     window.addEventListener('scroll', onWinScroll, { passive: true });
@@ -4682,99 +4752,106 @@ const ReaderPane = memo(function ReaderPane({
       });
     }
 
-    // 3. Single-Click Dictionary Word Lookup
+    // 3. Dictionary Word Hit-Test & Single-Click Word Lookup
     const isLookupActive = clickToLookupEnabled !== false && settings?.dictLookupTrigger !== 'off';
     const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
       ? settings.dictLookupTrigger
       : (clickLookupMode || 'single');
 
-    if (isLookupActive && mode === 'single') {
-      const selection = window.getSelection()?.toString()?.trim();
-      // Only trigger if not dragging/selecting multiple words
-      if (!selection || selection.length <= 1) {
-        clearClickedWordHighlight(containerRef.current || document);
-
-        let range = null;
-        if (document.caretRangeFromPoint) {
-          range = document.caretRangeFromPoint(e.clientX, e.clientY);
-        } else if (document.caretPositionFromPoint) {
-          const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-          if (pos && pos.offsetNode) {
-            range = document.createRange();
-            range.setStart(pos.offsetNode, pos.offset);
-            range.collapse(true);
-          }
+    const selection = window.getSelection()?.toString()?.trim();
+    // Only treat as a click (not drag-selection) when <= 1 char selected
+    if (!selection || selection.length <= 1) {
+      let range = null;
+      if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+        if (pos && pos.offsetNode) {
+          range = document.createRange();
+          range.setStart(pos.offsetNode, pos.offset);
+          range.collapse(true);
         }
+      }
 
-        let node = range?.startContainer;
-        let offset = range?.startOffset || 0;
-        if (node && node.nodeType === Node.ELEMENT_NODE) {
-          const child = node.childNodes[offset] || node.lastChild;
-          if (child) {
-            if (child.nodeType === Node.TEXT_NODE) {
-              node = child;
+      let node = range?.startContainer;
+      let offset = range?.startOffset || 0;
+      if (node && node.nodeType === Node.ELEMENT_NODE) {
+        const child = node.childNodes[offset] || node.lastChild;
+        if (child) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            node = child;
+            offset = 0;
+          } else {
+            const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
+            const textChild = walker.nextNode();
+            if (textChild) {
+              node = textChild;
               offset = 0;
-            } else {
-              const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
-              const textChild = walker.nextNode();
-              if (textChild) {
-                node = textChild;
-                offset = 0;
-              }
             }
           }
         }
+      }
 
-        if (node && node.nodeType === Node.TEXT_NODE) {
-          const text = node.textContent || '';
-          const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
-          const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
+      if (node && node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        const transBlock = node.parentElement?.closest('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
+        const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest('p[data-pindex]') ? 'pali' : 'pali');
 
-          const extracted = extractWordAtOffset(text, offset, transLang);
-          if (extracted) {
-            const { word: rawWord, start, end } = extracted;
-            const wordToLookup = cleanDictionaryQuery(rawWord);
-            if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
-              const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
-              const blockEl = transBlock || pEl;
-              const pIndex = pEl?.getAttribute('data-pindex') || null;
-              const pNum = pEl?.getAttribute('data-para') || null;
-              const chapEl = pEl?.closest('[data-chapter]');
-              const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
-              const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
-              const length = end - start;
+        const extracted = extractWordAtOffset(text, offset, transLang);
+        if (extracted) {
+          const { word: rawWord, start, end } = extracted;
+          const wordToLookup = cleanDictionaryQuery(rawWord);
+          if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
+            const wordRange = document.createRange();
+            wordRange.setStart(node, start);
+            wordRange.setEnd(node, end);
 
-              const wordRange = document.createRange();
-              wordRange.setStart(node, start);
-              wordRange.setEnd(node, end);
-              highlightRangeInReader(wordRange);
+            // Verify pointer is actually on the word glyphs rather than snapped from empty margin/blank space
+            if (isPointInsideRangeRects(wordRange, e.clientX, e.clientY, 4)) {
+              if (e.nativeEvent) e.nativeEvent.__tpoWordClicked = true;
+              e.__tpoWordClicked = true;
 
-              // Multi-frame clear to suppress mobile OS asynchronous selection handles / pins
-              if (typeof window !== 'undefined') {
-                const clearSel = () => {
-                  const sel = window.getSelection();
-                  if (sel) sel.removeAllRanges();
-                };
-                clearSel();
-                setTimeout(clearSel, 0);
-                setTimeout(clearSel, 60);
-                setTimeout(clearSel, 160);
+              if (isLookupActive && mode === 'single') {
+                const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
+                const blockEl = transBlock || pEl;
+                const pIndex = pEl?.getAttribute('data-pindex') || null;
+                const pNum = pEl?.getAttribute('data-para') || null;
+                const chapEl = pEl?.closest('[data-chapter]');
+                const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+                const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
+                const length = end - start;
+
+                clearClickedWordHighlight(containerRef.current || document);
+                const freshRange = (blockEl && createRangeFromCharOffset(blockEl, charOffset, length)) || wordRange;
+                highlightRangeInReader(freshRange);
+
+                // Multi-frame clear to suppress mobile OS asynchronous selection handles / pins
+                if (typeof window !== 'undefined') {
+                  const clearSel = () => {
+                    const sel = window.getSelection();
+                    if (sel) sel.removeAllRanges();
+                  };
+                  clearSel();
+                  setTimeout(clearSel, 0);
+                  setTimeout(clearSel, 60);
+                  setTimeout(clearSel, 160);
+                }
+
+                if (activeTab?.bookCode) {
+                  recordClickedWord(activeTab.bookCode, {
+                    chapIdx,
+                    pIndex,
+                    paraNum: pNum,
+                    word: wordToLookup,
+                    rawWord,
+                    charOffset,
+                    length,
+                    transLang,
+                  });
+                }
+
+                openDictionary(wordToLookup);
               }
-
-              if (activeTab?.bookCode) {
-                recordClickedWord(activeTab.bookCode, {
-                  chapIdx,
-                  pIndex,
-                  paraNum: pNum,
-                  word: wordToLookup,
-                  rawWord,
-                  charOffset,
-                  length,
-                  transLang,
-                });
-              }
-
-              openDictionary(wordToLookup);
             }
           }
         }
@@ -4912,33 +4989,38 @@ const ReaderPane = memo(function ReaderPane({
         const extracted = extractWordAtOffset(text, offset, transLang);
         if (extracted) {
           const { word: rawWord, start, end } = extracted;
-          wordToLookup = cleanDictionaryQuery(rawWord);
-          if (wordToLookup && (wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) {
-            const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
-            const blockEl = transBlock || pEl;
-            const pIndex = pEl?.getAttribute('data-pindex') || null;
-            const pNum = pEl?.getAttribute('data-para') || null;
-            const chapEl = pEl?.closest('[data-chapter]');
-            const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
-            const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
-            const length = end - start;
-
+          const candidateWord = cleanDictionaryQuery(rawWord);
+          if (candidateWord && (candidateWord.length >= 2 || /\p{L}/u.test(candidateWord))) {
             const wordRange = document.createRange();
             wordRange.setStart(node, start);
             wordRange.setEnd(node, end);
-            highlightRangeInReader(wordRange);
 
-            if (activeTab?.bookCode) {
-              recordClickedWord(activeTab.bookCode, {
-                chapIdx,
-                pIndex,
-                paraNum: pNum,
-                word: wordToLookup,
-                rawWord,
-                charOffset,
-                length,
-                transLang,
-              });
+            if (isPointInsideRangeRects(wordRange, e.clientX, e.clientY, 4)) {
+              wordToLookup = candidateWord;
+              const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
+              const blockEl = transBlock || pEl;
+              const pIndex = pEl?.getAttribute('data-pindex') || null;
+              const pNum = pEl?.getAttribute('data-para') || null;
+              const chapEl = pEl?.closest('[data-chapter]');
+              const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
+              const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
+              const length = end - start;
+
+              const freshRange = (blockEl && createRangeFromCharOffset(blockEl, charOffset, length)) || wordRange;
+              highlightRangeInReader(freshRange);
+
+              if (activeTab?.bookCode) {
+                recordClickedWord(activeTab.bookCode, {
+                  chapIdx,
+                  pIndex,
+                  paraNum: pNum,
+                  word: wordToLookup,
+                  rawWord,
+                  charOffset,
+                  length,
+                  transLang,
+                });
+              }
             }
           }
         }

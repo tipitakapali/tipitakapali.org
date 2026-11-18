@@ -673,7 +673,12 @@ export default function BookTabsBar() {
         >
           <button
             type="button"
-            onClick={() => updateSetting('tabView', 'single')}
+            onClick={() => {
+              if (tabView !== 'single' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'single', shiftsLayout: true } }));
+              }
+              updateSetting('tabView', 'single');
+            }}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
               tabView === 'single'
                 ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
@@ -686,7 +691,12 @@ export default function BookTabsBar() {
           </button>
           <button
             type="button"
-            onClick={() => updateSetting('tabView', 'tabbed')}
+            onClick={() => {
+              if (tabView !== 'tabbed' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'tabbed', shiftsLayout: true } }));
+              }
+              updateSetting('tabView', 'tabbed');
+            }}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
               tabView === 'tabbed'
                 ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
@@ -699,7 +709,12 @@ export default function BookTabsBar() {
           </button>
           <button
             type="button"
-            onClick={() => updateSetting('tabView', 'columns')}
+            onClick={() => {
+              if (tabView !== 'columns' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'columns', shiftsLayout: true } }));
+              }
+              updateSetting('tabView', 'columns');
+            }}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
               tabView === 'columns'
                 ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'

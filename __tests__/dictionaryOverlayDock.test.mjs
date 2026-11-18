@@ -383,3 +383,223 @@ test('CSS & SettingsModal invariants for floating non-shifting side dictionary',
   assert.match(dictModalSrc, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.doesNotMatch(dictModalSrc, /historyDropdownRef[\s\S]{0,120}sm:w-72/);
 });
+
+test('shouldDismissUnpinnedDictionaryOnClick closes unpinned panel on empty space click, keeps open on word/panel/pinned/interactive clicks', () => {
+  const noopComp = () => null;
+  const { shouldDismissUnpinnedDictionaryOnClick } = compileModule('../components/DictionaryModal.jsx', {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    'lucide-react': new Proxy({}, { get: () => noopComp }),
+    '../context/DictionaryContext': {
+      useDictionary: () => ({}),
+      DEFAULT_DICT_ORDER: ['dpd'],
+      DEFAULT_DICT_ENABLED: { dpd: true },
+    },
+    '../context/ThemeSettingsContext': { useThemeSettings: () => ({ settings: {} }) },
+    '../context/TabContext': { useTabs: () => ({}) },
+    './BoldDefinitionSection': { __esModule: true, default: noopComp },
+    '../services/transliterate': {
+      typeVelthuis: (s) => s,
+      convertAnyToRoman: (s) => s,
+      convertPaliScript: (s) => s,
+      cleanDictionaryQuery: (s) => s,
+    },
+    '../services/api': { fetchDictionaryInflection: async () => ({}) },
+    '../services/dpdFeedback': { restoreMinifiedLinks: (s) => s },
+  });
+
+  const makeTarget = (matchedSelector = null) => ({
+    closest: (sel) => {
+      if (!matchedSelector) return null;
+      return sel.includes(matchedSelector) ? {} : null;
+    },
+  });
+  const panelEl = { contains: (t) => t === panelChild };
+  const panelChild = makeTarget();
+  const emptySpaceEl = makeTarget();
+
+  // 1. Unpinned side mode + empty space click -> dismisses (true)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    true
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: false, dockMode: 'left', panelEl, now: 1000 }
+    ),
+    true
+  );
+
+  // 2. Word click (marked via nativeEvent or event) -> stays open (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl, __tpoWordClicked: true },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl, nativeEvent: { __tpoWordClicked: true } },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+
+  // 3. Pinned mode -> empty space click does NOT dismiss (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: true, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+
+  // 4. Inside dictionary panel -> stays open (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: panelChild },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+
+  // 5. Dictionary trigger button / interactive controls -> stays open (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: makeTarget('[data-dict-trigger]') },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: makeTarget('button') },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: makeTarget('a[href]') },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+
+  // 6. Drag text selection -> stays open (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, selectionText: 'Evaṃ me sutaṃ', now: 1000 }
+    ),
+    false
+  );
+
+  // 7. Just finished resizing (< 250ms) -> stays open (false)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, lastResizeEndTime: 900, now: 1000 }
+    ),
+    false
+  );
+
+  // 8. Modal mode or closed -> false (handled by modal pointerdown overlay)
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: true, isPinned: false, dockMode: 'modal', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: emptySpaceEl },
+      { isOpen: false, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+
+  // 9. Other open modals (.modal-backdrop / .fixed.inset-0 / [aria-modal="true"]) -> stays open (false)
+  for (const modalSel of ['.modal-backdrop', '.fixed.inset-0', '[aria-modal="true"]']) {
+    assert.equal(
+      shouldDismissUnpinnedDictionaryOnClick(
+        { target: makeTarget(modalSel) },
+        { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+      ),
+      false
+    );
+  }
+
+  // 10. Empty-space click handler calls closeDictionary({ suppressGhostClick: false }) directly without setting __tipitaka_dict_just_closed
+  const dictModalSrc = fs.readFileSync(path.join(rootDir, 'components/DictionaryModal.jsx'), 'utf8');
+  const emptyHandlerMatch = dictModalSrc.match(/const handleEmptySpaceClick = \(e\) => \{([\s\S]*?)\n    \};/);
+  assert.ok(emptyHandlerMatch, 'handleEmptySpaceClick should exist');
+  assert.match(emptyHandlerMatch[1], /closeDictionary\(\{\s*suppressGhostClick:\s*false\s*\}\)/);
+  assert.doesNotMatch(emptyHandlerMatch[1], /handleSafeDismiss\(/);
+});
+
+test('isPointInsideRangeRects distinguishes actual word glyphs from empty margins and end-of-line space', () => {
+  const noopComp = () => null;
+  const { isPointInsideRangeRects } = compileModule('../components/Reader/ReaderView.jsx', {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    'lucide-react': new Proxy({}, { get: () => noopComp }),
+    './WelcomeView': { __esModule: true, default: noopComp },
+    './MeditationLoader': { __esModule: true, default: noopComp },
+    './BookTocView': { __esModule: true, default: noopComp },
+    './LinkedDefinitionModal': { __esModule: true, default: noopComp },
+    '../AiChat/AiChatView': { __esModule: true, default: noopComp },
+    '../../context/TabContext': { useTabs: () => ({}) },
+    '../../context/ThemeSettingsContext': {
+      useThemeSettings: () => ({ settings: {} }),
+      getDefaultTranslationColorsForTheme: () => ({}),
+    },
+    '../../context/DictionaryContext': { useDictionary: () => ({}) },
+    '../../services/transliterate': {
+      transliterateHtml: (h) => h,
+      convertPaliScript: (s) => s,
+      highlightHtmlText: (h) => h,
+      highlightTranslationText: (t) => t,
+      capitalizePali: (s) => s,
+      convertAnyToRoman: (s) => s,
+      cleanDictionaryQuery: (s) => s,
+    },
+    '../../services/scroll': { smartScrollTo: () => {} },
+    '../../services/api': {
+      fetchChapterTranslations: async () => ({}),
+      fetchPaliSentences: async () => ({}),
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      getCachedPaliSentences: () => null,
+      getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
+    },
+  });
+
+  const singleLineRange = {
+    getClientRects: () => [{ left: 200, right: 280, top: 300, bottom: 328, width: 80, height: 28 }],
+  };
+  assert.equal(isPointInsideRangeRects(singleLineRange, 240, 314, 4), true, 'click inside word rect');
+  assert.equal(isPointInsideRangeRects(singleLineRange, 283, 314, 4), true, 'click within 4px tolerance');
+  assert.equal(isPointInsideRangeRects(singleLineRange, 450, 314, 4), false, 'empty space to right of short line');
+  assert.equal(isPointInsideRangeRects(singleLineRange, 100, 314, 4), false, 'empty left margin');
+  assert.equal(isPointInsideRangeRects(singleLineRange, 240, 345, 4), false, 'empty vertical gap between paragraphs');
+
+  // Wrapped word spanning two lines
+  const wrappedRange = {
+    getClientRects: () => [
+      { left: 720, right: 780, top: 300, bottom: 328, width: 60, height: 28 },
+      { left: 200, right: 245, top: 332, bottom: 360, width: 45, height: 28 },
+    ],
+  };
+  assert.equal(isPointInsideRangeRects(wrappedRange, 220, 344, 4), true);
+  assert.equal(isPointInsideRangeRects(wrappedRange, 500, 344, 4), false);
+
+  // Mock range with no layout geometry falls back safely to true
+  assert.equal(isPointInsideRangeRects({ getClientRects: () => [] }, 0, 0, 4), true);
+});

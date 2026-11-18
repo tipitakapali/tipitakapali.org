@@ -727,12 +727,12 @@ export function DictionaryProvider({ children }) {
     }
   }, [performLookup, setDictTab]);
 
-  const closeDictionary = useCallback(() => {
+  const closeDictionary = useCallback(({ suppressGhostClick = true } = {}) => {
     const effectiveMode = isMobileScreenRef.current ? 'modal' : dockModeRef.current;
     const shiftsLayout = Boolean(isPinnedRef.current && effectiveMode !== 'modal');
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-close', shiftsLayout } }));
-      window.__tipitaka_dict_just_closed = Date.now();
+      if (suppressGhostClick) window.__tipitaka_dict_just_closed = Date.now();
     }
     setIsOpen(false);
   }, []);

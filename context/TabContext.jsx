@@ -1962,6 +1962,41 @@ export function TabProvider({ children }) {
   );
 
 
+  const snapshotPaneScroll = useCallback((bookCode) => {
+    if (!bookCode || bookCode === 'ai_chat' || typeof document === 'undefined') return null;
+    const isWin = document.body?.classList?.contains('window-scroll');
+    let curScroll = null;
+    if (isWin && activeBookCodeRef.current === bookCode && typeof window !== 'undefined') {
+      curScroll = window.scrollY || document.documentElement?.scrollTop || 0;
+    } else {
+      const container = getActiveContentArea(bookCode);
+      if (container && container.offsetParent !== null) {
+        curScroll = container.scrollTop;
+      }
+    }
+    if (curScroll !== null && (curScroll > 0 || tabScrollMemoryRef.current[bookCode] === undefined)) {
+      tabScrollMemoryRef.current[bookCode] = curScroll;
+      try {
+        localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
+      } catch (e) {}
+    }
+    return curScroll;
+  }, []);
+
+  const emitLayoutShiftBeforeChange = useCallback((source) => {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.dispatchEvent === 'function' &&
+      typeof CustomEvent === 'function'
+    ) {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', {
+          detail: { source, shiftsLayout: true },
+        })
+      );
+    }
+  }, []);
+
   const closeTab = useCallback(
     (bookCode, e) => {
       if (e) e.stopPropagation();
@@ -1969,6 +2004,15 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx === -1) return;
+
+      const remainingBookTabs = currentTabs.filter(
+        (t) => t.bookCode !== bookCode && t.type !== 'ai_chat' && t.bookCode !== 'ai_chat'
+      );
+      if (remainingBookTabs.length === 1 && currentTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat').length > 1) {
+        snapshotPaneScroll(remainingBookTabs[0].bookCode);
+        emitLayoutShiftBeforeChange('close-tab');
+      }
+
       delete tabScriptPrefixRef.current[bookCode];
 
       const newTabs = currentTabs.filter((t) => t.bookCode !== bookCode);
@@ -2004,7 +2048,7 @@ export function TabProvider({ children }) {
         persistTabs(newTabs, activeBookCodeRef.current);
       }
     },
-    [updateUrlParams, persistTabs, setActiveParaNum, setIsSidebarOpen]
+    [updateUrlParams, persistTabs, setActiveParaNum, setIsSidebarOpen, snapshotPaneScroll, emitLayoutShiftBeforeChange]
   );
 
   // Close other tabs except bookCode
@@ -2013,6 +2057,11 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const targetTab = currentTabs.find((t) => t.bookCode === bookCode);
       if (!targetTab) return;
+
+      if (currentTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat').length > 1) {
+        snapshotPaneScroll(bookCode);
+        emitLayoutShiftBeforeChange('close-other-tabs');
+      }
 
       const newTabs = [targetTab];
       // Drop script-prefix entries for every tab that is being closed
@@ -2037,7 +2086,7 @@ export function TabProvider({ children }) {
       }
       persistTabs(newTabs, bookCode);
     },
-    [updateUrlParams, persistTabs, setActiveParaNum]
+    [updateUrlParams, persistTabs, setActiveParaNum, snapshotPaneScroll, emitLayoutShiftBeforeChange]
   );
 
   // Close all tabs
@@ -2060,6 +2109,11 @@ export function TabProvider({ children }) {
       for (let i = 0; i < idx; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
 
       const newTabs = currentTabs.slice(idx);
+      const remainingBooks = newTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat');
+      if (remainingBooks.length === 1 && currentTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat').length > 1) {
+        snapshotPaneScroll(remainingBooks[0].bookCode);
+        emitLayoutShiftBeforeChange('close-left-tabs');
+      }
       setOpenTabs(newTabs);
 
       const activeCode = activeBookCodeRef.current;
@@ -2088,7 +2142,7 @@ export function TabProvider({ children }) {
         persistTabs(newTabs, activeCode);
       }
     },
-    [updateUrlParams, persistTabs, setActiveParaNum]
+    [updateUrlParams, persistTabs, setActiveParaNum, snapshotPaneScroll, emitLayoutShiftBeforeChange]
   );
 
   // Close tabs to the right of bookCode
@@ -2100,6 +2154,11 @@ export function TabProvider({ children }) {
       for (let i = idx + 1; i < currentTabs.length; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
 
       const newTabs = currentTabs.slice(0, idx + 1);
+      const remainingBooks = newTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat');
+      if (remainingBooks.length === 1 && currentTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat').length > 1) {
+        snapshotPaneScroll(remainingBooks[0].bookCode);
+        emitLayoutShiftBeforeChange('close-right-tabs');
+      }
       setOpenTabs(newTabs);
 
       const activeCode = activeBookCodeRef.current;
@@ -2128,7 +2187,7 @@ export function TabProvider({ children }) {
         persistTabs(newTabs, activeCode);
       }
     },
-    [updateUrlParams, persistTabs, setActiveParaNum]
+    [updateUrlParams, persistTabs, setActiveParaNum, snapshotPaneScroll, emitLayoutShiftBeforeChange]
   );
 
   const reorderTabs = useCallback(
@@ -2230,18 +2289,8 @@ export function TabProvider({ children }) {
     (bookCode) => {
       if (!bookCode || bookCode === activeBookCodeRef.current) return;
       const outgoingCode = activeBookCodeRef.current;
-      if (outgoingCode && typeof document !== 'undefined') {
-        const container = getActiveContentArea(outgoingCode);
-        if (
-          container &&
-          container.offsetParent !== null &&
-          (container.scrollTop > 0 || tabScrollMemoryRef.current[outgoingCode] === undefined)
-        ) {
-          tabScrollMemoryRef.current[outgoingCode] = container.scrollTop;
-          try {
-            localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
-          } catch (e) {}
-        }
+      if (outgoingCode) {
+        snapshotPaneScroll(outgoingCode);
       }
       setActiveBookCode(bookCode);
       const tab = openTabsRef.current.find((t) => t.bookCode === bookCode);
@@ -2263,7 +2312,7 @@ export function TabProvider({ children }) {
         persistTabs(openTabsRef.current, tab.bookCode);
       }
     },
-    [updateUrlParams, persistTabs]
+    [updateUrlParams, persistTabs, snapshotPaneScroll]
   );
 
   // Open a text (Mūla / Aṭṭhakathā / Ṭīkā) alongside the current tab:
@@ -2289,7 +2338,14 @@ export function TabProvider({ children }) {
           ? existingTarget?.currentChapterIdx ?? 0
           : options.targetChapterIdx;
 
+      if (fromCode) {
+        snapshotPaneScroll(fromCode);
+      }
+      if (activeBookCodeRef.current && activeBookCodeRef.current !== fromCode) {
+        snapshotPaneScroll(activeBookCodeRef.current);
+      }
       if (isWide) {
+        emitLayoutShiftBeforeChange('open-alongside');
         if (settingsRef.current?.tabView !== 'columns') {
           updateSetting('tabView', 'columns');
         }
@@ -2305,7 +2361,7 @@ export function TabProvider({ children }) {
         keepActive: isWide && Boolean(fromCode && fromCode !== cleanTarget),
       });
     },
-    [openBook, updateSetting]
+    [openBook, updateSetting, snapshotPaneScroll, emitLayoutShiftBeforeChange]
   );
 
   // When switching tabView to 'single', keep only the active tab
@@ -2592,18 +2648,8 @@ export function TabProvider({ children }) {
         activeTab;
       if (!sourceTab) return;
 
-      if (sourceTab.bookCode && typeof document !== 'undefined') {
-        const container = getActiveContentArea(sourceTab.bookCode);
-        if (
-          container &&
-          container.offsetParent !== null &&
-          (container.scrollTop > 0 || tabScrollMemoryRef.current[sourceTab.bookCode] === undefined)
-        ) {
-          tabScrollMemoryRef.current[sourceTab.bookCode] = container.scrollTop;
-          try {
-            localStorage.setItem(STORAGE_KEYS.SCROLL, JSON.stringify(tabScrollMemoryRef.current));
-          } catch (e) {}
-        }
+      if (sourceTab.bookCode) {
+        snapshotPaneScroll(sourceTab.bookCode);
       }
 
       let mat = sourceTab.mat;
@@ -2896,7 +2942,7 @@ export function TabProvider({ children }) {
         openBook(targetCode, openOpts);
       }
     },
-    [activeTab, activeParaNum, openBook, openAlongside]
+    [activeTab, activeParaNum, openBook, openAlongside, snapshotPaneScroll]
   );
 
   const openGoToModal = useCallback((tab = 'para', edition = null) => {

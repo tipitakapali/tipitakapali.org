@@ -455,6 +455,43 @@ function extractOtherSummaryItem(rawHtml, dictType, fallbackWord = '', index = 0
   };
 }
 
+export function shouldDismissUnpinnedDictionaryOnClick(
+  e,
+  {
+    isOpen = false,
+    isPinned = false,
+    dockMode = 'side',
+    panelEl = null,
+    selectionText = '',
+    lastResizeEndTime = 0,
+    now = Date.now(),
+  } = {}
+) {
+  if (!isOpen || isPinned || dockMode === 'modal') return false;
+  if (now - lastResizeEndTime < 250) return false;
+  if (e?.__tpoWordClicked || e?.nativeEvent?.__tpoWordClicked) return false;
+  if (selectionText && selectionText.trim().length > 1) return false;
+
+  const target = e?.target;
+  if (!target) return false;
+  if (panelEl && typeof panelEl.contains === 'function' && panelEl.contains(target)) {
+    return false;
+  }
+  if (typeof target.closest === 'function') {
+    if (target.closest('[data-dict-trigger], .dict-quick-btn')) {
+      return false;
+    }
+    if (
+      target.closest(
+        'button, a[href], input, select, textarea, label, [role="button"], [role="tab"], [role="menuitem"], [role="dialog"], [aria-modal="true"], .book-tab, .tree-row, .linked-def-chip, .linked-def-more-btn, [data-goto-type], .modal-overlay, .modal-backdrop, .fixed.inset-0'
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export default function DictionaryModal() {
   const {
     isOpen,
@@ -535,6 +572,7 @@ export default function DictionaryModal() {
   // Resizable Width State (persisted in localStorage)
   const [dictWidth, setDictWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
+  const lastResizeEndRef = useRef(0);
 
   const currentScript = settings?.paliScript || 'roman';
   const { openBook, openAlongside, isHeaderVisible = true, isSidebarOpen = false } = useTabs();
@@ -700,6 +738,7 @@ export default function DictionaryModal() {
 
       const onPointerUp = () => {
         setIsResizing(false);
+        lastResizeEndRef.current = Date.now();
         try {
           if (pointerId !== undefined && pointerTarget?.hasPointerCapture?.(pointerId)) {
             pointerTarget.releasePointerCapture(pointerId);
@@ -772,13 +811,15 @@ export default function DictionaryModal() {
     closeDictionary();
   }, [closeDictionary]);
 
-  // Outside click listener: closes modal or top/bottom drawer when clicking outside (docked left/right stays docked like sidebar)
+  // Outside click listener:
+  // - In modal mode: closes on pointerdown outside panel
+  // - In unpinned side mode (!isPinned): closes when clicking empty space (not a word or panel/interactive control)
+  // - In pinned side mode (isPinned): stays docked beside the reader
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDownOutside = (e) => {
-      // In docked side panel modes (left/right), keep it docked like the navigation tree
-      if (dockMode === 'left' || dockMode === 'side' || dockMode === 'right') {
+      if (dockMode !== 'modal') {
         return;
       }
       // Don't close if click is inside the dictionary panel
@@ -792,15 +833,37 @@ export default function DictionaryModal() {
       handleSafeDismiss(e);
     };
 
+    const handleEmptySpaceClick = (e) => {
+      const sel = typeof window !== 'undefined' ? window.getSelection()?.toString() || '' : '';
+      if (
+        shouldDismissUnpinnedDictionaryOnClick(e, {
+          isOpen,
+          isPinned,
+          dockMode,
+          panelEl: modalPanelRef.current,
+          selectionText: sel,
+          lastResizeEndTime: lastResizeEndRef.current,
+        })
+      ) {
+        // Already running in bubble-phase `click`: close immediately without setting
+        // `__tipitaka_dict_just_closed` so the user's very next word click works right away.
+        closeDictionary({ suppressGhostClick: false });
+      }
+    };
+
     const timer = setTimeout(() => {
       document.addEventListener('pointerdown', handlePointerDownOutside, true);
+      if (!isPinned && dockMode !== 'modal') {
+        document.addEventListener('click', handleEmptySpaceClick, false);
+      }
     }, 60);
 
     return () => {
       clearTimeout(timer);
       document.removeEventListener('pointerdown', handlePointerDownOutside, true);
+      document.removeEventListener('click', handleEmptySpaceClick, false);
     };
-  }, [isOpen, dockMode, handleSafeDismiss]);
+  }, [isOpen, isPinned, dockMode, handleSafeDismiss, closeDictionary]);
 
   // Register global window.playAudio for inline DPD audio buttons (Fix 3) - singleton + dedupe to prevent double 206
   useEffect(() => {

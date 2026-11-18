@@ -6,6 +6,21 @@ import { useDictionary } from '../../context/DictionaryContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { cleanDictionaryQuery } from '../../services/transliterate';
 
+function isPointInsideRangeRects(range, clientX, clientY, tolerance = 4) {
+  if (!range || typeof range.getClientRects !== 'function') return true;
+  const rects = range.getClientRects();
+  if (!rects || rects.length === 0) return true;
+  const nonZeroRects = Array.from(rects).filter((r) => r.width > 0 || r.height > 0);
+  if (nonZeroRects.length === 0) return true;
+  return nonZeroRects.some(
+    (r) =>
+      clientX >= r.left - tolerance &&
+      clientX <= r.right + tolerance &&
+      clientY >= r.top - tolerance &&
+      clientY <= r.bottom + tolerance
+  );
+}
+
 /**
  * Extract the word-like segment at a viewport point (mirrors Reader word lookup).
  * Returns the raw word string or null.
@@ -32,9 +47,20 @@ function extractWordAtPoint(clientX, clientY) {
   let offset = range.startOffset || 0;
   if (node && node.nodeType === Node.ELEMENT_NODE) {
     const child = node.childNodes[offset] || node.lastChild;
-    if (child && child.nodeType === Node.TEXT_NODE) {
-      node = child;
-      offset = 0;
+    if (child) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        node = child;
+        offset = 0;
+      } else {
+        const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
+        const textChild = walker.nextNode();
+        if (textChild) {
+          node = textChild;
+          offset = 0;
+        } else {
+          return null;
+        }
+      }
     } else {
       return null;
     }
@@ -48,18 +74,26 @@ function extractWordAtPoint(clientX, clientY) {
   try {
     const segmenter = new Intl.Segmenter('en', { granularity: 'word' });
     const segments = Array.from(segmenter.segment(text));
+    const checkHit = (seg) => {
+      const start = seg.index;
+      const end = seg.index + seg.segment.length;
+      const wordRange = document.createRange();
+      wordRange.setStart(node, start);
+      wordRange.setEnd(node, end);
+      return isPointInsideRangeRects(wordRange, clientX, clientY, 4) ? seg.segment : null;
+    };
     for (const seg of segments) {
       const start = seg.index;
       const end = seg.index + seg.segment.length;
       if (seg.isWordLike && safeOffset >= start && safeOffset < end) {
-        return seg.segment;
+        return checkHit(seg);
       }
     }
     for (const seg of segments) {
       const start = seg.index;
       const end = seg.index + seg.segment.length;
       if (seg.isWordLike && safeOffset === end) {
-        return seg.segment;
+        return checkHit(seg);
       }
     }
   } catch (e) {
@@ -79,7 +113,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
   const { openDictionary, clickToLookupEnabled, clickLookupMode } = useDictionary();
   const { settings } = useThemeSettings();
 
-  const lookupWordAtPoint = useCallback((e) => {
+  const lookupWordAtPoint = useCallback((e, { markOnly = false } = {}) => {
     // 0. Ignore ghost clicks from backdrop/modal dismiss on mobile devices
     if (typeof window !== 'undefined' && window.__tipitaka_dict_just_closed) {
       if (Date.now() - window.__tipitaka_dict_just_closed < 500) {
@@ -98,6 +132,10 @@ export default function AiMarkdown({ content, onCitationClick }) {
     const wordToLookup = cleanDictionaryQuery(rawWord);
     if (!wordToLookup || !(wordToLookup.length >= 2 || /\p{L}/u.test(wordToLookup))) return;
 
+    if (e.nativeEvent) e.nativeEvent.__tpoWordClicked = true;
+    e.__tpoWordClicked = true;
+    if (markOnly) return;
+
     try {
       const sel = window.getSelection();
       if (sel) sel.removeAllRanges();
@@ -115,8 +153,7 @@ export default function AiMarkdown({ content, onCitationClick }) {
     const mode = (settings?.dictLookupTrigger && settings.dictLookupTrigger !== 'off')
       ? settings.dictLookupTrigger
       : (clickLookupMode || 'single');
-    if (!isLookupActive || mode !== 'single') return;
-    lookupWordAtPoint(e);
+    lookupWordAtPoint(e, { markOnly: !isLookupActive || mode !== 'single' });
   }, [clickToLookupEnabled, clickLookupMode, settings?.dictLookupTrigger, lookupWordAtPoint]);
 
   const handleDoubleClick = useCallback((e) => {
