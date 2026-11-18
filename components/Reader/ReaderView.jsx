@@ -2419,6 +2419,7 @@ const ReaderPane = memo(function ReaderPane({
   onPaneLinksLoaded,
   isDictOpen = false,
   dictDockMode = 'side',
+  isDictPinned = false,
 }) {
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
@@ -2616,6 +2617,9 @@ const ReaderPane = memo(function ReaderPane({
     if (!container) return;
     const onUserInput = (e) => {
       if (e?.target?.closest?.('.modal-overlay, .search-modal, .dict-dock-panel')) return;
+      if (!anchorPinRef.current.resizing) {
+        anchorPinRef.current.active = false;
+      }
       onColumnUserInteract?.(tab.bookCode);
       cancelJump();
     };
@@ -2623,6 +2627,9 @@ const ReaderPane = memo(function ReaderPane({
       if (!useWindowScroll || !isVisible) return;
       if (e?.target?.closest?.('input, textarea, select, [contenteditable="true"], .modal-overlay')) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+        if (!anchorPinRef.current.resizing) {
+          anchorPinRef.current.active = false;
+        }
         cancelJump();
       }
     };
@@ -2649,6 +2656,8 @@ const ReaderPane = memo(function ReaderPane({
   // Task 3: Reading-position anchor preservation across Left/Right dock open, close, resize, and sidebar toggles
   const captureReadingAnchor = useCallback(
     (source = '') => {
+      anchorPinRef.current.active = false;
+      anchorPinRef.current.resizing = false;
       const container = containerRef.current;
       if (!isVisible || !container || tab.viewMode === 'toc' || tab.isTocView || tab.isLoading || tab.bookCode === 'ai_chat') {
         return;
@@ -2744,9 +2753,19 @@ const ReaderPane = memo(function ReaderPane({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const onBeforeShift = (e) => {
+      if (e?.detail?.shiftsLayout === false) {
+        anchorPinRef.current.active = false;
+        anchorPinRef.current.resizing = false;
+        return;
+      }
       captureReadingAnchor(e?.detail?.source || '');
     };
     const onResizeShift = (e) => {
+      if (e?.detail?.shiftsLayout === false) {
+        anchorPinRef.current.active = false;
+        anchorPinRef.current.resizing = false;
+        return;
+      }
       const phase = e?.detail?.phase;
       if (phase === 'move') {
         if (!anchorPinRef.current.active) {
@@ -2783,7 +2802,7 @@ const ReaderPane = memo(function ReaderPane({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [isDictOpen, dictDockMode, isSidebarOpen, isColumnsMode, applyAnchorCompensation]);
+  }, [isDictOpen, dictDockMode, isDictPinned, isSidebarOpen, isColumnsMode, applyAnchorCompensation]);
 
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined' || !containerRef.current || !isVisible) return;
@@ -5583,7 +5602,7 @@ export default function ReaderView() {
     setIsHistoryOpen,
   } = useTabs();
 
-  const { openDictionary, clickToLookupEnabled, clickLookupMode, isOpen: isDictOpen, dockMode: dictDockMode } = useDictionary();
+  const { openDictionary, clickToLookupEnabled, clickLookupMode, isOpen: isDictOpen, dockMode: dictDockMode, isPinned: isDictPinned = false } = useDictionary();
   const [activeLinkedItem, setActiveLinkedItem] = useState(null);
   const { settings } = useThemeSettings();
   const pulseAnimation = Boolean(settings?.pulseAnimation);
@@ -6141,6 +6160,7 @@ export default function ReaderView() {
               onPaneLinksLoaded={handlePaneLinksLoaded}
               isDictOpen={isDictOpen}
               dictDockMode={dictDockMode}
+              isDictPinned={isDictPinned}
             />
           );
         })}

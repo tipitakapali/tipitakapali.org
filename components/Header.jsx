@@ -10,7 +10,7 @@ import { useDictionary } from '../context/DictionaryContext';
 
 export default function Header() {
   const { settings, updateSetting, openSettingsModal } = useThemeSettings();
-  const { openDictionary } = useDictionary();
+  const { openDictionary, closeDictionary, isOpen: isDictOpen } = useDictionary();
   const {
     toggleSidebar,
     isSidebarOpen,
@@ -150,9 +150,16 @@ export default function Header() {
 
         {/* Dictionary Button */}
         <button
-          className="flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
-          onClick={() => openDictionary()}
-          title="Pāḷi Dictionary Look-up"
+          type="button"
+          data-dict-trigger="true"
+          aria-expanded={isDictOpen}
+          className={`flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1 border rounded-md text-xs font-semibold transition cursor-pointer ${
+            isDictOpen
+              ? 'bg-[var(--accent-light)] border-[var(--accent)] text-[var(--accent)]'
+              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+          }`}
+          onClick={() => (isDictOpen ? closeDictionary() : openDictionary())}
+          title={isDictOpen ? 'Close Pāḷi Dictionary (Esc)' : 'Pāḷi Dictionary Look-up (D)'}
           aria-label="Pāḷi Dictionary Look-up"
         >
           <BookSearch size={14} className="text-[var(--accent)]" />

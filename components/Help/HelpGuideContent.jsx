@@ -452,7 +452,7 @@ export default function HelpGuideContent({ showTabBar = true }) {
         </div>
 
         <div className="p-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[11.5px] space-y-1">
-          <strong>Customizable Dictionary Layout:</strong> In Settings, choose between <em>Center Modal</em>, <em>Left Sidebar</em>, <em>Right Sidebar</em>, or <em>Embedded Drawer</em> according to your screen size and reading style.
+          <strong>Customizable Dictionary Layout:</strong> In Settings, choose between <em>Left Dock</em>, <em>Center Modal</em>, or <em>Right Dock</em>. Side panels float above the text without shrinking your reading columns, and can optionally be pinned beside the text.
         </div>
       </section>
 

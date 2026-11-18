@@ -92,8 +92,10 @@ export default function SettingsModal() {
   const {
     dockMode,
     rawDockMode,
+    isPinned,
     isMobileScreen,
     setDockMode,
+    setIsPinned,
     fontSizeMultiplier,
     setFontSizeMultiplier,
     clickToLookupEnabled,
@@ -373,6 +375,24 @@ export default function SettingsModal() {
                       );
                     })}
                   </div>
+                  {!isMobileScreen && (rawDockMode || dockMode) !== 'modal' && (
+                    <label className="mt-2.5 p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] flex items-center justify-between gap-3 cursor-pointer">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-[var(--text-primary)]">
+                          Pin side panel beside text (resizes reader columns)
+                        </div>
+                        <div className="text-[11px] text-[var(--text-muted)]">
+                          Off by default: dictionary floats above the text so columns never shift or shrink.
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(isPinned)}
+                        onChange={(e) => setIsPinned?.(e.target.checked)}
+                        className="accent-[var(--accent)] w-4 h-4 rounded cursor-pointer shrink-0"
+                      />
+                    </label>
+                  )}
                   {isMobileScreen && (
                     <p className="text-[10.5px] text-[var(--text-muted)] mt-1.5">
                       * Docked side panels require desktop screens (≥768px). Center modal is temporarily used below that width — your saved preference ({(rawDockMode || dockMode) === 'left' ? 'Left Dock' : (rawDockMode || dockMode) === 'modal' ? 'Center Modal' : 'Right Dock'}) is kept and restored automatically.

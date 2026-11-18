@@ -68,6 +68,7 @@ export const AVAILABLE_DICTIONARIES = [
 
 const STORAGE_KEYS = {
   DOCK_MODE: 'tipitaka_dict_dock_mode_v2',
+  PINNED: 'tipitaka_dict_pinned_v1',
   FONT_SIZE: 'tipitaka_dict_font_size_multiplier_v2',
   CLICK_LOOKUP: 'tipitaka_dict_click_lookup_v2',
   CLICK_MODE: 'tipitaka_dict_click_mode_v2',
@@ -109,6 +110,7 @@ export function DictionaryProvider({ children }) {
   const [queryWord, setQueryWord] = useState('');
   const [displayWord, setDisplayWord] = useState('');
   const [dockMode, setDockModeState] = useState('side'); // 'modal' | 'left' | 'side' | 'right'
+  const [isPinned, setIsPinnedState] = useState(false); // false = float above text without shifting columns; true = dock beside text
   const [fontSizeMultiplier, setFontSizeMultiplierState] = useState(1);
   const [clickToLookupEnabled, setClickToLookupState] = useState(true);
   const [clickLookupMode, setClickLookupModeState] = useState('single'); // 'single' | 'double'
@@ -198,6 +200,11 @@ export function DictionaryProvider({ children }) {
         setDockModeState(isMobile ? 'modal' : 'side');
       }
 
+      const savedPinned = localStorage.getItem(STORAGE_KEYS.PINNED);
+      if (savedPinned === 'true' || savedPinned === 'false') {
+        setIsPinnedState(savedPinned === 'true');
+      }
+
       const savedFont = localStorage.getItem(STORAGE_KEYS.FONT_SIZE);
       if (savedFont) {
         const num = parseFloat(savedFont);
@@ -259,13 +266,22 @@ export function DictionaryProvider({ children }) {
     } catch (e) {}
   }, []);
 
+  const isMobileScreenRef = useRef(isMobileScreen);
+  isMobileScreenRef.current = isMobileScreen;
+  const dockModeRef = useRef(dockMode);
+  dockModeRef.current = dockMode;
+  const isPinnedRef = useRef(isPinned);
+  isPinnedRef.current = isPinned;
+
   const setDockMode = useCallback((mode) => {
     const validMode = ['left', 'modal', 'side', 'right'].includes(mode) ? mode : 'side';
+    const prevEffective = isMobileScreenRef.current ? 'modal' : dockModeRef.current;
+    const nextEffective = isMobileScreenRef.current ? 'modal' : validMode;
+    const shiftsLayout = Boolean(isPinnedRef.current && (prevEffective !== 'modal' || nextEffective !== 'modal'));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-dock', mode: validMode } })
-      );
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-dock', mode: validMode, shiftsLayout } }));
     }
+    dockModeRef.current = validMode;
     setDockModeState(validMode);
     try {
       localStorage.setItem(STORAGE_KEYS.DOCK_MODE, validMode);
@@ -286,6 +302,29 @@ export function DictionaryProvider({ children }) {
       }
     }
   }, []);
+
+  const setIsPinned = useCallback((updater) => {
+    setIsPinnedState((prev) => {
+      const next = Boolean(typeof updater === 'function' ? updater(prev) : updater);
+      isPinnedRef.current = next;
+      const effectiveMode = isMobileScreenRef.current ? 'modal' : dockModeRef.current;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('tipitaka:before-layout-shift', {
+            detail: { source: 'dictionary-pin', pinned: next, shiftsLayout: effectiveMode !== 'modal' },
+          })
+        );
+      }
+      try {
+        localStorage.setItem(STORAGE_KEYS.PINNED, String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const togglePinned = useCallback(() => {
+    setIsPinned((prev) => !prev);
+  }, [setIsPinned]);
 
   const setClickLookupMode = useCallback((mode) => {
     if (!['single', 'double'].includes(mode)) return;
@@ -666,10 +705,10 @@ export function DictionaryProvider({ children }) {
         return;
       }
     }
+    const effectiveMode = isMobileScreenRef.current ? 'modal' : dockModeRef.current;
+    const shiftsLayout = Boolean(isPinnedRef.current && effectiveMode !== 'modal');
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-open' } })
-      );
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-open', shiftsLayout } }));
     }
     setIsOpen(true);
     if (initialTab) {
@@ -689,10 +728,10 @@ export function DictionaryProvider({ children }) {
   }, [performLookup, setDictTab]);
 
   const closeDictionary = useCallback(() => {
+    const effectiveMode = isMobileScreenRef.current ? 'modal' : dockModeRef.current;
+    const shiftsLayout = Boolean(isPinnedRef.current && effectiveMode !== 'modal');
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-close' } })
-      );
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-close', shiftsLayout } }));
       window.__tipitaka_dict_just_closed = Date.now();
     }
     setIsOpen(false);
@@ -793,6 +832,7 @@ export function DictionaryProvider({ children }) {
     activeDictTab,
     dockMode: effectiveDockMode,
     rawDockMode: dockMode,
+    isPinned,
     isMobileScreen,
     fontSizeMultiplier,
     clickToLookupEnabled,
@@ -818,6 +858,8 @@ export function DictionaryProvider({ children }) {
     removeLookupHistoryItem,
     setDictTab,
     setDockMode,
+    setIsPinned,
+    togglePinned,
     setFontSizeMultiplier,
     setClickToLookupEnabled,
     setClickLookupMode,

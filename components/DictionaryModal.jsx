@@ -24,6 +24,8 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { useDictionary, DEFAULT_DICT_ORDER, DEFAULT_DICT_ENABLED } from '../context/DictionaryContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
@@ -460,6 +462,7 @@ export default function DictionaryModal() {
     displayWord,
     activeDictTab,
     dockMode,
+    isPinned = false,
     fontSizeMultiplier,
     history,
     historyIndex,
@@ -473,6 +476,7 @@ export default function DictionaryModal() {
     goBack,
     setDictTab,
     setDockMode,
+    togglePinned,
     setFontSizeMultiplier,
     setDisplayWord,
     clearDictionaryInput,
@@ -533,7 +537,8 @@ export default function DictionaryModal() {
   const [isResizing, setIsResizing] = useState(false);
 
   const currentScript = settings?.paliScript || 'roman';
-  const { openBook, openAlongside } = useTabs();
+  const { openBook, openAlongside, isHeaderVisible = true, isSidebarOpen = false } = useTabs();
+  const isHeaderHidden = isHeaderVisible === false && !isSidebarOpen;
 
   // Load saved dimensions from localStorage
   useEffect(() => {
@@ -647,33 +652,45 @@ export default function DictionaryModal() {
     }
   }, [visibleTabs, isLoading, isBackgroundLoading, activeDictTab, setDictTab]);
 
-  // Resize handler for docked width (Left or Right panel)
+  // Resize handler for docked/floating width (Left or Right panel)
 
   const startResizingWidth = useCallback(
-    (mouseDownEvent) => {
-      mouseDownEvent.preventDefault();
+    (startEvent) => {
+      startEvent.preventDefault();
+      const shiftsLayout = Boolean(isPinned && dockMode !== 'modal');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
-          new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'dictionary-resize' } })
+          new CustomEvent('tipitaka:before-layout-shift', {
+            detail: { source: 'dictionary-resize', shiftsLayout },
+          })
         );
       }
       setIsResizing(true);
-      const startX = mouseDownEvent.clientX;
-      const startWidth = dictWidth;
+      const startX = startEvent.clientX;
+      const startWidth = modalPanelRef.current?.getBoundingClientRect?.().width || dictWidth;
+      const pointerTarget = startEvent.currentTarget;
+      const pointerId = startEvent.pointerId;
+      try {
+        if (pointerId !== undefined) {
+          pointerTarget?.setPointerCapture?.(pointerId);
+        }
+      } catch (_) {}
 
-      const onMouseMove = (mouseMoveEvent) => {
-        if (typeof window !== 'undefined') {
+      const onPointerMove = (moveEvent) => {
+        if (shiftsLayout && typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent('tipitaka:layout-shift-resize', { detail: { phase: 'move' } })
+            new CustomEvent('tipitaka:layout-shift-resize', {
+              detail: { phase: 'move', shiftsLayout: true },
+            })
           );
         }
         let newWidth;
         if (dockMode === 'side' || dockMode === 'right') {
-          newWidth = startWidth - (mouseMoveEvent.clientX - startX);
+          newWidth = startWidth - (moveEvent.clientX - startX);
         } else {
-          newWidth = startWidth + (mouseMoveEvent.clientX - startX);
+          newWidth = startWidth + (moveEvent.clientX - startX);
         }
-        const maxW = Math.min(950, typeof window !== 'undefined' ? window.innerWidth * 0.75 : 850);
+        const maxW = Math.min(950, typeof window !== 'undefined' ? window.innerWidth * 0.85 : 850);
         const clamped = Math.max(280, Math.min(newWidth, maxW));
         setDictWidth(clamped);
         try {
@@ -681,25 +698,34 @@ export default function DictionaryModal() {
         } catch (e) {}
       };
 
-      const onMouseUp = () => {
+      const onPointerUp = () => {
         setIsResizing(false);
-        if (typeof window !== 'undefined') {
+        try {
+          if (pointerId !== undefined && pointerTarget?.hasPointerCapture?.(pointerId)) {
+            pointerTarget.releasePointerCapture(pointerId);
+          }
+        } catch (_) {}
+        if (shiftsLayout && typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent('tipitaka:layout-shift-resize', { detail: { phase: 'end' } })
+            new CustomEvent('tipitaka:layout-shift-resize', {
+              detail: { phase: 'end', shiftsLayout: true },
+            })
           );
         }
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
       };
 
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'col-resize';
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+      document.addEventListener('pointercancel', onPointerUp);
     },
-    [dictWidth, dockMode]
+    [dictWidth, dockMode, isPinned]
   );
 
   // Synchronize local input with context display word ONLY when an external lookup occurs
@@ -725,14 +751,13 @@ export default function DictionaryModal() {
 
   // Focus search input on desktop open only (avoid auto-keyboard and auto-highlight on mobile)
   useEffect(() => {
-    if (isOpen) {
-      const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-      if (!isTouch) {
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 80);
-      }
-    }
+    if (!isOpen) return;
+    const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    if (isTouch) return;
+    const timer = setTimeout(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    }, 80);
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
   // Safe dismiss handler that stops mobile ghost click-through
@@ -1270,30 +1295,20 @@ export default function DictionaryModal() {
 
   const renderInnerContent = () => (
     <>
-      {/* Resizer handle on left edge (when docked right/side) */}
+      {/* Resizer handle on left edge (when docked/floating right/side) */}
       {(dockMode === 'side' || dockMode === 'right') && (
         <div
           className={`dict-resizer-handle dict-resizer-handle-left ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={startResizingWidth}
+          onPointerDown={startResizingWidth}
           title="Drag to resize dictionary panel width"
         />
       )}
 
-      {/* Resizer handle on right edge (when docked left) */}
+      {/* Resizer handle on right edge (when docked/floating left) */}
       {dockMode === 'left' && (
         <div
           className={`dict-resizer-handle dict-resizer-handle-right ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={startResizingWidth}
-          title="Drag to resize dictionary panel width"
-        />
-      )}
-
-      {/* Resizer handle on bottom edge (when top drawer) */}
-      {/* Resizer handle on right edge (when docked left) */}
-      {dockMode === 'left' && (
-        <div
-          className={`dict-resizer-handle dict-resizer-handle-right ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={startResizingWidth}
+          onPointerDown={startResizingWidth}
           title="Drag to resize dictionary panel width"
         />
       )}
@@ -1335,7 +1350,7 @@ export default function DictionaryModal() {
           {isHistoryOpen && (
             <div
               ref={historyDropdownRef}
-              className="absolute left-0 top-full mt-1.5 w-64 sm:w-72 max-w-[calc(100vw-2rem)] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden z-50 text-xs animate-in fade-in zoom-in-95 duration-100"
+              className="absolute left-0 top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl overflow-hidden z-50 text-xs animate-in fade-in zoom-in-95 duration-100"
             >
               <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] select-none">
                 <div className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
@@ -1471,6 +1486,28 @@ export default function DictionaryModal() {
           )}
         </form>
 
+        {/* Pin / Unpin Side Panel Toggle (Desktop Left/Right Dock only) */}
+        {dockMode !== 'modal' && typeof togglePinned === 'function' && (
+          <button
+            type="button"
+            onClick={togglePinned}
+            aria-pressed={isPinned}
+            className={`hidden md:inline-flex items-center justify-center p-1.5 sm:p-2 rounded-xl border text-xs font-medium shadow-2xs transition cursor-pointer shrink-0 ${
+              isPinned
+                ? 'bg-[var(--accent-light)] text-[var(--accent)] border-[var(--accent)]'
+                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] border-[var(--border-color)]'
+            }`}
+            title={
+              isPinned
+                ? 'Unpin panel (float above text without shifting columns)'
+                : 'Pin panel beside text (resizes reader columns)'
+            }
+            aria-label={isPinned ? 'Unpin dictionary panel' : 'Pin dictionary panel beside text'}
+          >
+            {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
+        )}
+
         {/* Close Button */}
         <button
           type="button"
@@ -1529,7 +1566,7 @@ export default function DictionaryModal() {
       <div
         ref={contentContainerRef}
         onClick={handleContentClick}
-        className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"
+        className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-2.5"
       >
         {/* Error Message */}
         {error && !isLoading && (
@@ -1821,6 +1858,9 @@ export default function DictionaryModal() {
       >
         <div
           ref={modalPanelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pāḷi Dictionary"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           className="dict-panel-modal flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]"
@@ -1833,13 +1873,16 @@ export default function DictionaryModal() {
     );
   }
 
-  // 2. Docked Left or Right Panels (Docked into layout alongside Reader & Sidebar)
+  // 2. Left or Right Side Panels (Default: floating overlay above text so columns never shrink; optional Pin to dock beside text)
   return (
     <aside
       ref={modalPanelRef}
+      aria-label="Pāḷi Dictionary"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className={`dict-dock-panel dock-${dockMode === 'left' ? 'left' : 'side'} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
+      className={`dict-dock-panel dock-${dockMode === 'left' ? 'left' : 'side'} ${
+        isPinned ? 'dict-pinned' : 'dict-floating'
+      } ${isHeaderHidden ? 'dict-header-hidden' : ''} flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] ${
         isResizing ? 'select-none' : ''
       }`}
       style={{
