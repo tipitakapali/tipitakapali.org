@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const DEFAULT_TRANSLATION_ORDER = [
   'pali',
@@ -139,6 +139,8 @@ export function ThemeSettingsProvider({ children }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const isStorageLoadedRef = useRef(false);
+  const preLoadOverridesRef = useRef([]);
 
   useEffect(() => {
     try {
@@ -209,21 +211,48 @@ export function ThemeSettingsProvider({ children }) {
             merged.fontFamily = 'default';
           }
 
+          // Replay any deep-link setting overrides (e.g. /translation/vi/... or /book/hi....)
+          // queued by child effects before localStorage finished hydrating.
+          let finalMerged = merged;
+          if (preLoadOverridesRef.current.length > 0) {
+            for (const ov of preLoadOverridesRef.current) {
+              const nextVal =
+                typeof ov.value === 'function'
+                  ? ov.value(finalMerged[ov.key], finalMerged)
+                  : ov.value;
+              finalMerged = { ...finalMerged, [ov.key]: nextVal };
+            }
+          }
+
           try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(finalMerged));
           } catch (e) {}
-          return merged;
+          return finalMerged;
+        });
+      } else if (preLoadOverridesRef.current.length > 0) {
+        // Persist any pre-load overrides when no prior localStorage snapshot existed
+        setSettingsState((prev) => {
+          try {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(prev));
+          } catch (e) {}
+          return prev;
         });
       }
     } catch (e) {
       console.error('Error loading settings from localStorage:', e);
     }
+    isStorageLoadedRef.current = true;
+    preLoadOverridesRef.current = [];
     setIsMounted(true);
   }, []);
 
   const updateSetting = (key, value) => {
+    if (!isStorageLoadedRef.current) {
+      preLoadOverridesRef.current.push({ key, value });
+    }
     setSettingsState((prev) => {
-      const finalVal = value;
+      const finalVal = typeof value === 'function' ? value(prev[key], prev) : value;
+      if (finalVal === prev[key]) return prev;
       const updated = { ...prev, [key]: finalVal };
       if (key === 'openMatInNewWindow') {
         updated.openMatInNewWindowExplicit = true;
@@ -231,10 +260,12 @@ export function ThemeSettingsProvider({ children }) {
       if (key === 'fontFamily') {
         updated.fontFamilyExplicit = true;
       }
-      try {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Error saving settings to localStorage:', e);
+      if (isStorageLoadedRef.current) {
+        try {
+          localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Error saving settings to localStorage:', e);
+        }
       }
       return updated;
     });

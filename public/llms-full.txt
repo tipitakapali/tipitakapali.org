@@ -7,7 +7,7 @@
 1. **For term / doctrinal / Vinaya / Abhidhamma definitions:** Call `GET https://api.tipitakapali.org/api/ai/bold_definitions?w={term}&langs=en&limit=8` (queries 387,006 pre-indexed commentarial & canonical bold glosses with `*ti attho*`, `*nāma*`, `*vuccati*` ranking and exact `[book:cX:pY-LZ]` citations) in parallel with `GET https://api.tipitakapali.org/api/dict/lookup?w={term}&dict=dpd` (DPD grammar, roots & compound splitter).
 2. **For multi-concept research questions:** Break the question into 2–4 Concept Groups (each with Pāḷi terms/stems AND English synonyms) and POST to `https://api.tipitakapali.org/api/ai/search_concepts` for tiered boolean-intersection search across Pāḷi and translation FTS5 indexes.
 3. **For exact textual grounding & verification:** Fetch complete paragraphs (`GET /api/ai/paragraph_content`), sentence-aligned Pāḷi + translations (`GET /api/ai/sentences`, 99.7% 1:1 `line_id` match), and parallel Aṭṭhakathā/Ṭīkā commentaries (`GET /api/ai/commentaries`).
-4. **For clickable citations:** Emit `[book_code:c{0_based_chapter}:p{para_index}-L{line_id}]` and/or link to `https://tipitakapali.org/book/{book_code}/{1_based_chapter}#pindex-{para_index}` (append `?l=en` or any translation code for side-by-side translation).
+4. **For clickable citations:** Emit `[book_code:c{0_based_chapter}:p{para_index}-L{line_id}]` and/or link to `https://tipitakapali.org/book/{book_code}/{1_based_chapter}#pindex-{para_index}` (or `https://tipitakapali.org/translation/{lang_code}/{book_code}/{1_based_chapter}#pindex-{para_index}` for canonical modern translations; legacy `?l={lang_code}` also works).
 
 ## Quick Nikāya / Piṭaka → `book_code` Citation Map
 | Collection | Mūla `book_code` | Aṭṭhakathā | Ṭīkā | Scope |
@@ -92,33 +92,33 @@
 - Offline-Capable Pāḷi Script Converter (17 scripts): `https://tipitakapali.org/pali-script-converter`
 
 ## Multilingual Translation Deep-Linking Guide (23 Languages)
-Users can open any canonical text with side-by-side / sentence-level translations by appending `?l=[lang_code]`:
+Every canonical book and chapter has a dedicated, self-canonical SSR translation URL at `/translation/{lang_code}/{book_code}` and `/translation/{lang_code}/{book_code}/{1_based_chapter}` (legacy `?l={lang_code}` query links remain supported and canonicalize cleanly to `/translation/{lang_code}/...`):
 
-| Language Code | Language Name | Native | Flag | Coverage / Sentences | Sample Book URL with Translation |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `en` | English | English | 🇬🇧 | English translation • 1.28M sentences | `https://tipitakapali.org/book/s0101m.mul?l=en` |
-| `vi` | Vietnamese | Tiếng Việt | 🇻🇳 | Bản dịch Tiếng Việt • 1.28M câu | `https://tipitakapali.org/book/s0101m.mul?l=vi` |
-| `my` | Myanmar / Burmese | မြန်မာ | 🇲🇲 | မြန်မာဘာသာပြန် • 1.28M စာကြောင်း | `https://tipitakapali.org/book/s0101m.mul?l=my` |
-| `my_nissaya` | Myanmar Nissaya | မြန်မာ နိဿယ | 🇲🇲 | Myanmar Nissaya word-by-word • 570K စာကြောင်း | `https://tipitakapali.org/book/s0101m.mul?l=my_nissaya` |
-| `si` | Sinhala | සිංහල | 🇱🇰 | සිංහල පරිවර්තනය • 1.21M වාක්‍ය | `https://tipitakapali.org/book/s0101m.mul?l=si` |
-| `zh` | Chinese | 中文 | 🇨🇳 | 中文翻译 • 1.27M 句 | `https://tipitakapali.org/book/s0101m.mul?l=zh` |
-| `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ | `https://tipitakapali.org/book/s0101m.mul?l=km` |
-| `th` | Thai | ไทย | 🇹🇭 | ฉบับแปลภาษาไทย • 1.27M ประโยค | `https://tipitakapali.org/book/s0101m.mul?l=th` |
-| `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 328K ປະໂຫຍກ | `https://tipitakapali.org/book/s0101m.mul?l=lo` |
-| `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/book/s0101m.mul?l=ta` |
-| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=hi` |
-| `mr` | Marathi | मराठी | 🇮🇳 | मराठी अनुवाद • 1.20M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=mr` |
-| `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.22M kalimat | `https://tipitakapali.org/book/s0101m.mul?l=id` |
-| `cs` | Czech | Čeština | 🇨🇿 | Český překlad • 1.20M vět | `https://tipitakapali.org/book/s0101m.mul?l=cs` |
-| `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/book/s0101m.mul?l=de` |
-| `es` | Spanish | Español | 🇪🇸 | Traducción en Español • 1.27M oraciones | `https://tipitakapali.org/book/s0101m.mul?l=es` |
-| `fr` | French | Français | 🇫🇷 | Traduction en Français • 1.27M phrases | `https://tipitakapali.org/book/s0101m.mul?l=fr` |
-| `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/book/s0101m.mul?l=ja` |
-| `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/book/s0101m.mul?l=pt` |
-| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 1.22M предложений | `https://tipitakapali.org/book/s0101m.mul?l=ru` |
-| `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 1.22M 문장 | `https://tipitakapali.org/book/s0101m.mul?l=ko` |
-| `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/book/s0101m.mul?l=ne` |
-| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা অনুবাদ • 1.27M বাক্য | `https://tipitakapali.org/book/s0101m.mul?l=be` |
+| Language Code | Language Name | Native | Flag | Coverage / Sentences | Canonical Translation Book URL | Sample Chapter URL |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `en` | English | English | 🇬🇧 | English translation • 1.28M sentences | `https://tipitakapali.org/translation/en/s0101m.mul` | `https://tipitakapali.org/translation/en/s0101m.mul/1` |
+| `vi` | Vietnamese | Tiếng Việt | 🇻🇳 | Bản dịch Tiếng Việt • 1.28M câu | `https://tipitakapali.org/translation/vi/s0101m.mul` | `https://tipitakapali.org/translation/vi/s0101m.mul/1` |
+| `my` | Myanmar / Burmese | မြန်မာ | 🇲🇲 | မြန်မာဘာသာပြန် • 1.28M စာကြောင်း | `https://tipitakapali.org/translation/my/s0101m.mul` | `https://tipitakapali.org/translation/my/s0101m.mul/1` |
+| `my_nissaya` | Myanmar Nissaya | မြန်မာ နိဿယ | 🇲🇲 | Myanmar Nissaya word-by-word • 570K စာကြောင်း | `https://tipitakapali.org/translation/my_nissaya/s0101m.mul` | `https://tipitakapali.org/translation/my_nissaya/s0101m.mul/1` |
+| `si` | Sinhala | සිංහල | 🇱🇰 | සිංහල පරිවර්තනය • 1.21M වාක්‍ය | `https://tipitakapali.org/translation/si/s0101m.mul` | `https://tipitakapali.org/translation/si/s0101m.mul/1` |
+| `zh` | Chinese | 中文 | 🇨🇳 | 中文翻译 • 1.27M 句 | `https://tipitakapali.org/translation/zh/s0101m.mul` | `https://tipitakapali.org/translation/zh/s0101m.mul/1` |
+| `km` | Khmer | ភាសាខ្មែរ | 🇰🇭 | ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ | `https://tipitakapali.org/translation/km/s0101m.mul` | `https://tipitakapali.org/translation/km/s0101m.mul/1` |
+| `th` | Thai | ไทย | 🇹🇭 | ฉบับแปลภาษาไทย • 1.27M ประโยค | `https://tipitakapali.org/translation/th/s0101m.mul` | `https://tipitakapali.org/translation/th/s0101m.mul/1` |
+| `lo` | Lao | ລາວ | 🇱🇦 | ການແປພາສາລາວ • 328K ປະໂຫຍກ | `https://tipitakapali.org/translation/lo/s0101m.mul` | `https://tipitakapali.org/translation/lo/s0101m.mul/1` |
+| `ta` | Tamil | தமிழ் | 🇮🇳 | தமிழ் மொழிபெயர்ப்பு • 1.22M வாக்கியங்கள் | `https://tipitakapali.org/translation/ta/s0101m.mul` | `https://tipitakapali.org/translation/ta/s0101m.mul/1` |
+| `hi` | Hindi | हिन्दी | 🇮🇳 | हिन्दी अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/translation/hi/s0101m.mul` | `https://tipitakapali.org/translation/hi/s0101m.mul/1` |
+| `mr` | Marathi | मराठी | 🇮🇳 | मराठी अनुवाद • 1.20M वाक्य | `https://tipitakapali.org/translation/mr/s0101m.mul` | `https://tipitakapali.org/translation/mr/s0101m.mul/1` |
+| `id` | Indonesian | Bahasa Indonesia | 🇮🇩 | Terjemahan Bahasa Indonesia • 1.22M kalimat | `https://tipitakapali.org/translation/id/s0101m.mul` | `https://tipitakapali.org/translation/id/s0101m.mul/1` |
+| `cs` | Czech | Čeština | 🇨🇿 | Český překlad • 1.20M vět | `https://tipitakapali.org/translation/cs/s0101m.mul` | `https://tipitakapali.org/translation/cs/s0101m.mul/1` |
+| `de` | German | Deutsch | 🇩🇪 | Deutsche Übersetzung • 1.28M Sätze | `https://tipitakapali.org/translation/de/s0101m.mul` | `https://tipitakapali.org/translation/de/s0101m.mul/1` |
+| `es` | Spanish | Español | 🇪🇸 | Traducción en Español • 1.27M oraciones | `https://tipitakapali.org/translation/es/s0101m.mul` | `https://tipitakapali.org/translation/es/s0101m.mul/1` |
+| `fr` | French | Français | 🇫🇷 | Traduction en Français • 1.27M phrases | `https://tipitakapali.org/translation/fr/s0101m.mul` | `https://tipitakapali.org/translation/fr/s0101m.mul/1` |
+| `ja` | Japanese | 日本語 | 🇯🇵 | 日本語訳 • 1.25M 文 | `https://tipitakapali.org/translation/ja/s0101m.mul` | `https://tipitakapali.org/translation/ja/s0101m.mul/1` |
+| `pt` | Portuguese | Português | 🇵🇹 | Tradução em Português • 1.22M frases | `https://tipitakapali.org/translation/pt/s0101m.mul` | `https://tipitakapali.org/translation/pt/s0101m.mul/1` |
+| `ru` | Russian | Русский | 🇷🇺 | Русский перевод • 1.22M предложений | `https://tipitakapali.org/translation/ru/s0101m.mul` | `https://tipitakapali.org/translation/ru/s0101m.mul/1` |
+| `ko` | Korean | 한국어 | 🇰🇷 | 한국어 번역 • 1.22M 문장 | `https://tipitakapali.org/translation/ko/s0101m.mul` | `https://tipitakapali.org/translation/ko/s0101m.mul/1` |
+| `ne` | Nepali | नेपाली | 🇳🇵 | नेपाली अनुवाद • 1.22M वाक्य | `https://tipitakapali.org/translation/ne/s0101m.mul` | `https://tipitakapali.org/translation/ne/s0101m.mul/1` |
+| `be` | Bengali | বাংলা | 🇧🇩 | বাংলা অনুবাদ • 1.27M বাক্য | `https://tipitakapali.org/translation/be/s0101m.mul` | `https://tipitakapali.org/translation/be/s0101m.mul/1` |
 
 ## Multi-Script Deep-Linking Guide (17 Pāḷi Scripts)
 Users can open any canonical text directly in their preferred script by prefixing the book code:

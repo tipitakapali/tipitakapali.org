@@ -36,6 +36,10 @@ const nextConfig = {
   // saves ES5 transforms; remaining 14 KiB is Next's mandatory fetch/URL polyfill (Turbopack)
   experimental: {
     optimizePackageImports: ['lucide-react'],
+    // Keep VPS SSR cache strictly bounded in RAM (50MB LRU) instead of writing
+    // 116K+ pages (and 404 bot scans) indefinitely to .next/server/route-cache on disk;
+    // Cloudflare CDN handles long-term edge caching via s-maxage=86400.
+    ...(!isExport ? { isrFlushToDisk: false } : {}),
   },
   ...(isExport
     ? {
@@ -44,7 +48,28 @@ const nextConfig = {
       }
     : {
         output: 'standalone',
+        // Always resolve generateMetadata synchronously into <head> so Cloudflare CDN
+        // caches complete <title>, <meta description>, canonical, and hreflang tags
+        // regardless of whether a browser or search bot warmed the edge cache first.
+        htmlLimitedBots: /.*/,
+        serverExternalPackages: ['better-sqlite3'],
+        outputFileTracingExcludes: {
+          '/*': [
+            './server_api/db/**/*',
+            './server_api/node_modules/**/*',
+            './tipitakapali_org_app/**/*',
+            './next_tipitakapali.org/**/*',
+            './dev_build_vri_db_2026/**/*',
+            './cloudflare_pages_dist/**/*',
+          ],
+        },
         async headers() {
+          const edgeCacheHeaders = [
+            {
+              key: 'Cache-Control',
+              value: 'public, s-maxage=86400, stale-while-revalidate=604800',
+            },
+          ];
           return [
             {
               source: '/:path*',
@@ -53,6 +78,24 @@ const nextConfig = {
                   key: 'Link',
                   value: '</.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc"; type="application/openapi+json", </llms.txt>; rel="describedby"; type="text/plain"',
                 },
+              ],
+            },
+            {
+              source: '/book/:path*',
+              headers: edgeCacheHeaders,
+            },
+            {
+              source: '/translation/:path*',
+              headers: edgeCacheHeaders,
+            },
+            {
+              source: '/:file(sitemap.*\\.xml)',
+              headers: [
+                {
+                  key: 'Content-Type',
+                  value: 'application/xml; charset=utf-8',
+                },
+                ...edgeCacheHeaders,
               ],
             },
           ];
@@ -78,4 +121,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

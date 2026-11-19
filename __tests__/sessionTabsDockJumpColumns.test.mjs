@@ -898,3 +898,215 @@ test('Task 1 (+Aṭṭha column open): jumpToMat preserves window-scroll offset 
     globalThis.CustomEvent = prevCustomEvent;
   }
 });
+
+test('Clicked first word of sentence stays inline: createRangeFromCharOffset avoids previous-node latch and highlightRangeInReader supports CSS.highlights + safe DOM fallback', () => {
+  const {
+    getCharOffsetInElement,
+    createRangeFromCharOffset,
+    highlightRangeInReader,
+    clearClickedWordHighlight,
+    selectClickedWordAnchor,
+  } = loadReaderViewExports();
+
+  // Minimal DOM mock modeling .reader-para-row.reader-sent-pairs with 2 sentences
+  const makeNode = (type, tagOrText) => {
+    const node = {
+      nodeType: type,
+      tagName: type === 1 ? tagOrText.toUpperCase() : undefined,
+      textContent: type === 3 ? tagOrText : '',
+      childNodes: [],
+      parentNode: null,
+      isConnected: true,
+      attributes: {},
+      className: '',
+      setAttribute(k, v) { this.attributes[k] = String(v); },
+      getAttribute(k) { return this.attributes[k] ?? null; },
+      appendChild(child) {
+        if (child.nodeType === 11) {
+          for (const c of [...child.childNodes]) this.appendChild(c);
+          child.childNodes = [];
+          return child;
+        }
+        child.parentNode = this;
+        this.childNodes.push(child);
+        return child;
+      },
+      insertBefore(newChild, refChild) {
+        const idx = this.childNodes.indexOf(refChild);
+        newChild.parentNode = this;
+        if (idx === -1) this.childNodes.push(newChild);
+        else this.childNodes.splice(idx, 0, newChild);
+        return newChild;
+      },
+      removeChild(child) {
+        const idx = this.childNodes.indexOf(child);
+        if (idx !== -1) this.childNodes.splice(idx, 1);
+        child.parentNode = null;
+        return child;
+      },
+      replaceChild(newChild, oldChild) {
+        const idx = this.childNodes.indexOf(oldChild);
+        if (idx === -1) return oldChild;
+        const incoming = newChild.nodeType === 11 ? [...newChild.childNodes] : [newChild];
+        for (const c of incoming) c.parentNode = this;
+        this.childNodes.splice(idx, 1, ...incoming);
+        oldChild.parentNode = null;
+        return oldChild;
+      },
+      normalize() {},
+      contains(target) {
+        let cur = target;
+        while (cur) {
+          if (cur === this) return true;
+          cur = cur.parentNode;
+        }
+        return false;
+      },
+      querySelector(sel) {
+        return this.querySelectorAll(sel)[0] || null;
+      },
+      querySelectorAll(sel) {
+        const matches = [];
+        const walk = (n) => {
+          for (const c of n.childNodes) {
+            if (c.nodeType === 1) {
+              if (
+                (sel.includes('.reader-clicked-word') && c.className.split(/\s+/).includes('reader-clicked-word')) ||
+                (sel.includes('[data-clicked-word="true"]') && c.getAttribute('data-clicked-word') === 'true')
+              ) {
+                matches.push(c);
+              }
+              walk(c);
+            }
+          }
+        };
+        walk(this);
+        return matches;
+      },
+    };
+    return node;
+  };
+
+  const collectText = (root) => {
+    const out = [];
+    const walk = (n) => {
+      for (const c of n.childNodes) {
+        if (c.nodeType === 3) out.push(c);
+        else walk(c);
+      }
+    };
+    walk(root);
+    return out;
+  };
+
+  const row = makeNode(1, 'div');
+  const pair1 = makeNode(1, 'div');
+  const sent1Text = makeNode(3, 'Evaṃ me sutaṃ.');
+  pair1.appendChild(sent1Text);
+  const emptyText = makeNode(3, '');
+  const pair2 = makeNode(1, 'div');
+  const paliSpan = makeNode(1, 'span');
+  const sent2Text = makeNode(3, 'Suppiyopi kho paribbājako');
+  paliSpan.appendChild(sent2Text);
+  pair2.appendChild(paliSpan);
+  row.appendChild(pair1);
+  row.appendChild(emptyText);
+  row.appendChild(pair2);
+
+  const prevDoc = globalThis.document;
+  const prevNodeFilter = globalThis.NodeFilter;
+  const prevCSS = globalThis.CSS;
+  const prevHighlight = globalThis.Highlight;
+
+  globalThis.NodeFilter = { SHOW_TEXT: 4 };
+  globalThis.document = {
+    createTreeWalker(root) {
+      const nodes = collectText(root);
+      let idx = 0;
+      return { nextNode: () => (idx < nodes.length ? nodes[idx++] : null) };
+    },
+    createRange() {
+      return {
+        startContainer: null,
+        startOffset: 0,
+        endContainer: null,
+        endOffset: 0,
+        collapsed: false,
+        commonAncestorContainer: null,
+        setStart(n, o) {
+          this.startContainer = n;
+          this.startOffset = o;
+          this.commonAncestorContainer = n === this.endContainer ? n : row;
+        },
+        setEnd(n, o) {
+          this.endContainer = n;
+          this.endOffset = o;
+          this.commonAncestorContainer = n === this.startContainer ? n : row;
+        },
+        getBoundingClientRect() {
+          return { top: 240, bottom: 264, height: 24, width: 90 };
+        },
+      };
+    },
+    createElement: (tag) => makeNode(1, tag),
+    createTextNode: (txt) => makeNode(3, txt),
+    createDocumentFragment: () => makeNode(11, ''),
+    querySelectorAll: (sel) => row.querySelectorAll(sel),
+  };
+
+  try {
+    // 1. Offset for first word "Suppiyopi" (start=0 in sent2Text, right after sent1Text + emptyText)
+    const offset = getCharOffsetInElement(row, sent2Text, 0);
+    assert.equal(offset, 'Evaṃ me sutaṃ.'.length);
+
+    const range = createRangeFromCharOffset(row, offset, 'Suppiyopi'.length);
+    assert.ok(range, 'Range must be created for first word of sentence 2');
+    assert.equal(range.startContainer, sent2Text, 'startContainer must be sent2Text, NEVER trailing end of sent1Text');
+    assert.equal(range.startOffset, 0);
+    assert.equal(range.endContainer, sent2Text);
+    assert.equal(range.endOffset, 9);
+
+    // 2. CSS Custom Highlight API primary path (zero DOM mutation)
+    const registry = new Map();
+    globalThis.CSS = { highlights: registry };
+    globalThis.Highlight = class Highlight {
+      constructor(...ranges) {
+        this.ranges = ranges;
+      }
+    };
+
+    highlightRangeInReader(range);
+    assert.equal(registry.has('reader-clicked-word'), true, 'Must register reader-clicked-word in CSS.highlights');
+    assert.equal(registry.get('reader-clicked-word').ranges.length, 1);
+    assert.equal(registry.get('reader-clicked-word').ranges[0].startContainer, sent2Text);
+    assert.equal(row.querySelectorAll('.reader-clicked-word').length, 0, 'CSS.highlights path must not mutate DOM');
+
+    const anchor = selectClickedWordAnchor(row, 100, 600);
+    assert.ok(anchor, 'selectClickedWordAnchor must anchor on active CSS.highlights range');
+    assert.equal(anchor.anchorEl.isConnected, true);
+    assert.equal(anchor.viewportY, 252);
+
+    clearClickedWordHighlight(row);
+    assert.equal(registry.has('reader-clicked-word'), false, 'clearClickedWordHighlight must delete highlight entry');
+
+    // 3. Fallback path without CSS.highlights: wraps ONLY text slice inline inside paliSpan
+    delete globalThis.CSS;
+    delete globalThis.Highlight;
+    highlightRangeInReader(range);
+    const wrapped = row.querySelectorAll('.reader-clicked-word');
+    assert.equal(wrapped.length, 1, 'Fallback must wrap word in a single inline span');
+    assert.equal(wrapped[0].parentNode, paliSpan, 'Highlight span must remain directly inside paliSpan');
+    assert.equal(wrapped[0].textContent, 'Suppiyopi');
+    assert.equal(paliSpan.childNodes.length, 2, 'Sentence text must stay inline as [<span>Suppiyopi</span>, " kho paribbājako"]');
+    assert.equal(paliSpan.childNodes[1].textContent, ' kho paribbājako');
+    assert.equal(pair1.childNodes.length, 1, 'Preceding sentence block must remain untouched');
+
+    clearClickedWordHighlight(row);
+    assert.equal(row.querySelectorAll('.reader-clicked-word').length, 0);
+  } finally {
+    globalThis.document = prevDoc;
+    globalThis.NodeFilter = prevNodeFilter;
+    globalThis.CSS = prevCSS;
+    globalThis.Highlight = prevHighlight;
+  }
+});

@@ -664,19 +664,24 @@ export async function onRequest(context) {
     with open(functions_book_dir / '[[path]].js', 'w', encoding='utf-8') as f:
         f.write(book_shell_code)
 
-    log_success("Generated scoped SPA fallback Functions: /book/* + /chapter/* only")
+    functions_trans_dir = functions_dir / 'translation'
+    functions_trans_dir.mkdir(parents=True, exist_ok=True)
+    with open(functions_trans_dir / '[[path]].js', 'w', encoding='utf-8') as f:
+        f.write(book_shell_code)
+
+    log_success("Generated scoped SPA fallback Functions: /book/* + /translation/* + /chapter/* only")
 
 
 def generate_routes_json(dist_dir: Path):
     """Scope Function invocation to page navigations; everything else stays static (unlimited)."""
     routes = {
         "version": 1,
-        "include": ["/book/*", "/chapter/*"],
+        "include": ["/book/*", "/translation/*", "/chapter/*"],
         "exclude": [],
     }
     with open(dist_dir / '_routes.json', 'w', encoding='utf-8') as f:
         json.dump(routes, f, separators=(',', ':'))
-    log_success("Wrote _routes.json (Functions only on /book/*, /chapter/*)")
+    log_success("Wrote _routes.json (Functions only on /book/*, /translation/*, /chapter/*)")
 
 
 
@@ -840,7 +845,7 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
                 pass
 
         s_url = site_url.rstrip('/')
-        sitemaps = generate_all_sitemaps(seo_books, seo_chapters, s_url)
+        sitemaps = generate_all_sitemaps(seo_books, seo_chapters, s_url, db_dir=paths.get('db_dir'))
         robots_content = generate_robots_txt(s_url)
         llms_content = generate_llms_txt(s_url, len(seo_books), len(seo_chapters), bold_def_count)
         llms_full_content = generate_llms_full_txt(s_url, seo_books, seo_catalog, bold_def_count)
@@ -848,7 +853,7 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
 
         for target in [dist_dir, public_dir, git_repo_dir]:
             if target.exists():
-                cleanup_obsolete_sitemaps(target)
+                cleanup_obsolete_sitemaps(target, keep_files=set(sitemaps.keys()))
                 for s_name, s_xml in sitemaps.items():
                     with open(target / s_name, 'w', encoding='utf-8') as f:
                         f.write(s_xml)
@@ -861,9 +866,13 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
                 with open(target / 'site.jsonld', 'w', encoding='utf-8') as f:
                     f.write(jsonld_content)
 
-        total_canonical_urls = 5 + len(seo_books)
+        total_urls = sum(
+            s_xml.count("<loc>")
+            for s_name, s_xml in sitemaps.items()
+            if s_name != "sitemap.xml"
+        )
         log_success(
-            f"Generated canonical sitemap.xml ({total_canonical_urls} URLs), robots.txt, llms.txt, llms-full.txt ({bold_def_count:,} bold defs, {len(TRANSLATION_LANGUAGES)} translations), site.jsonld"
+            f"Generated XML Sitemap Index ({len(sitemaps) - 1} child sitemaps, {total_urls:,} URLs), robots.txt, llms.txt, llms-full.txt ({bold_def_count:,} bold defs, {len(TRANSLATION_LANGUAGES)} translations), site.jsonld"
         )
 
         for target in [dist_dir, git_repo_dir]:
@@ -1358,12 +1367,16 @@ def export_website(args, paths):
                     except OSError:
                         pass
 
-    # 3b. Prune duplicate chapter/ prerender (canonical SEO lives on /book/*)
+    # 3b. Prune duplicate chapter/ and placeholder translation/ prerender (VPS SSR serves /book/* & /translation/*)
     if not args.keep_chapter:
         pruned_chapter = dist_dir / 'chapter'
         if pruned_chapter.exists():
             shutil.rmtree(pruned_chapter)
-            log_info("Pruned duplicate chapter/ prerender output (served via SPA shell + _redirects)")
+            log_info("Pruned duplicate chapter/ prerender output (served via SPA shell / VPS SSR)")
+    pruned_translation = dist_dir / 'translation'
+    if pruned_translation.exists():
+        shutil.rmtree(pruned_translation)
+        log_info("Pruned placeholder static translation/ prerender output (served dynamically via VPS SSR)")
 
     # 4. Pure static by default
     if args.with_spa_fallback:

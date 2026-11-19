@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, Suspense } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useMemo, Suspense } from 'react';
 
 import Header from '../components/Header';
 import BookTabsBar from '../components/BookTabsBar';
@@ -17,22 +17,30 @@ import NotFoundView from '../components/NotFoundView';
 import { useTabs, normalizeLangCode } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali, splitScriptCode } from '../services/transliterate';
-import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, SITE_URL } from '../services/seoMetadata';
-export function MainAppContent({ params: rawParams }) {
+import { parseClientRouteLocation } from '../services/clientRouteParser';
+import {
+  DEFAULT_SEO_TITLE,
+  DEFAULT_SEO_DESCRIPTION,
+  SITE_URL,
+  buildCanonicalPath,
+  isValidTranslationLang,
+  getTranslationLangMeta,
+  getPaliScriptMeta,
+} from '../services/seoMetadata';
+
+export function MainAppContent({ params: rawParams, ssrContent = null, initialRoute = null }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
   const { openBook, openAiChatTab, openSearchModal, updateUrlParams, openTabs, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound, isBookmarkOpen, setIsBookmarkOpen, isHistoryOpen, setIsHistoryOpen } = useTabs();
   const { settings } = useThemeSettings();
   const hasInitializedRef = useRef(false);
 
-
-
-
-  const { pageTitle, pageDesc, canonicalUrl } = useMemo(() => {
+  const { pageTitle, pageDesc, canonicalUrl, preserveSsrMeta } = useMemo(() => {
     if (isNotFound) {
       return {
         pageTitle: 'Lost in Saṃsāra (404) — Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
         pageDesc: 'The requested page could not be found on TipitakaPali.org. Return to the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon.',
         canonicalUrl: null,
+        preserveSsrMeta: false,
       };
     }
 
@@ -41,6 +49,7 @@ export function MainAppContent({ params: rawParams }) {
         pageTitle: 'Ani (AI Nissaya) Study Companion | Tipiṭaka Pāḷi',
         pageDesc: 'AI-powered Dhamma research companion for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon with concept-group search, bold definitions, and canonical citations.',
         canonicalUrl: `${SITE_URL}/`,
+        preserveSsrMeta: false,
       };
     }
 
@@ -52,59 +61,132 @@ export function MainAppContent({ params: rawParams }) {
           : DEFAULT_SEO_TITLE,
         pageDesc: DEFAULT_SEO_DESCRIPTION,
         canonicalUrl: `${SITE_URL}/`,
+        preserveSsrMeta: false,
       };
     }
 
-    const currentChapIdx = activeTab.currentChapterIdx || 0;
-    const currentChap = activeTab.chapters?.[currentChapIdx];
+    const cleanCode = splitScriptCode(activeTab.bookCode || '').bookCode;
+    const isTocView = Boolean(activeTab.isTocView || activeTab.viewMode === 'toc');
+    const currentChapIdx =
+      !isTocView && typeof activeTab.currentChapterIdx === 'number' && activeTab.currentChapterIdx >= 0
+        ? activeTab.currentChapterIdx
+        : null;
+    const currentChapNum = currentChapIdx !== null ? currentChapIdx + 1 : null;
+    const currentChap = currentChapIdx !== null ? activeTab.chapters?.[currentChapIdx] : null;
 
-    const bookTitle = convertPaliScript(capitalizePali(activeTab.title), settings?.paliScript);
-    const chapTitle = currentChap?.title ? convertPaliScript(capitalizePali(currentChap.title), settings?.paliScript) : '';
-    const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), settings?.paliScript) : '';
+    // Detect active route context (clean /translation/{lang}/..., /book/{script}., or ?l={lang})
+    let routeTransLang = null;
+    let routeScriptPrefix = null;
+    if (typeof window !== 'undefined') {
+      const p = window.location?.pathname || '/';
+      if (p.startsWith('/translation/')) {
+        const segs = p.replace(/^\/translation\//, '').split('/').filter(Boolean);
+        if (segs[0] && isValidTranslationLang(segs[0])) {
+          routeTransLang = segs[0];
+        }
+      } else if (p.startsWith('/book/')) {
+        const segs = p.replace(/^\/book\//, '').split('/').filter(Boolean);
+        if (segs[0]) {
+          const sp = splitScriptCode(segs[0]);
+          if (sp.prefix) routeScriptPrefix = sp.prefix;
+        }
+        const qL = new URLSearchParams(window.location?.search || '').get('l');
+        if (qL && isValidTranslationLang(qL)) {
+          routeTransLang = qL;
+        }
+      }
+    } else if (initialRoute) {
+      routeTransLang = initialRoute.translationLang || null;
+      routeScriptPrefix = initialRoute.scriptPrefix || null;
+    }
 
-    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi', settings?.paliScript);
-    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript);
+    const computedCanonicalPath = cleanCode
+      ? buildCanonicalPath({
+          bookCode: cleanCode,
+          scriptPrefix: routeTransLang ? null : routeScriptPrefix,
+          translationLang: routeTransLang,
+          chapterNum: currentChapNum,
+        })
+      : '/';
+    const computedCanonicalUrl = `${SITE_URL}${computedCanonicalPath}`;
+
+    // When still viewing the exact SSR-rendered route, keep the server-rendered
+    // SEO title, description, robots & canonical intact so JS hydration never drifts from initial SSR HTML.
+    const sameAsInitialSsr = Boolean(
+      initialRoute &&
+        ((initialRoute.canonicalUrl && initialRoute.canonicalUrl === computedCanonicalUrl) ||
+          (initialRoute.bookCode === cleanCode &&
+            (initialRoute.chapterNum || null) === (currentChapNum || null) &&
+            (initialRoute.translationLang || null) === (routeTransLang || null) &&
+            (initialRoute.scriptPrefix || null) === (routeTransLang ? null : routeScriptPrefix || null)))
+    );
+
+    const activeScript = routeTransLang
+      ? 'roman'
+      : (getPaliScriptMeta(routeScriptPrefix)?.scriptId || settings?.paliScript || 'roman');
+
+    const bookTitle = convertPaliScript(capitalizePali(activeTab.title), activeScript);
+    const rawChapTitle = currentChap?.title
+      ? String(currentChap.title).trim().replace(/^\d+\.\s*/, '').trim() || currentChap.title
+      : '';
+    const chapTitle = rawChapTitle ? convertPaliScript(capitalizePali(rawChapTitle), activeScript) : '';
+    const nikaya = activeTab.nikaya ? convertPaliScript(capitalizePali(activeTab.nikaya), activeScript) : '';
+    const langMeta = routeTransLang ? getTranslationLangMeta(routeTransLang) : null;
+    const langSuffix = langMeta
+      ? (langMeta.code === 'en' ? ' — English Translation' : ` — ${langMeta.native} (${langMeta.name})`)
+      : '';
+
+    const tipitakaLabel = convertPaliScript('Tipiṭaka Pāḷi', activeScript);
+    const fullAppTitle = convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', activeScript);
 
     let docTitle = '';
     let subject = '';
 
     if (chapTitle && chapTitle !== bookTitle) {
-      subject = `${bookTitle} › ${chapTitle}`;
-      docTitle = `${subject} | ${tipitakaLabel}`;
+      subject = `Ch. ${currentChapNum}: ${chapTitle} — ${bookTitle}`;
+      docTitle = `${subject}${langSuffix} | ${tipitakaLabel}`;
     } else if (nikaya && nikaya !== bookTitle) {
       subject = `${bookTitle} (${nikaya})`;
-      docTitle = `${subject} | ${tipitakaLabel}`;
+      docTitle = `${subject}${langSuffix} | ${tipitakaLabel}`;
     } else {
       subject = bookTitle;
-      docTitle = `${bookTitle} | ${fullAppTitle}`;
+      docTitle = `${bookTitle}${langSuffix} | ${fullAppTitle}`;
     }
-
-    const cleanCode = splitScriptCode(activeTab.bookCode || '').bookCode;
 
     return {
       pageTitle: docTitle,
-      pageDesc: `Read ${subject} in original Pāḷi (17 scripts) with 23 modern translations, DPD dictionary, 387K+ bold definitions, and fast full-text search.`,
-      canonicalUrl: cleanCode ? `${SITE_URL}/book/${cleanCode}` : `${SITE_URL}/`,
+      pageDesc: langMeta
+        ? `Read ${subject} in ${langMeta.native} (${langMeta.name}) alongside original Pāḷi with DPD dictionary, 387K+ bold definitions, and fast full-text search.`
+        : `Read ${subject} in original Pāḷi (17 scripts) with 23 modern translations, DPD dictionary, 387K+ bold definitions, and fast full-text search.`,
+      canonicalUrl: computedCanonicalUrl,
+      preserveSsrMeta: sameAsInitialSsr,
     };
   }, [
     isNotFound,
     activeTab,
     activeTab?.bookCode,
     activeTab?.title,
+    activeTab?.isTocView,
+    activeTab?.viewMode,
     activeTab?.currentChapterIdx,
     activeTab?.chapters,
     activeTab?.nikaya,
     activeBookCode,
     settings?.paliScript,
+    initialRoute,
   ]);
 
   // Dynamic Browser, Search & SEO friendly Title, Meta & Canonical Synchronizer
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    // On prerendered /book/* or /chapter/* routes, keep SSR metadata intact until activeTab loads
+    // On SSR /book/*, /chapter/*, or /translation/* routes, keep SSR metadata intact until activeTab loads
     const pathname = window.location?.pathname || '/';
-    if (!activeTab && !isNotFound && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
+    if (!activeTab && !isNotFound && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/') || pathname.startsWith('/translation/'))) {
+      return;
+    }
+
+    if (preserveSsrMeta && !isNotFound) {
       return;
     }
 
@@ -156,7 +238,7 @@ export function MainAppContent({ params: rawParams }) {
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
-  }, [pageTitle, pageDesc, canonicalUrl, activeTab, isNotFound]);
+  }, [pageTitle, pageDesc, canonicalUrl, preserveSsrMeta, activeTab, isNotFound]);
 
   // Listen for dynamic hash navigation (e.g. user changes URL hash or clicks an anchor link)
   useEffect(() => {
@@ -183,121 +265,51 @@ export function MainAppContent({ params: rawParams }) {
     hasInitializedRef.current = true;
 
     if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const query = urlParams.get('q') || urlParams.get('search');
-    const rawLang = urlParams.get('l') || urlParams.get('lang') || urlParams.get('db');
-    const normLang = rawLang ? normalizeLangCode(rawLang) : null;
-    const cleanL = normLang && normLang !== 'pali' ? normLang : null;
+    const parsed = parseClientRouteLocation({
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      params,
+      initialRoute,
+    });
 
     // Clean up legacy URL parameters: migrate ?db=... / ?lang=... into ?l=... or remove if pali
-    if (
-      urlParams.has('db') ||
-      urlParams.has('lang') ||
-      (urlParams.has('l') && urlParams.get('l') !== cleanL)
-    ) {
+    if (parsed.needsLegacyParamCleanup) {
       updateUrlParams({
-        l: cleanL,
+        l: parsed.cleanQueryL,
         db: null,
         lang: null,
       });
     }
 
-    // Check pathname: e.g. /book/s0505m.mul, /book/s0201m.mul/2, /chapter/s0201m.mul1, /chapter/s0201m.mul/2
-    const pathname = window.location.pathname;
-    let pathBook = null;
-    let pathChapter = null;
-
-    if (pathname.startsWith('/book/') || pathname.startsWith('/chapter/')) {
-      const rawPath = pathname.replace(/^\/(?:book|chapter)\//, '');
-      const parts = rawPath.split('/');
-      if (parts[0]) pathBook = decodeURIComponent(parts[0]);
-      if (parts[1]) pathChapter = decodeURIComponent(parts[1]);
-
-      if (pathBook) {
-        const chapSuffixMatch = pathBook.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
-        if (chapSuffixMatch) {
-          pathBook = chapSuffixMatch[1];
-          if (pathChapter === null || pathChapter === undefined) {
-            // Suffix 0 -> index 0 (ch 1), Suffix 1 -> index 1 (ch 2), etc.
-            pathChapter = parseInt(chapSuffixMatch[2], 10) + 1;
-          }
-        }
-      }
-    }
-
-    if (params?.slug?.[0]) {
-      const slug0 = decodeURIComponent(params.slug[0]);
-      const chapSuffixMatch = slug0.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
-      if (chapSuffixMatch) {
-        if (!pathBook) pathBook = chapSuffixMatch[1];
-        if (pathChapter === null || pathChapter === undefined) {
-          pathChapter = parseInt(chapSuffixMatch[2], 10) + 1;
-        }
-      }
-    }
-
-    // Extract hash e.g. #para57, #para-57, #57, #pindex-134
-    const hash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
-    let hashParaNum = null;
-    let hashParaIndex = null;
-    if (hash) {
-      const numMatch = hash.match(/^(?:para-?|p)?(\d+)$/i);
-      if (numMatch) {
-        hashParaNum = numMatch[1];
-      } else if (hash.startsWith('pindex-')) {
-        hashParaIndex = parseInt(hash.replace('pindex-', ''), 10);
-      }
-    }
-
-    const bookParam =
-      pathBook ||
-      params?.code ||
-      params?.slug?.[0] ||
-      urlParams.get('book') ||
-      urlParams.get('book_code');
-
-    const chapterParam =
-      pathChapter ||
-      params?.slug?.[1] ||
-      urlParams.get('chapter') ||
-      urlParams.get('c');
-
-    const explicitParaNum =
-      hashParaNum ||
-      urlParams.get('para') ||
-      urlParams.get('p') ||
-      urlParams.get('paranum');
-
-    const explicitParaIndex =
-      hashParaIndex ||
-      (urlParams.get('pindex') ? parseInt(urlParams.get('pindex'), 10) : undefined);
-
-    const tabParam = urlParams.get('tab');
-    if (tabParam === 'ai' || tabParam === 'ai_chat' || bookParam === 'ai_chat') {
+    if (parsed.tabParam === 'ai' || parsed.tabParam === 'ai_chat' || parsed.bookParam === 'ai_chat') {
       openAiChatTab();
       return;
     }
 
-    if (query && !bookParam) {
-      openSearchModal(query);
-    } else if (bookParam) {
+    if (parsed.query && !parsed.bookParam) {
+      openSearchModal(parsed.query);
+    } else if (parsed.bookParam) {
       let targetChapterIdx = undefined;
-      if (chapterParam !== null && chapterParam !== undefined) {
-        const parsed = parseInt(chapterParam, 10);
-        targetChapterIdx = Math.max(0, parsed > 0 ? parsed - 1 : 0);
+      if (parsed.chapterParam !== null && parsed.chapterParam !== undefined) {
+        const chNum = parseInt(parsed.chapterParam, 10);
+        if (!Number.isNaN(chNum)) {
+          targetChapterIdx = Math.max(0, chNum > 0 ? chNum - 1 : 0);
+        }
       }
 
-      openBook(bookParam, {
+      openBook(parsed.bookParam, {
         targetChapterIdx,
-        targetParaNum: explicitParaNum,
-        targetParaIndex: explicitParaIndex,
-        highlightQuery: query || undefined,
-        searchQuery: query || undefined,
-        lang: cleanL || undefined,
-        l: cleanL || undefined,
+        targetParaNum: parsed.explicitParaNum,
+        targetParaIndex: parsed.explicitParaIndex,
+        highlightQuery: parsed.query || undefined,
+        searchQuery: parsed.query || undefined,
+        lang: parsed.effectiveLang || undefined,
+        l: parsed.effectiveLang || undefined,
+        fromTranslationRoute: parsed.fromTranslationRoute,
       });
     }
-  }, [openBook, openAiChatTab, openSearchModal, updateUrlParams, params]);
+  }, [openBook, openAiChatTab, openSearchModal, updateUrlParams, params, initialRoute]);
 
   const isAiTab = activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat';
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -368,7 +380,7 @@ export function MainAppContent({ params: rawParams }) {
                 : 'app-body flex-1 min-h-0 flex overflow-hidden relative w-full max-w-full'
             }
           >
-            <ReaderView />
+            <ReaderView ssrContent={ssrContent} />
           </div>
           {!isAiTab && activeTab?.bookCode && <Footer />}
         </div>
@@ -385,8 +397,6 @@ export function MainAppContent({ params: rawParams }) {
   );
 }
 
-
-
 export default function Home({ params }) {
   return (
     <Suspense fallback={<div className="flex h-screen items-center justify-center bg-[var(--bg-primary)]">Loading Tipiṭaka...</div>}>
@@ -394,4 +404,3 @@ export default function Home({ params }) {
     </Suspense>
   );
 }
-

@@ -1,52 +1,28 @@
 import React, { Suspense } from 'react';
-import fs from 'fs';
-import path from 'path';
+import { notFound } from 'next/navigation';
 import { MainAppContent } from '../../page';
 import { splitScriptCode } from '../../../services/transliterate';
 import {
   SITE_URL,
-  DEFAULT_SEO_TITLE,
-  DEFAULT_SEO_DESCRIPTION,
   TRANSLATION_LANGS,
   buildBookSeoMetadata,
+  buildCanonicalPath,
 } from '../../../services/seoMetadata';
+import {
+  getBooksCatalog,
+  getChaptersByBook,
+  parseStrictPositiveInt,
+} from '../../../services/ssrCatalog';
 
 export { TRANSLATION_LANGS };
 
-let _catalogCache = null;
-let _chaptersByBookCache = null;
-
-function getBooksCatalog() {
-  if (_catalogCache) return _catalogCache;
-  try {
-    const catalogPath = path.join(process.cwd(), 'server_api', 'cst_books_catalog.json');
-    if (fs.existsSync(catalogPath)) {
-      _catalogCache = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-      return _catalogCache;
-    }
-  } catch (e) {}
-  return {};
-}
-
-function getChaptersByBook() {
-  if (_chaptersByBookCache) return _chaptersByBookCache;
-  const map = new Map();
-  try {
-    const chapsPath = path.join(process.cwd(), 'server_api', 'chapters_catalog.json');
-    if (fs.existsSync(chapsPath)) {
-      const allChaps = JSON.parse(fs.readFileSync(chapsPath, 'utf8'));
-      for (const ch of allChaps) {
-        if (!ch?.book_code) continue;
-        if (!map.has(ch.book_code)) map.set(ch.book_code, []);
-        map.get(ch.book_code).push(ch);
-      }
-    }
-  } catch (e) {}
-  _chaptersByBookCache = map;
-  return map;
-}
+const IS_STATIC_EXPORT =
+  process.env.NEXT_EXPORT === 'true' || process.env.STATIC_EXPORT === 'true';
 
 export async function generateStaticParams() {
+  if (!IS_STATIC_EXPORT) {
+    return [];
+  }
   const catalog = getBooksCatalog();
   const codes = Object.keys(catalog);
   if (codes.length > 0) {
@@ -55,87 +31,113 @@ export async function generateStaticParams() {
   return [{ slug: ['default'] }];
 }
 
-export async function generateMetadata({ params }) {
-  const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
-
-  const slug0 = unwrappedParams?.slug?.[0] ? decodeURIComponent(unwrappedParams.slug[0]) : '';
-  let bookCode = slug0;
-
-  const scriptSplit = splitScriptCode(bookCode);
-  bookCode = scriptSplit.bookCode;
-  const scriptId = scriptSplit.scriptId;
-
-  const chapSuffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
-  if (chapSuffixMatch) {
-    bookCode = chapSuffixMatch[1];
+function parseLegacyChapterSlug(slug) {
+  if (!Array.isArray(slug) || slug.length < 1 || slug.length > 2) {
+    return { valid: false };
   }
-
-  // Canonical points to the pre-rendered /book/<code> page; legacy /chapter/*
-  // routes consolidate to /book/<code> and are marked noindex to prevent duplicates.
-  const canonicalPath = bookCode ? `/book/${bookCode}` : '/';
-
-  if (!bookCode) {
-    return {
-      title: { absolute: DEFAULT_SEO_TITLE },
-      description: DEFAULT_SEO_DESCRIPTION,
-      alternates: { canonical: '/' },
-      robots: { index: false, follow: true },
-    };
-  }
-
+  let raw0;
   try {
-    const catalog = getBooksCatalog();
-    const entry = catalog[bookCode];
-    if (entry) {
-      const chaptersForBook = getChaptersByBook().get(bookCode) || [];
-      const seo = buildBookSeoMetadata(bookCode, entry, chaptersForBook, scriptId);
+    raw0 = decodeURIComponent(slug[0]);
+  } catch (_) {
+    return { valid: false };
+  }
+  const scriptSplit = splitScriptCode(raw0);
+  let bookCode = scriptSplit.bookCode;
+  let chapterNum = null;
 
-      return {
-        title: { absolute: seo.title },
-        description: seo.description,
-        keywords: seo.keywords,
-        alternates: {
-          canonical: canonicalPath,
-        },
-        robots: { index: false, follow: true },
-        openGraph: {
-          title: seo.title,
-          description: seo.description,
-          url: `${SITE_URL}${canonicalPath}`,
-          siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-          locale: 'pi_IN',
-          type: 'article',
-          images: [
-            {
-              url: '/android-chrome-512x512.png',
-              width: 512,
-              height: 512,
-              alt: seo.displayTitle,
-            },
-          ],
-        },
-        twitter: {
-          card: 'summary_large_image',
-          title: seo.title,
-          description: seo.description,
-          images: ['/android-chrome-512x512.png'],
-        },
-      };
+  const suffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (suffixMatch) {
+    bookCode = suffixMatch[1];
+    chapterNum = parseInt(suffixMatch[2], 10) + 1;
+  }
+  if (slug[1] !== undefined) {
+    try {
+      chapterNum = parseStrictPositiveInt(decodeURIComponent(slug[1]));
+    } catch (_) {
+      return { valid: false };
     }
-  } catch (err) {
-    console.warn('generateMetadata error:', err);
+    if (!chapterNum) return { valid: false };
+  }
+
+  const catalog = getBooksCatalog();
+  const entry = catalog[bookCode];
+  if (!entry) return { valid: false };
+
+  const chaptersForBook = getChaptersByBook().get(bookCode) || [];
+  if (chapterNum !== null && (chapterNum < 1 || chapterNum > chaptersForBook.length)) {
+    return { valid: false };
   }
 
   return {
-    title: { absolute: DEFAULT_SEO_TITLE },
-    description: DEFAULT_SEO_DESCRIPTION,
-    alternates: { canonical: canonicalPath },
+    valid: true,
+    bookCode,
+    scriptPrefix: scriptSplit.prefix,
+    chapterNum,
+    entry,
+    chaptersForBook,
+  };
+}
+
+export async function generateMetadata({ params }) {
+  const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
+  const parsed = parseLegacyChapterSlug(unwrappedParams?.slug);
+
+  if (!parsed.valid) {
+    notFound();
+  }
+
+  const seo = buildBookSeoMetadata(parsed.bookCode, parsed.entry, parsed.chaptersForBook, {
+    scriptPrefix: parsed.scriptPrefix,
+    chapterNum: parsed.chapterNum,
+  });
+
+  const canonicalPath = buildCanonicalPath({
+    bookCode: parsed.bookCode,
+    scriptPrefix: parsed.scriptPrefix,
+    chapterNum: parsed.chapterNum,
+  });
+
+  return {
+    title: { absolute: seo.title },
+    description: seo.description,
+    keywords: seo.keywords,
+    alternates: {
+      canonical: `${SITE_URL}${canonicalPath}`,
+    },
     robots: { index: false, follow: true },
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      url: `${SITE_URL}${canonicalPath}`,
+      siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
+      locale: 'pi_IN',
+      type: 'article',
+      images: [
+        {
+          url: '/android-chrome-512x512.png',
+          width: 512,
+          height: 512,
+          alt: seo.displayTitle,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+      images: ['/android-chrome-512x512.png'],
+    },
   };
 }
 
 export default async function ChapterPage({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
+  const parsed = parseLegacyChapterSlug(unwrappedParams?.slug);
+
+  if (!parsed.valid) {
+    notFound();
+  }
+
   return (
     <Suspense
       fallback={

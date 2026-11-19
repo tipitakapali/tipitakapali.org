@@ -78,8 +78,8 @@ cd tipitakapali_org_app
 What `sync_web_bundle.sh` does:
 
 1. Runs `NEXT_EXPORT=true STATIC_EXPORT=true npm run build` inside the parent `tipitakapali.org` root.
-2. Compresses `../out` into `assets/web.zip` (excluding unneeded static route directories/fonts such as `book/`, `chapter/`, `.well-known/`, `sitemap*`, `robots.txt`, `Noto_Serif_SC*`, and `Noto_Serif_JP*`).
-3. Attempts to regenerate `assets/dpd_family_data.json.gz` from `../server_api/db/dpd_goldendict.js` (note: step 3 currently exits with an error if `family_compounds` is absent in `dpd_goldendict.js`, after `assets/web.zip` has already been updated in step 2).
+2. Compresses `../out` into `assets/web.zip` (excluding unneeded static route directories/fonts such as `book/`, `chapter/`, `translation/`, `.well-known/`, `sitemap*`, `robots.txt`, `Noto_Serif_SC*`, and `Noto_Serif_JP*`).
+3. Extracts all 5 DPD family tables (`family_compounds`, `family_idioms`, `family_root`, `family_sets`, `family_word`) from `../server_api/db/dpd_goldendict.js` (supports both minified and unminified bundles) and writes `assets/dpd_family_data.json.gz`.
 
 After syncing, commit `assets/web.zip` and rebuild the app.
 

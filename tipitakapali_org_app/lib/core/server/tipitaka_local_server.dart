@@ -607,9 +607,10 @@ class TipitakaLocalServer {
           resolveCandidate('$joined.html') ??
           resolveCandidate(p.join(joined, 'index.html'));
 
-      // Client-side SPA fallback for `/book/*` and `/chapter/*` deep-links.
+      // Client-side SPA fallback for `/book/*`, `/translation/*`, and `/chapter/*` deep-links.
       if (target == null &&
           (relSegments.first == 'book' ||
+              relSegments.first == 'translation' ||
               relSegments.first == 'chapter' ||
               !relSegments.last.contains('.'))) {
         target = resolveCandidate('index.html');

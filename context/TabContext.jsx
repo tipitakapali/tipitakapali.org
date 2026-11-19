@@ -137,7 +137,7 @@ export function hasDeepLinkInLocation(loc = null) {
   const targetLoc = loc || (typeof window !== 'undefined' ? window.location : null);
   if (!targetLoc) return false;
   const pathname = targetLoc.pathname || '';
-  if (pathname.startsWith('/book/') || pathname.startsWith('/chapter/')) {
+  if (pathname.startsWith('/book/') || pathname.startsWith('/chapter/') || pathname.startsWith('/translation/')) {
     return true;
   }
   const params = new URLSearchParams(targetLoc.search || '');
@@ -339,6 +339,7 @@ export const LANG_KEY_TO_CODE = {
   indonesian: 'id',
   nepali: 'ne',
   bengali: 'be',
+  bn: 'be',
   spanish: 'es',
   french: 'fr',
   portuguese: 'pt',
@@ -485,6 +486,8 @@ export function TabProvider({ children }) {
   // bookCode -> URL script prefix (e.g. 'si') for tabs opened via script-prefixed URLs,
   // so updateUrlParams keeps the prefix in the address bar (deep-links stay script-specific)
   const tabScriptPrefixRef = useRef({});
+  // bookCode -> translation language code (e.g. 'vi') for tabs opened via /translation/{lang}/{code} routes
+  const tabTransRouteLangRef = useRef({});
 
   openTabsRef.current = openTabs;
   activeBookCodeRef.current = activeBookCode;
@@ -643,9 +646,16 @@ export function TabProvider({ children }) {
       } else if (bookTarget) {
         url.searchParams.delete('tab');
         const prefix = tabScriptPrefixRef.current[bookTarget];
+        const routeTransLang = tabTransRouteLangRef.current[bookTarget] || null;
         const fullBookCode = prefix ? `${prefix}.${bookTarget}` : bookTarget;
 
-        if (chapterTarget && parseInt(chapterTarget, 10) > 0) {
+        if (routeTransLang) {
+          if (chapterTarget && parseInt(chapterTarget, 10) > 0) {
+            url.pathname = `/translation/${routeTransLang}/${bookTarget}/${chapterTarget}`;
+          } else {
+            url.pathname = `/translation/${routeTransLang}/${bookTarget}`;
+          }
+        } else if (chapterTarget && parseInt(chapterTarget, 10) > 0) {
           url.pathname = `/book/${fullBookCode}/${chapterTarget}`;
         } else {
           url.pathname = `/book/${fullBookCode}`;
@@ -657,7 +667,7 @@ export function TabProvider({ children }) {
       }
 
       // Handle language/database parameter normalization:
-      // Primary: l=<lang_code> (omitted when 'pali' or null).
+      // Primary: l=<lang_code> (omitted when 'pali', null, or already encoded in /translation/{lang}/ path).
       // Disallow db and lang in URL; map legacy db/lang into l.
       if (paramsToUpdate.l !== undefined) {
         targetLang = paramsToUpdate.l;
@@ -678,13 +688,22 @@ export function TabProvider({ children }) {
       });
       url.searchParams.delete('hash');
 
+      const activeRouteTransLang =
+        bookTarget && bookTarget !== 'ai_chat' ? tabTransRouteLangRef.current[bookTarget] || null : null;
+
       if (targetLang !== undefined) {
         const norm = normalizeLangCode(targetLang);
         if (norm && norm !== 'pali') {
-          url.searchParams.set('l', norm);
+          if (activeRouteTransLang && norm === activeRouteTransLang) {
+            url.searchParams.delete('l');
+          } else {
+            url.searchParams.set('l', norm);
+          }
         } else {
           url.searchParams.delete('l');
         }
+      } else if (activeRouteTransLang && url.searchParams.get('l') === activeRouteTransLang) {
+        url.searchParams.delete('l');
       }
     }
 
@@ -1014,6 +1033,30 @@ export function TabProvider({ children }) {
       // Record the script prefix keyed by the final (chapter-suffix-stripped) book code
       if (scriptSplit.scriptId) {
         tabScriptPrefixRef.current[cleanCode] = scriptSplit.prefix;
+        delete tabTransRouteLangRef.current[cleanCode];
+      }
+
+      // Resolve and enable any requested translation language immediately (works for BOTH
+      // TOC routes like /translation/vi/{book_code} or /book/{code}?l=vi AND chapter routes)
+      const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
+      const requestedRawLang = options.l || options.lang || options.db || currentUrlL || null;
+      const requestedNormLang = requestedRawLang ? normalizeLangCode(requestedRawLang) : null;
+      const requestedCleanLang = (requestedNormLang && requestedNormLang !== 'pali') ? requestedNormLang : null;
+
+      if (options.fromTranslationRoute && requestedCleanLang) {
+        tabTransRouteLangRef.current[cleanCode] = requestedCleanLang;
+        delete tabScriptPrefixRef.current[cleanCode];
+      }
+
+      if (requestedCleanLang) {
+        const langKey = CODE_TO_LANG_KEY[requestedCleanLang] || requestedCleanLang;
+        if (langKey) {
+          updateSetting('translations', (prevTrans) => {
+            const base = prevTrans || {};
+            if (base[langKey]) return prevTrans;
+            return { ...base, [langKey]: true };
+          });
+        }
       }
 
       const rawParaNum = options.targetParaNum ? String(options.targetParaNum).replace(/^(?:para-?|p)/i, '') : null;
@@ -1267,10 +1310,11 @@ export function TabProvider({ children }) {
 
         if (cleanLangCode) {
           const langKey = CODE_TO_LANG_KEY[cleanLangCode] || cleanLangCode;
-          if (langKey && (!settings?.translations || !settings.translations[langKey])) {
-            updateSetting('translations', {
-              ...(settings?.translations || {}),
-              [langKey]: true,
+          if (langKey) {
+            updateSetting('translations', (prevTrans) => {
+              const base = prevTrans || {};
+              if (base[langKey]) return prevTrans;
+              return { ...base, [langKey]: true };
             });
           }
         }
@@ -1653,10 +1697,11 @@ export function TabProvider({ children }) {
 
         if (cleanLangCode) {
           const langKey = CODE_TO_LANG_KEY[cleanLangCode] || cleanLangCode;
-          if (langKey && (!settings?.translations || !settings.translations[langKey])) {
-            updateSetting('translations', {
-              ...(settings?.translations || {}),
-              [langKey]: true,
+          if (langKey) {
+            updateSetting('translations', (prevTrans) => {
+              const base = prevTrans || {};
+              if (base[langKey]) return prevTrans;
+              return { ...base, [langKey]: true };
             });
           }
         }
@@ -2011,6 +2056,7 @@ export function TabProvider({ children }) {
       }
 
       delete tabScriptPrefixRef.current[bookCode];
+      delete tabTransRouteLangRef.current[bookCode];
 
       const newTabs = currentTabs.filter((t) => t.bookCode !== bookCode);
       setOpenTabs(newTabs);
@@ -2061,9 +2107,12 @@ export function TabProvider({ children }) {
       }
 
       const newTabs = [targetTab];
-      // Drop script-prefix entries for every tab that is being closed
+      // Drop script-prefix & translation-route entries for every tab that is being closed
       for (const t of currentTabs) {
-        if (t.bookCode !== bookCode) delete tabScriptPrefixRef.current[t.bookCode];
+        if (t.bookCode !== bookCode) {
+          delete tabScriptPrefixRef.current[t.bookCode];
+          delete tabTransRouteLangRef.current[t.bookCode];
+        }
       }
       setOpenTabs(newTabs);
       const isAi = targetTab.type === 'ai_chat' || targetTab.bookCode === 'ai_chat';
@@ -2089,6 +2138,7 @@ export function TabProvider({ children }) {
   // Close all tabs
   const closeAllTabs = useCallback(() => {
     tabScriptPrefixRef.current = {};
+    tabTransRouteLangRef.current = {};
     setOpenTabs([]);
     setActiveBookCode(null);
     setTreeSelectedNode(null);
@@ -2103,7 +2153,10 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx <= 0) return;
-      for (let i = 0; i < idx; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
+      for (let i = 0; i < idx; i++) {
+        delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
+        delete tabTransRouteLangRef.current[currentTabs[i].bookCode];
+      }
 
       const newTabs = currentTabs.slice(idx);
       const remainingBooks = newTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat');
@@ -2148,7 +2201,10 @@ export function TabProvider({ children }) {
       const currentTabs = openTabsRef.current;
       const idx = currentTabs.findIndex((t) => t.bookCode === bookCode);
       if (idx === -1 || idx >= currentTabs.length - 1) return;
-      for (let i = idx + 1; i < currentTabs.length; i++) delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
+      for (let i = idx + 1; i < currentTabs.length; i++) {
+        delete tabScriptPrefixRef.current[currentTabs[i].bookCode];
+        delete tabTransRouteLangRef.current[currentTabs[i].bookCode];
+      }
 
       const newTabs = currentTabs.slice(0, idx + 1);
       const remainingBooks = newTabs.filter((t) => t.type !== 'ai_chat' && t.bookCode !== 'ai_chat');

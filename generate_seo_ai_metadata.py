@@ -2,27 +2,27 @@
 """
 generate_seo_ai_metadata.py
 ===========================
-Generates clean, canonical SEO metadata and high-signal AI crawler/agent files
-for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi web application (tipitakapali.org).
+Generates full VPS SSR multi-script & multi-translation XML Sitemap Index and
+high-signal AI crawler/agent files for tipitakapali.org.
 
 Generated Files:
-  1. sitemap.xml    - Clean canonical XML sitemap containing ONLY the 222
-                      statically prerendered, self-canonical URLs (Home, /info,
-                      /pali-script-converter, /privacy_policy.html,
-                      /terms_of_service.html, and all 217 /book/{code} pages).
-                      Eliminates canonical URL collapsing and duplicate title/
-                      description warnings from non-canonical SPA fallback URLs.
-  2. robots.txt     - Search engine & AI crawler rules with canonical sitemap
-                      and AI tool API allowances.
-  3. llms.txt       - Concise, high-signal AI Agent playbook & API guide
-                      (llmstxt.org standard): Canonical Bold Definitions
-                      (387,006 entries), Concept-Group Search, DPD, FTS5,
-                      Sentence Alignment, and verifiable citation syntax.
-  4. llms-full.txt  - Complete 217-book catalog (with Mūla/Aṭṭhakathā/Ṭīkā
-                      cross-links), 23 translations, 17 scripts, and full REST
-                      API reference for LLMs & research agents.
-  5. site.jsonld    - Schema.org JSON-LD structured data (WebSite, Organization,
-                      DataCatalog with all 217 canonical books).
+  1. sitemap.xml              - XML Sitemap Index referencing 40 child sitemaps:
+                                - sitemap-main.xml (site pages + 217 Roman books + 2,695 chapters)
+                                - sitemap-{script}.xml (16 Pāḷi script sitemaps: books + chapters)
+                                - sitemap-lang-{lang}.xml (23 translation language sitemaps:
+                                  /translation/{lang}/{book_code} + chapters present in translation_{lang}.db)
+                                Every child sitemap stays cleanly under 50,000 URLs & 50 MB.
+  2. robots.txt               - Search engine & AI crawler rules allowing /book/ and /translation/
+                                with canonical Sitemap Index entry.
+  3. llms.txt                 - Concise, high-signal AI Agent playbook & API guide
+                                (llmstxt.org standard): Canonical Bold Definitions
+                                (387,006 entries), Concept-Group Search, DPD, FTS5,
+                                Sentence Alignment, clean /translation/{lang}/{book} URLs, and citations.
+  4. llms-full.txt            - Complete 217-book catalog (with Mūla/Aṭṭhakathā/Ṭīkā
+                                cross-links), 23 translations (/translation/{lang}/...), 17 scripts,
+                                and full REST API reference for LLMs & research agents.
+  5. site.jsonld              - Schema.org JSON-LD structured data (WebSite, Organization,
+                                DataCatalog with all 217 canonical books).
 
 Usage:
   python3 generate_seo_ai_metadata.py
@@ -38,8 +38,7 @@ import sqlite3
 import argparse
 import time
 from pathlib import Path
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
+from xml.sax.saxutils import escape as xml_escape
 
 DEFAULT_SITE_URL = "https://tipitakapali.org"
 INDEXNOW_KEY_RE = re.compile(r"^[0-9a-f]{32}\.txt$")
@@ -69,7 +68,7 @@ TRANSLATION_LANGUAGES = [
     {"code": "en", "name": "English", "native": "English", "flag": "🇬🇧", "lang": "en", "desc": "English translation • 1.28M sentences"},
     {"code": "vi", "name": "Vietnamese", "native": "Tiếng Việt", "flag": "🇻🇳", "lang": "vi", "desc": "Bản dịch Tiếng Việt • 1.28M câu"},
     {"code": "my", "name": "Myanmar / Burmese", "native": "မြန်မာ", "flag": "🇲🇲", "lang": "my", "desc": "မြန်မာဘာသာပြန် • 1.28M စာကြောင်း"},
-    {"code": "my_nissaya", "name": "Myanmar Nissaya", "native": "မြန်မာ နိဿယ", "flag": "🇲🇲", "lang": "my", "desc": "Myanmar Nissaya word-by-word • 570K စာကြောင်း"},
+    {"code": "my_nissaya", "name": "Myanmar Nissaya", "native": "မြန်မာ နိဿယ", "flag": "🇲🇲", "lang": "my-MM", "desc": "Myanmar Nissaya word-by-word • 570K စာကြောင်း"},
     {"code": "si", "name": "Sinhala", "native": "සිංහල", "flag": "🇱🇰", "lang": "si", "desc": "සිංහල පරිවර්තනය • 1.21M වාක්‍ය"},
     {"code": "zh", "name": "Chinese", "native": "中文", "flag": "🇨🇳", "lang": "zh", "desc": "中文翻译 • 1.27M 句"},
     {"code": "km", "name": "Khmer", "native": "ភាសាខ្មែរ", "flag": "🇰🇭", "lang": "km", "desc": "ការបកប្រែជាភាសាខ្មែរ • 1.18M ប្រយោគ"},
@@ -139,6 +138,7 @@ def find_paths():
         'root_dir': root_dir,
         'web_app_dir': web_app_dir,
         'db_path': db_path,
+        'db_dir': db_path.parent if db_path else (web_app_dir / 'server_api' / 'db'),
         'bold_db_path': bold_db_path if bold_db_path.exists() else None,
         'catalog_path': catalog_path,
         'public_dir': public_dir,
@@ -160,76 +160,182 @@ def get_bold_definitions_count(bold_db_path):
         return 387006
 
 
-def generate_canonical_sitemap_xml(books, site_url):
+def _book_priority(book_dict):
+    clean_code = book_dict['code']
+    cat = str(book_dict.get('category') or '').lower()
+    if clean_code.endswith('.mul') or 'mūla' in cat or 'mula' in cat:
+        return "0.9"
+    if clean_code.endswith('.att') or 'aṭṭha' in cat or 'attha' in cat:
+        return "0.8"
+    return "0.75"
+
+
+def _chapter_priority(book_dict):
+    clean_code = book_dict['code']
+    if clean_code.endswith('.mul'):
+        return "0.7"
+    if clean_code.endswith('.att'):
+        return "0.65"
+    return "0.6"
+
+
+def _render_urlset_xml(entries, now_iso):
+    """Render a standards-compliant UTF-8 XML <urlset> cleanly and quickly."""
+    lines = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc, changefreq, priority in entries:
+        lines.append("  <url>")
+        lines.append(f"    <loc>{xml_escape(loc)}</loc>")
+        lines.append(f"    <lastmod>{now_iso}</lastmod>")
+        lines.append(f"    <changefreq>{changefreq}</changefreq>")
+        lines.append(f"    <priority>{priority}</priority>")
+        lines.append("  </url>")
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n"
+
+
+def _render_sitemapindex_xml(child_filenames, site_url, now_iso):
+    """Render a standards-compliant UTF-8 XML <sitemapindex>."""
+    lines = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for fname in child_filenames:
+        loc = f"{site_url}/{fname}"
+        lines.append("  <sitemap>")
+        lines.append(f"    <loc>{xml_escape(loc)}</loc>")
+        lines.append(f"    <lastmod>{now_iso}</lastmod>")
+        lines.append("  </sitemap>")
+    lines.append("</sitemapindex>")
+    return "\n".join(lines) + "\n"
+
+
+def _load_translation_coverage(db_dir: Path, lang_code: str):
     """
-    Generate a single clean XML sitemap containing ONLY the 222 statically
-    prerendered, self-canonical URLs.
-    Non-canonical SPA fallbacks (/book/{script}.{code}, /book/{code}/{ch},
-    /book/{code}?l={lang}) are intentionally excluded to eliminate canonical
-    URL collapsing and duplicate title/description penalties in Bing & Google.
+    Query translation_{lang}.db for distinct (book_code, chapter_index) pairs
+    that actually contain translated paragraphs. Returns {book_code: set(chapter_index)}
+    or None if the translation DB is not present on disk.
     """
-    urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+    if not db_dir:
+        return None
+    db_file = Path(db_dir) / f"translation_{lang_code}.db"
+    if not db_file.exists():
+        return None
+    coverage = {}
+    conn = sqlite3.connect(str(db_file))
+    try:
+        for bcode, ch_idx in conn.execute(
+            "SELECT DISTINCT book_code, chapter_index FROM paragraph_translations "
+            "ORDER BY book_code, chapter_index"
+        ):
+            coverage.setdefault(bcode, set()).add(int(ch_idx))
+    finally:
+        conn.close()
+    return coverage
+
+
+def generate_all_sitemaps(books, chapters, site_url, db_dir=None):
+    """
+    Generate the complete VPS SSR XML Sitemap Index and all 40 child sitemaps:
+      - sitemap.xml               : XML Sitemap Index referencing all 40 child sitemaps
+      - sitemap-main.xml          : 5 static pages + 217 Roman books + 2,695 Roman chapters
+      - sitemap-{script}.xml      : 16 Pāḷi script sitemaps (/book/{script}.{code} + chapters)
+      - sitemap-lang-{lang}.xml   : 23 translation sitemaps (/translation/{lang}/{code} + present chapters)
+    Each child sitemap contains <= 2,917 URLs (strictly within the 50,000-URL / 50 MB spec).
+    """
+    site_url = site_url.rstrip('/')
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    static_pages = [
+    chapters_by_book = {}
+    for ch in chapters:
+        chapters_by_book.setdefault(ch['book_code'], []).append(int(ch['chapter_index']))
+    for bcode in chapters_by_book:
+        chapters_by_book[bcode] = sorted(set(chapters_by_book[bcode]))
+
+    sitemaps = {}
+    child_order = []
+
+    # 1. sitemap-main.xml (5 site pages + 217 Roman books + 2,695 Roman chapters)
+    main_entries = [
         (f"{site_url}/", "weekly", "1.0"),
         (f"{site_url}/info", "monthly", "0.85"),
         (f"{site_url}/pali-script-converter", "monthly", "0.85"),
         (f"{site_url}/privacy_policy.html", "yearly", "0.3"),
         (f"{site_url}/terms_of_service.html", "yearly", "0.3"),
     ]
-
-    for loc, changefreq, priority in static_pages:
-        url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = loc
-        ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = changefreq
-        ET.SubElement(url_elem, "priority").text = priority
-
-    # All 217 prerendered canonical book pages (/book/{code})
     for b in books:
-        clean_code = b['code']
-        cat = str(b.get('category') or '').lower()
-        if clean_code.endswith('.mul') or 'mūla' in cat or 'mula' in cat:
-            priority = "0.9"
-        elif clean_code.endswith('.att') or 'aṭṭha' in cat or 'attha' in cat:
-            priority = "0.8"
-        else:
-            priority = "0.75"
-        url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{clean_code}"
-        ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = "monthly"
-        ET.SubElement(url_elem, "priority").text = priority
+        code = b['code']
+        main_entries.append((f"{site_url}/book/{code}", "monthly", _book_priority(b)))
+        ch_prio = _chapter_priority(b)
+        for ch_idx in chapters_by_book.get(code, []):
+            main_entries.append((f"{site_url}/book/{code}/{ch_idx + 1}", "monthly", ch_prio))
 
-    xml_str = ET.tostring(urlset, encoding="utf-8")
-    parsed = minidom.parseString(xml_str)
-    return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
+    sitemaps['sitemap-main.xml'] = _render_urlset_xml(main_entries, now_iso)
+    child_order.append('sitemap-main.xml')
+
+    # 2. sitemap-{script}.xml (16 non-Roman Pāḷi scripts: books + chapters)
+    for sc in PALI_SCRIPTS:
+        sc_code = sc['code']
+        sc_entries = []
+        for b in books:
+            code = b['code']
+            sc_entries.append((f"{site_url}/book/{sc_code}.{code}", "monthly", _book_priority(b)))
+            ch_prio = _chapter_priority(b)
+            for ch_idx in chapters_by_book.get(code, []):
+                sc_entries.append((f"{site_url}/book/{sc_code}.{code}/{ch_idx + 1}", "monthly", ch_prio))
+        fname = f"sitemap-{sc_code}.xml"
+        sitemaps[fname] = _render_urlset_xml(sc_entries, now_iso)
+        child_order.append(fname)
+
+    # 3. sitemap-lang-{lang}.xml (23 modern translations: /translation/{lang}/{code} + chapters present in DB)
+    for t in TRANSLATION_LANGUAGES:
+        lang_code = t['code']
+        coverage = _load_translation_coverage(db_dir, lang_code)
+        lang_entries = []
+        for b in books:
+            code = b['code']
+            valid_chaps = chapters_by_book.get(code, [])
+            if coverage is not None:
+                if code not in coverage:
+                    continue
+                present_chaps = [ci for ci in valid_chaps if ci in coverage[code]]
+            else:
+                present_chaps = valid_chaps
+
+            lang_entries.append((f"{site_url}/translation/{lang_code}/{code}", "monthly", _book_priority(b)))
+            ch_prio = _chapter_priority(b)
+            for ch_idx in present_chaps:
+                lang_entries.append((f"{site_url}/translation/{lang_code}/{code}/{ch_idx + 1}", "monthly", ch_prio))
+
+        fname = f"sitemap-lang-{lang_code}.xml"
+        sitemaps[fname] = _render_urlset_xml(lang_entries, now_iso)
+        child_order.append(fname)
+
+    # 4. Root XML Sitemap Index (sitemap.xml)
+    sitemaps['sitemap.xml'] = _render_sitemapindex_xml(child_order, site_url, now_iso)
+    return sitemaps
 
 
-def generate_all_sitemaps(books, chapters, site_url):
-    """Return canonical sitemap map (single clean sitemap.xml)."""
-    return {
-        'sitemap.xml': generate_canonical_sitemap_xml(books, site_url),
-    }
+def generate_sitemap_xml(books, chapters, site_url, db_dir=None):
+    """Backward-compatibility alias returning the root sitemap.xml index."""
+    return generate_all_sitemaps(books, chapters, site_url, db_dir=db_dir)['sitemap.xml']
 
 
-def generate_sitemap_xml(books, chapters, site_url):
-    """Backward-compatibility alias."""
-    return generate_canonical_sitemap_xml(books, site_url)
-
-
-def cleanup_obsolete_sitemaps(target_dir: Path):
-    """Remove obsolete non-canonical child sitemaps (sitemap-main.xml, sitemap-translations.xml, sitemap-{script}.xml)."""
+def cleanup_obsolete_sitemaps(target_dir: Path, keep_files=None):
+    """Remove stale sitemap-*.xml files (e.g. legacy sitemap-translations.xml) not in keep_files."""
     if not target_dir or not target_dir.exists():
         return 0
-    removed = 0
-    obsolete = {"sitemap-main.xml", "sitemap-translations.xml"} | {
-        f"sitemap-{sc['code']}.xml" for sc in PALI_SCRIPTS
+    keep = set(keep_files) if keep_files is not None else {
+        "sitemap.xml",
+        "sitemap-main.xml",
+        *(f"sitemap-{sc['code']}.xml" for sc in PALI_SCRIPTS),
+        *(f"sitemap-lang-{t['code']}.xml" for t in TRANSLATION_LANGUAGES),
     }
-    for fname in obsolete:
-        fpath = target_dir / fname
-        if fpath.exists():
+    removed = 0
+    for fpath in target_dir.glob("sitemap-*.xml"):
+        if fpath.name not in keep:
             try:
                 fpath.unlink()
                 removed += 1
@@ -270,6 +376,7 @@ Allow: /
 Allow: /_next/
 Allow: /api/
 Allow: /book/
+Allow: /translation/
 Disallow: /api/search*
 
 # 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow AI & Dict tools
@@ -296,6 +403,7 @@ Allow: /api/ai/
 Allow: /api/dict/
 Allow: /api/links/
 Allow: /book/
+Allow: /translation/
 
 # 3. Default for all other user agents
 User-agent: *
@@ -306,6 +414,8 @@ Allow: /api/
 Allow: /api/ai/
 Allow: /api/dict/
 Allow: /api/links/
+Allow: /book/
+Allow: /translation/
 Disallow: /api/search*
 
 # 4. Canonical Sitemap & AI Discovery Entry Points
@@ -334,7 +444,7 @@ def generate_llms_txt(site_url, books_count, chapters_count, bold_def_count=3870
 
     trans_rows = []
     for t in TRANSLATION_LANGUAGES:
-        trans_rows.append(f"- `{t['code']}`: **{t['name']}** ({t['native']}) {t['flag']} → `{site_url}/book/s0101m.mul?l={t['code']}` ({t['desc']})")
+        trans_rows.append(f"- `{t['code']}`: **{t['name']}** ({t['native']}) {t['flag']} → `{site_url}/translation/{t['code']}/s0101m.mul` ({t['desc']})")
     translations_list_str = "\n".join(trans_rows)
 
     return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (TipitakaPali.org)
@@ -394,11 +504,12 @@ Always ground every claim with exact canonical coordinates so users can click st
   - Paragraph: `[book_code:c{{0_based_chapter}}:p{{para_index}}]` (e.g. `[s0102m.mul:c8:p1343]`)
   - Sentence (Preferred for precision): `[book_code:c{{0_based_chapter}}:p{{para_index}}-L{{1_based_line_id}}]` (e.g. `[s0101m.mul:c0:p5-L1]`)
 - **Clickable Canonical Web URLs:**
-  - Book (canonical): `{site_url}/book/{{book_code}}`
+  - Book (Roman Pāḷi canonical): `{site_url}/book/{{book_code}}`
   - Chapter + Exact Paragraph Index: `{site_url}/book/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}`
   - Chapter + Printed Para Number: `{site_url}/book/{{book_code}}/{{1_based_chapter}}#para-{{para_num}}`
-  - With Modern Translation Layer: `{site_url}/book/{{book_code}}/{{1_based_chapter}}?l={{lang_code}}#pindex-{{para_index}}`
-  - In Alternative Pāḷi Script: `{site_url}/book/{{script_code}}.{{book_code}}`
+  - Modern Translation Book (canonical SSR): `{site_url}/translation/{{lang_code}}/{{book_code}}` (e.g. `{site_url}/translation/en/s0102m.mul`, `{site_url}/translation/vi/s0102m.mul`)
+  - Modern Translation Chapter (canonical SSR): `{site_url}/translation/{{lang_code}}/{{book_code}}/{{1_based_chapter}}` (legacy `?l={{lang_code}}` also supported & canonicalized)
+  - Alternative Pāḷi Script (16 non-Roman scripts, canonical SSR): `{site_url}/book/{{script_code}}.{{book_code}}` and `{site_url}/book/{{script_code}}.{{book_code}}/{{1_based_chapter}}`
 
 ### Quick Nikāya / Piṭaka → `book_code` Citation Map
 {QUICK_CITATION_MAP}
@@ -447,12 +558,12 @@ def generate_llms_full_txt(site_url, books, catalog, bold_def_count=387006):
         )
 
     trans_table_rows = [
-        "| Language Code | Language Name | Native | Flag | Coverage / Sentences | Sample Book URL with Translation |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| Language Code | Language Name | Native | Flag | Coverage / Sentences | Canonical Translation Book URL | Sample Chapter URL |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
     for t in TRANSLATION_LANGUAGES:
         trans_table_rows.append(
-            f"| `{t['code']}` | {t['name']} | {t['native']} | {t['flag']} | {t['desc']} | `{site_url}/book/s0101m.mul?l={t['code']}` |"
+            f"| `{t['code']}` | {t['name']} | {t['native']} | {t['flag']} | {t['desc']} | `{site_url}/translation/{t['code']}/s0101m.mul` | `{site_url}/translation/{t['code']}/s0101m.mul/1` |"
         )
 
     lines = [
@@ -465,7 +576,7 @@ def generate_llms_full_txt(site_url, books, catalog, bold_def_count=387006):
         "1. **For term / doctrinal / Vinaya / Abhidhamma definitions:** Call `GET https://api.tipitakapali.org/api/ai/bold_definitions?w={term}&langs=en&limit=8` (queries " + f"{bold_def_count:,}" + " pre-indexed commentarial & canonical bold glosses with `*ti attho*`, `*nāma*`, `*vuccati*` ranking and exact `[book:cX:pY-LZ]` citations) in parallel with `GET https://api.tipitakapali.org/api/dict/lookup?w={term}&dict=dpd` (DPD grammar, roots & compound splitter).",
         "2. **For multi-concept research questions:** Break the question into 2–4 Concept Groups (each with Pāḷi terms/stems AND English synonyms) and POST to `https://api.tipitakapali.org/api/ai/search_concepts` for tiered boolean-intersection search across Pāḷi and translation FTS5 indexes.",
         "3. **For exact textual grounding & verification:** Fetch complete paragraphs (`GET /api/ai/paragraph_content`), sentence-aligned Pāḷi + translations (`GET /api/ai/sentences`, 99.7% 1:1 `line_id` match), and parallel Aṭṭhakathā/Ṭīkā commentaries (`GET /api/ai/commentaries`).",
-        "4. **For clickable citations:** Emit `[book_code:c{0_based_chapter}:p{para_index}-L{line_id}]` and/or link to " + f"`{site_url}/book/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}` (append `?l=en` or any translation code for side-by-side translation).",
+        "4. **For clickable citations:** Emit `[book_code:c{0_based_chapter}:p{para_index}-L{line_id}]` and/or link to " + f"`{site_url}/book/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}` (or `{site_url}/translation/{{lang_code}}/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}` for canonical modern translations; legacy `?l={{lang_code}}` also works).",
         "",
         "## Quick Nikāya / Piṭaka → `book_code` Citation Map",
         QUICK_CITATION_MAP,
@@ -533,7 +644,7 @@ def generate_llms_full_txt(site_url, books, catalog, bold_def_count=387006):
         f"- Offline-Capable Pāḷi Script Converter (17 scripts): `{site_url}/pali-script-converter`",
         "",
         f"## Multilingual Translation Deep-Linking Guide ({len(TRANSLATION_LANGUAGES)} Languages)",
-        "Users can open any canonical text with side-by-side / sentence-level translations by appending `?l=[lang_code]`:",
+        "Every canonical book and chapter has a dedicated, self-canonical SSR translation URL at `/translation/{lang_code}/{book_code}` and `/translation/{lang_code}/{book_code}/{1_based_chapter}` (legacy `?l={lang_code}` query links remain supported and canonicalize cleanly to `/translation/{lang_code}/...`):",
         "",
         "\n".join(trans_table_rows),
         "",
@@ -703,9 +814,9 @@ def main():
 
     print(f"[*] Loaded {len(books)} books, {len(chapters)} chapters, and {bold_def_count:,} bold definitions.")
 
-    # 1. Generate clean canonical sitemap (222 prerendered canonical URLs only)
-    print("[*] Generating canonical sitemap.xml (222 self-canonical URLs)...")
-    sitemaps = generate_all_sitemaps(books, chapters, site_url)
+    # 1. Generate full multi-script & multi-translation XML Sitemap Index (40 child sitemaps)
+    print("[*] Generating XML Sitemap Index + 40 child sitemaps (17 Pāḷi scripts + 23 translations)...")
+    sitemaps = generate_all_sitemaps(books, chapters, site_url, db_dir=paths.get('db_dir'))
 
     # 2. Generate robots.txt, llms.txt, llms-full.txt, site.jsonld
     print("[*] Generating robots.txt...")
@@ -732,12 +843,12 @@ def main():
 
     for t_dir in target_dirs:
         if t_dir.exists():
-            # Prune obsolete bloated non-canonical child sitemaps
-            removed_old = cleanup_obsolete_sitemaps(t_dir)
+            # Prune any stale/obsolete child sitemaps not in the current sitemap index
+            removed_old = cleanup_obsolete_sitemaps(t_dir, keep_files=set(sitemaps.keys()))
             if removed_old:
-                print(f"[*] Removed {removed_old} obsolete non-canonical sitemap-*.xml files from {t_dir}")
+                print(f"[*] Removed {removed_old} obsolete sitemap-*.xml files from {t_dir}")
 
-            # Write canonical sitemap.xml
+            # Write sitemap index + all child sitemaps
             for filename, content in sitemaps.items():
                 with open(t_dir / filename, 'w', encoding='utf-8') as f:
                     f.write(content)
@@ -762,13 +873,17 @@ def main():
                 sync_indexnow_key(paths['public_dir'], t_dir)
             print(f"[✓] Saved {len(sitemaps) + 4} SEO & AI files into: {t_dir}")
 
-    total_canonical_urls = 5 + len(books)
+    total_urls = sum(
+        content.count("<loc>")
+        for fname, content in sitemaps.items()
+        if fname != "sitemap.xml"
+    )
     print("\n" + "=" * 60)
-    print(" [✓] CANONICAL SEO & AI METADATA GENERATION COMPLETE!")
+    print(" [✓] MULTI-SCRIPT & MULTI-TRANSLATION SEO METADATA COMPLETE!")
     print("=" * 60)
-    print(f" Canonical Sitemap : sitemap.xml ({total_canonical_urls} prerendered self-canonical URLs)")
+    print(f" XML Sitemap Index : sitemap.xml -> {len(sitemaps) - 1} child sitemaps ({total_urls:,} canonical URLs)")
     print(f" AI Agent Standards: /llms.txt, /llms-full.txt ({bold_def_count:,} bold definitions + {len(TRANSLATION_LANGUAGES)} translations + 17 scripts)")
-    print(f" Search Engine Rule: /robots.txt (single canonical sitemap + AI tool allowances)")
+    print(f" Search Engine Rule: /robots.txt (Allow /book/ & /translation/ + Sitemap Index + AI tool allowances)")
     print(f" Structured Data   : /site.jsonld (WebSite, Organization, DataCatalog with {len(books)} books)")
     print("=" * 60 + "\n")
 

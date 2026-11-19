@@ -420,27 +420,35 @@ test('Task 3: Next.js routes eliminate duplicate <title>, canonical collapsing, 
   const bookPageSrc = fs.readFileSync(path.join(rootDir, 'app', 'book', '[...slug]', 'page.js'), 'utf8');
   assert.match(bookPageSrc, /title:\s*\{\s*absolute:\s*seo\.title\s*\}/, 'book page must use title.absolute to avoid double suffix');
   assert.ok(!bookPageSrc.includes('languages[t.code]'), 'book page must not emit conflicting hreflang to non-canonical ?l= URLs');
-  assert.match(bookPageSrc, /rel="nofollow"/, 'noscript SPA deep-links should carry rel="nofollow"');
+  assert.match(bookPageSrc, /SsrBookArticle/, 'book page must render semantic SSR article content');
 });
 
-test('Task 3: Canonical sitemap.xml (222 URLs only), clean robots.txt, and valid IndexNow key + dry-run', () => {
+test('Task 3: Full XML Sitemap Index (40 child sitemaps), clean robots.txt, and valid IndexNow key + dry-run', () => {
   const publicDir = path.join(rootDir, 'public');
-  const sitemapFiles = fs.readdirSync(publicDir).filter((f) => f.startsWith('sitemap') && f.endsWith('.xml'));
-  assert.deepEqual(sitemapFiles, ['sitemap.xml'], 'Only canonical sitemap.xml should remain in public/');
+  const sitemapFiles = fs.readdirSync(publicDir).filter((f) => f.startsWith('sitemap') && f.endsWith('.xml')).sort();
+  assert.equal(sitemapFiles.length, 41, `Expected 41 sitemap files (sitemap.xml + 40 child sitemaps), got ${sitemapFiles.length}`);
+  assert.ok(sitemapFiles.includes('sitemap.xml'));
+  assert.ok(sitemapFiles.includes('sitemap-main.xml'));
+  assert.ok(sitemapFiles.includes('sitemap-hi.xml'));
+  assert.ok(sitemapFiles.includes('sitemap-lang-vi.xml'));
+  assert.ok(!sitemapFiles.includes('sitemap-translations.xml'), 'Legacy sitemap-translations.xml must not remain');
 
-  const sitemapXml = fs.readFileSync(path.join(publicDir, 'sitemap.xml'), 'utf8');
-  const locs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  assert.equal(locs.length, 222, `Expected 222 canonical URLs (5 static + 217 books), got ${locs.length}`);
-  assert.equal(new Set(locs).size, 222, 'All sitemap <loc> entries must be unique');
-  for (const u of locs) {
-    assert.ok(!u.includes('?l='), `Non-canonical translation URL leaked into sitemap: ${u}`);
-    assert.ok(!/\/book\/[a-z]+\.[a-z0-9]+\.(mul|att|tik|nrf)/i.test(u), `Script-prefixed URL leaked into sitemap: ${u}`);
-    assert.ok(!/\/book\/[^/]+\/\d+/.test(u), `Non-prerendered chapter URL leaked into sitemap: ${u}`);
+  const indexXml = fs.readFileSync(path.join(publicDir, 'sitemap.xml'), 'utf8');
+  assert.match(indexXml, /<sitemapindex\b/);
+  const childLocs = [...indexXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.equal(childLocs.length, 40, `Expected 40 child sitemaps in index, got ${childLocs.length}`);
+
+  const mainXml = fs.readFileSync(path.join(publicDir, 'sitemap-main.xml'), 'utf8');
+  const mainLocs = [...mainXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.equal(mainLocs.length, 2917, `Expected 2,917 URLs in sitemap-main.xml (5 static + 217 books + 2,695 chapters), got ${mainLocs.length}`);
+  for (const u of mainLocs) {
+    assert.ok(!u.includes('?l='), `Non-canonical ?l= URL leaked into sitemap: ${u}`);
   }
 
   const robots = fs.readFileSync(path.join(publicDir, 'robots.txt'), 'utf8');
   const sitemapDecls = robots.split('\n').filter((l) => l.startsWith('Sitemap:'));
   assert.deepEqual(sitemapDecls, ['Sitemap: https://tipitakapali.org/sitemap.xml']);
+  assert.match(robots, /Allow:\s*\/translation\//, 'robots.txt must allow /translation/ clean translation routes');
 
   // IndexNow verification key file & _headers
   const keyFiles = fs.readdirSync(publicDir).filter((f) => /^[0-9a-f]{32}\.txt$/.test(f));
@@ -453,11 +461,11 @@ test('Task 3: Canonical sitemap.xml (222 URLs only), clean robots.txt, and valid
   const headers = fs.readFileSync(path.join(publicDir, '_headers'), 'utf8');
   assert.ok(headers.includes(`/${keyName}`), `public/_headers must configure Content-Type for /${keyName}`);
 
-  // Run scripts/submit_indexnow.py --dry-run
-  const out = execFileSync('python3', [path.join(rootDir, 'scripts', 'submit_indexnow.py'), '--dry-run'], {
+  // Run scripts/submit_indexnow.py --only-books --dry-run
+  const out = execFileSync('python3', [path.join(rootDir, 'scripts', 'submit_indexnow.py'), '--only-books', '--dry-run'], {
     encoding: 'utf8',
   });
-  assert.match(out, /URLs to submit\s*:\s*222/);
+  assert.match(out, /URLs to submit\s*:\s*8425/);
   assert.match(out, /Dry run validated successfully/);
 });
 

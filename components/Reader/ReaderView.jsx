@@ -44,14 +44,40 @@ export function computeBlockCompensationDelta({
   return currentAnchorY - anchorViewportYBefore;
 }
 
+const READER_CLICKED_WORD_HIGHLIGHT = 'reader-clicked-word';
+let activeClickedWordRange = null;
+
 export function selectClickedWordAnchor(container, bandTop = 0, bandBottom = Infinity) {
-  if (!container?.querySelector) return null;
-  const clickedEl = container.querySelector('.reader-clicked-word, [data-clicked-word="true"]');
+  if (!container) return null;
+  const clickedEl = container.querySelector?.('.reader-clicked-word, [data-clicked-word="true"]');
   if (clickedEl && clickedEl.getBoundingClientRect) {
     const cr = clickedEl.getBoundingClientRect();
     if (cr.height > 0 && cr.bottom > bandTop && cr.top < bandBottom) {
       return {
         anchorEl: clickedEl,
+        subRatio: 0.5,
+        viewportY: cr.top + 0.5 * cr.height,
+      };
+    }
+  }
+  if (
+    activeClickedWordRange &&
+    activeClickedWordRange.startContainer?.isConnected &&
+    activeClickedWordRange.endContainer?.isConnected &&
+    typeof container.contains === 'function' &&
+    container.contains(activeClickedWordRange.commonAncestorContainer) &&
+    typeof activeClickedWordRange.getBoundingClientRect === 'function'
+  ) {
+    const range = activeClickedWordRange;
+    const cr = range.getBoundingClientRect();
+    if (cr.height > 0 && cr.bottom > bandTop && cr.top < bandBottom) {
+      return {
+        anchorEl: {
+          get isConnected() {
+            return Boolean(range.startContainer?.isConnected && range.endContainer?.isConnected);
+          },
+          getBoundingClientRect: () => range.getBoundingClientRect(),
+        },
         subRatio: 0.5,
         viewportY: cr.top + 0.5 * cr.height,
       };
@@ -237,6 +263,8 @@ const TRANSLATION_METAS = {
   be: { label: 'বাংলা', flag: '🇧🇩' },
   pt: { label: 'Português', flag: '🇵🇹' },
   ru: { label: 'Русский', flag: '🇷🇺' },
+  cs: { label: 'Čeština', flag: '🇨🇿' },
+  mr: { label: 'मराठी', flag: '🇮🇳' },
   my_nissaya: { label: 'မြန်မာနိဿယ', flag: '🇲🇲' },
 };
 
@@ -1693,9 +1721,75 @@ export const ChapterBlock = memo(function ChapterBlock({
 
 const STORAGE_KEY_CLICKED_WORDS = 'tipitaka_last_clicked_words_v2';
 
-// Helper to clear any clicked word highlight in Reader
-function clearClickedWordHighlight(root = typeof document !== 'undefined' ? document : null) {
-  if (!root) return;
+function collectTextSlicesForRange(range) {
+  if (!range || range.collapsed) return [];
+
+  if (range.startContainer === range.endContainer && range.startContainer?.nodeType === 3) {
+    const textLen = range.startContainer.textContent?.length || 0;
+    const start = Math.max(0, Math.min(range.startOffset, textLen));
+    const end = Math.max(start, Math.min(range.endOffset, textLen));
+    return end > start ? [{ node: range.startContainer, start, end }] : [];
+  }
+
+  const root = range.commonAncestorContainer;
+  if (!root || typeof document === 'undefined' || typeof document.createTreeWalker !== 'function') {
+    return [];
+  }
+
+  const slices = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+  let textNode;
+  while ((textNode = walker.nextNode())) {
+    const len = textNode.textContent?.length || 0;
+    if (len === 0) continue;
+
+    if (typeof range.intersectsNode === 'function' && !range.intersectsNode(textNode)) {
+      continue;
+    }
+
+    let start = 0;
+    if (textNode === range.startContainer) {
+      start = range.startOffset;
+    } else if (typeof range.comparePoint === 'function') {
+      const cmpStart = range.comparePoint(textNode, 0);
+      if (cmpStart !== 0) continue;
+    }
+
+    let end = len;
+    if (textNode === range.endContainer) {
+      end = range.endOffset;
+    } else if (typeof range.comparePoint === 'function') {
+      const cmpEnd = range.comparePoint(textNode, len);
+      if (cmpEnd > 0) continue;
+    }
+
+    const safeStart = Math.max(0, Math.min(start, len));
+    const safeEnd = Math.max(safeStart, Math.min(end, len));
+    if (safeEnd > safeStart) {
+      slices.push({ node: textNode, start: safeStart, end: safeEnd });
+    }
+  }
+  return slices;
+}
+
+// Helper to clear any clicked word highlight in Reader (CSS Custom Highlight API + DOM fallback)
+export function clearClickedWordHighlight(root = typeof document !== 'undefined' ? document : null) {
+  const isFullDocClear = !root || (typeof document !== 'undefined' && root === document);
+  if (
+    isFullDocClear ||
+    !activeClickedWordRange ||
+    !activeClickedWordRange.startContainer?.isConnected ||
+    (typeof root?.contains === 'function' && root.contains(activeClickedWordRange.commonAncestorContainer))
+  ) {
+    activeClickedWordRange = null;
+    if (typeof CSS !== 'undefined' && CSS.highlights) {
+      try {
+        CSS.highlights.delete(READER_CLICKED_WORD_HIGHLIGHT);
+      } catch (_) {}
+    }
+  }
+
+  if (!root || typeof root.querySelectorAll !== 'function') return;
   const elements = root.querySelectorAll('.reader-clicked-word');
   elements.forEach((el) => {
     const parent = el.parentNode;
@@ -1704,28 +1798,63 @@ function clearClickedWordHighlight(root = typeof document !== 'undefined' ? docu
         parent.insertBefore(el.firstChild, el);
       }
       parent.removeChild(el);
-      parent.normalize();
+      if (typeof parent.normalize === 'function') {
+        parent.normalize();
+      }
     }
   });
 }
 
-// Helper to highlight a DOM range with dashed accent underline and background
-function highlightRangeInReader(range) {
-  if (!range) return;
+// Helper to highlight a DOM range without mutating block layout.
+// Uses CSS Custom Highlight API when available (zero DOM mutation), with a safe
+// per-text-node <span> fallback that never extracts or splits surrounding elements.
+export function highlightRangeInReader(range) {
+  if (!range || range.collapsed) return;
   clearClickedWordHighlight();
+
+  const slices = collectTextSlicesForRange(range);
+  if (slices.length === 0) return;
+
   try {
-    const span = document.createElement('span');
-    span.className = 'reader-clicked-word';
-    span.setAttribute('data-clicked-word', 'true');
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
+    if (typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined') {
+      const textRanges = slices.map(({ node, start, end }) => {
+        const r = document.createRange();
+        r.setStart(node, start);
+        r.setEnd(node, end);
+        return r;
+      });
+      CSS.highlights.set(READER_CLICKED_WORD_HIGHLIGHT, new Highlight(...textRanges));
+      activeClickedWordRange = textRanges[0];
+      return;
+    }
+
+    // Fallback for browsers without CSS Custom Highlight API:
+    // wrap ONLY individual text-node slices (never cross-element extractContents()).
+    for (const { node, start, end } of slices) {
+      const text = node.textContent || '';
+      const frag = document.createDocumentFragment();
+      if (start > 0) {
+        frag.appendChild(document.createTextNode(text.slice(0, start)));
+      }
+      const span = document.createElement('span');
+      span.className = 'reader-clicked-word';
+      span.setAttribute('data-clicked-word', 'true');
+      span.textContent = text.slice(start, end);
+      frag.appendChild(span);
+      if (end < text.length) {
+        frag.appendChild(document.createTextNode(text.slice(end)));
+      }
+      if (node.parentNode) {
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
   } catch (err) {
     console.warn('Could not highlight clicked word range:', err);
   }
 }
 
 // Helper to compute exact character offset inside a parent element
-function getCharOffsetInElement(parentEl, targetNode, targetOffset) {
+export function getCharOffsetInElement(parentEl, targetNode, targetOffset) {
   if (!parentEl || !targetNode) return 0;
   let offset = 0;
   const walker = document.createTreeWalker(parentEl, NodeFilter.SHOW_TEXT, null, false);
@@ -1740,8 +1869,10 @@ function getCharOffsetInElement(parentEl, targetNode, targetOffset) {
 }
 
 // Helper to construct a DOM Range from character offset and length in a parent element
-function createRangeFromCharOffset(parentEl, targetOffset, length) {
-  if (!parentEl) return null;
+export function createRangeFromCharOffset(parentEl, targetOffset, length) {
+  if (!parentEl || !Number.isFinite(targetOffset) || targetOffset < 0 || !Number.isFinite(length) || length <= 0) {
+    return null;
+  }
   let offset = 0;
   let startNode = null;
   let startOffsetInNode = 0;
@@ -1754,7 +1885,10 @@ function createRangeFromCharOffset(parentEl, targetOffset, length) {
 
   while ((current = walker.nextNode())) {
     const nodeLen = current.textContent.length;
-    if (!startNode && offset + nodeLen >= targetOffset) {
+    if (nodeLen === 0) continue;
+    // Strictly > targetOffset so a boundary at start===0 of a sentence/span never
+    // latches onto the trailing end of the previous text node and crosses blocks.
+    if (!startNode && offset + nodeLen > targetOffset) {
       startNode = current;
       startOffsetInNode = targetOffset - offset;
     }
@@ -1952,12 +2086,40 @@ function extractWordAtOffset(text, offset, lang = 'en') {
 // Helper to find and highlight a stored word inside a book container
 function restoreClickedWordHighlight(bookCode, record, container = document) {
   if (!bookCode || !record || !container) return false;
-  const { pIndex, paraNum, chapIdx, word, rawWord, charOffset, length, transLang } = record;
+  const { pIndex, paraNum, chapIdx, lineId, word, rawWord, charOffset, length, transLang } = record;
 
   let targetEl = null;
 
+  // 0. Scoped sentence-pair cell resolution (sentence alignment mode)
+  if (lineId) {
+    const safeLine = String(lineId).replace(/"/g, '\\"');
+    if (transLang && transLang !== 'pali') {
+      if (pIndex) {
+        targetEl = container.querySelector(
+          `[data-pindex="${pIndex}"] .sent-pair-trans[data-trans-lang="${transLang}"][data-line="${safeLine}"]`
+        );
+      }
+      if (!targetEl && paraNum) {
+        targetEl = container.querySelector(
+          `[data-para="${paraNum}"] .sent-pair-trans[data-trans-lang="${transLang}"][data-line="${safeLine}"]`
+        );
+      }
+    } else {
+      if (pIndex) {
+        targetEl = container.querySelector(
+          `[data-pindex="${pIndex}"] .sent-pair-pali[data-line="${safeLine}"]`
+        );
+      }
+      if (!targetEl && paraNum) {
+        targetEl = container.querySelector(
+          `[data-para="${paraNum}"] .sent-pair-pali[data-line="${safeLine}"]`
+        );
+      }
+    }
+  }
+
   // 1. Scoped language block resolution
-  if (transLang && transLang !== 'pali') {
+  if (!targetEl && transLang && transLang !== 'pali') {
     if (pIndex) {
       targetEl = container.querySelector(
         `[data-pindex="${pIndex}"] .reader-trans-block[data-trans-lang="${transLang}"], ` +
@@ -4901,9 +5063,11 @@ const ReaderPane = memo(function ReaderPane({
 
               if (isLookupActive && mode === 'single') {
                 const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
-                const blockEl = transBlock || pEl;
+                const sentCell = node.parentElement?.closest('.sent-pair-pali, .sent-pair-trans') || e.target.closest?.('.sent-pair-pali, .sent-pair-trans');
+                const blockEl = sentCell || transBlock || pEl;
                 const pIndex = pEl?.getAttribute('data-pindex') || null;
                 const pNum = pEl?.getAttribute('data-para') || null;
+                const lineId = sentCell?.getAttribute('data-line') || node.parentElement?.closest?.('[data-line]')?.getAttribute('data-line') || null;
                 const chapEl = pEl?.closest('[data-chapter]');
                 const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
                 const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
@@ -4930,6 +5094,7 @@ const ReaderPane = memo(function ReaderPane({
                     chapIdx,
                     pIndex,
                     paraNum: pNum,
+                    lineId,
                     word: wordToLookup,
                     rawWord,
                     charOffset,
@@ -5015,9 +5180,11 @@ const ReaderPane = memo(function ReaderPane({
         const transBlock = node.parentElement?.closest?.('[data-trans-lang]') || e.target.closest('[data-trans-lang]');
         const transLang = transBlock?.getAttribute('data-trans-lang') || (node.parentElement?.closest?.('p[data-pindex]') ? 'pali' : 'pali');
         const pEl = node.parentElement?.closest?.('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
-        const blockEl = transBlock || pEl;
+        const sentCell = node.parentElement?.closest?.('.sent-pair-pali, .sent-pair-trans') || e.target.closest?.('.sent-pair-pali, .sent-pair-trans');
+        const blockEl = sentCell || transBlock || pEl;
         const pIndex = pEl?.getAttribute('data-pindex') || null;
         const pNum = pEl?.getAttribute('data-para') || null;
+        const lineId = sentCell?.getAttribute('data-line') || node.parentElement?.closest?.('[data-line]')?.getAttribute('data-line') || null;
         const chapEl = pEl?.closest('[data-chapter]');
         const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
         const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, startOffset) : startOffset;
@@ -5027,6 +5194,7 @@ const ReaderPane = memo(function ReaderPane({
           chapIdx,
           pIndex,
           paraNum: pNum,
+          lineId,
           word: wordToLookup,
           rawWord: selection,
           charOffset,
@@ -5071,9 +5239,11 @@ const ReaderPane = memo(function ReaderPane({
             if (isPointInsideRangeRects(wordRange, e.clientX, e.clientY, 4)) {
               wordToLookup = candidateWord;
               const pEl = node.parentElement?.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]') || e.target.closest('p[data-pindex], .reader-para-row[data-pindex], [data-pindex], [data-para]');
-              const blockEl = transBlock || pEl;
+              const sentCell = node.parentElement?.closest('.sent-pair-pali, .sent-pair-trans') || e.target.closest?.('.sent-pair-pali, .sent-pair-trans');
+              const blockEl = sentCell || transBlock || pEl;
               const pIndex = pEl?.getAttribute('data-pindex') || null;
               const pNum = pEl?.getAttribute('data-para') || null;
+              const lineId = sentCell?.getAttribute('data-line') || node.parentElement?.closest?.('[data-line]')?.getAttribute('data-line') || null;
               const chapEl = pEl?.closest('[data-chapter]');
               const chapIdx = chapEl ? parseInt(chapEl.getAttribute('data-chapter'), 10) : 0;
               const charOffset = blockEl ? getCharOffsetInElement(blockEl, node, start) : start;
@@ -5087,6 +5257,7 @@ const ReaderPane = memo(function ReaderPane({
                   chapIdx,
                   pIndex,
                   paraNum: pNum,
+                  lineId,
                   word: wordToLookup,
                   rawWord,
                   charOffset,
@@ -5723,7 +5894,7 @@ const ReaderPane = memo(function ReaderPane({
   );
 });
 
-export default function ReaderView() {
+export default function ReaderView({ ssrContent = null } = {}) {
   const {
     openTabs = [],
     activeTab,
@@ -6217,10 +6388,19 @@ export default function ReaderView() {
     return rules.join('\n');
   }, [orderedLayers, settings?.translationColors, settings?.theme]);
 
-  if (!activeTab) {
+  const activeTabHasRenderableContent = Boolean(
+    activeTab &&
+      (activeTab.type === 'ai_chat' ||
+        activeTab.bookCode === 'ai_chat' ||
+        !activeTab.isLoading ||
+        Object.keys(activeTab.loadedChapters || {}).length > 0 ||
+        (Array.isArray(activeTab.toc) && activeTab.toc.length > 0))
+  );
+
+  if (!activeTab || (ssrContent && !activeTabHasRenderableContent)) {
     return (
       <main className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]">
-        <WelcomeView />
+        {ssrContent || <WelcomeView />}
       </main>
     );
   }

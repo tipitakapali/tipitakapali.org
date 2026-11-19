@@ -36,7 +36,7 @@ import zipfile
 
 out_dir, staging_dir, zip_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
-skip_top = {'book', 'chapter', '.well-known'}
+skip_top = {'book', 'chapter', 'translation', '.well-known'}
 skip_prefixes = ('sitemap', 'robots.txt', 'Google_Play_Store_badge_EN')
 indexnow_key_re = re.compile(r'^[0-9a-f]{32}\.txt$')
 skip_font_prefixes = ('Noto_Serif_SC', 'Noto_Serif_JP')
@@ -88,24 +88,92 @@ PY
 echo "3/3 Extracting DPD family tables to $ASSETS_DIR/dpd_family_data.json.gz..."
 node - "$WEB_DIR/server_api/db/dpd_goldendict.js" "$ASSETS_DIR/dpd_family_data.json.gz" <<'NODE'
 const fs = require('fs');
+const vm = require('vm');
 const zlib = require('zlib');
 
 const srcPath = process.argv[2];
 const outPath = process.argv[3];
-const mod = require(srcPath);
+const src = fs.readFileSync(srcPath, 'utf8');
+
+const vmMod = { exports: {} };
+const ctx = vm.createContext({ module: vmMod, exports: vmMod.exports });
+vm.runInContext(src, ctx, { filename: srcPath });
+const mod = vmMod.exports || {};
+
+function isFamilyTable(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return false;
+  const sample = obj[keys[0]];
+  return Boolean(sample && typeof sample === 'object' && Array.isArray(sample.data));
+}
+
+function readLexicalOrContext(name) {
+  if (Object.prototype.hasOwnProperty.call(ctx, name)) return ctx[name];
+  try {
+    return vm.runInContext(name, ctx);
+  } catch (_) {
+    return undefined;
+  }
+}
+
+function resolveTable({ exportKeys, globalKeys, helperExport }) {
+  for (const k of exportKeys) {
+    if (isFamilyTable(mod[k])) return mod[k];
+  }
+  for (const k of globalKeys) {
+    const val = readLexicalOrContext(k);
+    if (isFamilyTable(val)) return val;
+  }
+  const helperFn = helperExport ? mod[helperExport] : null;
+  if (typeof helperFn === 'function') {
+    const seen = new Set();
+    for (const match of helperFn.toString().matchAll(/\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\[/g)) {
+      const ident = match[1];
+      if (seen.has(ident)) continue;
+      seen.add(ident);
+      const val = readLexicalOrContext(ident);
+      if (isFamilyTable(val)) return val;
+    }
+  }
+  return null;
+}
+
+const specs = {
+  family_compounds: {
+    exportKeys: ['family_compounds', 'family_compound_json'],
+    globalKeys: ['family_compounds', 'family_compound_json'],
+    helperExport: 'makeFamilyCompoundHtml',
+  },
+  family_idioms: {
+    exportKeys: ['family_idioms', 'family_idiom_json'],
+    globalKeys: ['family_idioms', 'family_idiom_json'],
+    helperExport: 'makeFamilyIdioms',
+  },
+  family_root: {
+    exportKeys: ['family_root', 'family_root_json'],
+    globalKeys: ['family_root', 'family_root_json'],
+    helperExport: null,
+  },
+  family_sets: {
+    exportKeys: ['family_sets', 'family_set_json'],
+    globalKeys: ['family_sets', 'family_set_json'],
+    helperExport: 'makeFamilySets',
+  },
+  family_word: {
+    exportKeys: ['family_word', 'family_word_json'],
+    globalKeys: ['family_word', 'family_word_json'],
+    helperExport: 'makeFamilyWordHtml',
+  },
+};
 
 const payload = {};
-for (const key of [
-  'family_compounds',
-  'family_idioms',
-  'family_root',
-  'family_sets',
-  'family_word',
-]) {
-  if (!mod[key] || typeof mod[key] !== 'object') {
+for (const [key, spec] of Object.entries(specs)) {
+  const table = resolveTable(spec);
+  if (!table) {
     throw new Error(`Missing DPD family table: ${key}`);
   }
-  payload[key] = mod[key];
+  payload[key] = table;
 }
 
 const gz = zlib.gzipSync(Buffer.from(JSON.stringify(payload), 'utf8'), { level: 9 });

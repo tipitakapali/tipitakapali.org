@@ -4453,6 +4453,14 @@ div.dict-dock-panel.dict-pinned.dock-side {
 }
 
 /* Clicked/Tapped Word Highlight in Reader & Dictionary (High contrast yellow for all themes including OLED) */
+::highlight(reader-clicked-word) {
+  background-color: #ffff00;
+  color: #000000;
+  text-decoration: underline solid rgba(0, 0, 0, 0.5);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
 .reader-clicked-word,
 .dict-clicked-word {
   background-color: #ffff00 !important;
@@ -4464,7 +4472,7 @@ div.dict-dock-panel.dict-pinned.dock-side {
   text-decoration: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  display: inline;
+  display: inline !important;
 }
 
 [data-theme="dark"] .reader-clicked-word,
@@ -5491,6 +5499,209 @@ body.window-scroll .app-footer.hidden-footer {
   margin-bottom: 0 !important;
   transform: translateY(100%) !important;
 }
+
+/* Semantic SSR Book/Chapter/Translation Reader Shell */
+.ssr-reader-article {
+  width: 100%;
+  max-width: var(--reader-max-width, 880px);
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+  color: var(--text-primary);
+  font-family: var(--font-reader);
+  line-height: 1.75;
+}
+
+.ssr-breadcrumb {
+  margin-bottom: 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.ssr-breadcrumb-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ssr-breadcrumb-list li + li::before {
+  content: "›";
+  margin-right: 0.4rem;
+  color: var(--text-muted);
+}
+
+.ssr-breadcrumb-list a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ssr-breadcrumb-list a:hover {
+  text-decoration: underline;
+}
+
+.ssr-reader-header {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ssr-reader-h1 {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 0.4rem;
+  color: var(--text-primary);
+}
+
+.ssr-reader-meta {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem;
+}
+
+.ssr-reader-desc {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.ssr-chapter-body {
+  margin-bottom: 2rem;
+}
+
+.ssr-section {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.ssr-section-h2 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.85rem;
+  color: var(--text-primary);
+}
+
+.ssr-paragraphs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.ssr-para-block {
+  margin: 0;
+}
+
+.ssr-para-pali {
+  font-size: 1.1rem;
+  line-height: 1.85;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.ssr-para-pali-paired {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.ssr-para-translation {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.ssr-para-heading {
+  font-weight: 700;
+  margin-top: 0.75rem;
+}
+
+.ssr-truncated-note {
+  margin-top: 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.ssr-chapter-pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border-color);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+
+.ssr-pager-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.ssr-pager-link:hover {
+  text-decoration: underline;
+}
+
+.ssr-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.4rem 1rem;
+  padding-left: 1.25rem;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+
+.ssr-link-grid a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ssr-link-grid a:hover,
+.ssr-link-active {
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.ssr-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+}
+
+.ssr-pill {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.ssr-pill:hover,
+.ssr-pill-active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
 
 
 

@@ -403,6 +403,10 @@ void main() {
     expect(spaChapter.statusCode, 200);
     expect(spaChapter.contentType, 'text/html');
 
+    final spaTranslation = await _httpGet(baseUri, '/translation/vi/s0101m.mul');
+    expect(spaTranslation.statusCode, 200);
+    expect(spaTranslation.contentType, 'text/html');
+
     // Static Cloudflare JSON endpoints must 404 so api.js uses live SQLite API endpoints
     final staticJson = await _httpGet(baseUri, '/api/book/s0101m.mul/mat_para_map.json');
     expect(staticJson.statusCode, 404);

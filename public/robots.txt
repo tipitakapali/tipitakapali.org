@@ -14,6 +14,7 @@ Allow: /
 Allow: /_next/
 Allow: /api/
 Allow: /book/
+Allow: /translation/
 Disallow: /api/search*
 
 # 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow AI & Dict tools
@@ -40,6 +41,7 @@ Allow: /api/ai/
 Allow: /api/dict/
 Allow: /api/links/
 Allow: /book/
+Allow: /translation/
 
 # 3. Default for all other user agents
 User-agent: *
@@ -50,6 +52,8 @@ Allow: /api/
 Allow: /api/ai/
 Allow: /api/dict/
 Allow: /api/links/
+Allow: /book/
+Allow: /translation/
 Disallow: /api/search*
 
 # 4. Canonical Sitemap & AI Discovery Entry Points

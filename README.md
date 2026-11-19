@@ -132,20 +132,145 @@ web_app_next/
 
 ---
 
-## ⚡ Quick Start & Development Workflows
+## 🚀 Publishing & Release Guide (Checklist)
+
+Use this checklist whenever you update code, SEO routes, translations, or databases so nothing is missed before pushing to Git and publishing live.
+
+### Scripts Quick Reference
+
+| Script | When to Run | What It Does |
+| :--- | :--- | :--- |
+| `python3 generate_seo_ai_metadata.py --public-only` | After changing books, chapters, translations, SEO routes, or AI API docs | Regenerates `public/sitemap.xml` (40 child sitemaps, 112,995 canonical URLs), `public/robots.txt`, `public/llms.txt`, `public/llms-full.txt`, and `public/site.jsonld`. |
+| `bash tipitakapali_org_app/scripts/sync_web_bundle.sh` | After changing web UI, CSS, JS, or `server_api/db/dpd_goldendict.js` | Rebuilds static export into `tipitakapali_org_app/assets/web.zip` and extracts all 5 DPD family tables into `tipitakapali_org_app/assets/dpd_family_data.json.gz`. |
+| `node --test __tests__/*.test.mjs` | Before every `git push` | Runs all web, Ani AI, SEO, sitemap, routing, and reader unit/regression tests. |
+| `(cd tipitakapali_org_app && flutter analyze && flutter test)` | Before every `git push` touching offline app / `web.zip` | Verifies Dart analysis and all Flutter offline server/UI tests. |
+| `npm run build` | Before VPS deploy (and after `sync_web_bundle.sh`) | Builds the Next.js SSR standalone production server (`.next/standalone`). |
+| `python3 export_static_cloudflare.py` | When deploying static files to Cloudflare Pages (`next_tipitakapali.org`) | Exports static site (`Option 1`), static translation JSONs (`Option 2`), or both (`Option 3`), and syncs `next_tipitakapali.org/`. |
+| `python3 scripts/submit_indexnow.py` | **After** the live site is deployed | Notifies Bing, Yandex, Seznam, Naver, and Yep via IndexNow for fast indexing. |
+| `bash tipitakapali_org_app/scripts/upload_db_releases.sh` | After rebuilding any `.db` file | Uploads updated SQLite zips to GitHub Releases (`db`) and updates `tipitakapali_org_app/assets/databases_manifest.json`. |
+| `dev_build_vri_db_2026/run.sh` | Only when rebuilding `tipitaka.db` / `fts_tipitaka.db` from VRI XML | Runs full VRI XML transliteration, DB build, FTS5 indexing, and verification. |
+
+---
+
+### Step 1: Prepare & Verify Before `git push` (Main Repo)
+
+Run from the repository root (`tipitakapali.org/`):
+
+```bash
+# 1. Regenerate sitemaps, robots.txt, llms.txt, llms-full.txt, and site.jsonld
+python3 generate_seo_ai_metadata.py --public-only
+
+# 2. Rebuild offline Flutter web bundle (assets/web.zip + assets/dpd_family_data.json.gz)
+bash tipitakapali_org_app/scripts/sync_web_bundle.sh
+
+# 3. Run all web & Flutter tests
+node --test __tests__/*.test.mjs
+(cd tipitakapali_org_app && flutter analyze && flutter test)
+
+# 4. Restore & verify Next.js SSR standalone production build
+#    (Important: sync_web_bundle.sh leaves .next in static export mode)
+npm run build
+```
+
+Before committing, check `git status` to make sure no temporary/uncompressed files (such as an unzipped `tipitakapali_org_app/assets/dpd_family_data.json`) are staged by accident:
+
+```bash
+git status
+git add -A
+git commit -m "Describe your changes"
+git push origin main
+```
+
+> **CI Note:** Pushing changes under `tipitakapali_org_app/**` (including `assets/web.zip`) to `main` automatically triggers `.github/workflows/build_windows_linux.yml` to build Windows and Linux installers.
+
+---
+
+### Step 2A: Publish Live Website — VPS Next.js SSR (Full Multi-Script & 23-Language SEO)
+
+Full SSR serves live HTML for all 17 Pāḷi scripts (`/book/{book_code}`, `/book/{script}.{book_code}`, plus chapters) and all 23 translations (`/translation/{lang}/{book_code}`, plus chapters) on-demand with edge caching (`Cache-Control: public, s-maxage=86400, stale-while-revalidate=604800`) and bounded RAM cache (`isrFlushToDisk: false`, so VPS disk never fills up).
+
+On your VPS:
+
+```bash
+cd /path/to/tipitakapali.org
+git pull origin main
+npm ci             # only needed if package.json / package-lock.json changed
+npm run build
+
+# Restart Fastify API backend (port 8400 by default) if server_api/ changed
+# Restart Next.js SSR server (port 3000, BACKEND_API_URL=http://127.0.0.1:8400)
+# e.g. pm2 restart all   (or systemctl restart tipitaka-api tipitaka-web)
+```
+
+**Cloudflare Dashboard Setup for VPS SSR:**
+- Route `/book/*`, `/translation/*`, and `/sitemap*.xml` to your VPS Next.js SSR origin, with Cloudflare Cache Rules set to **Respect origin `Cache-Control`**.
+- Legacy `/book/{code}?l={lang}` and `/book/{code}{N}` links automatically `301` redirect in `proxy.js` to `/translation/{lang}/{code}` or `/book/{code}/{N+1}`.
+- If migrating from static Cloudflare Pages, **disable** the legacy SPA-shell URL Rewrite Rules (Rules 1–3 below) for `/book/*` and `/chapter/*` so Cloudflare does not overwrite SSR HTML with `/`.
+
+---
+
+### Step 2B: Publish Live Website — Cloudflare Pages Static Export (`next_tipitakapali.org`)
+
+If you also/instead deploy the static edge build to Cloudflare Pages:
+
+```bash
+# Interactive menu: 1 = website only, 2 = translation JSONs only, 3 = both
+python3 export_static_cloudflare.py
+
+# Push the synced Cloudflare Pages repository
+cd next_tipitakapali.org
+git status
+git add -A
+git commit -m "Update static build"
+git push origin main
+```
+
+> **Note:** dictionary, search, inflection, and the **Ani AI chat** endpoints (`/api/ai/chat`, `/api/ai/paragraph_content`, `/api/ai/tools`, …) are **not** proxied through Cloudflare — the browser calls `https://api.tipitakapali.org` directly (`services/api.js:getApiBase`) and MAT maps load from static JSON first (`fetchMatStaticMap`), so no Worker hop and no quota burn. After any change in `server_api/`, restart the Fastify API server on the VPS.
+
+---
+
+### Step 3: Notify Search Engines After Live Deploy (IndexNow & Sitemaps)
+
+Once the live site is updated and reachable at `https://tipitakapali.org`:
+
+```bash
+# 1. Preview book-level URLs across all 17 scripts + 23 translations (8,425 URLs, 1 batch)
+python3 scripts/submit_indexnow.py --only-books --dry-run
+
+# 2. Verify live IndexNow key file and submit book-level URLs (fast, recommended for routine updates)
+python3 scripts/submit_indexnow.py --only-books --verify-live
+
+# 3. Full submission of all 112,995 canonical URLs (auto-chunked at 10,000/request)
+python3 scripts/submit_indexnow.py --verify-live
+
+# 4. Or submit specific updated URLs only
+python3 scripts/submit_indexnow.py --urls https://tipitakapali.org/ https://tipitakapali.org/translation/vi/s0102m.mul
+```
+
+In **Google Search Console** and **Bing Webmaster Tools**, only submit the single Sitemap Index URL:
+- `https://tipitakapali.org/sitemap.xml` (automatically references all 40 child sitemaps: `sitemap-main.xml`, 16 `sitemap-{script}.xml`, and 23 `sitemap-lang-{lang}.xml`).
+
+---
+
+### Step 4: Publish Offline Apps & Database Releases (`tipitakapali_org_app/`)
+
+See [`tipitakapali_org_app/README.md`](tipitakapali_org_app/README.md) for platform build details (Android Play Store, iOS/macOS App Store, Windows, Linux) and database release uploads (`bash tipitakapali_org_app/scripts/upload_db_releases.sh`).
+
+---
+
+## ⚡ Quick Start & Local Development
 
 ### 1. Local Development (Next.js + Fastify API)
 
 #### Terminal A: Start the API Backend
 ```bash
-cd web_app_next/server_api
+cd server_api
 node server.js
 ```
-*(Runs on port `5055` by default, or port specified by `PORT` env)*
+*(Runs on port `8400` by default, or port specified by `PORT` env)*
 
 #### Terminal B: Start Next.js Frontend
 ```bash
-cd web_app_next
 npm run dev
 ```
 Open **`http://localhost:3000`** in your browser.
@@ -157,7 +282,7 @@ Open **`http://localhost:3000`** in your browser.
 To regenerate or verify the primary SQLite databases from authentic VRI XML:
 
 ```bash
-cd web_app_next/dev_build_vri_db_2026
+cd dev_build_vri_db_2026
 
 # Verify existing databases (integrity checks & all 6 multi-volume test suites)
 python3 build_pipeline.py --verify-only
@@ -171,33 +296,20 @@ python3 build_pipeline.py --db-only
 
 ---
 
-### 3. Deploying to Cloudflare Pages (Static Edge Distribution)
+### 3. Legacy Static Cloudflare Pages URL Rewrite Rules (Only if NOT using VPS SSR)
 
-To export the entire application as an ultra-fast static distribution for Cloudflare Pages:
-
-```bash
-cd web_app_next
-python3 export_static_cloudflare.py
-```
-This presents an interactive menu to export static website files (Option 1), static translation JSON files (Option 2), or both (Option 3).
-
-> **Note:** dictionary, search, inflection, and the **Ani AI chat** endpoints (`/api/ai/chat`, `/api/ai/paragraph_content`, `/api/ai/tools`, …) are **not** proxied through Cloudflare — the browser calls `https://api.tipitakapali.org` directly (`services/api.js:getApiBase`) and MAT maps load from static JSON first (`fetchMatStaticMap`), so no Worker hop and no quota burn. Nothing in the Cloudflare transform rules below matches `/api/*`, so they are **not** responsible for AI chat failing on the static host — the chat UI must reach the Fastify API server, which serves `/api/ai/chat` and must allow cross-origin `POST` (`server_api/server.js` CORS methods include `POST`; restart the API server after any change there).
-
----
-
-### 4. Cloudflare URL Rewrite Rules (Required Dashboard Setup)
-
-Deep links such as `/book/s0101m.mul/1` (chapter), `/book/si.s0101m.mul` (script prefix), and `/book/si.s0101m.mul/1` (both) have **no pre-rendered file** — only plain `/book/<code>` does (217 SEO pages). These rules serve the SPA shell (`/`) server-side while keeping the browser URL intact, so the client router (`app/page.js` + `splitScriptCode()`) opens the right book/chapter/script.
+If serving solely from static Cloudflare Pages without VPS SSR, deep links such as `/book/s0101m.mul/1` (chapter), `/book/si.s0101m.mul` (script prefix), `/book/si.s0101m.mul/1` (both), and `/translation/vi/s0101m.mul` have **no pre-rendered static file** — only plain `/book/<code>` does (217 SEO pages). These rules serve the SPA shell (`/`) server-side while keeping the browser URL intact, so the client router opens the right book/chapter/script/translation.
 
 Why URL Rewrite rules and not `_redirects` or Functions:
 - Cloudflare rejects `/book/* /index.html 200` in `_redirects` as an infinite loop (rules get ignored), and `_redirects` rewrites would shadow the real SEO files anyway.
-- Functions are **not** generated by default because every `/book/*` + `/chapter/*` hit costs 1 Workers invocation — search/AI crawlers following the ~49k-URL sitemap alone can exhaust the 100k/day Free quota (Error 1027 for everyone). The exporter keeps them only as a legacy opt-in backup (`--with-spa-fallback`); they fire zero times while the rules below are live.
+- Functions are **not** generated by default because every `/book/*`, `/translation/*`, and `/chapter/*` hit costs 1 Workers invocation — search/AI crawlers alone can exhaust the 100k/day Free quota (Error 1027). The exporter keeps them only as a legacy opt-in backup (`--with-spa-fallback`).
 
-**Setup:** Dashboard → zone `tipitakapali.org` → **Rules → Overview → Create rule → URL Rewrite Rule**. For each rule: **If incoming requests match → Custom filter expression** (Expression Editor), Query → **Preserve**. Rules 1–3 use action **Rewrite to → Static `/`**; Rule 4 uses **Rewrite to → Dynamic** (value below). Four rules:
+**Setup:** Dashboard → zone `tipitakapali.org` → **Rules → Overview → Create rule → URL Rewrite Rule**. For each rule: **If incoming requests match → Custom filter expression** (Expression Editor), Query → **Preserve**. Rules 1–3 use action **Rewrite to → Static `/`**; Rule 4 uses **Rewrite to → Dynamic** (value below):
 
 ```text
-Rule 1 — "SPA shell: chapter paths"
-starts_with(http.request.uri.path, "/chapter/")
+Rule 1 — "SPA shell: chapter & translation paths"
+starts_with(http.request.uri.path, "/chapter/") or
+starts_with(http.request.uri.path, "/translation/")
 
 Rule 2 — "SPA shell: book chapter deep-links"
 starts_with(http.request.uri.path, "/book/") and

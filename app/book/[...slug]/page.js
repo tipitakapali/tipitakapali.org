@@ -1,54 +1,34 @@
 import React, { Suspense } from 'react';
-import fs from 'fs';
-import path from 'path';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { MainAppContent } from '../../page';
-import { capitalizePali, splitScriptCode } from '../../../services/transliterate';
+import SsrBookArticle from '../../../components/SsrBookArticle';
 import {
   SITE_URL,
-  DEFAULT_SEO_TITLE,
-  DEFAULT_SEO_DESCRIPTION,
   TRANSLATION_LANGS,
   PALI_SCRIPT_LIST,
-  ALL_SCHEMA_LANGUAGES,
   buildBookSeoMetadata,
+  buildPageJsonLd,
 } from '../../../services/seoMetadata';
+import {
+  getBooksCatalog,
+  parseBookRouteParams,
+} from '../../../services/ssrCatalog';
+import {
+  getAvailableTranslationLangs,
+  getSsrChapterContent,
+} from '../../../services/ssrContent';
 
 export { TRANSLATION_LANGS, PALI_SCRIPT_LIST };
 
-let _catalogCache = null;
-let _chaptersByBookCache = null;
-
-function getBooksCatalog() {
-  if (_catalogCache) return _catalogCache;
-  try {
-    const catalogPath = path.join(process.cwd(), 'server_api', 'cst_books_catalog.json');
-    if (fs.existsSync(catalogPath)) {
-      _catalogCache = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-      return _catalogCache;
-    }
-  } catch (e) {}
-  return {};
-}
-
-function getChaptersByBook() {
-  if (_chaptersByBookCache) return _chaptersByBookCache;
-  const map = new Map();
-  try {
-    const chapsPath = path.join(process.cwd(), 'server_api', 'chapters_catalog.json');
-    if (fs.existsSync(chapsPath)) {
-      const allChaps = JSON.parse(fs.readFileSync(chapsPath, 'utf8'));
-      for (const ch of allChaps) {
-        if (!ch?.book_code) continue;
-        if (!map.has(ch.book_code)) map.set(ch.book_code, []);
-        map.get(ch.book_code).push(ch);
-      }
-    }
-  } catch (e) {}
-  _chaptersByBookCache = map;
-  return map;
-}
+const IS_STATIC_EXPORT =
+  process.env.NEXT_EXPORT === 'true' || process.env.STATIC_EXPORT === 'true';
 
 export async function generateStaticParams() {
+  if (!IS_STATIC_EXPORT) {
+    // In VPS SSR mode, render all 17 scripts x 217 books x chapters on-demand
+    // (cached at the Cloudflare CDN edge via Cache-Control s-maxage=86400).
+    return [];
+  }
   const catalog = getBooksCatalog();
   const codes = Object.keys(catalog);
   if (codes.length > 0) {
@@ -59,248 +39,122 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
+  const parsed = parseBookRouteParams(unwrappedParams?.slug);
 
-  const slug0 = unwrappedParams?.slug?.[0] ? decodeURIComponent(unwrappedParams.slug[0]) : '';
-  let bookCode = slug0;
-
-  // Optional script prefix (e.g. si.abh03m10.mul -> abh03m10.mul)
-  const scriptSplit = splitScriptCode(bookCode);
-  bookCode = scriptSplit.bookCode;
-  const scriptId = scriptSplit.scriptId;
-
-  const chapSuffixMatch = bookCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
-  if (chapSuffixMatch) {
-    bookCode = chapSuffixMatch[1];
-  }
-
-  // Self-canonical on the pre-rendered /book/<code> URL; script-prefixed,
-  // chapter-segment, and ?l= translation variants consolidate cleanly here.
-  const canonicalPath = bookCode ? `/book/${bookCode}` : '/';
-
-  if (!bookCode) {
+  if (parsed.redirectTo) {
     return {
-      title: { absolute: DEFAULT_SEO_TITLE },
-      description: DEFAULT_SEO_DESCRIPTION,
-      alternates: { canonical: '/' },
+      alternates: { canonical: `${SITE_URL}${parsed.redirectTo}` },
+      robots: { index: false, follow: true },
     };
   }
 
-  try {
-    const catalog = getBooksCatalog();
-    const entry = catalog[bookCode];
-    if (entry) {
-      const chaptersForBook = getChaptersByBook().get(bookCode) || [];
-      const seo = buildBookSeoMetadata(bookCode, entry, chaptersForBook, scriptId);
-
-      return {
-        title: { absolute: seo.title },
-        description: seo.description,
-        keywords: seo.keywords,
-        alternates: {
-          canonical: canonicalPath,
-        },
-        openGraph: {
-          title: seo.title,
-          description: seo.description,
-          url: `${SITE_URL}${canonicalPath}`,
-          siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-          locale: 'pi_IN',
-          alternateLocales: ['en_US', 'vi_VN', 'my_MM', 'th_TH', 'si_LK', 'de_DE', 'ja_JP', 'hi_IN', 'zh_CN', 'pt_PT'],
-          type: 'article',
-          images: [
-            {
-              url: '/android-chrome-512x512.png',
-              width: 512,
-              height: 512,
-              alt: seo.displayTitle,
-            },
-          ],
-        },
-        twitter: {
-          card: 'summary_large_image',
-          title: seo.title,
-          description: seo.description,
-          images: ['/android-chrome-512x512.png'],
-        },
-      };
-    }
-  } catch (err) {
-    console.warn('generateMetadata error:', err);
+  if (!parsed.valid) {
+    notFound();
   }
 
+  const availableTranslationLangs = await getAvailableTranslationLangs(
+    parsed.bookCode,
+    parsed.chapterNum ? parsed.chapterIndex : null
+  );
+
+  const seo = buildBookSeoMetadata(parsed.bookCode, parsed.entry, parsed.chaptersForBook, {
+    scriptPrefix: parsed.scriptPrefix,
+    chapterNum: parsed.chapterNum,
+    availableTranslationLangs,
+  });
+
   return {
-    title: { absolute: DEFAULT_SEO_TITLE },
-    description: DEFAULT_SEO_DESCRIPTION,
-    alternates: { canonical: canonicalPath },
+    title: { absolute: seo.title },
+    description: seo.description,
+    keywords: seo.keywords,
+    alternates: {
+      canonical: seo.canonicalUrl,
+      languages: seo.alternatesLanguages,
+    },
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      url: seo.canonicalUrl,
+      siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
+      locale: seo.ogLocale,
+      alternateLocales: ['en_US', 'vi_VN', 'my_MM', 'th_TH', 'si_LK', 'de_DE', 'ja_JP', 'hi_IN', 'zh_CN', 'pt_PT'],
+      type: 'article',
+      images: [
+        {
+          url: '/android-chrome-512x512.png',
+          width: 512,
+          height: 512,
+          alt: seo.displayTitle,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+      images: ['/android-chrome-512x512.png'],
+    },
   };
 }
 
 export default async function BookPage({ params }) {
   const unwrappedParams = params && typeof params.then === 'function' ? await params : params;
-  const slug0 = unwrappedParams?.slug?.[0] ? decodeURIComponent(unwrappedParams.slug[0]) : '';
-  const scriptSplit = splitScriptCode(slug0);
-  const bookCode = scriptSplit.bookCode;
-  const scriptId = scriptSplit.scriptId;
+  const parsed = parseBookRouteParams(unwrappedParams?.slug);
 
-  const catalog = getBooksCatalog();
-  const entry = catalog[bookCode] || null;
-  const chaptersForBook = entry ? (getChaptersByBook().get(bookCode) || []) : [];
-  const seo = entry ? buildBookSeoMetadata(bookCode, entry, chaptersForBook, scriptId) : null;
+  if (parsed.redirectTo) {
+    permanentRedirect(parsed.redirectTo);
+  }
 
-  const bookJsonLd = entry && seo ? {
-    '@context': 'https://schema.org',
-    '@type': 'Book',
-    '@id': `${SITE_URL}/book/${bookCode}#book`,
-    name: seo.displayTitle,
-    headline: seo.title,
-    description: seo.description,
-    identifier: bookCode,
-    inLanguage: ALL_SCHEMA_LANGUAGES,
-    isAccessibleForFree: true,
-    license: 'https://creativecommons.org/licenses/by-nc-sa/3.0/',
-    url: `${SITE_URL}/book/${bookCode}`,
-    genre: seo.parentLabel || entry.pitaka || 'Buddhism',
-    isPartOf: {
-      '@type': 'BookSeries',
-      name: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-      url: `${SITE_URL}/`,
-    },
-    about: [
-      { '@type': 'Thing', name: 'Buddhism' },
-      { '@type': 'Thing', name: 'Theravada' },
-      { '@type': 'Thing', name: 'Pali Canon' },
-      ...(seo.parentLabel ? [{ '@type': 'Thing', name: seo.parentLabel }] : []),
-    ],
-    ...(chaptersForBook.length > 0
-      ? {
-          hasPart: chaptersForBook.slice(0, 50).map((ch, idx) => ({
-            '@type': 'Chapter',
-            position: idx + 1,
-            name: capitalizePali(ch.title || `Chapter ${idx + 1}`),
-          })),
-        }
-      : {}),
-  } : null;
+  if (!parsed.valid) {
+    notFound();
+  }
 
-  const toAnchorSlug = (s) =>
-    String(s || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+  const [availableTranslationLangs, chapterContent] = await Promise.all([
+    getAvailableTranslationLangs(parsed.bookCode, parsed.chapterNum ? parsed.chapterIndex : null),
+    getSsrChapterContent({
+      bookCode: parsed.bookCode,
+      chapterIndex: parsed.chapterIndex,
+      scriptId: parsed.scriptId,
+    }),
+  ]);
 
-  const breadcrumbItems = entry && seo
-    ? [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: 'Home',
-          item: `${SITE_URL}/`,
-        },
-        ...(seo.pitakaLabel
-          ? [
-              {
-                '@type': 'ListItem',
-                position: 2,
-                name: seo.pitakaLabel,
-                item: `${SITE_URL}/#pitaka-${toAnchorSlug(seo.pitakaLabel)}`,
-              },
-            ]
-          : []),
-        ...(seo.parentLabel && seo.parentLabel !== seo.pitakaLabel
-          ? [
-              {
-                '@type': 'ListItem',
-                position: seo.pitakaLabel ? 3 : 2,
-                name: seo.parentLabel,
-                item: `${SITE_URL}/#collection-${toAnchorSlug(seo.parentLabel)}`,
-              },
-            ]
-          : []),
-        {
-          '@type': 'ListItem',
-          position:
-            1 +
-            (seo.pitakaLabel ? 1 : 0) +
-            (seo.parentLabel && seo.parentLabel !== seo.pitakaLabel ? 1 : 0) +
-            1,
-          name: seo.displayTitle,
-          item: `${SITE_URL}/book/${bookCode}`,
-        },
-      ]
-    : [];
+  const seo = buildBookSeoMetadata(parsed.bookCode, parsed.entry, parsed.chaptersForBook, {
+    scriptPrefix: parsed.scriptPrefix,
+    chapterNum: parsed.chapterNum,
+    availableTranslationLangs,
+  });
 
-  const breadcrumbJsonLd = entry && seo
-    ? {
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        itemListElement: breadcrumbItems,
-      }
-    : null;
+  const { primaryJsonLd, breadcrumbJsonLd } = buildPageJsonLd(
+    parsed.bookCode,
+    parsed.entry,
+    parsed.chaptersForBook,
+    seo
+  );
+
+  const ssrArticle = (
+    <SsrBookArticle
+      bookCode={parsed.bookCode}
+      entry={parsed.entry}
+      chaptersForBook={parsed.chaptersForBook}
+      seo={seo}
+      chapterContent={chapterContent}
+      availableTranslationLangs={availableTranslationLangs}
+    />
+  );
 
   return (
     <>
-      {entry && seo && (
-        <>
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(bookJsonLd) }}
-          />
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-          />
-          <noscript>
-            <div style={{ padding: '2rem', maxWidth: '850px', margin: '0 auto', fontFamily: 'serif', lineHeight: '1.6' }}>
-              <h1>{seo.displayTitle}</h1>
-              <p><strong>Canonical Corpus:</strong> Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (Vipassana Research Institute / CSCD edition)</p>
-              {entry.longNavPath && <p><strong>Canonical Path:</strong> {entry.longNavPath}</p>}
-              <p>{seo.description}</p>
-
-              {chaptersForBook.length > 0 && (
-                <section style={{ marginTop: '1.5rem' }}>
-                  <h2>Chapters in {seo.displayTitle} ({chaptersForBook.length})</h2>
-                  <ul>
-                    {chaptersForBook.map((ch, idx) => (
-                      <li key={idx}>
-                        <a href={`/book/${bookCode}/${idx + 1}`} rel="nofollow">
-                          {capitalizePali(ch.title || `Chapter ${idx + 1}`)}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              <section style={{ marginTop: '1.5rem' }}>
-                <h2>Available Translations ({TRANSLATION_LANGS.length} Modern Languages)</h2>
-                <ul>
-                  {TRANSLATION_LANGS.map((t) => (
-                    <li key={t.code}>
-                      <a href={`/book/${bookCode}?l=${t.code}`} rel="nofollow">
-                        {t.name} ({t.native})
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section style={{ marginTop: '1.5rem' }}>
-                <h2>Pāḷi Script Transliterations (17 Scripts)</h2>
-                <ul>
-                  {PALI_SCRIPT_LIST.map((s) => (
-                    <li key={s.code}>
-                      <a href={`/book/${s.code}.${bookCode}`} rel="nofollow">
-                        {s.name} ({s.native})
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-          </noscript>
-        </>
+      {primaryJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(primaryJsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
       )}
       <Suspense
         fallback={
@@ -309,7 +163,18 @@ export default async function BookPage({ params }) {
           </div>
         }
       >
-        <MainAppContent params={unwrappedParams} />
+        <MainAppContent
+          params={unwrappedParams}
+          ssrContent={ssrArticle}
+          initialRoute={{
+            bookCode: parsed.bookCode,
+            scriptPrefix: parsed.scriptPrefix,
+            translationLang: null,
+            chapterNum: parsed.chapterNum,
+            canonicalUrl: seo.canonicalUrl,
+            fromTranslationRoute: false,
+          }}
+        />
       </Suspense>
     </>
   );
