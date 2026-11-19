@@ -9,6 +9,8 @@ import {
   PanelLeft,
   PanelRight,
   GripHorizontal,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import TreeNode from './TreeNode';
 import HelpModal from '../HelpModal';
@@ -17,6 +19,42 @@ import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary } from '../../context/DictionaryContext';
 import { typeVelthuis, convertPaliScript, normalizePaliForSearch } from '../../services/transliterate';
+
+export function shouldDismissUnpinnedTreeOnClick(
+  e,
+  {
+    isOpen = false,
+    isPinned = false,
+    dockPosition = 'left',
+    panelEl = null,
+    selectionText = '',
+    lastResizeEndTime = 0,
+    now = Date.now(),
+  } = {}
+) {
+  if (!isOpen || isPinned || dockPosition === 'float') return false;
+  if (now - lastResizeEndTime < 250) return false;
+  if (selectionText && selectionText.trim().length > 1) return false;
+
+  const target = e?.target;
+  if (!target) return false;
+  if (panelEl && typeof panelEl.contains === 'function' && panelEl.contains(target)) {
+    return false;
+  }
+  if (typeof target.closest === 'function') {
+    if (target.closest('[data-sidebar-trigger]')) {
+      return false;
+    }
+    if (
+      target.closest(
+        '[role="dialog"], [aria-modal="true"], .modal-overlay, .modal-backdrop, .fixed.inset-0'
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export default function NavigationTree() {
   const [treeData, setTreeData] = useState([]);
@@ -36,10 +74,19 @@ export default function NavigationTree() {
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [floatPos, setFloatPos] = useState({ x: 80, y: 100, width: 380, height: 600 });
   const [isResizing, setIsResizing] = useState(false);
-  const { isSidebarOpen, setIsSidebarOpen, treeSelectedNode } = useTabs();
+  const {
+    isSidebarOpen,
+    setIsSidebarOpen,
+    treeSelectedNode,
+    isTreePinned = false,
+    toggleTreePinned,
+    isHeaderVisible = true,
+  } = useTabs();
   const { settings } = useThemeSettings();
   const { isOpen: isDictOpen, closeDictionary } = useDictionary();
   const treeContainerRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const lastResizeEndRef = useRef(0);
   const prevSidebarOpenRef = useRef(isSidebarOpen);
 
   // Auto-close dictionary when sidebar is opened to give more reading space
@@ -192,16 +239,78 @@ export default function NavigationTree() {
   };
 
   const handleSetDock = (newPos) => {
+    if (typeof window !== 'undefined' && isSidebarOpen) {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', {
+          detail: { source: 'sidebar-dock', shiftsLayout: Boolean(isTreePinned && newPos !== 'float') },
+        })
+      );
+    }
     setDockPosition(newPos);
     try {
       localStorage.setItem('tipitaka_tree_dock_v2', newPos);
     } catch (e) {}
+    if (typeof window !== 'undefined' && isSidebarOpen) {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:layout-shift-resize', {
+          detail: { source: 'sidebar-dock', shiftsLayout: Boolean(isTreePinned && newPos !== 'float') },
+        })
+      );
+    }
   };
+
+  // Dismiss unpinned floating tree on outside click or Escape key (without shifting reader text)
+  useEffect(() => {
+    if (!isSidebarOpen || isTreePinned || dockPosition === 'float') return;
+
+    const handleOutsideClick = (e) => {
+      const sel = typeof window !== 'undefined' ? window.getSelection()?.toString() || '' : '';
+      if (
+        shouldDismissUnpinnedTreeOnClick(e, {
+          isOpen: isSidebarOpen,
+          isPinned: isTreePinned,
+          dockPosition,
+          panelEl: sidebarRef.current,
+          selectionText: sel,
+          lastResizeEndTime: lastResizeEndRef.current,
+        })
+      ) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (typeof document !== 'undefined' && document.querySelector('[aria-modal="true"]')) {
+          return;
+        }
+        setIsSidebarOpen(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleOutsideClick, false);
+      document.addEventListener('keydown', handleKeyDown);
+    }, 60);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleOutsideClick, false);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSidebarOpen, isTreePinned, dockPosition, setIsSidebarOpen]);
 
   // Resize handler for docked sidebar (left or right)
   const startResizing = useCallback(
     (mouseDownEvent) => {
       mouseDownEvent.preventDefault();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('tipitaka:before-layout-shift', {
+            detail: { source: 'sidebar-resize', shiftsLayout: Boolean(isTreePinned) },
+          })
+        );
+      }
       setIsResizing(true);
       const startX = mouseDownEvent.clientX;
       const startWidth = sidebarWidth;
@@ -223,10 +332,18 @@ export default function NavigationTree() {
 
       const onMouseUp = () => {
         setIsResizing(false);
+        lastResizeEndRef.current = Date.now();
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('tipitaka:layout-shift-resize', {
+              detail: { source: 'sidebar-resize', shiftsLayout: Boolean(isTreePinned) },
+            })
+          );
+        }
       };
 
       document.body.style.userSelect = 'none';
@@ -234,7 +351,7 @@ export default function NavigationTree() {
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
     },
-    [sidebarWidth, dockPosition]
+    [sidebarWidth, dockPosition, isTreePinned]
   );
 
   // Drag handler for floating mode
@@ -354,7 +471,7 @@ export default function NavigationTree() {
           width: `${floatPos.width}px`,
           height: `${floatPos.height}px`,
         }
-      : !isSidebarOpen && dockPosition === 'right'
+      : !isSidebarOpen && dockPosition === 'right' && isTreePinned
       ? { width: 0 }
       : {
           width: `${sidebarWidth}px`,
@@ -371,8 +488,12 @@ export default function NavigationTree() {
       )}
 
       <aside
+        ref={sidebarRef}
+        aria-label="Tipiṭaka Navigation Tree"
         style={floatStyle}
-        className={`app-sidebar dock-${dockPosition} ${isSidebarOpen ? '' : 'collapsed'} ${
+        className={`app-sidebar dock-${dockPosition} ${
+          dockPosition === 'float' ? 'tree-window-float' : isTreePinned ? 'tree-pinned' : 'tree-floating'
+        } ${!isHeaderVisible ? 'tree-header-hidden' : ''} ${isSidebarOpen ? '' : 'collapsed'} ${
           isResizing ? 'select-none' : ''
         }`}
       >
@@ -439,6 +560,26 @@ export default function NavigationTree() {
               >
                 <PanelRight size={12} />
               </button>
+
+              {/* Pin / Unpin beside reader text */}
+              {dockPosition !== 'float' && toggleTreePinned && (
+                <button
+                  type="button"
+                  className={`tree-action-btn p-1 hidden md:inline-flex ${
+                    isTreePinned ? 'text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-light)]' : ''
+                  }`}
+                  onClick={toggleTreePinned}
+                  title={
+                    isTreePinned
+                      ? 'Unpin tree (overlay above text without shifting columns)'
+                      : 'Pin tree beside text (shifts reader columns)'
+                  }
+                  aria-label={isTreePinned ? 'Unpin Navigation Tree' : 'Pin Navigation Tree'}
+                  aria-pressed={Boolean(isTreePinned)}
+                >
+                  {isTreePinned ? <PinOff size={12} /> : <Pin size={12} />}
+                </button>
+              )}
 
               {/* Close Sidebar Button */}
               <button

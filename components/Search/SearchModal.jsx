@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, X, Loader2, Filter, SlidersHorizontal, ArrowUpDown, ChevronDown } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
-import { searchTipitaka, fetchSearchDatabases } from '../../services/api';
+import { searchTipitaka, fetchSearchDatabases, invalidateSearchDatabasesCache } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { typeVelthuis, convertAnyToRoman } from '../../services/transliterate';
@@ -405,8 +405,10 @@ export default function SearchModal() {
   const handledInitialQueryRef = useRef(null);
   const performSearchRef = useRef(null);
 
-  // Dynamically load available FTS databases from server
-  useEffect(() => {
+  const refreshSearchDatabases = useCallback((bustCache = false) => {
+    if (bustCache && typeof invalidateSearchDatabasesCache === 'function') {
+      invalidateSearchDatabasesCache();
+    }
     fetchSearchDatabases()
       .then((data) => {
         if (data?.databases && Array.isArray(data.databases) && data.databases.length > 0) {
@@ -424,10 +426,20 @@ export default function SearchModal() {
           const orderMap = new Map(DEFAULT_FTS_DATABASES.map((def, idx) => [def.id, idx]));
           mapped.sort((a, b) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99));
           setFtsDatabases(mapped);
+          setSelectedDb((prev) => (mapped.some((d) => d.id === prev) ? prev : mapped[0].id));
         }
       })
       .catch(() => {});
   }, []);
+
+  // Dynamically load available FTS databases from server and refresh when offline FTS packs change
+  useEffect(() => {
+    refreshSearchDatabases(false);
+    if (typeof window === 'undefined') return;
+    const onFtsChanged = () => refreshSearchDatabases(true);
+    window.addEventListener('tipitaka:fts-databases-changed', onFtsChanged);
+    return () => window.removeEventListener('tipitaka:fts-databases-changed', onFtsChanged);
+  }, [refreshSearchDatabases]);
 
   // Load saved preferences or URL parameters on mount
   useEffect(() => {

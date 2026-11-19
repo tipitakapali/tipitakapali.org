@@ -205,6 +205,42 @@ class WebLocalStorageStore {
     }
   }
 
+  /// Marks [settingsKey] (e.g. `'vietnamese'`, `'english'`) disabled in
+  /// `tipitaka_advanced_settings_v7.translations` and persists immediately.
+  Future<void> disableTranslationSetting(String settingsKey) async {
+    final trimmed = settingsKey.trim();
+    if (trimmed.isEmpty || trimmed == 'pali') return;
+    await ensureLoaded();
+
+    final raw = _entries[advancedSettingsKey];
+    if (raw == null || raw.trim().isEmpty) return;
+
+    Map<String, dynamic> parsed = <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        parsed = Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {
+      return;
+    }
+
+    final rawTranslations = parsed['translations'];
+    final translations = rawTranslations is Map
+        ? Map<String, dynamic>.from(rawTranslations)
+        : <String, dynamic>{};
+    translations[trimmed] = false;
+    final hasAnyEnabled = translations.values.any((v) => v == true);
+    if (!hasAnyEnabled) {
+      translations['pali'] = true;
+    }
+    parsed['translations'] = translations;
+
+    if (_applySet(advancedSettingsKey, jsonEncode(parsed))) {
+      persistSync();
+    }
+  }
+
   bool _applySet(dynamic rawKey, dynamic rawValue) {
     if (rawKey == null || rawValue == null) return false;
     final key = rawKey.toString();

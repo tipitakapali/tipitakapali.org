@@ -202,4 +202,29 @@ void main() {
     expect(store2.entries['tipitaka_active_book_v3'], equals('s0102a.att'));
     expect(store2.entries['tipitaka_tab_scrolls_v3'], equals(savedScrolls));
   });
+
+  test('disableTranslationSetting turns off deleted language while preserving pali and other active languages', () async {
+    final store = WebLocalStorageStore(explicitDirectory: tempDir);
+    await store.ensureLoaded();
+    await store.applyOperation({
+      'op': 'set',
+      'key': WebLocalStorageStore.advancedSettingsKey,
+      'value': jsonEncode({
+        'translations': {'pali': false, 'vietnamese': true},
+      }),
+    });
+
+    await store.disableTranslationSetting('vietnamese');
+
+    final reopened = WebLocalStorageStore(explicitDirectory: tempDir);
+    await reopened.ensureLoaded();
+    final saved = jsonDecode(
+      reopened.entries[WebLocalStorageStore.advancedSettingsKey]!,
+    ) as Map<String, dynamic>;
+    // Falls back to keeping Pali enabled if last active translation is deleted
+    expect(saved['translations'], equals({
+      'pali': true,
+      'vietnamese': false,
+    }));
+  });
 }

@@ -1631,24 +1631,77 @@ aside.app-sidebar {
   position: relative;
 }
 
-aside.app-sidebar.dock-left {
+/* Tipitaka Tree: Default unpinned floating overlay (desktop >=768px) so reader columns never shift */
+@media (min-width: 768px) {
+  aside.app-sidebar.tree-floating {
+    position: fixed;
+    top: 52px;
+    bottom: 0;
+    height: auto;
+    max-width: min(850px, 85dvw);
+    z-index: 48;
+    transition: top 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  aside.app-sidebar.tree-floating.dock-left {
+    left: 0;
+    right: auto;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 8px 0 28px -4px rgba(0, 0, 0, 0.18), 2px 0 8px rgba(0, 0, 0, 0.06);
+    animation: dictSlideRight 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  aside.app-sidebar.tree-floating.dock-right {
+    right: 0;
+    left: auto;
+    border-left: 1px solid var(--border-color);
+    box-shadow: -8px 0 28px -4px rgba(0, 0, 0, 0.18), -2px 0 8px rgba(0, 0, 0, 0.06);
+    animation: dictSlideLeft 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  aside.app-sidebar.tree-floating.tree-header-hidden,
+  body:has(.app-header.hidden-header) aside.app-sidebar.tree-floating,
+  body.tpo-bars-hidden aside.app-sidebar.tree-floating {
+    top: 0;
+  }
+
+  aside.app-sidebar.tree-floating.collapsed {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
+  [data-theme="dark"] aside.app-sidebar.tree-floating.dock-left,
+  [data-theme="oled"] aside.app-sidebar.tree-floating.dock-left,
+  [data-theme="dusk"] aside.app-sidebar.tree-floating.dock-left {
+    box-shadow: 10px 0 32px rgba(0, 0, 0, 0.55);
+  }
+
+  [data-theme="dark"] aside.app-sidebar.tree-floating.dock-right,
+  [data-theme="oled"] aside.app-sidebar.tree-floating.dock-right,
+  [data-theme="dusk"] aside.app-sidebar.tree-floating.dock-right {
+    box-shadow: -10px 0 32px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Tipitaka Tree: Pinned Docked Modes (Opt-in: docks beside reader and shifts columns) */
+aside.app-sidebar.tree-pinned.dock-left {
   order: 5;
   border-right: 1px solid var(--border-color);
   transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-aside.app-sidebar.dock-left.collapsed {
+aside.app-sidebar.tree-pinned.dock-left.collapsed {
   margin-left: calc(-1 * var(--sidebar-width, 360px));
   pointer-events: none;
 }
 
-aside.app-sidebar.dock-right {
+aside.app-sidebar.tree-pinned.dock-right {
   order: 99;
   border-left: 1px solid var(--border-color);
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), margin-right 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-aside.app-sidebar.dock-right.collapsed {
+aside.app-sidebar.tree-pinned.dock-right.collapsed {
   width: 0 !important;
   min-width: 0 !important;
   max-width: 0 !important;
@@ -1657,6 +1710,14 @@ aside.app-sidebar.dock-right.collapsed {
   pointer-events: none !important;
   overflow: hidden !important;
   visibility: hidden !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  aside.app-sidebar.tree-floating,
+  aside.app-sidebar.tree-pinned {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 aside.app-sidebar.dock-float {
@@ -3570,7 +3631,7 @@ footer.app-footer.hidden-footer,
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .tree-action-dock,
   .tree-action-btn.tree-action-dock {
     display: none !important;
@@ -3581,12 +3642,14 @@ footer.app-footer.hidden-footer,
     height: calc(100dvh - 50px);
     top: 50px;
     left: 0;
+    right: auto;
     width: 84vw;
     max-width: 320px;
     z-index: 50;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   }
-  aside.app-sidebar.collapsed {
+  aside.app-sidebar.collapsed,
+  aside.app-sidebar.tree-pinned.dock-right.collapsed {
     transform: translateX(-100%);
     width: 0;
     pointer-events: none;
@@ -5291,7 +5354,7 @@ body.window-scroll .app-main-flex {
 }
 
 @media (min-width: 768px) {
-  body.window-scroll aside.app-sidebar,
+  body.window-scroll aside.app-sidebar.tree-pinned,
   body.window-scroll aside.dict-dock-panel.dict-pinned,
   body.window-scroll div.dict-dock-panel.dict-pinned {
     position: sticky;
@@ -5301,10 +5364,67 @@ body.window-scroll .app-main-flex {
     transition: top 0.28s cubic-bezier(0.4, 0, 0.2, 1), height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  body.window-scroll:has(.app-header.hidden-header) aside.app-sidebar.tree-pinned,
   body.window-scroll:has(.app-header.hidden-header) aside.dict-dock-panel.dict-pinned,
   body.window-scroll:has(.app-header.hidden-header) div.dict-dock-panel.dict-pinned {
     top: 0;
     height: 100dvh;
+  }
+}
+
+/* Language Menu accessible toggle switch (<input type="checkbox" switch>) */
+input.tpo-lang-switch[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--text-muted) 32%, transparent);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+input.tpo-lang-switch[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  transition: transform 0.18s ease;
+}
+
+input.tpo-lang-switch[type="checkbox"]:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+input.tpo-lang-switch[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+input.tpo-lang-switch[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input.tpo-lang-switch[type="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input.tpo-lang-switch[type="checkbox"],
+  input.tpo-lang-switch[type="checkbox"]::after,
+  .tpo-lang-row {
+    transition: none !important;
   }
 }
 

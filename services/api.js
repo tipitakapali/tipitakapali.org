@@ -505,6 +505,21 @@ export async function fetchMatJump(bookCode, para = null, chapter = null) {
   }, 24 * 60 * 60 * 1000);
 }
 
+export function invalidateSearchDatabasesCache() {
+  cache.delete('search_databases');
+  pendingRequests.delete('search_databases');
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith('search_')) {
+      cache.delete(key);
+    }
+  }
+  for (const key of Array.from(pendingRequests.keys())) {
+    if (key.startsWith('search_')) {
+      pendingRequests.delete(key);
+    }
+  }
+}
+
 export async function fetchSearchDatabases() {
   const base = getApiBase();
   return cachedFetch(

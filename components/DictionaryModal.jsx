@@ -72,9 +72,159 @@ function highlightInflections(searchTerm, container, targetScript = 'roman') {
   });
 }
 
-// Helper to extract word under cursor on click event (supports Pāḷi Roman diacritics, Devanagari, Myanmar, Sinhala, Thai)
-function extractWordFromPointerEvent(e) {
-  if (typeof document === 'undefined') return '';
+const DICT_WORD_CHAR_RE = /[\p{L}\p{M}]/u;
+
+export function extractWordAtTextOffset(text, offset) {
+  if (!text || typeof text !== 'string') return '';
+  let start = Math.max(0, Math.min(offset || 0, text.length));
+  let end = start;
+
+  // If cursor landed immediately after a word char (e.g. on boundary or space right after word),
+  // step back 1 when current char is not a word char and previous char is.
+  if (
+    start > 0 &&
+    start < text.length &&
+    !DICT_WORD_CHAR_RE.test(text[start]) &&
+    DICT_WORD_CHAR_RE.test(text[start - 1])
+  ) {
+    start--;
+    end = start;
+  }
+
+  while (start > 0 && DICT_WORD_CHAR_RE.test(text[start - 1])) {
+    start--;
+  }
+  while (end < text.length && DICT_WORD_CHAR_RE.test(text[end])) {
+    end++;
+  }
+
+  return text.slice(start, end).trim();
+}
+
+export function isPointInsideDictRangeRects(range, clientX, clientY, tolerance = 6) {
+  if (!range || typeof range.getClientRects !== 'function') return true;
+  if (typeof clientX !== 'number' || typeof clientY !== 'number') return true;
+  const rects = range.getClientRects();
+  if (!rects || rects.length === 0) return true;
+  const nonZeroRects = Array.from(rects).filter((r) => r.width > 0 || r.height > 0);
+  if (nonZeroRects.length === 0) return true;
+  return nonZeroRects.some(
+    (r) =>
+      clientX >= r.left - tolerance &&
+      clientX <= r.right + tolerance &&
+      clientY >= r.top - tolerance &&
+      clientY <= r.bottom + tolerance
+  );
+}
+
+function findOffsetInTextNodeAtPoint(textNode, clientX, clientY, tolerance = 6) {
+  const len = (textNode?.textContent || '').length;
+  if (len === 0 || typeof document === 'undefined' || typeof document.createRange !== 'function') {
+    return 0;
+  }
+  const probe = document.createRange();
+  let bestOffset = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < len; i++) {
+    probe.setStart(textNode, i);
+    probe.setEnd(textNode, i + 1);
+    const rects = probe.getClientRects?.();
+    if (!rects || rects.length === 0) continue;
+    for (let rIdx = 0; rIdx < rects.length; rIdx++) {
+      const r = rects[rIdx];
+      if (r.width === 0 && r.height === 0) continue;
+      if (
+        clientX >= r.left - tolerance &&
+        clientX <= r.right + tolerance &&
+        clientY >= r.top - tolerance &&
+        clientY <= r.bottom + tolerance
+      ) {
+        if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+          return i;
+        }
+        const cx = (r.left + r.right) / 2;
+        const cy = (r.top + r.bottom) / 2;
+        const dist = Math.hypot(clientX - cx, clientY - cy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestOffset = i;
+        }
+      }
+    }
+  }
+  return bestOffset;
+}
+
+function resolveDictTextNodeAndOffset(container, rawOffset, clientX, clientY) {
+  if (!container) return null;
+  if (container.nodeType === 3 /* Node.TEXT_NODE */) {
+    return { node: container, offset: rawOffset || 0 };
+  }
+  if (container.nodeType !== 1 /* Node.ELEMENT_NODE */ || typeof document === 'undefined') {
+    return null;
+  }
+
+  const children = container.childNodes || [];
+  const directCandidates = [];
+  if (children[rawOffset]) directCandidates.push(children[rawOffset]);
+  if (rawOffset > 0 && children[rawOffset - 1]) directCandidates.push(children[rawOffset - 1]);
+
+  const seen = new Set();
+  const orderedTextNodes = [];
+  const collectText = (root) => {
+    if (!root) return;
+    if (root.nodeType === 3) {
+      if (!seen.has(root) && (root.textContent || '').trim()) {
+        seen.add(root);
+        orderedTextNodes.push(root);
+      }
+      return;
+    }
+    if (typeof document.createTreeWalker === 'function') {
+      const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */, null, false);
+      let n;
+      while ((n = walker.nextNode())) {
+        if (!seen.has(n) && (n.textContent || '').trim()) {
+          seen.add(n);
+          orderedTextNodes.push(n);
+        }
+      }
+    }
+  };
+
+  for (const cand of directCandidates) collectText(cand);
+  collectText(container);
+
+  if (orderedTextNodes.length === 0) return null;
+
+  if (typeof document.createRange === 'function' && typeof clientX === 'number' && typeof clientY === 'number') {
+    for (const tol of [0, 6]) {
+      let fallbackHit = null;
+      for (const tn of orderedTextNodes) {
+        const r = document.createRange();
+        r.selectNodeContents(tn);
+        if (isPointInsideDictRangeRects(r, clientX, clientY, tol)) {
+          const offset = findOffsetInTextNodeAtPoint(tn, clientX, clientY, tol);
+          if (extractWordAtTextOffset(tn.textContent || '', offset)) {
+            return { node: tn, offset };
+          }
+          if (!fallbackHit) {
+            fallbackHit = { node: tn, offset };
+          }
+        }
+      }
+      if (fallbackHit && tol === 6) {
+        return fallbackHit;
+      }
+    }
+  }
+
+  return { node: orderedTextNodes[0], offset: 0 };
+}
+
+// Helper to extract word under cursor on click event (supports all 17 Pāḷi scripts, combining marks, and English)
+export function extractWordFromPointerEvent(e) {
+  if (typeof document === 'undefined' || !e) return '';
   let range = null;
   if (document.caretRangeFromPoint) {
     range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -87,25 +237,45 @@ function extractWordFromPointerEvent(e) {
     }
   }
 
-  if (range && range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
-    const text = range.startContainer.textContent || '';
-    const offset = range.startOffset;
-    let start = offset;
-    let end = offset;
+  if (!range || !range.startContainer) return '';
+  const resolved = resolveDictTextNodeAndOffset(range.startContainer, range.startOffset, e.clientX, e.clientY);
+  if (!resolved || !resolved.node) return '';
 
-    const isWordChar = (ch) => /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u1000-\u109F\u0D80-\u0DFF\u0E00-\u0E7F]/.test(ch);
+  const text = resolved.node.textContent || '';
+  const offset = resolved.offset || 0;
+  let start = Math.max(0, Math.min(offset, text.length));
+  let end = start;
 
-    while (start > 0 && isWordChar(text[start - 1])) {
-      start--;
-    }
-    while (end < text.length && isWordChar(text[end])) {
-      end++;
-    }
-
-    const raw = text.slice(start, end).trim();
-    return raw;
+  if (
+    start > 0 &&
+    start < text.length &&
+    !DICT_WORD_CHAR_RE.test(text[start]) &&
+    DICT_WORD_CHAR_RE.test(text[start - 1])
+  ) {
+    start--;
+    end = start;
   }
-  return '';
+
+  while (start > 0 && DICT_WORD_CHAR_RE.test(text[start - 1])) {
+    start--;
+  }
+  while (end < text.length && DICT_WORD_CHAR_RE.test(text[end])) {
+    end++;
+  }
+
+  const raw = text.slice(start, end).trim();
+  if (!raw) return '';
+
+  if (typeof document.createRange === 'function') {
+    const wordRange = document.createRange();
+    wordRange.setStart(resolved.node, start);
+    wordRange.setEnd(resolved.node, end);
+    if (!isPointInsideDictRangeRects(wordRange, e.clientX, e.clientY, 6)) {
+      return '';
+    }
+  }
+
+  return raw;
 }
 
 // Helper to selectively convert only Pāḷi content in dictionary entries (leaves English buttons, definitions, & EPD English headwords untouched)
@@ -529,6 +699,7 @@ export default function DictionaryModal() {
   const inputRef = useRef(null);
   const contentContainerRef = useRef(null);
   const modalPanelRef = useRef(null);
+  const contentPointerDownRef = useRef(null);
 
   // History Dropdown State & Refs
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -772,7 +943,7 @@ export default function DictionaryModal() {
     if (displayWord || queryWord) {
       setLocalInput(displayWord || queryWord || '');
     }
-  }, [queryWord]);
+  }, [queryWord, displayWord]);
 
   // Dedicated instant clear handler
   const handleClearInput = useCallback((e) => {
@@ -1272,14 +1443,24 @@ export default function DictionaryModal() {
       }
 
       // 4. Handle clicks on clickable terms / jumps inside definitions (Explicit jump links)
-      const jumpLink = e.target.closest('a.jump, span.p1w, span.p2w, span.p3w, .dec-term, b.epd, .epd');
+      const jumpLink = e.target.closest('a.jump, span.p1w, span.p2w, span.p3w, span.pp1w, span.pp2w, span.pm1w, span.pm2w, .dec-term, b.epd, .epd');
       if (jumpLink) {
-        const text = jumpLink.textContent?.trim();
-        if (text && text.length > 1) {
-          e.preventDefault();
-          e.stopPropagation();
-          const cleanWord = cleanDictionaryQuery(text);
-          if (cleanWord && cleanWord.length >= 2) {
+        const pointerWord = extractWordFromPointerEvent(e);
+        const rawText = (jumpLink.textContent || '').trim().replace(/\s+\d+(?:\.\d+)*\s*$/, '');
+        const candidateText =
+          rawText && rawText.split(/\s+/).length > 1 && pointerWord
+            ? pointerWord
+            : rawText || pointerWord;
+        if (candidateText) {
+          const cleanWord = cleanDictionaryQuery(candidateText);
+          if (cleanWord && (cleanWord.length >= 2 || /\p{L}/u.test(cleanWord))) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window !== 'undefined') {
+              try {
+                window.getSelection()?.removeAllRanges?.();
+              } catch (_) {}
+            }
             performLookup(cleanWord, true);
             return;
           }
@@ -1287,24 +1468,41 @@ export default function DictionaryModal() {
       }
 
       // 5. Handle clicking ANY word inside the dictionary text results
-      // Don't trigger if clicked inside buttons, inputs, links, resizers, feedback boxes, audio, or jump bar
+      // Don't trigger if clicked inside interactive controls (buttons, inputs, links with href, resizers, feedback, jump bar)
       if (
         e.target.closest(
-          'button, input, a, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback, .dict-meanings-jump-bar, .dict-summary-row, .bold-def-nonlookup'
+          'button, input, a[href], a.dpd-button, a.button, select, option, .dict-resizer-handle, .play, .dpd-button, [id^="feedback_"], .feedback, .dict-meanings-jump-bar, .dict-summary-row, .bold-def-nonlookup'
         )
       ) {
         return;
       }
 
+      const downPos = contentPointerDownRef.current;
+      contentPointerDownRef.current = null;
+      const pointerMoved =
+        downPos &&
+        typeof e.clientX === 'number' &&
+        typeof e.clientY === 'number' &&
+        Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 6;
+
+      if (pointerMoved) {
+        const selNow = typeof window !== 'undefined' ? window.getSelection()?.toString()?.trim() : '';
+        if (selNow && selNow.length > 1) {
+          return;
+        }
+      }
+
       const clickedWord = extractWordFromPointerEvent(e);
       const cleanClicked = clickedWord ? cleanDictionaryQuery(clickedWord) : '';
-      if (cleanClicked && cleanClicked.length >= 2) {
-        const sel = window.getSelection()?.toString()?.trim();
-        if (!sel || sel.length <= 1) {
-          e.preventDefault();
-          e.stopPropagation();
-          performLookup(cleanClicked, true);
+      if (cleanClicked && (cleanClicked.length >= 2 || /\p{L}/u.test(cleanClicked))) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window !== 'undefined') {
+          try {
+            window.getSelection()?.removeAllRanges?.();
+          } catch (_) {}
         }
+        performLookup(cleanClicked, true);
       }
     },
     [queryWord, currentScript, performLookup, handleJumpToEntry]
@@ -1628,6 +1826,9 @@ export default function DictionaryModal() {
       {/* ========================================================= */}
       <div
         ref={contentContainerRef}
+        onPointerDown={(e) => {
+          contentPointerDownRef.current = { x: e.clientX, y: e.clientY };
+        }}
         onClick={handleContentClick}
         className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-2.5"
       >

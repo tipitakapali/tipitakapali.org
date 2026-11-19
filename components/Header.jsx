@@ -91,6 +91,8 @@ export default function Header() {
       {/* Brand & Menu */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 min-w-0 sm:min-w-[190px]">
         <button
+          data-sidebar-trigger="true"
+          aria-expanded={isSidebarOpen}
           className="p-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
           onClick={toggleSidebar}
           title="Toggle Navigation Tree (Ctrl+B)"
@@ -100,6 +102,8 @@ export default function Header() {
         </button>
 
         <button
+          data-sidebar-trigger="true"
+          aria-expanded={isSidebarOpen}
           onClick={toggleSidebar}
           className="hidden sm:flex font-bold text-[14px] sm:text-[17px] text-[var(--accent)] tracking-tight hover:opacity-85 transition cursor-pointer items-center gap-1.5 focus:outline-none truncate"
           title="Toggle Navigation Tree (Ctrl+B)"

@@ -17,6 +17,17 @@ const STORAGE_KEYS = {
   HISTORY: 'tipitaka_recent_history_v3',
 };
 
+const TREE_PINNED_STORAGE_KEY = 'tipitaka_tree_pinned_v1';
+
+export function readStoredTreePinned() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(TREE_PINNED_STORAGE_KEY) === 'true';
+  } catch (_) {
+    return false;
+  }
+}
+
 const MAX_TABS = 12;
 
 export function parseSavedTabsSnapshot(rawTabs, savedActiveCode = null) {
@@ -406,7 +417,8 @@ export function TabProvider({ children }) {
   const [activeBookCode, setActiveBookCode] = useState(null);
   const [activeParaNum, setActiveParaNum] = useState(null);
   const [loadingBook, setLoadingBook] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpenRaw] = useState(false);
+  const [isTreePinned, setIsTreePinnedState] = useState(() => readStoredTreePinned());
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
@@ -430,8 +442,22 @@ export function TabProvider({ children }) {
   const activeBookCodeRef = useRef(null);
   const activeParaNumRef = useRef(null);
   const isSidebarOpenRef = useRef(isSidebarOpen);
+  const isTreePinnedRef = useRef(isTreePinned);
+  isTreePinnedRef.current = isTreePinned;
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  const setIsSidebarOpen = useCallback((nextValue) => {
+    const resolved =
+      typeof nextValue === 'function' ? Boolean(nextValue(isSidebarOpenRef.current)) : Boolean(nextValue);
+    if (resolved !== isSidebarOpenRef.current && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', {
+        detail: { source: 'sidebar', shiftsLayout: Boolean(isTreePinnedRef.current && window.innerWidth >= 768) },
+      }));
+    }
+    isSidebarOpenRef.current = resolved;
+    setIsSidebarOpenRaw(resolved);
+  }, []);
 
   const setBookScrollIntent = useCallback((bookCode, intent) => {
     if (!bookCode) {
@@ -468,12 +494,13 @@ export function TabProvider({ children }) {
   const restoredSessionRef = useRef(false);
   const hydratingBooksRef = useRef(new Set());
 
-  // Restore saved bookmarks, history, scroll positions, and open tabs BEFORE child mount effects
+  // Restore saved bookmarks, history, and scroll positions BEFORE child mount effects.
+  // Do NOT auto-reload last opened tabs on app launch so reopening starts cleanly on WelcomeView.
   useIsomorphicLayoutEffect(() => {
     if (typeof window === 'undefined') return;
 
     if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
+      setIsSidebarOpenRaw(false);
     }
 
     try {
@@ -488,36 +515,6 @@ export function TabProvider({ children }) {
         const parsedScrolls = JSON.parse(savedScrolls);
         if (parsedScrolls && typeof parsedScrolls === 'object') {
           tabScrollMemoryRef.current = parsedScrolls;
-        }
-      }
-
-      const savedTabsRaw = localStorage.getItem(STORAGE_KEYS.TABS);
-      const savedActiveRaw = localStorage.getItem(STORAGE_KEYS.ACTIVE);
-      const snapshot = parseSavedTabsSnapshot(savedTabsRaw, savedActiveRaw);
-      if (snapshot.tabs.length > 0 && openTabsRef.current.length === 0) {
-        restoredSessionRef.current = true;
-        tabScriptPrefixRef.current = {
-          ...snapshot.scriptPrefixes,
-          ...tabScriptPrefixRef.current,
-        };
-        openTabsRef.current = snapshot.tabs;
-        setOpenTabs(snapshot.tabs);
-
-        const isDeepLinked = hasDeepLinkInLocation();
-        if (!isDeepLinked && snapshot.activeBookCode) {
-          activeBookCodeRef.current = snapshot.activeBookCode;
-          setActiveBookCode(snapshot.activeBookCode);
-          const activeRestored = snapshot.tabs.find((t) => t.bookCode === snapshot.activeBookCode);
-          if (activeRestored && activeRestored.type !== 'ai_chat') {
-            setTreeSelectedNode({
-              bookCode: activeRestored.bookCode,
-              chapterIdx: activeRestored.isTocView ? null : (activeRestored.currentChapterIdx ?? 0),
-            });
-            if (activeRestored.lastParaNum) {
-              activeParaNumRef.current = activeRestored.lastParaNum;
-              setActiveParaNum(activeRestored.lastParaNum);
-            }
-          }
         }
       }
     } catch (e) {
@@ -2384,13 +2381,40 @@ export function TabProvider({ children }) {
     setIsSearchOpen(false);
   }, []);
 
+  const setIsTreePinned = useCallback((nextValue) => {
+    const resolved =
+      typeof nextValue === 'function' ? Boolean(nextValue(isTreePinnedRef.current)) : Boolean(nextValue);
+    const shiftsLayout = typeof window !== 'undefined' ? Boolean(window.innerWidth >= 768) : true;
+    if (typeof window !== 'undefined' && isSidebarOpenRef.current) {
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'sidebar-pin', shiftsLayout } })
+      );
+    }
+    isTreePinnedRef.current = resolved;
+    setIsTreePinnedState(resolved);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(TREE_PINNED_STORAGE_KEY, String(resolved));
+      } catch (_) {}
+      window.dispatchEvent(
+        new CustomEvent('tipitaka:layout-shift-resize', { detail: { source: 'sidebar-pin', shiftsLayout } })
+      );
+    }
+  }, []);
+
+  const toggleTreePinned = useCallback(() => {
+    setIsTreePinned((prev) => !prev);
+  }, [setIsTreePinned]);
+
   const toggleSidebar = useCallback(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'sidebar' } }));
+      window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', {
+        detail: { source: 'sidebar', shiftsLayout: Boolean(isTreePinnedRef.current && window.innerWidth >= 768) },
+      }));
     }
     const next = !isSidebarOpenRef.current;
     isSidebarOpenRef.current = next;
-    setIsSidebarOpen(next);
+    setIsSidebarOpenRaw(next);
     if (next) {
       setIsHeaderVisible(true);
     }
@@ -3022,6 +3046,9 @@ export function TabProvider({ children }) {
         toggleSidebar,
         isSidebarOpen,
         setIsSidebarOpen,
+        isTreePinned,
+        setIsTreePinned,
+        toggleTreePinned,
         isHeaderVisible,
         setIsHeaderVisible,
         isNotFound,

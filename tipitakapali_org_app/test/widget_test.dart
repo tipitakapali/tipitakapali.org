@@ -601,6 +601,50 @@ void main() {
   );
 
   testWidgets(
+    'LanguageDownloadDialog with enableOnComplete=false shows Download-only title and action button',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final tmp = Directory.systemTemp.createTempSync('lang_dl_only_test_');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final bundledRaw =
+          File('assets/databases_manifest.json').readAsStringSync();
+      final mockClient = MockClient((_) async => http.Response('{}', 404));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dbStorageServiceProvider.overrideWithValue(
+              DbStorageService(overrideDirectory: tmp),
+            ),
+            gitHubReleaseServiceProvider.overrideWithValue(
+              GitHubReleaseService(
+                client: mockClient,
+                assetLoader: (_) async => bundledRaw,
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: LanguageDownloadDialog(
+                langCode: 'vi',
+                label: 'Tiếng Việt',
+                enableOnComplete: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(find.text('Download Tiếng Việt'), findsOneWidget);
+      expect(find.text('Download'), findsOneWidget);
+      expect(find.text('Download & Enable'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'PaliSentencesDownloadDialog displays database size and can be cancelled',
     (tester) async {
       SharedPreferences.setMockInitialValues({});

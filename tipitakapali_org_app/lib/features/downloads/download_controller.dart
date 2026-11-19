@@ -1020,6 +1020,100 @@ class DownloadController extends Notifier<DownloadCenterState> {
     return state.installedDbs.containsKey(asset.filename);
   }
 
+  /// Re-downloads an updated translation database (`translation_<langCode>.db`)
+  /// from the manifest, records its new metadata, and rebuilds its FTS5 index
+  /// (`fts_translation_<langCode>.db`).
+  Future<bool> updateTranslationLanguage(String langCode) async {
+    final normalized = langCode.trim().toLowerCase();
+    if (normalized.isEmpty || normalized == 'pali') return false;
+
+    if (!state.fetchedLiveRelease) {
+      await refreshReleaseManifest(silentOffline: false);
+    }
+    final manifest = state.manifest;
+    final langPack = manifest?.languages[normalized];
+    if (langPack == null) {
+      if (!_disposed) {
+        state = state.copyWith(
+          releaseWarning: 'Translation pack "$normalized" is not in the catalog.',
+        );
+      }
+      return false;
+    }
+
+    final asset = langPack.translationDb;
+    await downloadAsset(asset, useWakelock: true, indexOnComplete: false);
+
+    final transfer = state.transfers[asset.id];
+    if (transfer != null &&
+        (transfer.phase == TransferPhase.failed ||
+            transfer.phase == TransferPhase.cancelled)) {
+      return false;
+    }
+
+    if (!state.installedDbs.containsKey(asset.filename)) {
+      return false;
+    }
+
+    final ftsResult = await _runMissingFtsIndexing(
+      forceTranslationLang: normalized,
+    );
+    await refreshInstalled();
+    return !ftsResult.hadError &&
+        state.installedDbs.containsKey(asset.filename);
+  }
+
+  /// Deletes both the translation SQLite database (`translation_<langCode>.db`)
+  /// and its full-text search index (`fts_translation_<langCode>.db`), along
+  /// with cached install metadata and optional selection flags.
+  Future<bool> deleteTranslationLanguage(String langCode) async {
+    final normalized = langCode.trim().toLowerCase();
+    if (normalized.isEmpty || normalized == 'pali' || normalized == noLanguageCode) {
+      return false;
+    }
+
+    final assetId = 'translation_$normalized';
+    final dbFilename = 'translation_$normalized.db';
+    final ftsFilename = 'fts_translation_$normalized.db';
+
+    cancelDownload(assetId);
+    await _storage.deleteDatabase(dbFilename);
+    await _storage.deleteDatabase(ftsFilename);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_prefInstalledMetaPrefix$dbFilename');
+    await prefs.remove('$_prefInstalledMetaPrefix$ftsFilename');
+
+    final nextOptional = Set<String>.from(state.selectedOptionalIds)
+      ..remove(assetId);
+    await prefs.setStringList(
+      _prefOptionalAssets,
+      nextOptional.where((id) => !id.startsWith('fts_')).toList()..sort(),
+    );
+
+    final nextTransfers = Map<String, DownloadProgress>.from(state.transfers)
+      ..remove(assetId);
+
+    var nextLang = state.selectedLanguageCode;
+    if (nextLang == normalized) {
+      nextLang = noLanguageCode;
+      await prefs.setString(_prefLanguageCode, nextLang);
+    }
+
+    if (!_disposed) {
+      state = state.copyWith(
+        selectedOptionalIds: nextOptional,
+        selectedLanguageCode: nextLang,
+        transfers: nextTransfers,
+        clearWarning: true,
+      );
+    }
+
+    await refreshInstalled();
+    return !state.installedDbs.containsKey(dbFilename) &&
+        !state.installedDbs.containsKey(ftsFilename);
+  }
+
   /// Downloads and verifies `pali_sentences.db` when enabling sentence-by-sentence mode.
   Future<bool> downloadPaliSentences() async {
     var manifest = state.manifest;

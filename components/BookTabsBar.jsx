@@ -674,20 +674,20 @@ export default function BookTabsBar() {
           <button
             type="button"
             onClick={() => {
-              if (tabView !== 'single' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'single', shiftsLayout: true } }));
+              if (tabView !== 'columns' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'columns', shiftsLayout: true } }));
               }
-              updateSetting('tabView', 'single');
+              updateSetting('tabView', 'columns');
             }}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
-              tabView === 'single'
+              tabView === 'columns'
                 ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
-            title="Single tab mode: opening a book replaces the current tab"
+            title="Columns mode: view open books side-by-side (Mūla / Aṭṭhakathā / Ṭīkā)"
           >
-            <Square size={11} />
-            <span className="hidden xl:inline">Single</span>
+            <Columns size={11} />
+            <span className="hidden xl:inline">Columns</span>
           </button>
           <button
             type="button"
@@ -710,20 +710,20 @@ export default function BookTabsBar() {
           <button
             type="button"
             onClick={() => {
-              if (tabView !== 'columns' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'columns', shiftsLayout: true } }));
+              if (tabView !== 'single' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('tipitaka:before-layout-shift', { detail: { source: 'tab-view-toggle', mode: 'single', shiftsLayout: true } }));
               }
-              updateSetting('tabView', 'columns');
+              updateSetting('tabView', 'single');
             }}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-semibold transition cursor-pointer ${
-              tabView === 'columns'
+              tabView === 'single'
                 ? 'bg-[var(--bg-card)] text-[var(--accent)] shadow-xs'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
-            title="Columns mode: view open books side-by-side (Mūla / Aṭṭhakathā / Ṭīkā)"
+            title="Single tab mode: opening a book replaces the current tab"
           >
-            <Columns size={11} />
-            <span className="hidden xl:inline">Columns</span>
+            <Square size={11} />
+            <span className="hidden xl:inline">Single</span>
           </button>
         </div>
       </div>

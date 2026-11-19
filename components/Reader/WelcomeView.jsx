@@ -86,6 +86,7 @@ export default function WelcomeView() {
       <div className="category-grid">
         {/* 1. Open Tipitaka Tree */}
         <button
+          data-sidebar-trigger="true"
           onClick={handleOpenTree}
           className="category-card group relative text-left !p-3 flex items-center gap-3 hover:border-[var(--accent)] hover:shadow-md !min-h-0"
         >

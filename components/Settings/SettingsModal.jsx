@@ -30,6 +30,7 @@ import {
 
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { useDictionary, AVAILABLE_DICTIONARIES } from '../../context/DictionaryContext';
+import { useTabs } from '../../context/TabContext';
 import HelpGuideContent from '../Help/HelpGuideContent';
 
 // Bookmarks are intentionally preserved when the reader is reset,
@@ -108,6 +109,8 @@ export default function SettingsModal() {
     moveDictDown,
     toggleDictEnabled,
   } = useDictionary();
+
+  const { isTreePinned = false, setIsTreePinned } = useTabs();
 
   const [activeTab, setActiveTab] = useState('backup');
   const [importError, setImportError] = useState('');
@@ -792,9 +795,9 @@ export default function SettingsModal() {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { id: 'single', label: 'Single Tab', desc: 'Replace active tab' },
-                        { id: 'tabbed', label: 'Multi-Tabs', desc: 'Keep tabs in bar' },
                         { id: 'columns', label: 'Parallel Columns', desc: 'Side-by-side (≥900px)' },
+                        { id: 'tabbed', label: 'Multi-Tabs', desc: 'Keep tabs in bar' },
+                        { id: 'single', label: 'Single Tab', desc: 'Replace active tab' },
                       ].map((mode) => {
                         const isSelected = (settings.tabView || 'columns') === mode.id;
                         return (
@@ -815,6 +818,23 @@ export default function SettingsModal() {
                       })}
                     </div>
                   </div>
+
+                  {!isMobileScreen && (
+                    <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
+                      <div className="flex flex-col pr-2">
+                        <span className="text-xs font-semibold">Pin Tipiṭaka navigation tree beside text</span>
+                        <span className="text-[10.5px] text-[var(--text-muted)] mt-0.5">
+                          Off by default: tree floats above the reader so columns never shift or shrink.
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(isTreePinned)}
+                        onChange={(e) => setIsTreePinned?.(e.target.checked)}
+                        className="accent-[var(--accent)] w-4 h-4 rounded shrink-0 cursor-pointer"
+                      />
+                    </label>
+                  )}
 
                   <label className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] cursor-pointer">
                     <div className="flex flex-col pr-2">

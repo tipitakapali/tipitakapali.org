@@ -181,26 +181,145 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
 
   Future<bool> _handleLanguageDownloadRequest(
     String langCode,
-    String? label,
-  ) async {
+    String? label, {
+    bool isUpdate = false,
+    bool enableOnComplete = true,
+  }) async {
     if (!mounted) return false;
+    final api = ref.read(tipitakaLocalServerProvider).api;
+    if (isUpdate) {
+      api.invalidateDatabases();
+    }
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => LanguageDownloadDialog(langCode: langCode, label: label),
+      builder: (_) => LanguageDownloadDialog(
+        langCode: langCode,
+        label: label,
+        isUpdate: isUpdate,
+        enableOnComplete: enableOnComplete,
+      ),
     );
     if (ok == true && mounted) {
-      ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+      api.invalidateDatabases();
+      unawaited(api.warmUpIndexes());
       final normalized = langCode.trim().toLowerCase();
+      if (!isUpdate && enableOnComplete) {
+        final settingsKey = translationCodeToSettingsKey[normalized];
+        if (settingsKey != null) {
+          await ref
+              .read(webLocalStorageStoreProvider)
+              .enableTranslationSetting(settingsKey);
+        }
+      }
+      _notifyOfflineLangStateChanged();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _handleLanguageDeleteRequest(String langCode) async {
+    final normalized = langCode.trim().toLowerCase();
+    if (normalized.isEmpty || normalized == 'pali') return false;
+    final api = ref.read(tipitakaLocalServerProvider).api;
+    api.invalidateDatabases();
+    final ok = await ref
+        .read(downloadControllerProvider.notifier)
+        .deleteTranslationLanguage(normalized);
+    if (ok && mounted) {
       final settingsKey = translationCodeToSettingsKey[normalized];
       if (settingsKey != null) {
         await ref
             .read(webLocalStorageStoreProvider)
-            .enableTranslationSetting(settingsKey);
+            .disableTranslationSetting(settingsKey);
       }
-      return true;
+      api.invalidateDatabases();
+      _notifyOfflineLangStateChanged();
     }
-    return false;
+    return ok;
+  }
+
+  Map<String, dynamic> _buildOfflineTranslationsStatePayload() {
+    final dlState = ref.read(downloadControllerProvider);
+    final transRe = RegExp(r'^translation_(.+)\.db$');
+    final ftsRe = RegExp(r'^fts_translation_(.+)\.db$');
+    final installedCodes = <String>[];
+    final ftsCodes = <String>[];
+    for (final name in dlState.installedDbs.keys) {
+      final tm = transRe.firstMatch(name);
+      if (tm != null) {
+        installedCodes.add(tm.group(1)!);
+        continue;
+      }
+      final fm = ftsRe.firstMatch(name);
+      if (fm != null) {
+        ftsCodes.add(fm.group(1)!);
+      }
+    }
+    installedCodes.sort();
+    ftsCodes.sort();
+
+    final updates = <String, dynamic>{};
+    for (final item in dlState.availableUpdates) {
+      final m = transRe.firstMatch(item.asset.filename);
+      if (m == null) continue;
+      final code = m.group(1)!;
+      updates[code] = {
+        'version': item.asset.version,
+        'updated': item.asset.updated,
+        'installedVersion': item.installedVersion,
+        'installedUpdated': item.installedUpdated,
+        'zipSize': item.asset.zipSize,
+        'dbSize': item.asset.dbSize,
+      };
+    }
+
+    final catalog = <String, dynamic>{};
+    final langs = dlState.manifest?.languages;
+    if (langs != null) {
+      for (final entry in langs.entries) {
+        final db = entry.value.translationDb;
+        final fts = entry.value.ftsDb;
+        catalog[entry.key] = {
+          'code': entry.key,
+          'name': entry.value.name,
+          'nativeName': entry.value.nativeName,
+          'version': db.version,
+          'updated': db.updated,
+          'zipSize': db.zipSize,
+          'dbSize': db.dbSize,
+          'ftsZipSize': fts?.zipSize ?? 0,
+          'ftsDbSize': fts?.dbSize ?? 0,
+        };
+      }
+    }
+
+    return {
+      'installedCodes': installedCodes,
+      'ftsCodes': ftsCodes,
+      'updates': updates,
+      'catalog': catalog,
+      'hasPaliSentences': dlState.installedDbs.containsKey('pali_sentences.db'),
+      'paliSentencesAsset': dlState.manifest?.core['pali_sentences'] != null
+          ? {
+              'zipSize': dlState.manifest!.core['pali_sentences']!.zipSize,
+              'dbSize': dlState.manifest!.core['pali_sentences']!.dbSize,
+            }
+          : null,
+      'fetchedLiveRelease': dlState.fetchedLiveRelease,
+      'isFetchingManifest': dlState.isFetchingManifest,
+      'hasCheckedUpdates': dlState.hasCheckedUpdates,
+      'releaseWarning': dlState.releaseWarning,
+    };
+  }
+
+  void _notifyOfflineLangStateChanged() {
+    _webViewController?.evaluateJavascript(
+      source:
+          'window.__tpoOnOfflineLangStateChanged && window.__tpoOnOfflineLangStateChanged();'
+          'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();'
+          'try { window.dispatchEvent(new CustomEvent("tipitaka:fts-databases-changed")); } catch (_) {}',
+    );
   }
 
   Future<bool> _handlePaliSentencesDownloadRequest() async {
@@ -453,6 +572,37 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
           callback: (args) async {
             String code = '';
             String? label;
+            var enableOnComplete = true;
+            if (args.isNotEmpty && args.first is Map) {
+              final map = args.first as Map;
+              code = (map['code'] ?? '').toString().trim().toLowerCase();
+              label = map['label']?.toString();
+              if (map['enableOnComplete'] == false) {
+                enableOnComplete = false;
+              }
+            } else if (args.isNotEmpty) {
+              code = args.first.toString().trim().toLowerCase();
+            }
+            if (code.isEmpty) {
+              return {'success': false};
+            }
+            final ok = await _handleLanguageDownloadRequest(
+              code,
+              label,
+              enableOnComplete: enableOnComplete,
+            );
+            return {
+              'success': ok,
+              'code': code,
+              'state': _buildOfflineTranslationsStatePayload(),
+            };
+          },
+        );
+        controller.addJavaScriptHandler(
+          handlerName: 'updateTranslationLanguage',
+          callback: (args) async {
+            String code = '';
+            String? label;
             if (args.isNotEmpty && args.first is Map) {
               final map = args.first as Map;
               code = (map['code'] ?? '').toString().trim().toLowerCase();
@@ -463,8 +613,51 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
             if (code.isEmpty) {
               return {'success': false};
             }
-            final ok = await _handleLanguageDownloadRequest(code, label);
-            return {'success': ok, 'code': code};
+            final ok = await _handleLanguageDownloadRequest(
+              code,
+              label,
+              isUpdate: true,
+            );
+            return {
+              'success': ok,
+              'code': code,
+              'state': _buildOfflineTranslationsStatePayload(),
+            };
+          },
+        );
+        controller.addJavaScriptHandler(
+          handlerName: 'deleteTranslationLanguage',
+          callback: (args) async {
+            String code = '';
+            if (args.isNotEmpty && args.first is Map) {
+              code = (args.first['code'] ?? '').toString().trim().toLowerCase();
+            } else if (args.isNotEmpty) {
+              code = args.first.toString().trim().toLowerCase();
+            }
+            if (code.isEmpty) {
+              return {'success': false};
+            }
+            final ok = await _handleLanguageDeleteRequest(code);
+            return {
+              'success': ok,
+              'code': code,
+              'state': _buildOfflineTranslationsStatePayload(),
+            };
+          },
+        );
+        controller.addJavaScriptHandler(
+          handlerName: 'getOfflineTranslationsState',
+          callback: (_) async => _buildOfflineTranslationsStatePayload(),
+        );
+        controller.addJavaScriptHandler(
+          handlerName: 'checkTranslationUpdates',
+          callback: (_) async {
+            await ref
+                .read(downloadControllerProvider.notifier)
+                .checkForDatabaseUpdates();
+            final payload = _buildOfflineTranslationsStatePayload();
+            _notifyOfflineLangStateChanged();
+            return payload;
           },
         );
         controller.addJavaScriptHandler(
@@ -506,8 +699,16 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
 class LanguageDownloadDialog extends ConsumerStatefulWidget {
   final String langCode;
   final String? label;
+  final bool isUpdate;
+  final bool enableOnComplete;
 
-  const LanguageDownloadDialog({super.key, required this.langCode, this.label});
+  const LanguageDownloadDialog({
+    super.key,
+    required this.langCode,
+    this.label,
+    this.isUpdate = false,
+    this.enableOnComplete = true,
+  });
 
   @override
   ConsumerState<LanguageDownloadDialog> createState() =>
@@ -527,9 +728,10 @@ class _LanguageDownloadDialogState
       _running = true;
       _error = null;
     });
-    final ok = await ref
-        .read(downloadControllerProvider.notifier)
-        .downloadAndIndexLanguage(widget.langCode);
+    final controller = ref.read(downloadControllerProvider.notifier);
+    final ok = widget.isUpdate
+        ? await controller.updateTranslationLanguage(widget.langCode)
+        : await controller.downloadAndIndexLanguage(widget.langCode);
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop(true);
@@ -542,7 +744,9 @@ class _LanguageDownloadDialogState
         _error =
             transferErr ??
             state.releaseWarning ??
-            'Failed to download or index "${widget.langCode}".';
+            (widget.isUpdate
+                ? 'Failed to update "${widget.langCode}".'
+                : 'Failed to download or index "${widget.langCode}".');
       });
     }
   }
@@ -567,7 +771,13 @@ class _LanguageDownloadDialogState
       final storageLabel = dbSize > 0 ? formatBytes(dbSize) : null;
 
       return AlertDialog(
-        title: Text('Enable $displayName'),
+        title: Text(
+          widget.isUpdate
+              ? 'Update $displayName'
+              : widget.enableOnComplete
+              ? 'Enable $displayName'
+              : 'Download $displayName',
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -688,15 +898,25 @@ class _LanguageDownloadDialogState
           ),
           FilledButton(
             onPressed: _runDownloadAndIndex,
-            child: const Text('Download & Enable'),
+            child: Text(
+              widget.isUpdate
+                  ? 'Update Now'
+                  : widget.enableOnComplete
+                  ? 'Download & Enable'
+                  : 'Download',
+            ),
           ),
         ],
       );
     }
 
-    final titleText = hasLabel
-        ? 'Downloading $displayName'
-        : 'Downloading ${normalized.toUpperCase()} Translation';
+    final titleText = widget.isUpdate
+        ? (hasLabel
+              ? 'Updating $displayName'
+              : 'Updating ${normalized.toUpperCase()} Translation')
+        : (hasLabel
+              ? 'Downloading $displayName'
+              : 'Downloading ${normalized.toUpperCase()} Translation');
 
     final statusMessage =
         _error ??
@@ -1500,6 +1720,7 @@ const String _languageMenuBridgeScript = r'''
 
   function syncModal(modal) {
     if (!modal || !loadedOnce) return;
+    if (modal.dataset && modal.dataset.tpoNativeLangMenu === '1') return;
 
     var countSpans = modal.querySelectorAll('span');
     for (var s = 0; s < countSpans.length; s++) {
@@ -1704,6 +1925,7 @@ const String _languageMenuBridgeScript = r'''
   document.addEventListener('click', async function(e) {
     var target = e.target;
     if (!target || !target.closest) return;
+    if (target.closest('[data-tpo-native-lang-menu="1"]')) return;
 
     var sentBtn = target.closest('button');
     if (sentBtn) {

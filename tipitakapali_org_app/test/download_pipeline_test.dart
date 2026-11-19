@@ -434,4 +434,110 @@ void main() {
       isNotNull,
     );
   });
+
+  test('deleteTranslationLanguage removes both translation DB and FTS index along with prefs metadata', () async {
+    SharedPreferences.setMockInitialValues({
+      'optional_asset_ids_v1': ['translation_vi', 'translation_en'],
+      'installed_asset_meta_translation_vi.db': '{"version":1,"updated":"2026-11-14"}',
+      'installed_asset_meta_fts_translation_vi.db': '{"version":1,"updated":"2026-11-14"}',
+    });
+    final tmp = await Directory.systemTemp.createTemp('tp_dl_delete_trans_');
+    addTearDown(() => tmp.delete(recursive: true));
+
+    final dbDir = Directory(p.join(tmp.path, 'dbs'))..createSync(recursive: true);
+    final viDb = File(p.join(dbDir.path, 'translation_vi.db'));
+    final viFts = File(p.join(dbDir.path, 'fts_translation_vi.db'));
+    final enDb = File(p.join(dbDir.path, 'translation_en.db'));
+    for (final path in [viDb.path, enDb.path]) {
+      final db = sqlite3.open(path);
+      try {
+        db.execute('CREATE TABLE paragraph_translations (id INTEGER PRIMARY KEY, text TEXT);');
+        db.execute("INSERT INTO paragraph_translations VALUES (1, 'test');");
+      } finally {
+        db.close();
+      }
+    }
+    {
+      final ftsDb = sqlite3.open(viFts.path);
+      try {
+        ftsDb.execute('CREATE TABLE paragraphs_fts (text TEXT);');
+        ftsDb.execute("INSERT INTO paragraphs_fts VALUES ('test');");
+      } finally {
+        ftsDb.close();
+      }
+    }
+
+    final manifestJson = jsonEncode({
+      'version': 1,
+      'releaseRepo': 'tipitakapali/tipitakapali.org',
+      'releaseTag': 'db',
+      'core': <String, dynamic>{},
+      'dictionaries': <String, dynamic>{},
+      'languages': {
+        'vi': {
+          'code': 'vi',
+          'name': 'Vietnamese',
+          'nativeName': 'Tiếng Việt',
+          'translationDb': {
+            'id': 'translation_vi',
+            'filename': 'translation_vi.db',
+            'assetName': 'translation_vi.db.zip',
+            'title': 'Vietnamese',
+            'category': 'translation',
+            'compulsory': false,
+            'version': 1,
+            'dbSize': 4,
+            'size': 4,
+          },
+          'ftsDb': {
+            'id': 'fts_translation_vi',
+            'filename': 'fts_translation_vi.db',
+            'assetName': 'fts_translation_vi.db.zip',
+            'title': 'Vietnamese FTS',
+            'category': 'fts',
+            'compulsory': false,
+            'version': 1,
+            'dbSize': 4,
+            'size': 4,
+          },
+        },
+      },
+    });
+
+    final container = ProviderContainer(
+      overrides: [
+        dbStorageServiceProvider.overrideWithValue(
+          DbStorageService(overrideDirectory: dbDir),
+        ),
+        gitHubReleaseServiceProvider.overrideWithValue(
+          GitHubReleaseService(
+            client: MockClient((_) async => http.Response('{}', 404)),
+            assetLoader: (_) async => manifestJson,
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(downloadControllerProvider.notifier);
+    await controller.initialize(fetchRemote: false);
+    expect(container.read(downloadControllerProvider).installedDbs.containsKey('translation_vi.db'), isTrue);
+    expect(container.read(downloadControllerProvider).installedDbs.containsKey('fts_translation_vi.db'), isTrue);
+
+    final deleted = await controller.deleteTranslationLanguage('vi');
+    expect(deleted, isTrue);
+    expect(viDb.existsSync(), isFalse);
+    expect(viFts.existsSync(), isFalse);
+    expect(enDb.existsSync(), isTrue);
+
+    final stateAfter = container.read(downloadControllerProvider);
+    expect(stateAfter.installedDbs.containsKey('translation_vi.db'), isFalse);
+    expect(stateAfter.installedDbs.containsKey('fts_translation_vi.db'), isFalse);
+    expect(stateAfter.selectedOptionalIds.contains('translation_vi'), isFalse);
+    expect(stateAfter.selectedOptionalIds.contains('translation_en'), isTrue);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('installed_asset_meta_translation_vi.db'), isNull);
+    expect(prefs.getString('installed_asset_meta_fts_translation_vi.db'), isNull);
+  });
 }

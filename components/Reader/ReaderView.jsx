@@ -75,6 +75,109 @@ export function isPointInsideRangeRects(range, clientX, clientY, tolerance = 4) 
   );
 }
 
+function resolveReaderTextNodeAndOffset(container, rawOffset, clientX, clientY) {
+  if (!container) return null;
+  if (container.nodeType === 3 /* Node.TEXT_NODE */) {
+    return { node: container, offset: rawOffset || 0 };
+  }
+  if (container.nodeType !== 1 /* Node.ELEMENT_NODE */ || typeof document === 'undefined') {
+    return null;
+  }
+
+  const children = container.childNodes || [];
+  const candidates = [];
+  if (children[rawOffset]) candidates.push(children[rawOffset]);
+  if (rawOffset > 0 && children[rawOffset - 1]) candidates.push(children[rawOffset - 1]);
+
+  const seen = new Set();
+  const textNodes = [];
+  const collectText = (root) => {
+    if (!root) return;
+    if (root.nodeType === 3) {
+      if (!seen.has(root) && (root.textContent || '').trim()) {
+        seen.add(root);
+        textNodes.push(root);
+      }
+      return;
+    }
+    if (typeof document.createTreeWalker === 'function') {
+      const walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */, null, false);
+      let n;
+      while ((n = walker.nextNode())) {
+        if (!seen.has(n) && (n.textContent || '').trim()) {
+          seen.add(n);
+          textNodes.push(n);
+        }
+      }
+    }
+  };
+
+  for (const cand of candidates) collectText(cand);
+  collectText(container);
+  if (textNodes.length === 0) return null;
+
+  if (typeof document.createRange === 'function' && typeof clientX === 'number' && typeof clientY === 'number') {
+    const probe = document.createRange();
+    for (const tol of [0, 4]) {
+      let fallbackHit = null;
+      for (const tn of textNodes) {
+        const r = document.createRange();
+        r.selectNodeContents(tn);
+        if (isPointInsideRangeRects(r, clientX, clientY, tol)) {
+          const rawText = tn.textContent || '';
+          const len = rawText.length;
+          let bestIdx = 0;
+          let bestDist = Infinity;
+          let matchedChar = false;
+          for (let i = 0; i < len; i++) {
+            probe.setStart(tn, i);
+            probe.setEnd(tn, i + 1);
+            const rects = probe.getClientRects?.();
+            if (!rects) continue;
+            for (let j = 0; j < rects.length; j++) {
+              const rect = rects[j];
+              if (rect.width === 0 && rect.height === 0) continue;
+              if (
+                clientX >= rect.left - tol &&
+                clientX <= rect.right + tol &&
+                clientY >= rect.top - tol &&
+                clientY <= rect.bottom + tol
+              ) {
+                if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                  bestIdx = i;
+                  matchedChar = true;
+                  bestDist = 0;
+                  break;
+                }
+                const d = Math.hypot(clientX - (rect.left + rect.right) / 2, clientY - (rect.top + rect.bottom) / 2);
+                if (d < bestDist) {
+                  bestDist = d;
+                  bestIdx = i;
+                  matchedChar = true;
+                }
+              }
+            }
+            if (bestDist === 0 && matchedChar) break;
+          }
+          const ch = rawText[bestIdx] || '';
+          const prevCh = bestIdx > 0 ? rawText[bestIdx - 1] || '' : '';
+          if (/[\p{L}\p{M}]/u.test(ch) || /[\p{L}\p{M}]/u.test(prevCh)) {
+            return { node: tn, offset: bestIdx };
+          }
+          if (!fallbackHit) {
+            fallbackHit = { node: tn, offset: bestIdx };
+          }
+        }
+      }
+      if (fallbackHit && tol === 4) {
+        return fallbackHit;
+      }
+    }
+  }
+
+  return { node: textNodes[0], offset: 0 };
+}
+
 export function detectLiveSectionTitleFromElements(headings, thresholdY = 120) {
   if (!headings || typeof headings[Symbol.iterator] !== 'function') return null;
   const extractCleanHeadingText = (el) => {
@@ -4773,24 +4876,9 @@ const ReaderPane = memo(function ReaderPane({
         }
       }
 
-      let node = range?.startContainer;
-      let offset = range?.startOffset || 0;
-      if (node && node.nodeType === Node.ELEMENT_NODE) {
-        const child = node.childNodes[offset] || node.lastChild;
-        if (child) {
-          if (child.nodeType === Node.TEXT_NODE) {
-            node = child;
-            offset = 0;
-          } else {
-            const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
-            const textChild = walker.nextNode();
-            if (textChild) {
-              node = textChild;
-              offset = 0;
-            }
-          }
-        }
-      }
+      const resolvedSingle = resolveReaderTextNodeAndOffset(range?.startContainer, range?.startOffset || 0, e.clientX, e.clientY);
+      let node = resolvedSingle?.node;
+      let offset = resolvedSingle?.offset || 0;
 
       if (node && node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
@@ -4962,24 +5050,9 @@ const ReaderPane = memo(function ReaderPane({
         }
       }
 
-      let node = range?.startContainer;
-      let offset = range?.startOffset || 0;
-      if (node && node.nodeType === Node.ELEMENT_NODE) {
-        const child = node.childNodes[offset] || node.lastChild;
-        if (child) {
-          if (child.nodeType === Node.TEXT_NODE) {
-            node = child;
-            offset = 0;
-          } else {
-            const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT, null, false);
-            const textChild = walker.nextNode();
-            if (textChild) {
-              node = textChild;
-              offset = 0;
-            }
-          }
-        }
-      }
+      const resolvedSingle = resolveReaderTextNodeAndOffset(range?.startContainer, range?.startOffset || 0, e.clientX, e.clientY);
+      let node = resolvedSingle?.node;
+      let offset = resolvedSingle?.offset || 0;
 
       if (node && node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
@@ -5318,6 +5391,7 @@ const ReaderPane = memo(function ReaderPane({
         } ${isContentHeaderHidden ? 'hidden-scroll' : ''}`}
       >
         <div
+          data-sidebar-trigger="true"
           className="breadcrumbs truncate text-xs flex-1 flex items-center gap-1.5 cursor-pointer min-w-0"
           onClick={handleBreadcrumbClick}
           title={
