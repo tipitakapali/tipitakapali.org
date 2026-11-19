@@ -2,15 +2,19 @@
 
 const dictEngine = require('./dictEngine');
 
-// Stop words to exclude from naive token matching
+// Stop words to exclude from naive token matching & catalog title matching
 const QUERY_STOP_WORDS = new Set([
   'explain', 'what', 'which', 'where', 'when', 'who', 'how', 'why',
   'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
   'by', 'from', 'about', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
   'have', 'has', 'had', 'do', 'does', 'did', 'their', 'there', 'these', 'those',
   'this', 'that', 'they', 'them', 'canonical', 'definitions', 'definition',
-  'sutta', 'suttas', 'relevant', 'quote', 'passages', 'passage', 'text', 'please',
+  'sutta', 'suttas', 'discourse', 'discourses', 'relevant', 'quote', 'passages', 'passage', 'text', 'please',
   'tell', 'me', 'give', 'list', 'show', 'explore', 'between', 'exact',
+  'buddha', 'dhamma', 'sangha', 'saṅgha', 'teach', 'teaches', 'teaching', 'teachings',
+  'say', 'says', 'said', 'talk', 'talks', 'overcome', 'overcoming', 'practice',
+  'pali', 'pāḷi', 'canon', 'tipitaka', 'tipiṭaka', 'buddhism', 'buddhist', 'theravada', 'theravāda',
+  'rule', 'rules', 'monk', 'monks', 'bhikkhu', 'bhikkhus', 'concept', 'concepts', 'meaning', 'mean',
   'tìm', 'giúp', 'tôi', 'bài', 'kinh', 'có', 'tên', 'giống', 'như', 'hay', 'cho', 'biết',
   'số', 'hiệu', 'và', 'tóm', 'tắt', 'nội', 'dung', 'chính', 'với', 'trích', 'dẫn',
   'về', 'điều', 'gì', 'ý', 'nghĩa', 'dạy', 'những', 'của', 'đức', 'phật',
@@ -25,16 +29,383 @@ function extractPaliStem(word) {
   return clean.replace(/[aāeo]$/i, '');
 }
 
-// Detect language of inquiry
+// Detect language of inquiry (avoids misclassifying French/Spanish/Portuguese/German as Vietnamese)
 function detectLanguage(text) {
   if (!text) return 'en';
   if (/[\u1000-\u109F]/.test(text)) return 'my';
-  if (/[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i.test(text)) return 'vi';
-  if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
-  if (/[\u0900-\u097F]/.test(text)) return 'hi';
+  if (/[\u0D80-\u0DFF]/.test(text)) return 'si';
   if (/[\u0E00-\u0E7F]/.test(text)) return 'th';
-  if (/[āīūṅñṭḍṇḷṃ]/i.test(text)) return 'pi';
+  if (/[\u0E80-\u0EFF]/.test(text)) return 'lo';
+  if (/[\u1780-\u17FF]/.test(text)) return 'km';
+  if (/[\u0B80-\u0BFF]/.test(text)) return 'ta';
+  if (/[\u0980-\u09FF]/.test(text)) return 'be';
+  if (/[\u0900-\u097F]/.test(text)) return 'hi';
+  if (/[\u3040-\u30FF]/.test(text)) return 'ja';
+  if (/[\uAC00-\uD7AF]/.test(text)) return 'ko';
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'zh';
+  if (/[\u0400-\u04FF]/.test(text)) return 'ru';
+  // Vietnamese-exclusive diacritics (ă, ơ, ư, đ, stacked vowel+tone, hook-above, dot-below —
+  // intentionally excluding bare â/ê/ô which are shared with French and Portuguese)
+  if (
+    /[ăằắẳẵặầấẩẫậềếểễệồốổỗộơờớởỡợưừứửữựđảạẻẹẽỉịỏọủụỳỷỹỵ]/i.test(text) ||
+    /\b(không|của|những|người|như thế nào|là gì|đức phật|bài kinh|tam tạng|sân hận|tâm từ|vô thường|vô ngã)\b/i.test(text)
+  ) {
+    return 'vi';
+  }
+  // European Latin-script languages (before falling back to Pāḷi/English)
+  if (/[¿¡ñ]/i.test(text) || /\b(qué|cómo|enseña|sobre|sufrimiento|compasión|buda|cuál|cuáles)\b/i.test(text)) return 'es';
+  if (/\b(qu['’]est-ce|comment|enseigne|bouddha|souffrance|pleine conscience|équanimité|bienveillance|quel|quelle)\b/i.test(text)) return 'fr';
+  if (/[äöüß]/i.test(text) || /\b(was|wie|lehrt|über|achtsamkeit|weisheit|leiden|geduld|mitgefühl)\b/i.test(text)) return 'de';
+  if (/[ãõç]/i.test(text) || /\b(o que é|como|ensina|sofrimento|compaixão|atenção plena|cânone)\b/i.test(text)) return 'pt';
+  if (/[ěščřžů]/i.test(text)) return 'cs';
+  if (/\b(apakah|bagaimana|ajaran|penderitaan|kebijaksanaan|perhatian penuh)\b/i.test(text)) return 'id';
+  if (/[āīūṅñṭḍṇḷṃ]/i.test(text) && !/\b(the|what|how|explain|between|does|about|where|which|define|meaning)\b/i.test(text)) return 'pi';
   return 'en';
+}
+
+// Reusable concept-group templates for common Theravāda Buddhist research themes
+const CONCEPT_GROUP_LEXICON = [
+  {
+    patterns: [/\banger\b/i, /\bill[\s-]?will\b/i, /\bhatred\b/i, /\bresentment\b/i, /\baversion\b/i, /\bkodha\b/i, /\bvy[aā]p[aā]da\b/i, /\bdosa\b/i, /\b[aā]gh[aā]ta\b/i, /\bpa[ṭt]igha\b/i, /sân\s*hận/i, /giận\s*dữ/i, /oán\s*hận/i, /ဒေါသ/i],
+    group: {
+      concept: 'Anger & Ill-will',
+      pali_terms: ['kodha', 'vyāpāda', 'dosa', 'āghāta', 'paṭigha', 'vera'],
+      pali_stems: ['kodh*', 'vyāpād*', 'dos*', 'āghāt*', 'paṭigh*', 'ver*'],
+      english_keywords: ['anger', 'ill-will', 'hatred', 'resentment', 'aversion', 'hostility'],
+      local_keywords: ['sân hận', 'phẫn nộ', 'oán hận', 'ဒေါသ'],
+    },
+  },
+  {
+    patterns: [/loving[\s-]?kindness/i, /\bgoodwill\b/i, /\bbenevolence\b/i, /\bmett[aā]\b/i, /\bavera\b/i, /\bakodha\b/i, /\badosa\b/i, /tâm\s*từ/i, /từ\s*bi/i, /lòng\s*từ/i, /မေတ္တာ/i],
+    group: {
+      concept: 'Loving-kindness (Mettā)',
+      pali_terms: ['mettā', 'avera', 'abyāpajja', 'adosa', 'brahmavihāra'],
+      pali_stems: ['mett*', 'aver*', 'abyāpajj*', 'ados*', 'brahmavihār*'],
+      english_keywords: ['loving-kindness', 'goodwill', 'friendliness', 'non-hatred', 'benevolence'],
+      local_keywords: ['tâm từ', 'từ ái', 'từ bi', 'မေတ္တာ'],
+    },
+  },
+  {
+    patterns: [/\bcompassion\b/i, /\bkaru[ṇn][aā]\b/i, /\bsympath/i, /bi\s*mẫn/i, /tâm\s*bi/i, /ကရုဏာ/i],
+    group: {
+      concept: 'Compassion (Karuṇā)',
+      pali_terms: ['karuṇā', 'anukampā', 'avihiṃsā', 'brahmavihāra'],
+      pali_stems: ['karuṇ*', 'anukamp*', 'avihiṃs*'],
+      english_keywords: ['compassion', 'pity', 'sympathy', 'non-harming'],
+      local_keywords: ['bi mẫn', 'lòng bi', 'tâm bi', 'ကရုဏာ'],
+    },
+  },
+  {
+    patterns: [/\bmindfulness\b/i, /\bawareness\b/i, /\bsati\b/i, /\bsatipa[ṭt][ṭt]h[aā]na\b/i, /\bsampaja[ñn][ñn]a\b/i, /chánh\s*niệm/i, /niệm\s*xứ/i, /tỉnh\s*giác/i, /သတိ/i],
+    group: {
+      concept: 'Mindfulness (Sati)',
+      pali_terms: ['sati', 'satipaṭṭhāna', 'sampajañña', 'anupassanā', 'sammāsati'],
+      pali_stems: ['sati*', 'satipaṭṭhān*', 'sampajaññ*', 'anupassan*'],
+      english_keywords: ['mindfulness', 'awareness', 'clear comprehension', 'contemplation'],
+      local_keywords: ['chánh niệm', 'niệm xứ', 'tỉnh giác', 'သတိ'],
+    },
+  },
+  {
+    patterns: [/\bbreath/i, /\b[aā]n[aā]p[aā]na/i, /hơi\s*thở/i, /nhập\s*tức/i, /အာနာပါန/i],
+    group: {
+      concept: 'Breathing (Ānāpāna)',
+      pali_terms: ['ānāpānassati', 'assāsa', 'passāsa', 'kāyasaṅkhāra'],
+      pali_stems: ['ānāpān*', 'assās*', 'passās*', 'kāyasaṅkhār*'],
+      english_keywords: ['breathing', 'in-breath', 'out-breath', 'breath meditation'],
+      local_keywords: ['hơi thở', 'thở vào', 'thở ra', 'အာနာပါန'],
+    },
+  },
+  {
+    patterns: [/\bconcentration\b/i, /\bjh[aā]na\b/i, /\bsam[aā]dhi\b/i, /\babsorption\b/i, /thiền\s*định/i, /chánh\s*định/i, /tâm\s*định/i, /định\s*tâm/i, /သမာဓိ/i, /ဈာန်/i],
+    group: {
+      concept: 'Concentration & Jhāna',
+      pali_terms: ['samādhi', 'jhāna', 'ekaggatā', 'samatha', 'sammāsamādhi'],
+      pali_stems: ['samādh*', 'jhān*', 'ekaggat*', 'samath*'],
+      english_keywords: ['concentration', 'jhana', 'absorption', 'tranquility', 'unification'],
+      local_keywords: ['thiền định', 'chánh định', 'định tâm', 'သမာဓိ', 'ဈာန်'],
+    },
+  },
+  {
+    patterns: [/\bwisdom\b/i, /\binsight\b/i, /\bpa[ñn][ñn][aā]\b/i, /\bvipassan[aā]\b/i, /\b[ñn][aā][ṇn]a\b/i, /trí\s*tuệ/i, /tuệ\s*giác/i, /minh\s*sát/i, /ပညာ/i, /ဝိပဿနာ/i],
+    group: {
+      concept: 'Wisdom & Insight (Paññā)',
+      pali_terms: ['paññā', 'vipassanā', 'ñāṇa', 'yathābhūtañāṇadassana', 'sammādiṭṭhi'],
+      pali_stems: ['paññ*', 'vipassan*', 'ñāṇ*', 'sammādiṭṭh*'],
+      english_keywords: ['wisdom', 'insight', 'understanding', 'knowledge and vision', 'right view'],
+      local_keywords: ['trí tuệ', 'tuệ giác', 'minh sát', 'ပညာ', 'ဝိပဿနာ'],
+    },
+  },
+  {
+    patterns: [/\bimpermanen/i, /\banicc/i, /vô\s*thường/i, /အနိစ္စ/i],
+    group: {
+      concept: 'Impermanence (Anicca)',
+      pali_terms: ['anicca', 'aniccatā', 'vayadhamma', 'khayadhamma', 'vipariṇāmadhamma'],
+      pali_stems: ['anicc*', 'vayadhamm*', 'vipariṇām*'],
+      english_keywords: ['impermanence', 'impermanent', 'change', 'decay', 'passing away'],
+      local_keywords: ['vô thường', 'biến hoại', 'အနိစ္စ'],
+    },
+  },
+  {
+    patterns: [/\bsuffering\b/i, /\bstress\b/i, /\bunsatisfactor/i, /\bdukkh/i, /khổ\s*đế/i, /khổ\s*đau/i, /đau\s*khổ/i, /khổ\s*não/i, /sufrimiento/i, /souffrance/i, /sofrimento/i, /ဒုက္ခ/i],
+    group: {
+      concept: 'Suffering (Dukkha)',
+      pali_terms: ['dukkha', 'dukkhasacca', 'domanassa', 'upāyāsa', 'saṅkhāradukkha'],
+      pali_stems: ['dukkh*', 'domanass*', 'upāyās*'],
+      english_keywords: ['suffering', 'stress', 'pain', 'unsatisfactoriness', 'anguish'],
+      local_keywords: ['khổ đế', 'khổ đau', 'đau khổ', 'ဒုက္ခ'],
+    },
+  },
+  {
+    patterns: [/\bnon[\s-]?self\b/i, /\bnot[\s-]?self\b/i, /\banatt/i, /\bselfless/i, /vô\s*ngã/i, /အနတ္တ/i],
+    group: {
+      concept: 'Non-Self (Anattā)',
+      pali_terms: ['anattā', 'anattalakkhaṇa', 'suññata', 'attānudiṭṭhi', 'sakkāyadiṭṭhi'],
+      pali_stems: ['anatt*', 'suññat*', 'sakkāyadiṭṭh*'],
+      english_keywords: ['non-self', 'not-self', 'selfless', 'emptiness', 'identity view'],
+      local_keywords: ['vô ngã', 'không phải tự ngã', 'အနတ္တ'],
+    },
+  },
+  {
+    patterns: [/\bkamma\b/i, /\bkarma\b/i, /\bvolition/i, /\bintention\b/i, /\bcetan[aā]\b/i, /\bvip[aā]ka\b/i, /nghiệp\s*báo/i, /tạo\s*nghiệp/i, /tác\s*ý/i, /ကံ/i],
+    group: {
+      concept: 'Kamma & Intention',
+      pali_terms: ['kamma', 'cetanā', 'kammavipāka', 'kusala', 'akusala'],
+      pali_stems: ['kamm*', 'cetan*', 'vipāk*'],
+      english_keywords: ['kamma', 'karma', 'action', 'volition', 'intention', 'result'],
+      local_keywords: ['nghiệp', 'tác ý', 'quả báo', 'ကံ'],
+    },
+  },
+  {
+    patterns: [/\bnibb[aā]na\b/i, /\bnirvana\b/i, /\bcessation\b/i, /\bliberation\b/i, /\bvimutti\b/i, /niết\s*bàn/i, /giải\s*thoát/i, /နိဗ္ဗာန်/i],
+    group: {
+      concept: 'Nibbāna & Liberation',
+      pali_terms: ['nibbāna', 'nirodha', 'vimutti', 'amata', 'asaṅkhata', 'virāga'],
+      pali_stems: ['nibbān*', 'nirodh*', 'vimutt*', 'asaṅkhat*', 'virāg*'],
+      english_keywords: ['nibbana', 'nirvana', 'cessation', 'liberation', 'unconditioned', 'release'],
+      local_keywords: ['niết bàn', 'giải thoát', 'đoạn diệt', 'နိဗ္ဗာန်'],
+    },
+  },
+  {
+    patterns: [/\bcraving\b/i, /\bdesire\b/i, /\bclinging\b/i, /\battachment\b/i, /\bta[ṇn]h[aā]\b/i, /\bup[aā]d[aā]na\b/i, /\blobha\b/i, /tham\s*ái/i, /ái\s*dục/i, /chấp\s*thủ/i, /တဏှာ/i],
+    group: {
+      concept: 'Craving & Clinging',
+      pali_terms: ['taṇhā', 'upādāna', 'lobha', 'rāga', 'chandarāga'],
+      pali_stems: ['taṇh*', 'upādān*', 'lobh*', 'rāg*'],
+      english_keywords: ['craving', 'clinging', 'attachment', 'greed', 'lust', 'desire'],
+      local_keywords: ['tham ái', 'chấp thủ', 'ái dục', 'တဏှာ'],
+    },
+  },
+  {
+    patterns: [/\bvirtue\b/i, /\bmoral/i, /\bethic/i, /\bprecept/i, /\bs[iī]la\b/i, /\bvinaya\b/i, /\bp[aā]timokkha\b/i, /giới\s*luật/i, /trì\s*giới/i, /ngũ\s*giới/i, /giới\s*hạnh/i, /သီလ/i, /ဝိနည်း/i],
+    group: {
+      concept: 'Virtue & Monastic Discipline (Sīla / Vinaya)',
+      pali_terms: ['sīla', 'vinaya', 'sikkhāpada', 'pātimokkha', 'saṃvara'],
+      pali_stems: ['sīl*', 'vinay*', 'sikkhāpad*', 'pātimokkh*'],
+      english_keywords: ['virtue', 'morality', 'precept', 'discipline', 'ethics', 'restraint'],
+      local_keywords: ['giới luật', 'trì giới', 'giới hạnh', 'သီလ', 'ဝိနည်း'],
+    },
+  },
+  {
+    patterns: [/\bdependent\s*origination\b/i, /\bpa[ṭt]iccasamupp[aā]d/i, /\bconditioned\b/i, /\bsa[ṅn]kh[aā]r/i, /duyên\s*khởi/i, /hành\s*uẩn/i, /ပဋိစ္စသမုပ္ပါဒ်/i, /သင်္ခါရ/i],
+    group: {
+      concept: 'Dependent Origination & Formations',
+      pali_terms: ['paṭiccasamuppāda', 'saṅkhāra', 'avijjā', 'paccaya', 'idappaccayatā'],
+      pali_stems: ['paṭiccasamuppād*', 'saṅkhār*', 'avijj*', 'paccay*'],
+      english_keywords: ['dependent origination', 'conditioned', 'formations', 'volitional formations', 'conditionality'],
+      local_keywords: ['duyên khởi', 'hành uẩn', 'vô minh', 'ပဋိစ္စသမုပ္ပါဒ်'],
+    },
+  },
+  {
+    patterns: [/\bfive\s*aggregates\b/i, /\bkhandha\b/i, /\baggregates\b/i, /ngũ\s*uẩn/i, /ခန္ဓာ/i],
+    group: {
+      concept: 'Five Aggregates (Pañcakkhandha)',
+      pali_terms: ['khandha', 'upādānakkhandha', 'rūpa', 'vedanā', 'saññā', 'saṅkhāra', 'viññāṇa'],
+      pali_stems: ['khandh*', 'upādānakkhandh*', 'vedan*', 'viññāṇ*'],
+      english_keywords: ['aggregates', 'five aggregates', 'clinging aggregates', 'form', 'feeling', 'perception', 'consciousness'],
+      local_keywords: ['ngũ uẩn', 'thủ uẩn', 'sắc thọ tưởng hành thức', 'ခန္ဓာ'],
+    },
+  },
+  {
+    patterns: [/\bhindrance/i, /\bn[iī]vara[ṇn]a\b/i, /\bsloth\b/i, /\brestlessness\b/i, /\bdoubt\b/i, /triền\s*cái/i, /năm\s*triền\s*cái/i, /နီဝရဏ/i],
+    group: {
+      concept: 'Five Hindrances (Nīvaraṇa)',
+      pali_terms: ['nīvaraṇa', 'kāmacchanda', 'vyāpāda', 'thinamiddha', 'uddhaccakukkucca', 'vicikicchā'],
+      pali_stems: ['nīvaraṇ*', 'kāmacchand*', 'thinamiddh*', 'uddhacc*', 'vicikicch*'],
+      english_keywords: ['hindrances', 'sensual desire', 'sloth and torpor', 'restlessness', 'doubt'],
+      local_keywords: ['triền cái', 'hôn trầm', 'trạo cử', 'hoài nghi', 'နီဝရဏ'],
+    },
+  },
+  {
+    patterns: [/\bawakening\s*factor/i, /\benlightenment\s*factor/i, /\bbojjha[ṅn]ga\b/i, /giác\s*chi/i, /thất\s*giác\s*chi/i, /ဗောဇ္ဈင်/i],
+    group: {
+      concept: 'Seven Factors of Awakening (Bojjhaṅga)',
+      pali_terms: ['bojjhaṅga', 'satisambojjhaṅga', 'dhammavicaya', 'vīriya', 'pīti', 'passaddhi', 'upekkhā'],
+      pali_stems: ['bojjhaṅg*', 'dhammavicay*', 'vīriy*', 'passaddh*', 'upekkh*'],
+      english_keywords: ['awakening factors', 'enlightenment factors', 'investigation', 'energy', 'rapture', 'tranquility', 'equanimity'],
+      local_keywords: ['giác chi', 'trạch pháp', 'khinh an', 'xả', 'ဗောဇ္ဈင်'],
+    },
+  },
+  {
+    patterns: [/\bgenerosit/i, /\bgiving\b/i, /\bd[aā]na\b/i, /\bcharity\b/i, /bố\s*thí/i, /ဒါန/i],
+    group: {
+      concept: 'Generosity (Dāna)',
+      pali_terms: ['dāna', 'cāga', 'pariccāga', 'dakkhiṇā', 'puñña'],
+      pali_stems: ['dān*', 'cāg*', 'pariccāg*', 'puññ*'],
+      english_keywords: ['generosity', 'giving', 'charity', 'offering', 'merit'],
+      local_keywords: ['bố thí', 'phước đức', 'cúng dường', 'ဒါန'],
+    },
+  },
+  {
+    patterns: [/\brebirth\b/i, /\bdeath\b/i, /\bdying\b/i, /\bmaran/i, /\bmara[ṇn]a\b/i, /\bcuti\b/i, /\bpa[ṭt]isandhi\b/i, /\bbhava\b/i, /tái\s*sinh/i, /sự\s*chết/i, /sinh\s*tử/i, /သေခြင်း/i],
+    group: {
+      concept: 'Death & Rebirth',
+      pali_terms: ['maraṇa', 'punabbhava', 'jāti', 'upapatti', 'cuti', 'paṭisandhi'],
+      pali_stems: ['maraṇ*', 'punabbhav*', 'upapatt*', 'paṭisandh*'],
+      english_keywords: ['death', 'rebirth', 'dying', 're-becoming', 'passing away'],
+      local_keywords: ['tái sinh', 'sinh tử', 'chết', 'သေခြင်း'],
+    },
+  },
+  {
+    patterns: [/\bdefine\b/i, /\bdefinition\b/i, /\bmeaning\s+of\b/i, /\bwhat\s+is\b/i, /\betymolog/i, /định\s*nghĩa/i, /là\s*gì/i, /nghĩa\s*là/i, /qu['’]est-ce/i, /qué\s+es/i, /o\s+que\s+é/i, /အဓိပ္ပာယ်/i],
+    isDefinitionIntent: true,
+  },
+];
+
+function extractHeuristicConceptGroups(userQuery, detectedTerms = [], matchedKb = null) {
+  const groups = [];
+  const seenConcepts = new Set();
+
+  for (const entry of CONCEPT_GROUP_LEXICON) {
+    if (entry.isDefinitionIntent) continue;
+    if (entry.patterns.some((pat) => pat.test(userQuery))) {
+      if (!seenConcepts.has(entry.group.concept)) {
+        seenConcepts.add(entry.group.concept);
+        groups.push({ ...entry.group });
+      }
+      if (groups.length >= 4) break;
+    }
+  }
+
+  if (matchedKb && groups.length === 0) {
+    const kbName = (matchedKb.target_suttas && matchedKb.target_suttas[0]) || 'Primary Canonical Topic';
+    if (!seenConcepts.has(kbName)) {
+      const paliTerms = (matchedKb.pali_terms || []).slice(0, 6);
+      const paliStems = Array.from(new Set(
+        paliTerms
+          .flatMap((t) => String(t).split(/\s+/))
+          .map((tok) => extractPaliStem(tok))
+          .filter((s) => s.length >= 3)
+          .map((s) => `${s}*`)
+      )).slice(0, 8);
+      const engFallback = String(userQuery || '')
+        .toLowerCase()
+        .replace(/[^a-z\s-]/gi, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 4 && !QUERY_STOP_WORDS.has(w));
+      groups.push({
+        concept: kbName,
+        pali_terms: paliTerms,
+        pali_stems: paliStems,
+        english_keywords: Array.from(new Set([kbName.replace(/\s*\(.*?\)/, '').trim(), ...engFallback])).slice(0, 6),
+      });
+    }
+  }
+
+  if (groups.length === 0) {
+    const engTokens = String(userQuery || '')
+      .toLowerCase()
+      .replace(/[^a-zāīūṅñṭḍṇḷṃ\s-]/gi, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !QUERY_STOP_WORDS.has(w));
+    const uniqueEng = Array.from(new Set(engTokens)).slice(0, 6);
+    const paliTerms = Array.from(new Set(detectedTerms)).slice(0, 6);
+    const paliStems = Array.from(new Set(paliTerms.map((t) => `${extractPaliStem(t)}*`).filter((s) => s.length >= 4)));
+    if (paliTerms.length > 0 || uniqueEng.length > 0) {
+      groups.push({
+        concept: paliTerms[0] || uniqueEng.slice(0, 2).join(' ') || 'Core Topic',
+        pali_terms: paliTerms,
+        pali_stems: paliStems,
+        english_keywords: uniqueEng.filter((w) => !paliTerms.includes(w)).slice(0, 5),
+      });
+    }
+  }
+
+  return groups.slice(0, 4);
+}
+
+function normalizeConceptGroups(rawGroups, fallbackTerms = [], fallbackStems = []) {
+  const normalized = [];
+  const list = Array.isArray(rawGroups) ? rawGroups : [];
+  for (const g of list) {
+    if (!g) continue;
+    if (typeof g === 'string') {
+      const clean = g.trim();
+      if (!clean) continue;
+      normalized.push({
+        concept: clean,
+        pali_terms: [clean],
+        pali_stems: [`${extractPaliStem(clean)}*`],
+        english_keywords: [clean],
+      });
+      continue;
+    }
+    const concept = String(g.concept || g.name || g.label || g.topic || '').trim();
+    const paliTerms = Array.from(new Set(
+      (Array.isArray(g.pali_terms) ? g.pali_terms
+        : Array.isArray(g.pali_keywords) ? g.pali_keywords
+        : Array.isArray(g.pali) ? g.pali
+        : Array.isArray(g.terms) ? g.terms : [])
+        .map((x) => String(x || '').trim())
+        .filter(Boolean)
+    )).slice(0, 8);
+    let paliStems = Array.from(new Set(
+      (Array.isArray(g.pali_stems) ? g.pali_stems : [])
+        .map((x) => String(x || '').trim())
+        .filter(Boolean)
+    )).slice(0, 8);
+    if (paliStems.length === 0 && paliTerms.length > 0) {
+      paliStems = Array.from(new Set(
+        paliTerms
+          .map((t) => extractPaliStem(t.split(/\s+/)[0]))
+          .filter((s) => s.length >= 3)
+          .map((s) => `${s}*`)
+      )).slice(0, 8);
+    }
+    const englishKeywords = Array.from(new Set(
+      (Array.isArray(g.english_keywords) ? g.english_keywords
+        : Array.isArray(g.english_synonyms) ? g.english_synonyms
+        : Array.isArray(g.english) ? g.english
+        : Array.isArray(g.keywords) ? g.keywords : [])
+        .map((x) => String(x || '').trim())
+        .filter(Boolean)
+    )).slice(0, 8);
+    const localKeywords = Array.from(new Set(
+      (Array.isArray(g.local_keywords) ? g.local_keywords : [])
+        .map((x) => String(x || '').trim())
+        .filter(Boolean)
+    )).slice(0, 6);
+
+    if (paliTerms.length > 0 || paliStems.length > 0 || englishKeywords.length > 0 || localKeywords.length > 0) {
+      normalized.push({
+        concept: concept || paliTerms[0] || englishKeywords[0] || `Concept ${normalized.length + 1}`,
+        pali_terms: paliTerms,
+        pali_stems: paliStems,
+        english_keywords: englishKeywords,
+        ...(localKeywords.length > 0 ? { local_keywords: localKeywords } : {}),
+      });
+    }
+    if (normalized.length >= 4) break;
+  }
+
+  if (normalized.length === 0 && (fallbackTerms.length > 0 || fallbackStems.length > 0)) {
+    normalized.push({
+      concept: fallbackTerms[0] || 'Core Topic',
+      pali_terms: fallbackTerms.slice(0, 6),
+      pali_stems: fallbackStems.slice(0, 6),
+      english_keywords: [],
+    });
+  }
+  return normalized;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -226,16 +597,16 @@ function resolveCanonicalCitation(book, num, subNum, dbTipitaka) {
       endPara = 333;
     } else if (n === 12 && sub === 2) {
       suttaTitle = 'Paṭiccasamuppāda-vibhaṅga Sutta';
-      startPara = 2;
-      endPara = 15;
+      startPara = 9;
+      endPara = 22;
     } else if (n === 35 && sub === 28) {
       suttaTitle = 'Ādittapariyāya Sutta (Fire Sermon)';
-      startPara = 28;
-      endPara = 35;
+      startPara = 83;
+      endPara = 90;
     } else if (n === 45 && sub === 8) {
       suttaTitle = 'Maggavibhaṅga Sutta';
-      startPara = 8;
-      endPara = 20;
+      startPara = 46;
+      endPara = 58;
     } else if (dbTipitaka) {
       try {
         if (sub) {
@@ -277,7 +648,7 @@ function resolveCanonicalCitation(book, num, subNum, dbTipitaka) {
   // 4. Aṅguttara Nikāya (AN 1 - 11)
   if (b === 'AN' && n >= 1 && n <= 11) {
     const bookMap = {
-      1: 's0401m1.mul', 2: 's0402m1.mul', 3: 's0402m2.mul', 4: 's0402m3.mul',
+      1: 's0401m.mul', 2: 's0402m1.mul', 3: 's0402m2.mul', 4: 's0402m3.mul',
       5: 's0403m1.mul', 6: 's0403m2.mul', 7: 's0403m3.mul',
       8: 's0404m1.mul', 9: 's0404m2.mul', 10: 's0404m3.mul', 11: 's0404m4.mul'
     };
@@ -298,10 +669,10 @@ function resolveCanonicalCitation(book, num, subNum, dbTipitaka) {
       startPara = 271;
       endPara = 285;
     } else if (n === 5 && sub === 161) {
-      suttaTitle = 'Aghātapaṭivinaya Sutta';
+      suttaTitle = 'Āghātapaṭivinaya Sutta';
       chapIdx = 16;
-      startPara = 161;
-      endPara = 175;
+      startPara = 1089;
+      endPara = 1096;
     } else if (dbTipitaka && sub) {
       try {
         const sRow = dbTipitaka.prepare(`
@@ -470,9 +841,9 @@ const CANONICAL_KNOWLEDGE_BASE = [
     target_suttas: ['Maggavibhaṅga Sutta (SN 45.8)', 'Mahācattārīsaka Sutta (MN 117)'],
     pali_terms: ['ariya aṭṭhaṅgika magga', 'sammādiṭṭhi', 'sammāsaṅkappa', 'sammāvācā', 'sammākammanta', 'sammā-ājīva', 'sammāvāyāma', 'sammāsati', 'sammāsamādhi'],
     locations: { pitakas: ['sutta'], nikayas: ['sn', 'mn'], books: ['s0305m.mul', 's0203m.mul'] },
-    default_sutta_para: 8,
+    default_sutta_para: 46,
     strategy: [
-      'Search SN 45.8 (s0305m.mul:c0:p8) for canonical definitions of the eight factors.',
+      'Search SN 45.8 (s0305m.mul:c0:p46) for canonical definitions of the eight factors.',
       'Review MN 117 (s0203m.mul §423) on Right View as the forerunner.'
     ],
     summary: 'Identified inquiry regarding the Noble Eightfold Path (Ariya Aṭṭhaṅgika Magga) in SN 45.8 and MN 117.'
@@ -485,9 +856,9 @@ const CANONICAL_KNOWLEDGE_BASE = [
     target_suttas: ['Paṭiccasamuppāda-vibhaṅga Sutta (SN 12.2)', 'Mahānidāna Sutta (DN 15)'],
     pali_terms: ['paṭiccasamuppāda', 'avijjā', 'saṅkhāra', 'viññāṇa', 'nāmarūpa', 'saḷāyatana', 'phassa', 'vedanā', 'taṇhā', 'upādāna', 'bhava', 'jāti', 'jarāmaraṇa'],
     locations: { pitakas: ['sutta'], nikayas: ['sn', 'dn'], books: ['s0302m.mul', 's0102m.mul'] },
-    default_sutta_para: 2,
+    default_sutta_para: 9,
     strategy: [
-      'Retrieve canonical definitions of the 12 links in direct and reverse order (SN 12.2, s0302m.mul §2).',
+      'Retrieve canonical definitions of the 12 links in direct and reverse order (SN 12.2, s0302m.mul §9).',
       'Cross-reference Mahānidāna Sutta (DN 15, s0102m.mul §228) on consciousness and name-and-form.'
     ],
     summary: 'Identified inquiry regarding Dependent Origination (Paṭiccasamuppāda) in SN 12.2 and DN 15.'
@@ -555,14 +926,14 @@ const CANONICAL_KNOWLEDGE_BASE = [
 
   // 13. Loving-Kindness / Mettā Sutta (Khp 9, Snp 1.8)
   {
-    patterns: [/từ\s*bi/i, /mett[aā]\s*sutta/i, /kara[ṇn][iī]yamett/i, /loving-kindness/i, /metta/i, /tâm\s*từ/i],
-    intent: 'doctrinal_explanation',
+    patterns: [/mett[aā]\s*sutta/i, /kara[ṇn][iī]yamett/i, /kinh\s*(?:từ\s*bi|tâm\s*từ|từ\s*ái)/i, /loving[\s-]?kindness\s+(?:sutta|discourse)/i],
+    intent: 'sutta_lookup',
     target_suttas: ['Karaṇīyamettā Sutta (Khp 9 / Snp 1.8)'],
     pali_terms: ['karaṇīyamettāsutta', 'mettā', 'sabbe sattā bhavantu sukhitattā', 'mātā yathā niyaṃ puttaṃ', 'mānasam bhāvaye aparimāṇaṃ'],
     locations: { pitakas: ['sutta'], nikayas: ['kn'], books: ['s0501m.mul', 's0505m.mul'] },
-    default_sutta_para: 10,
+    default_sutta_para: 243,
     strategy: [
-      'Fetch Karaṇīyamettā Sutta (s0501m.mul §10 / s0505m.mul §143).',
+      'Fetch Karaṇīyamettā Sutta (s0501m.mul:c8:p243 / s0505m.mul:c0:p478).',
       'Examine the simile of the mother protecting her only child with her life.'
     ],
     summary: 'Identified inquiry regarding the Karaṇīyamettā Sutta (Khp 9 / Snp 1.8) on universal loving-kindness.'
@@ -575,7 +946,7 @@ const CANONICAL_KNOWLEDGE_BASE = [
     target_suttas: ['Cūḷasuññata Sutta (MN 121)', 'Mahāsuññata Sutta (MN 122)', 'Suññatasaṃyutta (SN 35.85)'],
     pali_terms: ['suññatā', 'suññato lokaṃ avekkhassu', 'cūḷasuññata', 'mahāsuññata'],
     locations: { pitakas: ['sutta'], nikayas: ['mn', 'sn'], books: ['s0203m.mul', 's0304m.mul'] },
-    default_sutta_para: 480,
+    default_sutta_para: 530,
     strategy: [
       'Explain clearly that the Diamond and Heart Sūtras are Mahāyāna Sanskrit texts outside the Theravāda Pāḷi CST canon.',
       'Guide to the primary Pāḷi canonical discourses on Suññatā: MN 121, MN 122, and SN 35.85.'
@@ -584,8 +955,9 @@ const CANONICAL_KNOWLEDGE_BASE = [
   }
 ];
 
-// Extract potential Pali terms from user prompt using dictionary lookup
-function extractTermsFromPrompt(userQuery) {
+// Extract genuine Pāḷi terms from user prompt via DPD (filtering out English-to-Pāḷi <b class=epd> reverse entries,
+// while optionally harvesting canonical Pāḷi equivalents from <b class=epd> when an English concept isn't in our lexicon)
+function extractTermsFromPrompt(userQuery, { includeEpdReverse = false } = {}) {
   if (!userQuery) return [];
   const words = userQuery
     .toLowerCase()
@@ -593,8 +965,10 @@ function extractTermsFromPrompt(userQuery) {
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !QUERY_STOP_WORDS.has(w));
 
-  const validTerms = [];
+  const validPaliTerms = [];
+  const reversePaliTerms = [];
   const seen = new Set();
+  const seenRev = new Set();
 
   for (const w of words.slice(0, 10)) {
     if (seen.has(w)) continue;
@@ -602,11 +976,26 @@ function extractTermsFromPrompt(userQuery) {
     try {
       const res = dictEngine.lookupDPDFast(w, false);
       if (res && Array.isArray(res.dpd) && res.dpd.length > 0) {
-        validTerms.push(w);
+        const hasNativePaliEntry = res.dpd.some((item) => item.html && !/class=["']?epd["']?/i.test(item.html));
+        if (hasNativePaliEntry) {
+          validPaliTerms.push(w);
+        } else if (includeEpdReverse) {
+          // Harvest top Pāḷi lemmas from DPD's English-to-Pāḷi reverse dictionary
+          for (const item of res.dpd.slice(0, 1)) {
+            const epdMatches = [...String(item.html || '').matchAll(/<b\s+class=["']?epd["']?[^>]*>([^<]+)<\/b>/gi)];
+            for (const m of epdMatches.slice(0, 3)) {
+              const lemma = m[1].trim().toLowerCase().split(/\s+/)[0];
+              if (lemma.length >= 3 && !seenRev.has(lemma)) {
+                seenRev.add(lemma);
+                reversePaliTerms.push(lemma);
+              }
+            }
+          }
+        }
       }
     } catch (e) {}
   }
-  return validTerms;
+  return validPaliTerms.length > 0 ? validPaliTerms : reversePaliTerms.slice(0, 6);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -616,9 +1005,17 @@ function extractTermsFromPrompt(userQuery) {
 function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipitaka = null, dbSummaries = null) {
   const trimmed = (userQuery || '').trim();
   const lang = detectLanguage(trimmed);
+  const SUPPORTED_TRANS_LANGS = new Set([
+    'en', 'vi', 'my', 'si', 'zh', 'km', 'th', 'lo', 'ta', 'hi', 'mr',
+    'id', 'cs', 'de', 'es', 'fr', 'ja', 'pt', 'ru', 'ko', 'ne', 'be',
+  ]);
   const transLangs = ['en'];
-  if (lang === 'vi' && !transLangs.includes('vi')) transLangs.push('vi');
-  if (lang === 'my' && !transLangs.includes('my')) transLangs.push('my');
+  if (SUPPORTED_TRANS_LANGS.has(lang) && !transLangs.includes(lang)) {
+    transLangs.push(lang);
+  }
+  const isDefinitionQuestion = CONCEPT_GROUP_LEXICON.some(
+    (entry) => entry.isDefinitionIntent && entry.patterns.some((pat) => pat.test(trimmed))
+  );
 
   // 1. Direct Citation Check (e.g. MN 118, DN 16, SN 56.11, AN 3.65, Dhp 183)
   const citationMatch = parseCanonicalCitation(trimmed);
@@ -632,12 +1029,26 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
 
     if (resolved) {
       const paliStems = [extractPaliStem(resolved.sutta_name), extractPaliStem(resolved.citation)].filter(Boolean);
+      const detectedTerms = extractTermsFromPrompt(trimmed);
+      const conceptGroups = extractHeuristicConceptGroups(trimmed, detectedTerms, null);
+      if (conceptGroups.length === 0) {
+        conceptGroups.push({
+          concept: resolved.sutta_name,
+          pali_terms: [resolved.sutta_name.replace(/\s*\(.*?\)/, '').trim()],
+          pali_stems: Array.from(new Set(paliStems.map((s) => `${s}*`))),
+          english_keywords: [],
+        });
+      }
       return {
         intent: 'sutta_lookup',
         detected_language: lang,
         core_question: trimmed,
-        canonical_pali_terms: [resolved.sutta_name, resolved.citation],
+        concept_groups: conceptGroups,
+        canonical_pali_terms: Array.from(new Set([resolved.sutta_name, resolved.citation, ...detectedTerms])),
         pali_stems: Array.from(new Set(paliStems.map((s) => `${s}*`))),
+        english_keywords: Array.from(new Set(conceptGroups.flatMap((g) => g.english_keywords || []))),
+        needs_bold_definitions: isDefinitionQuestion || detectedTerms.length > 0,
+        key_terms_for_bold_def: detectedTerms.slice(0, 3),
         target_sutta_names: [resolved.sutta_name],
         recommended_locations: {
           pitakas: ['sutta'],
@@ -649,7 +1060,7 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
         initial_search_strategy: [
           `Open ${resolved.sutta_name} in ${resolved.book_code} (paragraphs §${resolved.start_para}–§${resolved.end_para || resolved.start_para + 6}).`,
           'Retrieve root Pāḷi text with verified English and translation passages.',
-          'Cross-reference classical Aṭṭhakathā commentary for doctrinal context.',
+          'Cross-reference classical Aṭṭhakathā commentary and bold definitions for doctrinal context.',
           'Examine technical Pāḷi terminology in Digital Pāḷi Dictionary (DPD).'
         ],
         user_facing_summary: `Identified inquiry for ${resolved.sutta_name} in the ${resolved.nikaya.toUpperCase()} (${resolved.book_code} §${resolved.start_para}).`,
@@ -664,13 +1075,30 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
   );
 
   if (matchedKb) {
-    const paliStems = matchedKb.pali_terms.map(extractPaliStem).filter(Boolean);
+    const detectedTerms = extractTermsFromPrompt(trimmed);
+    const conceptGroups = extractHeuristicConceptGroups(trimmed, detectedTerms, matchedKb);
+    const allPaliTerms = Array.from(new Set([
+      ...matchedKb.pali_terms,
+      ...conceptGroups.flatMap((g) => g.pali_terms || []),
+    ]));
+    const paliStems = Array.from(new Set([
+      ...allPaliTerms.map(extractPaliStem).filter((s) => s.length >= 3).map((s) => `${s}*`),
+      ...conceptGroups.flatMap((g) => g.pali_stems || []),
+    ]));
+    const englishKeywords = Array.from(new Set(conceptGroups.flatMap((g) => g.english_keywords || [])));
+    const keyTermsForBoldDef = allPaliTerms
+      .filter((t) => !/\s/.test(t) && t.length >= 3)
+      .slice(0, 3);
     return {
-      intent: matchedKb.intent,
+      intent: isDefinitionQuestion && matchedKb.intent !== 'sutta_lookup' ? 'term_analysis' : matchedKb.intent,
       detected_language: lang,
       core_question: trimmed,
-      canonical_pali_terms: matchedKb.pali_terms,
-      pali_stems: Array.from(new Set(paliStems.map((s) => `${s}*`))),
+      concept_groups: conceptGroups,
+      canonical_pali_terms: allPaliTerms.slice(0, 12),
+      pali_stems: paliStems.slice(0, 12),
+      english_keywords: englishKeywords.slice(0, 12),
+      needs_bold_definitions: isDefinitionQuestion || matchedKb.intent === 'doctrinal_explanation',
+      key_terms_for_bold_def: keyTermsForBoldDef,
       target_sutta_names: matchedKb.target_suttas,
       recommended_locations: matchedKb.locations,
       default_sutta_para: matchedKb.default_sutta_para || null,
@@ -681,14 +1109,19 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
     };
   }
 
-  // 3. Database Catalog Match: Search chapters and toc for suttas matching prompt tokens
-  if (dbTipitaka) {
+  // 3. Database Catalog Match: only trigger for specific named sutta/chapter lookups
+  // (avoid hijacking multi-concept doctrinal questions or Vinaya/Abhidhamma questions)
+  const preDetectedTerms = extractTermsFromPrompt(trimmed, { includeEpdReverse: false });
+  const preLexiconGroups = extractHeuristicConceptGroups(trimmed, [], null);
+  const looksLikeSuttaLookup = /\b(sutta|suttaṃ|vagga|vaggo|discourse|kinh|သုတ်)\b/i.test(trimmed);
+
+  if (dbTipitaka && (looksLikeSuttaLookup || preLexiconGroups.length === 0)) {
     try {
       const words = trimmed
         .toLowerCase()
         .replace(/[^a-zāīūṅñṭḍṇḷṃ\s]/gi, ' ')
         .split(/\s+/)
-        .filter((w) => w.length >= 3 && !QUERY_STOP_WORDS.has(w));
+        .filter((w) => w.length >= 5 && !QUERY_STOP_WORDS.has(w));
 
       for (const w of words.slice(0, 3)) {
         const cRow = dbTipitaka.prepare(`
@@ -702,16 +1135,30 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
 
         if (cRow) {
           const sTitle = cRow.title.replace(/^[0-9]+\.\s*/, '').replace(/ṃ$/, '').trim();
+          const conceptGroups = extractHeuristicConceptGroups(trimmed, [w, ...preDetectedTerms], null);
+          const nikCode = cRow.book_code.startsWith('s01')
+            ? 'dn'
+            : cRow.book_code.startsWith('s02')
+            ? 'mn'
+            : cRow.book_code.startsWith('s03')
+            ? 'sn'
+            : cRow.book_code.startsWith('s04')
+            ? 'an'
+            : 'kn';
           return {
             intent: 'sutta_lookup',
             detected_language: lang,
             core_question: trimmed,
-            canonical_pali_terms: [sTitle, w],
-            pali_stems: [`${extractPaliStem(w)}*`],
+            concept_groups: conceptGroups,
+            canonical_pali_terms: Array.from(new Set([sTitle, w, ...preDetectedTerms])),
+            pali_stems: Array.from(new Set([`${extractPaliStem(w)}*`, ...conceptGroups.flatMap((g) => g.pali_stems || [])])),
+            english_keywords: Array.from(new Set(conceptGroups.flatMap((g) => g.english_keywords || []))),
+            needs_bold_definitions: isDefinitionQuestion,
+            key_terms_for_bold_def: preDetectedTerms.slice(0, 3),
             target_sutta_names: [sTitle],
             recommended_locations: {
               pitakas: ['sutta'],
-              nikayas: [cRow.book_code.startsWith('s01') ? 'dn' : cRow.book_code.startsWith('s02') ? 'mn' : cRow.book_code.startsWith('s03') ? 'sn' : 'an'],
+              nikayas: [nikCode],
               books: [cRow.book_code],
             },
             default_sutta_para: cRow.start_para,
@@ -729,32 +1176,76 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
     } catch (e) {}
   }
 
-  // 4. Generic Extraction via DPD Dictionary
-  const detectedTerms = extractTermsFromPrompt(trimmed);
-  const stems = detectedTerms.map(extractPaliStem).filter(Boolean);
+  // 4. Concept-Group Lexicon + DPD Dictionary (including English-to-Pāḷi reverse lookup when lexicon had no hits)
+  const detectedTerms = preDetectedTerms.length > 0
+    ? preDetectedTerms
+    : extractTermsFromPrompt(trimmed, { includeEpdReverse: true });
+  const conceptGroups = extractHeuristicConceptGroups(trimmed, detectedTerms, null);
+  const groupPaliTerms = conceptGroups.flatMap((g) => g.pali_terms || []);
+  const groupStems = conceptGroups.flatMap((g) => g.pali_stems || []);
+  const groupEnglish = conceptGroups.flatMap((g) => g.english_keywords || []);
 
-  const fallbackTerms = detectedTerms.length > 0 ? detectedTerms : (trimmed.split(/\s+/).slice(0, 2));
+  const allTerms = Array.from(new Set([...detectedTerms, ...groupPaliTerms]));
+  const fallbackTerms = allTerms.length > 0 ? allTerms : (trimmed.split(/\s+/).slice(0, 3));
+  const stems = Array.from(new Set([
+    ...groupStems,
+    ...fallbackTerms.map(extractPaliStem).filter((s) => s.length >= 3).map((s) => `${s}*`),
+  ]));
+  const keyTermsForBoldDef = allTerms.filter((t) => !/\s/.test(t) && t.length >= 3).slice(0, 3);
+
+  // Detect explicit Piṭaka / Nikāya scope if mentioned in the user's inquiry.
+  // Leave empty for general inquiries so Vinaya, Abhidhamma, Khuddaka, and Visuddhimagga are never masked out.
+  const explicitPitakas = [];
+  const explicitNikayas = [];
+  if (/\b(vinaya|p[aā]timokkha|p[aā]r[aā]jika|p[aā]cittiya|monastic\s+rule|bhikkhu\s+rule|luật\s*tạng|ဝိနည်း)\b/i.test(trimmed)) {
+    explicitPitakas.push('vinaya');
+  }
+  if (/\b(abhidhamma|dhammasa[ṅn]ga[ṇn][iī]|vibha[ṅn]ga|pa[ṭt][ṭt]h[aā]na|cetasika|vi\s*diệu\s*pháp|အဘိဓမ္မာ)\b/i.test(trimmed)) {
+    explicitPitakas.push('abhidhamma');
+  }
+  if (/\b(d[iī]gha\s*nik[aā]ya|tr[uư][ờo]ng\s*b[ộo])\b/i.test(trimmed)) explicitNikayas.push('dn');
+  if (/\b(majjhima\s*nik[aā]ya|trung\s*b[ộo])\b/i.test(trimmed)) explicitNikayas.push('mn');
+  if (/\b(sa[ṃm]yutta\s*nik[aā]ya|t[uư][ơo]ng\s*[uư]ng)\b/i.test(trimmed)) explicitNikayas.push('sn');
+  if (/\b(a[ṅn]guttara\s*nik[aā]ya|t[aă]ng\s*chi)\b/i.test(trimmed)) explicitNikayas.push('an');
+  if (/\b(khuddaka\s*nik[aā]ya|ti[ểe]u\s*b[ộo])\b/i.test(trimmed)) explicitNikayas.push('kn');
+  if (/\b(j[aā]taka|b[ổo]n\s*sanh)\b/i.test(trimmed)) explicitNikayas.push('ja');
+
+  const intent = explicitPitakas.includes('vinaya')
+    ? 'monastic_rule'
+    : isDefinitionQuestion
+    ? 'term_analysis'
+    : (conceptGroups.length >= 2 ? 'doctrinal_explanation' : (allTerms.length > 0 ? 'doctrinal_explanation' : 'general_dhamma'));
 
   return {
-    intent: detectedTerms.length > 0 ? 'doctrinal_explanation' : 'general_dhamma',
+    intent,
     detected_language: lang,
     core_question: trimmed,
-    canonical_pali_terms: fallbackTerms,
-    pali_stems: stems.length > 0 ? Array.from(new Set(stems.map((s) => `${s}*`))) : fallbackTerms.map((t) => `${extractPaliStem(t)}*`),
+    concept_groups: conceptGroups,
+    canonical_pali_terms: fallbackTerms.slice(0, 12),
+    pali_stems: stems.slice(0, 12),
+    english_keywords: Array.from(new Set(groupEnglish)).slice(0, 12),
+    needs_bold_definitions: isDefinitionQuestion || keyTermsForBoldDef.length > 0,
+    key_terms_for_bold_def: keyTermsForBoldDef,
     target_sutta_names: [],
     recommended_locations: {
-      pitakas: ['sutta'],
-      nikayas: ['mn', 'sn', 'dn', 'an'],
-      books: ['s0201m.mul', 's0301m.mul'],
+      pitakas: explicitPitakas,
+      nikayas: explicitNikayas,
+      books: [],
     },
     default_sutta_para: null,
     translation_languages: transLangs,
     initial_search_strategy: [
-      `Search section titles for terms: ${fallbackTerms.join(', ')}`,
-      'Search CST full-text database across the Four Primary Nikāyas',
-      'Read matching paragraph passages and cross-reference commentary'
+      conceptGroups.length >= 2
+        ? `Run concept-group boolean search intersecting: ${conceptGroups.map((g) => g.concept).join(' AND ')}`
+        : `Search canonical passages & titles for: ${fallbackTerms.slice(0, 4).join(', ')}`,
+      keyTermsForBoldDef.length > 0
+        ? `Check pre-indexed canonical bold definitions & DPD for: ${keyTermsForBoldDef.join(', ')}`
+        : 'Search CST full-text database across Pāḷi and English translations',
+      'Read exact root paragraphs and cross-reference Aṭṭhakathā/Ṭīkā commentary',
     ],
-    user_facing_summary: `Investigating Dhamma inquiry across the canonical books with identified terms: ${fallbackTerms.join(', ')}.`,
+    user_facing_summary: conceptGroups.length >= 2
+      ? `Decomposed inquiry into ${conceptGroups.length} concept groups (${conceptGroups.map((g) => g.concept).join(' + ')}) for multi-concept Pāḷi & English canonical search.`
+      : `Investigating Dhamma inquiry across the canonical books with identified terms: ${fallbackTerms.slice(0, 5).join(', ')}.`,
     source: 'heuristic_general',
   };
 }
@@ -764,54 +1255,94 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
 // ═══════════════════════════════════════════════════════════════════════════
 
 const kAiUnderstandingSystemPrompt = `You are Ani (AI Nissaya)'s Scholarly Query Understanding Engine for the Chaṭṭha Saṅgāyana Tipiṭaka (Pāḷi Canon).
-Your duty is Step 1 of the canonical research loop: dissect the user's inquiry, penetrate the underlying doctrinal or canonical intent, extract exact Pāḷi technical terms, map the question to specific Canonical books / Nikāyas, and formulate a high-precision research strategy.
+Your duty is Step 1 of the canonical research loop:
+1. Break the user's research question down into 1 to 4 MAIN CONCEPT GROUPS.
+2. For each concept group, suggest precise Pāḷi technical terms & canonical synonyms (in Roman IAST diacritics), Pāḷi prefix stems (terminal vowel -a/-ā/-e/-o stripped + *), English keywords & synonyms (for English translation FTS5), AND optional "local_keywords" in the user's own language if the user did not ask in English (for native-language translation FTS5).
+3. Identify whether canonical bold definitions (Aṭṭhakathā/Ṭīkā/Mūla term definitions) should be queried, and list up to 3 single-word Pāḷi headwords in "key_terms_for_bold_def".
+4. Map the inquiry to candidate Sutta names, Piṭakas, Nikāyas, and CST book codes (leave pitakas/nikayas empty arrays [] unless the inquiry specifically targets one Piṭaka or Nikāya).
 
 ## Canonical Knowledge Guidelines
-- Polyglot Fluency: The user may ask in English, Vietnamese, Burmese, Pali, Chinese, Thai, or other languages.
-- Sutta Identifications:
-  * "bánh mật", "mật hoàn", "honey ball", "honey cake", "ပျားလုံး", "ပျားမုန့်" -> Madhupiṇḍika Sutta (MN 18, Majjhima Nikāya, s0201m.mul).
-  * "quán niệm hơi thở", "nhập tức xuất tức", "mindfulness of breathing", "အာနာပါနဿတိ" -> Ānāpānassati Sutta (MN 118, Majjhima Nikāya, s0203m.mul §438).
-  * "đại bát niết bàn", "parinibbana", "last days of buddha", "မဟာပရိနိဗ္ဗာန" -> Mahāparinibbāna Sutta (DN 16, Dīgha Nikāya, s0102m.mul §286).
-  * "tứ diệu đế", "bốn thánh đế", "four noble truths", "သစ္စာလေးပါး" -> Dhammacakkappavattana Sutta (SN 56.11, s0305m.mul §2473) & Saccavibhaṅga (MN 141).
-  * "tứ niệm xứ", "satipatthana", "mindfulness", "သတိပဋ္ဌာန်" -> Mahāsatipaṭṭhāna (DN 22, s0102m.mul §1340) & Satipaṭṭhāna (MN 10, s0201m.mul §285).
-  * "duyên khởi", "thập nhị nhân duyên", "dependent origination", "paṭiccasamuppāda" -> SN 12.2 (s0302m.mul) & DN 15.
-  * "vô ngã", "non-self", "anattā" -> Anattalakkhaṇa Sutta (SN 22.59, s0303m.mul §322).
-  * "kālāma", "kesamutti", "ca-la-ma" -> AN 3.65 (s0402m2.mul §586).
-  * "pháp cú", "dhammapada", "dhp" -> Dhammapada (s0502m.mul).
-  * "sân hận", "giận", "anger", "vyāpāda", "kodha" -> AN 5.161, Dhp 221-223.
-- If the user asks about Mahāyāna Sanskrit sūtras ("Kim Cang" / Diamond Sūtra, "Bát Nhã" / Heart Sūtra), identify them as Mahāyāna texts outside the Theravāda Canon and direct to Pāḷi Suññatā discourses (MN 121, MN 122).
-- Always provide Pāḷi stems with terminal vowels (-a, -ā, -e, -o) stripped for prefix matching (e.g. "madhupiṇḍik*", "dhamm*", "sacc*", "khandh*").
-- Map Nikāyas to canonical CST book codes:
+- Polyglot Fluency: The user may ask in English, Vietnamese, Burmese, Pāḷi, Chinese, Thai, Sinhala, German, French, Spanish, Japanese, etc. Detect the exact language code in "detected_language" and include it in "translation_languages" alongside "en".
+- Concept-Group Decomposition Best Practices:
+  * Multi-facet questions (e.g. "How does the Buddha teach overcoming anger with loving-kindness?") MUST be split into distinct concept groups:
+    - Group 1: "Overcoming Anger" -> pali_terms: ["kodha", "vyāpāda", "āghāta", "dosa", "vera"], english_keywords: ["anger", "ill-will", "resentment", "hatred"]
+    - Group 2: "Loving-kindness (Mettā)" -> pali_terms: ["mettā", "avera", "akodha", "adosa"], english_keywords: ["loving-kindness", "goodwill", "non-hatred", "benevolence"]
+  * Term / definition questions (e.g. "What is saṅkhāra?" or "Explain papañca") -> set intent: "term_analysis", needs_bold_definitions: true, key_terms_for_bold_def: ["saṅkhāra"], and include contextual synonyms in concept_groups.
+  * Sutta lookup examples:
+    - "bánh mật", "mật hoàn", "honey ball", "ပျားလုံး" -> Madhupiṇḍika Sutta (MN 18, s0201m.mul).
+    - "quán niệm hơi thở", "mindfulness of breathing", "အာနာပါနဿတိ" -> Ānāpānassati Sutta (MN 118, s0203m.mul).
+    - "đại bát niết bàn", "parinibbana", "last days of buddha" -> Mahāparinibbāna Sutta (DN 16, s0102m.mul).
+    - "tứ diệu đế", "four noble truths", "သစ္စာလေးပါး" -> Dhammacakkappavattana Sutta (SN 56.11, s0305m.mul) & Saccavibhaṅga (MN 141).
+    - "tứ niệm xứ", "satipatthana", "သတိပဋ္ဌာန်" -> Mahāsatipaṭṭhāna (DN 22, s0102m.mul) & Satipaṭṭhāna (MN 10, s0201m.mul).
+    - "duyên khởi", "dependent origination" -> Paṭiccasamuppāda-vibhaṅga (SN 12.2, s0302m.mul) & Mahānidāna (DN 15).
+    - "vô ngã", "non-self", "anattā" -> Anattalakkhaṇa Sutta (SN 22.59, s0303m.mul).
+    - "kālāma", "kesamutti" -> Kesamutti Sutta (AN 3.65, s0402m2.mul).
+  * If the user asks about Mahāyāna Sanskrit sūtras ("Kim Cang" / Diamond Sūtra, "Bát Nhã" / Heart Sūtra), note they are outside the Theravāda Pāḷi Canon and point to Pāḷi Suññatā discourses (MN 121, MN 122, SN 35.85).
+- Always strip terminal vowels (-a, -ā, -e, -o) for Pāḷi stems (e.g. "madhupiṇḍik*", "kodh*", "mett*", "saṅkhār*", "sati*" — never shorten "sati" to "sat*").
+- CST book code map:
   * DN 1-13 -> s0101m.mul, DN 14-23 -> s0102m.mul, DN 24-34 -> s0103m.mul
   * MN 1-50 -> s0201m.mul, MN 51-100 -> s0202m.mul, MN 101-152 -> s0203m.mul
   * SN 1-11 -> s0301m.mul, SN 12-21 -> s0302m.mul, SN 22-34 -> s0303m.mul, SN 35-44 -> s0304m.mul, SN 45-56 -> s0305m.mul
-  * AN 1 -> s0401m1.mul, AN 2 -> s0402m1.mul, AN 3 -> s0402m2.mul, AN 4 -> s0402m3.mul, AN 5-7 -> s0403m*.mul, AN 8-11 -> s0404m*.mul
-  * Dhp -> s0502m.mul, Jataka -> s0513m.mul
-  * Vinaya -> vin01m.mul to vin05m.mul
-  * Abhidhamma -> abh01m.mul to abh07m.mul
+  * AN 1 -> s0401m.mul, AN 2 -> s0402m1.mul, AN 3 -> s0402m2.mul, AN 4 -> s0402m3.mul, AN 5 -> s0403m1.mul, AN 6 -> s0403m2.mul, AN 7 -> s0403m3.mul, AN 8 -> s0404m1.mul, AN 9 -> s0404m2.mul, AN 10 -> s0404m3.mul, AN 11 -> s0404m4.mul
+  * Dhp -> s0502m.mul, Snp -> s0505m.mul, Jātaka -> s0513m.mul
+  * Vinaya -> vin01m.mul, vin02m1.mul–vin02m4.mul
+  * Abhidhamma -> abh01m.mul, abh02m.mul, abh03m1.mul–abh03m11.mul
 
 ## Output Schema
 Return STRICTLY valid JSON adhering to:
 {
-  "intent": "sutta_lookup" | "doctrinal_explanation" | "term_analysis" | "monastic_rule" | "comparison" | "general_dhamma",
-  "detected_language": "en" | "vi" | "my" | "pi" | "zh" | "other",
+  "intent": "sutta_lookup" | "doctrinal_explanation" | "term_analysis" | "monastic_rule" | "comparison" | "grammar_analysis" | "general_dhamma",
+  "detected_language": "en" | "vi" | "my" | "th" | "zh" | "si" | "pi" | "de" | "fr" | "es" | "pt" | "ja" | "ko" | "other",
   "core_question": "Single clear sentence defining what is specifically being asked",
-  "canonical_pali_terms": ["array of exact Pali terms in Roman IAST script"],
-  "pali_stems": ["array of stems ending in * (e.g. madhupiṇḍik*, sacc*)"],
-  "target_sutta_names": ["array of specific sutta names (e.g. Madhupiṇḍika Sutta (MN 18))"],
-  "recommended_locations": {
-    "pitakas": ["sutta" | "vinaya" | "abhidhamma"],
-    "nikayas": ["dn" | "mn" | "sn" | "an" | "kn" | "dhp" | "ja"],
-    "books": ["s0201m.mul", "s0102m.mul"]
-  },
-  "translation_languages": ["en", "vi"],
-  "initial_search_strategy": [
-    "Step 1: exact tool action to discover sections",
-    "Step 2: exact tool action to read paragraphs",
-    "Step 3: exact tool action to review commentaries"
+  "concept_groups": [
+    {
+      "concept": "Short name of Main Concept Group 1",
+      "pali_terms": ["exact Pali lemma", "Pali synonym 1", "Pali synonym 2"],
+      "pali_stems": ["stem1*", "stem2*"],
+      "english_keywords": ["English keyword", "English synonym 1", "English synonym 2"],
+      "local_keywords": ["optional keywords in user's non-English language"]
+    }
   ],
-  "user_facing_summary": "1-2 concise, elegant sentences explaining Ani's understanding of the inquiry to the user."
+  "needs_bold_definitions": true,
+  "key_terms_for_bold_def": ["up to 3 single Pali headwords to look up in canonical bold definitions"],
+  "canonical_pali_terms": ["flat list of primary Pali terms in Roman IAST"],
+  "pali_stems": ["flat list of Pali stems ending in *"],
+  "target_sutta_names": ["specific sutta names if identifiable, e.g. Madhupiṇḍika Sutta (MN 18)"],
+  "recommended_locations": {
+    "pitakas": [],
+    "nikayas": [],
+    "books": []
+  },
+  "translation_languages": ["en"],
+  "initial_search_strategy": [
+    "Step 1: Intersect concept groups using search_concepts",
+    "Step 2: Check canonical bold definitions & DPD for core terms",
+    "Step 3: Read exact root paragraphs and Aṭṭhakathā/Ṭīkā commentary"
+  ],
+  "user_facing_summary": "1-2 concise sentences summarizing how Ani broke down the question and which canonical sources will be investigated."
 }`;
+
+function safeParseJsonObject(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const trimmed = rawText.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (_) {}
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced && fenced[1]) {
+    try {
+      return JSON.parse(fenced[1].trim());
+    } catch (_) {}
+  }
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+    } catch (_) {}
+  }
+  return null;
+}
 
 async function understandUserQuery({
   userQuery,
@@ -831,12 +1362,12 @@ async function understandUserQuery({
 
   // 1. If no API key, use rich heuristic knowledge base and database grounding
   if (!apiKey || apiKey.trim().length < 5) {
-    if (onStatus) onStatus('Analyzing prompt with canonical heuristic knowledge base…');
+    if (onStatus) onStatus('Analyzing prompt with canonical concept-group engine…');
     return heuristicQueryUnderstanding(trimmed, conversationHistory, dbTipitaka, dbSummaries);
   }
 
-  // 2. Call AI model for deep query understanding
-  if (onStatus) onStatus('🧠 Ani is analyzing your prompt and formulating canonical research plan…');
+  // 2. Call AI model for deep concept-group query understanding
+  if (onStatus) onStatus('🧠 Ani is decomposing your inquiry into concept groups & Pāḷi/English synonyms…');
 
   const contextMessages = [];
   if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
@@ -854,7 +1385,7 @@ async function understandUserQuery({
 "${trimmed}"
 
 ${contextMessages.length > 0 ? `PREVIOUS CONTEXT:\n${contextMessages.map((c) => `${c.role}: ${c.text}`).join('\n')}\n` : ''}
-Dissect this prompt according to the system instructions. Output ONLY the JSON object.`;
+Dissect this prompt into main concept groups with Pāḷi terms/stems and English synonyms according to the system instructions. Output ONLY the JSON object.`;
 
   try {
     if (provider === 'gemini') {
@@ -865,7 +1396,7 @@ Dissect this prompt according to the system instructions. Output ONLY the JSON o
         generationConfig: {
           response_mime_type: 'application/json',
           temperature: 0.1,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 1536,
         },
       };
 
@@ -873,14 +1404,14 @@ Dissect this prompt according to the system instructions. Output ONLY the JSON o
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (res.ok) {
         const json = await res.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          const parsed = JSON.parse(text);
+        const parsed = safeParseJsonObject(text);
+        if (parsed) {
           return enrichUnderstandingResult(parsed, trimmed, dbTipitaka);
         }
       }
@@ -911,18 +1442,30 @@ Dissect this prompt according to the system instructions. Output ONLY the JSON o
         headers['X-Title'] = 'tipitakapali.org';
       }
 
-      const res = await fetch(endpoint, {
+      let res = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(15000),
       });
+
+      // Some OpenRouter / custom models reject response_format: json_object (HTTP 400/422)
+      if (!res.ok && (res.status === 400 || res.status === 422)) {
+        const retryPayload = { ...payload };
+        delete retryPayload.response_format;
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(retryPayload),
+          signal: AbortSignal.timeout(15000),
+        });
+      }
 
       if (res.ok) {
         const json = await res.json();
         const text = json.choices?.[0]?.message?.content;
-        if (text) {
-          const parsed = JSON.parse(text);
+        const parsed = safeParseJsonObject(text);
+        if (parsed) {
           return enrichUnderstandingResult(parsed, trimmed, dbTipitaka);
         }
       }
@@ -936,23 +1479,49 @@ Dissect this prompt according to the system instructions. Output ONLY the JSON o
 }
 
 function enrichUnderstandingResult(parsed, originalQuery, dbTipitaka = null) {
+  const SUPPORTED_TRANS_LANGS = new Set([
+    'en', 'vi', 'my', 'si', 'zh', 'km', 'th', 'lo', 'ta', 'hi', 'mr',
+    'id', 'cs', 'de', 'es', 'fr', 'ja', 'pt', 'ru', 'ko', 'ne', 'be',
+  ]);
   const lang = parsed.detected_language || detectLanguage(originalQuery);
-  const terms = Array.isArray(parsed.canonical_pali_terms) ? parsed.canonical_pali_terms : [];
-  let stems = Array.isArray(parsed.pali_stems) ? parsed.pali_stems : [];
+  const rawTerms = Array.isArray(parsed.canonical_pali_terms) ? parsed.canonical_pali_terms : [];
+  const rawStems = Array.isArray(parsed.pali_stems) ? parsed.pali_stems : [];
+
+  const conceptGroups = normalizeConceptGroups(parsed.concept_groups, rawTerms, rawStems);
+  const terms = Array.from(new Set([
+    ...rawTerms,
+    ...conceptGroups.flatMap((g) => g.pali_terms || []),
+  ])).filter(Boolean);
+
+  let stems = Array.from(new Set([
+    ...rawStems,
+    ...conceptGroups.flatMap((g) => g.pali_stems || []),
+  ])).filter(Boolean);
 
   if (stems.length === 0 && terms.length > 0) {
-    stems = terms.map((t) => `${extractPaliStem(t)}*`);
+    stems = Array.from(new Set(terms.map((t) => extractPaliStem(t.split(/\s+/)[0])).filter((s) => s.length >= 3).map((s) => `${s}*`)));
   }
 
-  const transLangs = Array.isArray(parsed.translation_languages) ? parsed.translation_languages : ['en'];
-  if (lang === 'vi' && !transLangs.includes('vi')) transLangs.push('vi');
-  if (lang === 'my' && !transLangs.includes('my')) transLangs.push('my');
+  const englishKeywords = Array.from(new Set(
+    conceptGroups.flatMap((g) => g.english_keywords || [])
+  )).filter(Boolean);
+
+  const keyTermsForBoldDef = Array.from(new Set([
+    ...(Array.isArray(parsed.key_terms_for_bold_def) ? parsed.key_terms_for_bold_def : []),
+    ...terms.filter((t) => !/\s/.test(t) && t.length >= 3),
+  ])).slice(0, 3);
+
+  const transLangs = Array.isArray(parsed.translation_languages)
+    ? parsed.translation_languages.filter((l) => SUPPORTED_TRANS_LANGS.has(l))
+    : [];
+  if (!transLangs.includes('en')) transLangs.unshift('en');
+  if (SUPPORTED_TRANS_LANGS.has(lang) && !transLangs.includes(lang)) transLangs.push(lang);
 
   let defaultPara = null;
   const targetSuttas = Array.isArray(parsed.target_sutta_names) ? parsed.target_sutta_names : [];
   let locations = parsed.recommended_locations || {
-    pitakas: ['sutta'],
-    nikayas: ['mn', 'sn'],
+    pitakas: [],
+    nikayas: [],
     books: [],
   };
 
@@ -975,8 +1544,14 @@ function enrichUnderstandingResult(parsed, originalQuery, dbTipitaka = null) {
     intent: parsed.intent || 'doctrinal_explanation',
     detected_language: lang,
     core_question: parsed.core_question || originalQuery,
-    canonical_pali_terms: terms,
-    pali_stems: stems,
+    concept_groups: conceptGroups,
+    canonical_pali_terms: terms.slice(0, 12),
+    pali_stems: stems.slice(0, 12),
+    english_keywords: englishKeywords.slice(0, 12),
+    needs_bold_definitions: parsed.needs_bold_definitions !== undefined
+      ? Boolean(parsed.needs_bold_definitions)
+      : (parsed.intent === 'term_analysis' || parsed.intent === 'doctrinal_explanation'),
+    key_terms_for_bold_def: keyTermsForBoldDef,
     target_sutta_names: targetSuttas,
     recommended_locations: locations,
     default_sutta_para: defaultPara,
@@ -994,6 +1569,10 @@ module.exports = {
   resolveCanonicalCitation,
   detectLanguage,
   extractPaliStem,
+  extractHeuristicConceptGroups,
+  normalizeConceptGroups,
+  safeParseJsonObject,
   kAiUnderstandingSystemPrompt,
   CANONICAL_KNOWLEDGE_BASE,
+  CONCEPT_GROUP_LEXICON,
 };

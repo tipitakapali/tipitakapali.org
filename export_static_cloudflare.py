@@ -767,6 +767,12 @@ def generate_cloudflare_headers(dist_dir: Path):
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
 
+# IndexNow Key Verification File
+/ae6f8bf329e4fca113231f5647ff1549.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=86400
+  Access-Control-Allow-Origin: *
+
 /.well-known/oauth-protected-resource
   Content-Type: application/json; charset=utf-8
   Access-Control-Allow-Origin: *
@@ -787,12 +793,12 @@ def generate_cloudflare_headers(dist_dir: Path):
 
 def generate_seo_and_ai_metadata(paths: dict, site_url: str):
     """
-    Generate comprehensive SEO & AI Agent metadata across all supported targets:
-    - 19 XML Sitemaps (root index, default Roman, translations for 23 modern languages, and 16 Pali scripts)
-    - robots.txt (crawler and AI bot rules with all sitemap declarations)
-    - llms.txt & llms-full.txt (standardized AI discovery and canonical reference)
-    - site.jsonld (Schema.org WebSite, Dataset, and Collection metadata)
-    - Well-known catalogs and auth.md
+    Generate clean canonical SEO & AI Agent metadata across all supported targets:
+    - Canonical XML Sitemap (222 self-canonical prerendered URLs; removes obsolete non-canonical child sitemaps)
+    - robots.txt (crawler & AI bot rules with single canonical sitemap)
+    - llms.txt & llms-full.txt (bold definitions, concept search, full 217-book catalog)
+    - site.jsonld (Schema.org WebSite, Organization, DataCatalog)
+    - Well-known catalogs, auth.md, and IndexNow verification key file
     Outputs directly to cloudflare_pages_dist, public/, and next_tipitakapali.org.
     """
     try:
@@ -802,13 +808,16 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
             generate_llms_txt,
             generate_llms_full_txt,
             generate_schema_jsonld,
-            PALI_SCRIPTS,
+            cleanup_obsolete_sitemaps,
+            sync_indexnow_key,
+            get_bold_definitions_count,
             TRANSLATION_LANGUAGES,
         )
 
         dist_dir = paths['dist_dir']
         git_repo_dir = paths['git_repo_dir']
         db_path = paths['db_path']
+        public_dir = paths['web_app_dir'] / 'public'
 
         log_info(f"Generating SEO & AI Agent metadata files for {site_url}...")
         conn_seo = sqlite3.connect(str(db_path))
@@ -819,6 +828,8 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
         cur_seo.execute("SELECT book_code, chapter_index, title FROM chapters ORDER BY book_code, chapter_index")
         seo_chapters = [dict(r) for r in cur_seo.fetchall()]
         conn_seo.close()
+
+        bold_def_count = get_bold_definitions_count(paths['web_app_dir'] / 'server_api' / 'db' / 'bold_definitions.db')
 
         seo_catalog = {}
         if paths.get('catalog_path') and paths['catalog_path'].exists():
@@ -831,12 +842,13 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
         s_url = site_url.rstrip('/')
         sitemaps = generate_all_sitemaps(seo_books, seo_chapters, s_url)
         robots_content = generate_robots_txt(s_url)
-        llms_content = generate_llms_txt(s_url, len(seo_books), len(seo_chapters))
-        llms_full_content = generate_llms_full_txt(s_url, seo_books, seo_catalog)
-        jsonld_content = generate_schema_jsonld(s_url, seo_books)
+        llms_content = generate_llms_txt(s_url, len(seo_books), len(seo_chapters), bold_def_count)
+        llms_full_content = generate_llms_full_txt(s_url, seo_books, seo_catalog, bold_def_count)
+        jsonld_content = generate_schema_jsonld(s_url, seo_books, seo_catalog, bold_def_count)
 
-        for target in [dist_dir, paths['web_app_dir'] / 'public', git_repo_dir]:
+        for target in [dist_dir, public_dir, git_repo_dir]:
             if target.exists():
+                cleanup_obsolete_sitemaps(target)
                 for s_name, s_xml in sitemaps.items():
                     with open(target / s_name, 'w', encoding='utf-8') as f:
                         f.write(s_xml)
@@ -849,27 +861,21 @@ def generate_seo_and_ai_metadata(paths: dict, site_url: str):
                 with open(target / 'site.jsonld', 'w', encoding='utf-8') as f:
                     f.write(jsonld_content)
 
-        total_trans_urls = len(seo_books) * len(TRANSLATION_LANGUAGES)
-        total_indexed_urls = (
-            1
-            + len(seo_books)
-            + len(seo_chapters)
-            + len(PALI_SCRIPTS) * (len(seo_books) + len(seo_chapters))
-            + total_trans_urls
-        )
+        total_canonical_urls = 5 + len(seo_books)
         log_success(
-            f"Generated {len(sitemaps)} XML sitemaps ({total_indexed_urls:,} URLs across 17 scripts and {len(TRANSLATION_LANGUAGES)} translation languages), robots.txt, llms.txt, llms-full.txt, site.jsonld"
+            f"Generated canonical sitemap.xml ({total_canonical_urls} URLs), robots.txt, llms.txt, llms-full.txt ({bold_def_count:,} bold defs, {len(TRANSLATION_LANGUAGES)} translations), site.jsonld"
         )
 
         for target in [dist_dir, git_repo_dir]:
             if target.exists():
-                src_wk = paths['web_app_dir'] / 'public' / '.well-known'
+                src_wk = public_dir / '.well-known'
                 dst_wk = target / '.well-known'
                 if src_wk.exists():
                     shutil.copytree(src_wk, dst_wk, dirs_exist_ok=True)
-                src_auth = paths['web_app_dir'] / 'public' / 'auth.md'
+                src_auth = public_dir / 'auth.md'
                 if src_auth.exists():
                     shutil.copy2(src_auth, target / 'auth.md')
+                sync_indexnow_key(public_dir, target)
     except Exception as e:
         log_warn(f"SEO/AI metadata generation note: {e}")
 
@@ -1598,6 +1604,11 @@ def main():
         action="store_true",
         help="Opt-in legacy backup SPA functions"
     )
+    parser.add_argument(
+        "--indexnow",
+        action="store_true",
+        help="Submit canonical sitemap URLs to IndexNow (Bing, Yandex, etc.) after export"
+    )
 
     args = parser.parse_args()
 
@@ -1639,6 +1650,14 @@ def main():
         export_translations(args, paths)
     elif mode == '3':
         export_both(args, paths)
+
+    if getattr(args, 'indexnow', False):
+        indexnow_script = paths['web_app_dir'] / 'scripts' / 'submit_indexnow.py'
+        if indexnow_script.exists():
+            log_info("Submitting canonical URLs to IndexNow...")
+            subprocess.run([sys.executable, str(indexnow_script), "--site-url", args.site_url], check=False)
+        else:
+            log_warn(f"IndexNow script not found at {indexnow_script}")
 
 
 if __name__ == '__main__':

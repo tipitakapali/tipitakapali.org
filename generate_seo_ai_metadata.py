@@ -2,24 +2,36 @@
 """
 generate_seo_ai_metadata.py
 ===========================
-Generates comprehensive SEO metadata, XML sitemaps (including 16-script sitemaps),
-and AI crawler/agent files for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi web application.
+Generates clean, canonical SEO metadata and high-signal AI crawler/agent files
+for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi web application (tipitakapali.org).
 
 Generated Files:
-  1. sitemap.xml          - Root XML Sitemap Index referencing all child sitemaps.
-  2. sitemap-main.xml     - Roman / Latin default sitemap (Home, /info, /pali-script-converter, 217 books, 2,695 chapters).
-  3. sitemap-{script}.xml - 16 child sitemaps for all supported Pali scripts (si, hi, thai, etc.).
-  4. robots.txt           - Search engine and AI crawler rules with all sitemap endpoints.
-  5. llms.txt             - Structured site summary and index adhering to /llms.txt standard for AI agents.
-  6. llms-full.txt        - Complete 217-book catalog, multi-script URL patterns, and API reference for LLMs.
-  7. site.jsonld          - Schema.org JSON-LD structured data (WebSite, SearchAction, Dataset, Collection).
+  1. sitemap.xml    - Clean canonical XML sitemap containing ONLY the 222
+                      statically prerendered, self-canonical URLs (Home, /info,
+                      /pali-script-converter, /privacy_policy.html,
+                      /terms_of_service.html, and all 217 /book/{code} pages).
+                      Eliminates canonical URL collapsing and duplicate title/
+                      description warnings from non-canonical SPA fallback URLs.
+  2. robots.txt     - Search engine & AI crawler rules with canonical sitemap
+                      and AI tool API allowances.
+  3. llms.txt       - Concise, high-signal AI Agent playbook & API guide
+                      (llmstxt.org standard): Canonical Bold Definitions
+                      (387,006 entries), Concept-Group Search, DPD, FTS5,
+                      Sentence Alignment, and verifiable citation syntax.
+  4. llms-full.txt  - Complete 217-book catalog (with Mūla/Aṭṭhakathā/Ṭīkā
+                      cross-links), 23 translations, 17 scripts, and full REST
+                      API reference for LLMs & research agents.
+  5. site.jsonld    - Schema.org JSON-LD structured data (WebSite, Organization,
+                      DataCatalog with all 217 canonical books).
 
 Usage:
   python3 generate_seo_ai_metadata.py
+  python3 generate_seo_ai_metadata.py --public-only
   python3 generate_seo_ai_metadata.py --site-url https://tipitakapali.org
 """
 
 import os
+import re
 import sys
 import json
 import sqlite3
@@ -30,8 +42,9 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
 DEFAULT_SITE_URL = "https://tipitakapali.org"
+INDEXNOW_KEY_RE = re.compile(r"^[0-9a-f]{32}\.txt$")
 
-# 16 non-default Pali scripts available in the application (Roman 'ro' is default)
+# 16 non-default Pāḷi scripts available in the application (Roman 'ro' is default -> 17 total)
 PALI_SCRIPTS = [
     {"code": "si", "name": "Sinhala", "native": "සිංහල", "desc": "Sinhala script", "lang": "pi-Sinh"},
     {"code": "hi", "name": "Devanagari / Hindi", "native": "देवनागरी", "desc": "Devanagari script", "lang": "pi-Deva"},
@@ -51,7 +64,7 @@ PALI_SCRIPTS = [
     {"code": "cyrl", "name": "Cyrillic", "native": "кириллица", "desc": "Cyrillic script", "lang": "pi-Cyrl"},
 ]
 
-# 15 supported modern translation languages across the Canon
+# 23 supported modern translation languages across the Canon (+ Pāḷi = 24 total reading layers)
 TRANSLATION_LANGUAGES = [
     {"code": "en", "name": "English", "native": "English", "flag": "🇬🇧", "lang": "en", "desc": "English translation • 1.28M sentences"},
     {"code": "vi", "name": "Vietnamese", "native": "Tiếng Việt", "flag": "🇻🇳", "lang": "vi", "desc": "Bản dịch Tiếng Việt • 1.28M câu"},
@@ -75,27 +88,48 @@ TRANSLATION_LANGUAGES = [
     {"code": "ru", "name": "Russian", "native": "Русский", "flag": "🇷🇺", "lang": "ru", "desc": "Русский перевод • 1.22M предложений"},
     {"code": "ko", "name": "Korean", "native": "한국어", "flag": "🇰🇷", "lang": "ko", "desc": "한국어 번역 • 1.22M 문장"},
     {"code": "ne", "name": "Nepali", "native": "नेपाली", "flag": "🇳🇵", "lang": "ne", "desc": "नेपाली अनुवाद • 1.22M वाक्य"},
-    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা अनुवाद • 1.27M বাক্য"},
+    {"code": "be", "name": "Bengali", "native": "বাংলা", "flag": "🇧🇩", "lang": "bn", "desc": "বাংলা অনুবাদ • 1.27M বাক্য"},
 ]
+
+QUICK_CITATION_MAP = """| Collection | Mūla `book_code` | Aṭṭhakathā | Ṭīkā | Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dīgha Nikāya (DN 1–13)** | `s0101m.mul` | `s0101a.att` | `s0101t.tik` | Sīlakkhandhavagga |
+| **Dīgha Nikāya (DN 14–23)** | `s0102m.mul` | `s0102a.att` | `s0102t.tik` | Mahāvagga (incl. DN 22 Mahāsatipaṭṭhāna) |
+| **Dīgha Nikāya (DN 24–34)** | `s0103m.mul` | `s0103a.att` | `s0103t.tik` | Pāthikavagga |
+| **Majjhima Nikāya (MN 1–50)** | `s0201m.mul` | `s0201a.att` | `s0201t.tik` | Mūlapaṇṇāsa (incl. MN 10, MN 18) |
+| **Majjhima Nikāya (MN 51–100)** | `s0202m.mul` | `s0202a.att` | `s0202t.tik` | Majjhimapaṇṇāsa |
+| **Majjhima Nikāya (MN 101–152)** | `s0203m.mul` | `s0203a.att` | `s0203t.tik` | Uparipaṇṇāsa (incl. MN 118 Ānāpānasati) |
+| **Saṃyutta Nikāya (SN 1–11)** | `s0301m.mul` | `s0301a.att` | `s0301t.tik` | Sagāthāvagga |
+| **Saṃyutta Nikāya (SN 12–21)** | `s0302m.mul` | `s0302a.att` | `s0302t.tik` | Nidānavagga (Paṭiccasamuppāda) |
+| **Saṃyutta Nikāya (SN 22–34)** | `s0303m.mul` | `s0303a.att` | `s0303t.tik` | Khandhavagga |
+| **Saṃyutta Nikāya (SN 35–44)** | `s0304m.mul` | `s0304a.att` | `s0304t.tik` | Saḷāyatanavagga |
+| **Saṃyutta Nikāya (SN 45–56)** | `s0305m.mul` | `s0305a.att` | `s0305t.tik` | Mahāvagga (incl. SN 56.11 Dhammacakka) |
+| **Aṅguttara Nikāya (AN 1–11)** | `s0401m.mul`, `s0402m1..3.mul`, `s0403m1..3.mul`, `s0404m1..4.mul` | `s0401a..04a.att` | `s0401t..04t.tik` | Ekaka through Ekādasaka Nipāta |
+| **Khuddaka Nikāya (Key Texts)** | `s0501m.mul` (Kp), `s0502m.mul` (Dhp), `s0503m.mul` (Ud), `s0504m.mul` (Iti), `s0505m.mul` (Snp), `s0508m.mul` (Thag), `s0509m.mul` (Thig) | `s0501a..09a.att` | — | Short discourses & verse collections |
+| **Vinaya Piṭaka** | `vin01m.mul` (Pārājika), `vin02m1.mul` (Pācittiya), `vin02m2.mul` (Mahāvagga), `vin02m3.mul` (Cūḷavagga), `vin02m4.mul` (Parivāra) | `vin01a..02a4.att` | `vin01t1..t2.tik`, `vin02t.tik` | Monastic discipline & rules |
+| **Abhidhamma Piṭaka** | `abh01m.mul` (Dhs), `abh02m.mul` (Vibh), `abh03m1.mul` (Dhk), `abh03m2.mul` (Pp), `abh03m3.mul` (Kv), `abh03m4..6.mul` (Yam), `abh03m7..11.mul` (Paṭṭh) | `abh01a..03a.att` | `abh01t..03t.tik` | Higher doctrine & conditional relations |
+| **Visuddhimagga & Manuals** | `e0101n.mul`, `e0102n.mul` (Vism), `abh07t.nrf` (Abhidhammatthasaṅgaha), `s0518m.nrf` (Milindapañha) | `e0103n.att`, `e0104n.att` (Vism-mhṭ) | — | Classical Theravāda treatises |"""
+
 
 def find_paths():
     script_dir = Path(__file__).resolve().parent
     root_dir = script_dir.parent if (script_dir / 'server_api').exists() else script_dir
     web_app_dir = script_dir if (script_dir / 'package.json').exists() else root_dir / 'web_app_next'
-    
+
     db_candidates = [
         web_app_dir / 'server_api' / 'db' / 'tipitaka.db',
         web_app_dir / 'server_api' / 'tipitaka.db',
         root_dir / 'tipitaka.db',
         root_dir / 'tipitaka_latin2.db',
     ]
-    
+
     db_path = None
     for cand in db_candidates:
         if cand.exists():
             db_path = cand
             break
 
+    bold_db_path = web_app_dir / 'server_api' / 'db' / 'bold_definitions.db'
     catalog_path = web_app_dir / 'server_api' / 'cst_books_catalog.json'
     public_dir = web_app_dir / 'public'
     dist_dir = web_app_dir / 'cloudflare_pages_dist'
@@ -105,138 +139,120 @@ def find_paths():
         'root_dir': root_dir,
         'web_app_dir': web_app_dir,
         'db_path': db_path,
+        'bold_db_path': bold_db_path if bold_db_path.exists() else None,
         'catalog_path': catalog_path,
         'public_dir': public_dir,
         'dist_dir': dist_dir,
         'next_git_dir': next_git_dir,
     }
 
-def generate_sitemap_index_xml(site_url):
-    """Generate official XML Sitemap Index referencing main, translations, and all 16 script sitemaps."""
-    sitemapindex = ET.Element("sitemapindex", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # 1. Main Roman/Latin Canon Sitemap
-    sitemap_elem = ET.SubElement(sitemapindex, "sitemap")
-    ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-main.xml"
-    ET.SubElement(sitemap_elem, "lastmod").text = now_iso
+def get_bold_definitions_count(bold_db_path):
+    """Read live row count from bold_definitions.db if available."""
+    if not bold_db_path or not Path(bold_db_path).exists():
+        return 387006
+    try:
+        conn = sqlite3.connect(str(bold_db_path))
+        row = conn.execute("SELECT COUNT(*) FROM bold_definitions").fetchone()
+        conn.close()
+        return int(row[0]) if row and row[0] else 387006
+    except Exception:
+        return 387006
 
-    # 2. Translations Sitemap (15 modern languages across all 217 books)
-    sitemap_elem = ET.SubElement(sitemapindex, "sitemap")
-    ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-translations.xml"
-    ET.SubElement(sitemap_elem, "lastmod").text = now_iso
 
-    # 3. 16 Script Child Sitemaps
-    for sc in PALI_SCRIPTS:
-        sitemap_elem = ET.SubElement(sitemapindex, "sitemap")
-        ET.SubElement(sitemap_elem, "loc").text = f"{site_url}/sitemap-{sc['code']}.xml"
-        ET.SubElement(sitemap_elem, "lastmod").text = now_iso
-
-    xml_str = ET.tostring(sitemapindex, encoding="utf-8")
-    parsed = minidom.parseString(xml_str)
-    return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
-
-def generate_single_sitemap_xml(books, chapters, site_url, script_code=None):
-    """Generate a single XML sitemap for either default Roman or a specific script."""
+def generate_canonical_sitemap_xml(books, site_url):
+    """
+    Generate a single clean XML sitemap containing ONLY the 222 statically
+    prerendered, self-canonical URLs.
+    Non-canonical SPA fallbacks (/book/{script}.{code}, /book/{code}/{ch},
+    /book/{code}?l={lang}) are intentionally excluded to eliminate canonical
+    URL collapsing and duplicate title/description penalties in Bing & Google.
+    """
     urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
     now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    prefix = f"{script_code}." if script_code else ""
-    is_main = script_code is None
+    static_pages = [
+        (f"{site_url}/", "weekly", "1.0"),
+        (f"{site_url}/info", "monthly", "0.85"),
+        (f"{site_url}/pali-script-converter", "monthly", "0.85"),
+        (f"{site_url}/privacy_policy.html", "yearly", "0.3"),
+        (f"{site_url}/terms_of_service.html", "yearly", "0.3"),
+    ]
 
-    # Home page + static info/guide page only in main sitemap
-    if is_main:
+    for loc, changefreq, priority in static_pages:
         url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/"
+        ET.SubElement(url_elem, "loc").text = loc
         ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = "weekly"
-        ET.SubElement(url_elem, "priority").text = "1.0"
+        ET.SubElement(url_elem, "changefreq").text = changefreq
+        ET.SubElement(url_elem, "priority").text = priority
 
-        url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/info"
-        ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = "monthly"
-        ET.SubElement(url_elem, "priority").text = "0.8"
-
-        url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/pali-script-converter"
-        ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = "monthly"
-        ET.SubElement(url_elem, "priority").text = "0.8"
-
-    # All 217 Books
-    book_priority = "0.9" if is_main else "0.85"
+    # All 217 prerendered canonical book pages (/book/{code})
     for b in books:
         clean_code = b['code']
+        cat = str(b.get('category') or '').lower()
+        if clean_code.endswith('.mul') or 'mūla' in cat or 'mula' in cat:
+            priority = "0.9"
+        elif clean_code.endswith('.att') or 'aṭṭha' in cat or 'attha' in cat:
+            priority = "0.8"
+        else:
+            priority = "0.75"
         url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{prefix}{clean_code}"
+        ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{clean_code}"
         ET.SubElement(url_elem, "lastmod").text = now_iso
         ET.SubElement(url_elem, "changefreq").text = "monthly"
-        ET.SubElement(url_elem, "priority").text = book_priority
-
-    # All individual chapters
-    chap_priority = "0.7" if is_main else "0.65"
-    for ch in chapters:
-        book_code = ch['book_code']
-        ch_idx = ch['chapter_index']
-        url_elem = ET.SubElement(urlset, "url")
-        ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{prefix}{book_code}/{ch_idx + 1}"
-        ET.SubElement(url_elem, "lastmod").text = now_iso
-        ET.SubElement(url_elem, "changefreq").text = "monthly"
-        ET.SubElement(url_elem, "priority").text = chap_priority
+        ET.SubElement(url_elem, "priority").text = priority
 
     xml_str = ET.tostring(urlset, encoding="utf-8")
     parsed = minidom.parseString(xml_str)
     return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
 
-def generate_translations_sitemap_xml(books, site_url):
-    """Generate XML sitemap containing all 217 books across the 15 translation languages (3,255 URLs)."""
-    urlset = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-    for b in books:
-        clean_code = b['code']
-        for t in TRANSLATION_LANGUAGES:
-            url_elem = ET.SubElement(urlset, "url")
-            ET.SubElement(url_elem, "loc").text = f"{site_url}/book/{clean_code}?l={t['code']}"
-            ET.SubElement(url_elem, "lastmod").text = now_iso
-            ET.SubElement(url_elem, "changefreq").text = "monthly"
-            ET.SubElement(url_elem, "priority").text = "0.8"
-
-    xml_str = ET.tostring(urlset, encoding="utf-8")
-    parsed = minidom.parseString(xml_str)
-    return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
 
 def generate_all_sitemaps(books, chapters, site_url):
-    """Generate all sitemap files: root index + main + translations + 16 script sitemaps."""
-    sitemaps = {}
-    # 1. Root index
-    sitemaps['sitemap.xml'] = generate_sitemap_index_xml(site_url)
-    # 2. Main Roman sitemap
-    sitemaps['sitemap-main.xml'] = generate_single_sitemap_xml(books, chapters, site_url, script_code=None)
-    # 3. Translations sitemap (15 languages across all 217 books)
-    sitemaps['sitemap-translations.xml'] = generate_translations_sitemap_xml(books, site_url)
-    # 4. 16 Script sitemaps
-    for sc in PALI_SCRIPTS:
-        filename = f"sitemap-{sc['code']}.xml"
-        sitemaps[filename] = generate_single_sitemap_xml(books, chapters, site_url, script_code=sc['code'])
-    return sitemaps
+    """Return canonical sitemap map (single clean sitemap.xml)."""
+    return {
+        'sitemap.xml': generate_canonical_sitemap_xml(books, site_url),
+    }
 
-# Backward-compatibility alias
+
 def generate_sitemap_xml(books, chapters, site_url):
-    return generate_sitemap_index_xml(site_url)
+    """Backward-compatibility alias."""
+    return generate_canonical_sitemap_xml(books, site_url)
+
+
+def cleanup_obsolete_sitemaps(target_dir: Path):
+    """Remove obsolete non-canonical child sitemaps (sitemap-main.xml, sitemap-translations.xml, sitemap-{script}.xml)."""
+    if not target_dir or not target_dir.exists():
+        return 0
+    removed = 0
+    obsolete = {"sitemap-main.xml", "sitemap-translations.xml"} | {
+        f"sitemap-{sc['code']}.xml" for sc in PALI_SCRIPTS
+    }
+    for fname in obsolete:
+        fpath = target_dir / fname
+        if fpath.exists():
+            try:
+                fpath.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
+
+def sync_indexnow_key(public_dir: Path, target_dir: Path):
+    """Copy the 32-hex IndexNow verification key file from public/ to target_dir."""
+    if not public_dir or not target_dir or public_dir == target_dir or not public_dir.exists() or not target_dir.exists():
+        return None
+    for p in sorted(public_dir.iterdir()):
+        if p.is_file() and INDEXNOW_KEY_RE.match(p.name):
+            dst = target_dir / p.name
+            dst.write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+            return p.name
+    return None
+
 
 def generate_robots_txt(site_url):
-    """Generate SEO and AI crawler friendly robots.txt with all sitemaps declared."""
+    """Generate SEO and AI-crawler-friendly robots.txt with single canonical sitemap."""
     api_url = "https://api.tipitakapali.org"
-    sitemap_lines = [
-        f"Sitemap: {site_url}/sitemap.xml",
-        f"Sitemap: {site_url}/sitemap-main.xml",
-        f"Sitemap: {site_url}/sitemap-translations.xml",
-    ]
-    for sc in PALI_SCRIPTS:
-        sitemap_lines.append(f"Sitemap: {site_url}/sitemap-{sc['code']}.xml")
-    sitemaps_block = "\n".join(sitemap_lines)
 
     return f"""# robots.txt for Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
 # =========================================================
@@ -254,10 +270,9 @@ Allow: /
 Allow: /_next/
 Allow: /api/
 Allow: /book/
-Allow: /chapter/
 Disallow: /api/search*
 
-# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow dict tool use
+# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow AI & Dict tools
 User-agent: GPTBot
 User-agent: ChatGPT-User
 User-agent: OAI-SearchBot
@@ -277,19 +292,10 @@ Allow: /
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /api/
-Allow: /api/dict/lookup
-Allow: /api/dict/inf
-Allow: /book/
-Allow: /chapter/
-
-# 2b. Canonical AI Tool API (direct VPS) — always allow
-# AI tools should call {api_url}/api/dict/lookup?w={{word}}&dict=dpd|others
-# and {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd as live example
-User-agent: GPTBot
-User-agent: ClaudeBot
-User-agent: PerplexityBot
-Content-Signal: ai-train=yes, search=yes, ai-input=yes
+Allow: /api/ai/
 Allow: /api/dict/
+Allow: /api/links/
+Allow: /book/
 
 # 3. Default for all other user agents
 User-agent: *
@@ -297,23 +303,28 @@ Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /
 Allow: /_next/
 Allow: /api/
-Allow: /api/dict/lookup
-Allow: /api/dict/inf
+Allow: /api/ai/
+Allow: /api/dict/
+Allow: /api/links/
 Disallow: /api/search*
 
-# 4. Sitemaps and AI Entry Points (Root Index, Main, and 16 Scripts)
-{sitemaps_block}
+# 4. Canonical Sitemap & AI Discovery Entry Points
+Sitemap: {site_url}/sitemap.xml
 Agentmap: {site_url}/.well-known/ai-catalog.json
 Host: {site_url.replace('https://', '').replace('http://', '')}
-# AI Tool Docs
-# Canonical Dict API: {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd
-# Canonical Dict Others: {api_url}/api/dict/lookup?w=mett%C4%81&dict=others
-# OpenAPI: {site_url}/openapi.json
-# AI Plugin: {site_url}/.well-known/ai-plugin.json
+
+# AI Tool Quick Reference (Direct VPS, CORS *, no auth)
+# Bold Definitions (387K+ canonical/commentary glosses): {api_url}/api/ai/bold_definitions?w=mett%C4%81&langs=en
+# Concept-Group Search (multi-concept boolean FTS5):     POST {api_url}/api/ai/search_concepts
+# Digital Pāḷi Dictionary (DPD primary):                 {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd
+# Sentence-Aligned Pāḷi + Translations:                  {api_url}/api/ai/sentences?book=s0101m.mul&chapter=0&para_index=5&langs=en
+# OpenAPI Specification:                                 {site_url}/openapi.json
+# AI Agent Instructions:                                 {site_url}/llms.txt
 """
 
-def generate_llms_txt(site_url, books_count, chapters_count):
-    """Generate /llms.txt adhering to the LLM agent standard (https://llmstxt.org)."""
+
+def generate_llms_txt(site_url, books_count, chapters_count, bold_def_count=387006):
+    """Generate /llms.txt adhering to the llmstxt.org standard with high-signal AI research workflows."""
     api_url = "https://api.tipitakapali.org"
 
     script_rows = []
@@ -326,76 +337,105 @@ def generate_llms_txt(site_url, books_count, chapters_count):
         trans_rows.append(f"- `{t['code']}`: **{t['name']}** ({t['native']}) {t['flag']} → `{site_url}/book/s0101m.mul?l={t['code']}` ({t['desc']})")
     translations_list_str = "\n".join(trans_rows)
 
-    return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (VRI)
-> Complete Chaṭṭha Saṅgāyana Tipiṭaka (Sixth Buddhist Council) Pali Canon texts, commentary, sub-commentary, and dictionaries with {len(TRANSLATION_LANGUAGES)} modern translations.
+    return f"""# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (TipitakaPali.org)
+> Complete Sixth Buddhist Council (VRI / CSCD) Theravāda Pāḷi Canon — {books_count} books (Mūla, Aṭṭhakathā, Ṭīkā, Añña), {chapters_count:,} chapters, 520,000+ paragraphs, 1.2M aligned Pāḷi sentences, {bold_def_count:,} pre-indexed canonical bold definitions, Digital Pāḷi Dictionary (DPD), 17 scripts, and {len(TRANSLATION_LANGUAGES)} modern translations (24 layers including Pāḷi). Zero-auth open REST & static JSON APIs (`CORS *`).
 
-## Overview
-- **Corpus**: Chaṭṭha Saṅgāyana Tipiṭaka (Vipassana Research Institute / CSCD edition).
-- **Total Canonical Books**: {books_count} books.
-- **Total Chapters**: {chapters_count:,} chapters across 520,000+ paragraphs.
-- **Languages / Scripts**: Pāḷi in Roman (Latin with full IAST diacritics) + 16 Asian & historic scripts.
-- **Translations Available**: {len(TRANSLATION_LANGUAGES)} languages (English, Vietnamese, Burmese, Sinhala, Chinese, Thai, German, Japanese, Portuguese, Hindi, Khmer, Lao, Tamil, Russian, Myanmar Nissaya, Korean, Indonesian, Nepali, Bengali, Spanish, French, Czech, Marathi) with 15M+ sentence-aligned translations.
-- **Canonical Piṭakas**:
-  1. **Vinaya Piṭaka** (Monastic Rules): Pārājikapāḷi, Pācittiyapāḷi, Mahāvaggapāḷi, Cūḷavaggapāḷi, Parivārapāḷi, plus commentaries (Aṭṭhakathā) and sub-commentaries (Ṭīkā).
-  2. **Sutta Piṭaka** (Discourses): Dīgha Nikāya, Majjhima Nikāya, Saṃyutta Nikāya, Aṅguttara Nikāya, Khuddaka Nikāya (Dhammapada, Sutta Nipāta, Jātaka, etc.), plus Aṭṭhakathā and Ṭīkā.
-  3. **Abhidhamma Piṭaka** (Higher Doctrine): Dhammasaṅgaṇī, Vibhaṅga, Dhātukathā, Puggalapaññatti, Kathāvatthu, Yamaka, Paṭṭhāna, plus Aṭṭhakathā and Ṭīkā.
-  4. **Añña Texts**: Post-canonical grammars, Visuddhimagga, chronicles (Vaṃsa), and commentaries.
+## Fastest AI Research & Citation Playbook (Start Here)
+> Direct VPS API base (fastest, no proxy hop, no auth, `CORS *`): `{api_url}`
 
-## Key Reading Links
-- [Home & Canonical Navigation]({site_url}/)
-- [About, User Guide & Help]({site_url}/info)
-- [Pāḷi Script Converter (17 scripts, Velthuis input)]({site_url}/pali-script-converter)
-- [Full Catalog & AI Documentation]({site_url}/llms-full.txt)
-- [XML Sitemap Index]({site_url}/sitemap.xml)
-- [OpenAPI for AI Tools]({site_url}/openapi.json)
+### 1. Defining Any Pāḷi / Buddhist Term → Use Canonical Bold Definitions + DPD First
+In the Chaṭṭha Saṅgāyana Tipiṭaka (Aṭṭhakathā, Ṭīkā, Visuddhimagga, Abhidhammatthasaṅgaha, and Mūla), classical commentators mark every defined headword in **bold** (`<span class="bld">term</span>`, followed by *ti attho*, *nāma*, *vuccati*, *lakkhaṇaṃ*). TipitakaPali.org pre-indexes **{bold_def_count:,} bold definitions** with aligned translations and exact sentence citations:
+- **Canonical Bold Definitions (Ranked AI Endpoint — Recommended):**
+  - `GET {api_url}/api/ai/bold_definitions?w=mett%C4%81&langs=en&limit=8` (also accepts `word=`, `term=`, `q=`; `langs` accepts comma-separated codes e.g. `en,vi`)
+  - Returns `{{word, count, definitions: [{{word, book_code, book_title, category, chapter_index, para_index, para_num, line_id, citation_ref, citation_url, pali_definition, translations}}]}}` — pre-scored so authoritative definitional glosses (*ti attho*, *nāma*, *vuccati*, Aṭṭhakathā/Visuddhimagga) appear first with Markdown `**bold**` highlights and ready-to-cite `[book:cX:pY-LZ]` + clickable URLs.
+- **Batch Bold Definitions (Multiple Terms in 1 Call):**
+  - `POST {api_url}/api/ai/bold_definitions_batch` → JSON body `{{"words": ["sati", "samādhi", "paññā"], "langs": ["en"], "limit": 4}}` (also accepts `"terms"`).
+- **Dictionary-Format Bold Definitions:**
+  - `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=bold_def&langs=en`
+- **Digital Pāḷi Dictionary (DPD 90,000+ entries — Grammar, Roots, Inflections, Compound Splitter):**
+  - Primary DPD: `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd` (add `&d=yes` for sandhi/compound splitter)
+  - Secondary Dictionaries (PTS PED 2015, Pāḷi–Myanmar Abhidhān, Pāḷi–Sinhala, Sanskrit, Splitter): `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=others`
+  - Inflection Table: `GET {api_url}/api/dict/inf?w=declension_mett%C4%81_1`
+  - Input note: `w` accepts Roman IAST, Velthuis (`aa ii uu .m .t ~n`), or Myanmar/Sinhala/Devanagari/Thai scripts; `ṁ→ṃ` normalized automatically.
+
+### 2. Multi-Concept Research Questions → Concept-Group Search (Boolean Intersection)
+For questions combining 2+ concepts (e.g., *"mindfulness of breathing leading to liberation"*), decompose the question into **2–4 independent Concept Groups**, each with Pāḷi terms/stems AND English synonyms, and call:
+- **Concept-Group Search (Tiered AND-across-groups / OR-within-synonyms FTS5):**
+  - `POST {api_url}/api/ai/search_concepts`
+  - JSON body:
+    `{{"concept_groups": [{{"concept": "Mindfulness", "pali_terms": ["sati", "satipaṭṭhāna"], "pali_stems": ["sati"], "english_keywords": ["mindfulness", "awareness"]}}, {{"concept": "Breathing", "pali_terms": ["ānāpāna", "assāsa", "passāsa"], "english_keywords": ["breath", "breathing"]}}], "langs": ["en"], "limit": 12}}`
+  - Searches Pāḷi + English/user-language FTS5 indexes with automatic Tier 1 (all groups) → Tier 2 (pairwise) → Tier 3 (single-group) fallback, ranked by concept coverage and Mūla priority.
+- **Query Understanding & Canonical Sutta Grounding (Local, Zero-Auth):**
+  - `POST {api_url}/api/ai/understand` → `{{"query": "What does DN 22 teach about vedanā?"}}` → returns detected language, concept groups, canonical Pāḷi terms, and resolved `book_code`s.
+- **Sutta / Section Title Search:**
+  - `GET {api_url}/api/ai/sections?q=satipatthana&limit=10`
+- **Full-Text Search (FTS5 across 520,000+ Pāḷi paragraphs & translation indexes):**
+  - `GET {api_url}/api/search?q=anatta&l=pali&pitaka=sutta&mat=mula&distance=5&sort=canonical&limit=20`
+  - Params: `l` (`pali` or any of the {len(TRANSLATION_LANGUAGES)} translation codes e.g. `en`, `vi`, `my`), `pitaka` (`all|vinaya|sutta|abhidhamma|anna`), `mat` (`all|mula|attha|tika`), `distance` (`1`=exact phrase, `2..10`=NEAR, `0`=anywhere in paragraph), `sort` (`canonical|relevance|bm25`).
+
+### 3. Verifying Exact Passages, Sentence Translations & Commentaries (Zero-Hallucination Grounding)
+- **Exact Paragraph Range + Aligned Translations:**
+  - `GET {api_url}/api/ai/paragraph_content?book=s0102m.mul&chapter=8&start=1341&end=1345&langs=en` (or by printed VRI paragraph number: `&para_num=373`)
+  - Batch: `POST {api_url}/api/ai/paragraph_content_batch` → `{{"ranges": [{{"book_code": "s0102m.mul", "chapter_index": 8, "para_start": 1341, "para_end": 1345}}], "langs": ["en"]}}`
+- **Sentence-Level Pāḷi ↔ Translation Alignment (1.2M sentences, shared `line_id`, 99.7% 1:1 match):**
+  - `GET {api_url}/api/ai/sentences?book=s0101m.mul&chapter=0&para_index=5&langs=en,vi`
+  - Returns exact 1-based `line_id` pairs for sentence-level citations `[book:cX:pY-LZ]`.
+- **Parallel Aṭṭhakathā & Ṭīkā Commentaries for Any Mūla Paragraph:**
+  - `GET {api_url}/api/ai/commentaries?book=s0101m.mul&chapter=0&para=1`
+- **Linked Definition / Cross-Reference Preview (Mūla ↔ Aṭṭhakathā ↔ Ṭīkā):**
+  - `GET {api_url}/api/links/preview?book=s0101m.mul&para=1&langs=en`
+- **Unified AI Tool Dispatcher (Supports All Tools via Single Endpoint):**
+  - `POST {api_url}/api/ai/tool-call` → `{{"tool": "get_bold_definitions", "args": {{"word": "sati", "langs": ["en"], "limit": 6}}}}`
+  - Full tool list: `GET {api_url}/api/ai/tools`
+
+## Verifiable Citation Format & Deep-Link URLs
+Always ground every claim with exact canonical coordinates so users can click straight to the source paragraph or sentence:
+- **Bracket Citation Syntax:**
+  - Paragraph: `[book_code:c{{0_based_chapter}}:p{{para_index}}]` (e.g. `[s0102m.mul:c8:p1343]`)
+  - Sentence (Preferred for precision): `[book_code:c{{0_based_chapter}}:p{{para_index}}-L{{1_based_line_id}}]` (e.g. `[s0101m.mul:c0:p5-L1]`)
+- **Clickable Canonical Web URLs:**
+  - Book (canonical): `{site_url}/book/{{book_code}}`
+  - Chapter + Exact Paragraph Index: `{site_url}/book/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}`
+  - Chapter + Printed Para Number: `{site_url}/book/{{book_code}}/{{1_based_chapter}}#para-{{para_num}}`
+  - With Modern Translation Layer: `{site_url}/book/{{book_code}}/{{1_based_chapter}}?l={{lang_code}}#pindex-{{para_index}}`
+  - In Alternative Pāḷi Script: `{site_url}/book/{{script_code}}.{{book_code}}`
+
+### Quick Nikāya / Piṭaka → `book_code` Citation Map
+{QUICK_CITATION_MAP}
+
+## Public Static Edge JSON APIs (0ms Cloudflare CDN)
+- Navigation Tree: `GET {site_url}/api/tree`
+- 217-Book Catalog: `GET {site_url}/api/books`
+- Book Details, TOC & Initial Chapters: `GET {site_url}/api/book/{{book_code}}`
+- Chapter HTML: `GET {site_url}/api/book/{{book_code}}/chapter/{{0_based_chapter_index}}`
+- Book Table of Contents: `GET {site_url}/api/book/{{book_code}}/toc`
+- Mūla–Aṭṭhakathā–Ṭīkā Matrix: `GET {site_url}/api/mat` and `GET {site_url}/api/mat/chapter_map`
+- Pāḷi Sentences (shared `line_id`): `GET {site_url}/api/book/{{book_code}}/pali_sentences`
+- Translation Sentences (static): `GET {site_url}/api/book/{{book_code}}/translation/{{lang}}.sentences.json`
+
+## Key Links & Machine Discovery
+- [Home & Tipiṭaka Reader]({site_url}/)
+- [About, Features & User Guide]({site_url}/info)
+- [Pāḷi Script Converter (17 scripts, Velthuis)]({site_url}/pali-script-converter)
+- [Full 217-Book Catalog & Complete API Docs]({site_url}/llms-full.txt)
+- [Canonical XML Sitemap]({site_url}/sitemap.xml)
+- [OpenAPI 3.1 Specification]({site_url}/openapi.json)
+- [MCP Server Card]({site_url}/.well-known/mcp.json)
 - [AI Plugin Manifest]({site_url}/.well-known/ai-plugin.json)
+- [A2A Agent Card]({site_url}/.well-known/agent-card.json)
 
-## Reading URLs, Translations & Multi-Script Syntax
-- **Default Roman Book**: `{site_url}/book/[book_code]` (e.g. `{site_url}/book/s0101m.mul` for Dīgha Nikāya Sīlakkhandhavagga)
-- **Book with Translation**: `{site_url}/book/[book_code]?l=[lang_code]` (e.g. `{site_url}/book/s0101m.mul?l=en` for English, `{site_url}/book/s0101m.mul?l=vi` for Vietnamese, `{site_url}/book/s0101m.mul?l=my` for Burmese)
-- **Multi-Script Book**: `{site_url}/book/[script_code].[book_code]` (e.g. `{site_url}/book/hi.s0101m.mul` for Devanagari, `{site_url}/book/si.s0101m.mul` for Sinhala, `{site_url}/book/my.s0101m.mul` for Myanmar, `{site_url}/book/thai.s0101m.mul` for Thai)
-- **Default Roman Chapter**: `{site_url}/book/[book_code]/[chapter_number]` (e.g. `{site_url}/book/s0101m.mul/2` for Chapter 2)
-- **Chapter with Translation**: `{site_url}/book/[book_code]/[chapter_number]?l=[lang_code]` (e.g. `{site_url}/book/s0101m.mul/2?l=en`)
-- **Specific Paragraph**: `{site_url}/book/[book_code]#para-[number]` (e.g. `{site_url}/book/s0502m.mul#para-1` for Dhammapada Verse 1)
-
-### Supported {len(TRANSLATION_LANGUAGES)} Modern Translation Languages (15M+ Aligned Sentences):
+### Supported {len(TRANSLATION_LANGUAGES)} Modern Translations (+ Pāḷi = 24 Layers)
 {translations_list_str}
 
-### Supported 16 Pāḷi Script Codes:
+### Supported 16 Alternative Pāḷi Scripts (+ Roman Default = 17 Scripts)
 {scripts_list_str}
-*(Note: Roman/Latin is the default and uses the standard URL without a prefix)*
-
-## Public Static JSON API (Edge CDN 0ms)
-- Navigation Tree: `GET {site_url}/api/tree`
-- Books List: `GET {site_url}/api/books`
-- Book Details & Initial Chapters: `GET {site_url}/api/book/[book_code]`
-- Chapter HTML: `GET {site_url}/api/book/[book_code]/chapter/[chapter_index]`
-- Book Table of Contents: `GET {site_url}/api/book/[book_code]/toc`
-- Mūla-Aṭṭhakathā-Ṭīkā Cross Matrix: `GET {site_url}/api/mat`
-- Pāḷi Sentences (epitaka segmentation, shared line_id): `GET {site_url}/api/book/[book_code]/pali_sentences` → `{{chapters: {{chapter: {{para_index: [{{line,text}}]}}}}}}`
-- Translation Sentences: `GET {site_url}/api/book/[book_code]/translation/[lang].sentences.json` (static) or `GET {api_url}/api/book/[book_code]/chapter/[chapter_index]/translation?lang=[lang]&sentences=1` (VPS)
-
-## AI Tool-Use: Canonical Dictionary, Search & Sentences (Direct VPS — no Worker hop)
-> Canonical base for AI agents: `{api_url}` (CORS `*`, `Cache-Control: public, max-age=86400`)
-> Sentence-level note: Pāḷi sentences (`pali_sentences.db`, 1.2M sentences, 217 books) and translation sentences share `line_id` per paragraph by construction — **99.7% per-para line-count match**. Use `get_sentences` tool for precise sentence citations: `[book:c{{chapter}}:p{{para}}-L{{line}}]`.
-
-- **DPD Primary Lookup (recommended first):** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd`
-  - Example live: `curl "{api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd"` → `{{word, counts:{{dpd:2}}, dpd:[{{word,html}}]}}`
-- **Secondary Dictionaries (PTS, ABD, PSD, Sanskrit, Splitter):** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=others`
-  - Returns `{{counts:{{pts,abd,psd,sans,splitter}}, pts:[], abd:[], psd:[], sans:[], splitter:[]}}`
-- **All at once:** `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=all` or `GET {site_url}/api/dict/lookup?w=mett%C4%81&dict=all`
-- **Inflection:** `GET {api_url}/api/dict/inf?w=declension_mett%C4%81_1` → `{{word, html}}`
-- **Full-Text Search:** `GET {api_url}/api/search?q=anatta&pitaka=sutta&mat=mula&limit=50`
-- Params: `w` (Pāḷi word, Velthuis or Unicode, `ṁ→ṃ` normalized), `dict` (`dpd`|`others`|`all`|`pts`|`abd`|`psd`|`sans`|`splitter`), `d=yes` for splitter.
-- No auth, `CORS *`, `GET` preferred (POST also via `{{w,dict}}` JSON).
-
-## Legacy Edge Proxies (also work, but direct VPS is faster)
-- `GET {site_url}/api/dict/lookup?w=[word]&dict=dpd` → proxied to VPS
-- `GET {site_url}/api/search?q=[query]` → proxied to VPS
 """
 
-def generate_llms_full_txt(site_url, books, catalog):
-    """Generate complete /llms-full.txt with 217-book catalog, translations reference, multi-script patterns, and metadata."""
+
+def generate_llms_full_txt(site_url, books, catalog, bold_def_count=387006):
+    """Generate comprehensive /llms-full.txt with AI playbook, full 217-book catalog + MAT cross-links, and complete REST API docs."""
+    api_url = "https://api.tipitakapali.org"
+
     script_table_rows = [
         "| Script Code | Script Name | Native | Sample Book URL | Sample Chapter 1 URL |",
         "| :--- | :--- | :--- | :--- | :--- |",
@@ -416,106 +456,171 @@ def generate_llms_full_txt(site_url, books, catalog):
         )
 
     lines = [
-        "# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete Canonical Catalog, Translations & Multi-Script Reference",
+        "# Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi — Complete AI Research Reference, 217-Book Catalog & API Docs",
         f"> Website: {site_url}",
-        f"> Total Canonical Books: {len(books)}",
+        f"> Direct AI & Search API (CORS *, no auth): {api_url}",
+        f"> Corpus: {len(books)} canonical books (Mūla, Aṭṭhakathā, Ṭīkā, Añña) • 520,000+ paragraphs • 1.2M aligned Pāḷi sentences • {bold_def_count:,} pre-indexed canonical bold definitions • {len(TRANSLATION_LANGUAGES)} modern translations • 17 Pāḷi scripts.",
         "",
-        "## Multilingual Translation Deep-Linking Guide for AI Agents",
+        "## Recommended AI Agent Workflow for Maximum Accuracy & Citation Grounding",
+        "1. **For term / doctrinal / Vinaya / Abhidhamma definitions:** Call `GET https://api.tipitakapali.org/api/ai/bold_definitions?w={term}&langs=en&limit=8` (queries " + f"{bold_def_count:,}" + " pre-indexed commentarial & canonical bold glosses with `*ti attho*`, `*nāma*`, `*vuccati*` ranking and exact `[book:cX:pY-LZ]` citations) in parallel with `GET https://api.tipitakapali.org/api/dict/lookup?w={term}&dict=dpd` (DPD grammar, roots & compound splitter).",
+        "2. **For multi-concept research questions:** Break the question into 2–4 Concept Groups (each with Pāḷi terms/stems AND English synonyms) and POST to `https://api.tipitakapali.org/api/ai/search_concepts` for tiered boolean-intersection search across Pāḷi and translation FTS5 indexes.",
+        "3. **For exact textual grounding & verification:** Fetch complete paragraphs (`GET /api/ai/paragraph_content`), sentence-aligned Pāḷi + translations (`GET /api/ai/sentences`, 99.7% 1:1 `line_id` match), and parallel Aṭṭhakathā/Ṭīkā commentaries (`GET /api/ai/commentaries`).",
+        "4. **For clickable citations:** Emit `[book_code:c{0_based_chapter}:p{para_index}-L{line_id}]` and/or link to " + f"`{site_url}/book/{{book_code}}/{{1_based_chapter}}#pindex-{{para_index}}` (append `?l=en` or any translation code for side-by-side translation).",
+        "",
+        "## Quick Nikāya / Piṭaka → `book_code` Citation Map",
+        QUICK_CITATION_MAP,
+        "",
+        "## Complete REST & AI Tool API Reference",
+        "",
+        f"### 1. Canonical Bold Definitions ({bold_def_count:,} Pre-Indexed Glosses) — Primary Term Definition API",
+        f"- Single term (ranked): `GET {api_url}/api/ai/bold_definitions?w={{pali_term}}&langs=en&limit=8`",
+        f"  - Also accepts query params `word=`, `term=`, `q=`; `langs` accepts comma-separated language codes (e.g. `en,vi`).",
+        f"  - Example: `GET {api_url}/api/ai/bold_definitions?w=satipa%E1%B9%AD%E1%B9%ADh%C4%81na&langs=en&limit=6`",
+        f"  - Returns: `{{success, word, search_prefix, count, definitions: [{{word, book_code, book_title, category, chapter_index, para_index, para_num, line_id, citation_ref, citation_url, pali_definition, context_before, context_after, translations}}]}}`",
+        f"- Batch terms: `POST {api_url}/api/ai/bold_definitions_batch`",
+        "  - Body: `{\"words\": [\"sati\", \"samādhi\", \"paññā\"], \"langs\": [\"en\"], \"limit\": 4}` (also accepts `\"terms\"`).",
+        f"- Dictionary-compatible endpoint: `GET {api_url}/api/dict/lookup?w={{pali_term}}&dict=bold_def&langs=en`",
+        "- Why Bold Definitions matter: Classical Theravāda commentaries (Buddhaghosa, Dhammapāla, etc.) wrap every exact lemma under explanation in **bold**. Pre-indexing all 387,006 bold occurrences gives AI agents direct, verifiable primary-source definitions instead of relying on parametric memory.",
+        "",
+        "### 2. Multi-Concept Boolean Search (`search_concepts`) & Query Understanding",
+        f"- Concept-Group Search: `POST {api_url}/api/ai/search_concepts`",
+        "  - Body: `{\"concept_groups\": [{\"concept\": \"Mindfulness\", \"pali_terms\": [\"sati\", \"satipaṭṭhāna\"], \"pali_stems\": [\"sati\"], \"english_keywords\": [\"mindfulness\", \"awareness\"]}, {\"concept\": \"Breathing\", \"pali_terms\": [\"ānāpāna\", \"assāsa\", \"passāsa\"], \"english_keywords\": [\"breath\", \"breathing\"]}], \"categories\": [], \"nikayas\": [], \"langs\": [\"en\"], \"limit\": 12}`",
+        "  - Executes Tier 1 (all concept groups intersected), Tier 2 (pairwise intersections), and Tier 3 (single-group fallback) across Pāḷi and translation FTS5 indexes, ranked by concept coverage and Mūla priority.",
+        f"- Local Query Understanding: `POST {api_url}/api/ai/understand` with `{{\"query\": \"...\"}}` → detects language, extracts concept groups, Pāḷi terms/stems, English keywords, and canonical book references.",
+        "",
+        "### 3. Sutta/Section Discovery, Paragraph Retrieval & Commentaries",
+        f"- Search Suttas & Headings: `GET {api_url}/api/ai/sections?q={{query}}&limit=10`",
+        f"- Get Section Outline & Summary: `GET {api_url}/api/ai/section?book={{book_code}}&chapter={{0_based_ch}}`",
+        f"- Get Exact Paragraph Range + Translations: `GET {api_url}/api/ai/paragraph_content?book={{book_code}}&chapter={{0_based_ch}}&start={{para_index}}&end={{para_index}}&langs=en,vi` (also supports `&para_num={{printed_para}}`)",
+        f"- Batch Paragraph Retrieval: `POST {api_url}/api/ai/paragraph_content_batch` with `{{\"ranges\": [{{\"book_code\": \"s0102m.mul\", \"chapter_index\": 8, \"para_start\": 1341, \"para_end\": 1345}}], \"langs\": [\"en\"]}}`",
+        f"- Parallel Aṭṭhakathā & Ṭīkā Commentaries: `GET {api_url}/api/ai/commentaries?book={{book_code}}&chapter={{0_based_ch}}&para={{para_num}}`",
+        f"- Linked Mūla/Aṭṭhakathā/Ṭīkā Preview: `GET {api_url}/api/links/preview?book={{book_code}}&para={{para_num}}&langs=en`",
+        f"- Unified Tool Endpoint & Schema Discovery: `GET {api_url}/api/ai/tools` and `POST {api_url}/api/ai/tool-call` (`{{\"tool\": \"...\", \"args\": {{...}}}}`).",
+        "",
+        "### 4. Sentence-Level Pāḷi & Translation APIs (Shared `line_id`, 99.7% 1:1 Match)",
+        f"- AI Sentence Endpoint: `GET {api_url}/api/ai/sentences?book={{book_code}}&chapter={{0_based_ch}}&para_index={{para_index}}&langs=en,vi`",
+        "  - Returns: `{pali_sentences: [{line_id, sentence}], translations: {en: [{line_id, translation}]}}`",
+        f"- Book-Level Static Pāḷi Sentences: `GET {site_url}/api/book/{{book_code}}/pali_sentences`",
+        f"- Static Translation Sentences: `GET {site_url}/api/book/{{book_code}}/translation/{{lang}}.sentences.json`",
+        f"- Live Chapter Translation Sentences: `GET {api_url}/api/book/{{book_code}}/chapter/{{0_based_ch}}/translation?lang={{lang}}&sentences=1`",
+        "",
+        "### 5. Full-Text Search (FTS5 across Pāḷi & 23 Translations)",
+        f"- Endpoint: `GET {api_url}/api/search?q={{query}}&l={{pali|en|vi|...}}&pitaka={{all|vinaya|sutta|abhidhamma|anna}}&mat={{all|mula|attha|tika}}&distance={{1|5|0}}&sort={{canonical|relevance|bm25}}&limit=50`",
+        f"- Example: `GET {api_url}/api/search?q=anatta&pitaka=sutta&mat=mula&limit=20`",
+        "- Description: Ultra-fast FTS5 across 520,000+ paragraphs plus per-language translation FTS5 indexes. CORS `*`, `Cache-Control: public, max-age=86400`.",
+        "",
+        "### 6. Pāḷi Dictionary & Inflection Lookup (DPD + 5 Classical Lexicons)",
+        f"- Endpoint: `GET {api_url}/api/dict/lookup?w={{pali_word}}&dict={{dpd|others|bold_def|all|pts|abd|psd|sans|splitter}}&d={{yes|no}}`",
+        f"- Example DPD (primary): `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=dpd` → `{{word, counts:{{dpd:2}}, dpd:[{{word,html}}]}}`",
+        f"- Example Others (secondary): `GET {api_url}/api/dict/lookup?w=mett%C4%81&dict=others` → `{{counts:{{pts,abd,psd,sans,splitter}}, pts:[], ...}}`",
+        f"- Inflection Tables: `GET {api_url}/api/dict/inf?w=declension_{{lemma}}_1` (e.g. `declension_mett%C4%81_1` → `{{word, html}}`)",
+        "- Description: DPD (90k+ entries), PTS PED 2015, Tipiṭaka Pāḷi–Myanmar Abhidhān, Pāḷi–Sinhala, Sanskrit (MW/Apte/Edgerton), Compound Splitter, and Bold Definitions. `w` accepts IAST, Velthuis, or Asian scripts (`ṁ→ṃ` normalized). No auth, `GET` preferred, `POST {w,dict}` also supported.",
+        "",
+        "### 7. Edge Static JSON APIs (0ms CDN)",
+        f"- Navigation Tree: `GET {site_url}/api/tree`",
+        f"- 217-Book Catalog: `GET {site_url}/api/books`",
+        f"- Book Metadata, TOC & Initial Chapters: `GET {site_url}/api/book/{{book_code}}`",
+        f"- Chapter HTML: `GET {site_url}/api/book/{{book_code}}/chapter/{{chapter_index}}`",
+        f"- MAT Cross-Reference Matrix: `GET {site_url}/api/mat` and `GET {site_url}/api/mat/chapter_map`",
+        "",
+        "### 8. OpenAPI, MCP & Machine Discovery",
+        f"- OpenAPI 3.1: `GET {site_url}/openapi.json`",
+        f"- MCP Server Card: `GET {site_url}/.well-known/mcp.json`",
+        f"- AI Plugin Manifest: `GET {site_url}/.well-known/ai-plugin.json`",
+        f"- A2A Agent Card: `GET {site_url}/.well-known/agent-card.json`",
+        f"- Canonical XML Sitemap: `GET {site_url}/sitemap.xml`",
+        f"- Human Guide & Help: `{site_url}/info`",
+        f"- Offline-Capable Pāḷi Script Converter (17 scripts): `{site_url}/pali-script-converter`",
+        "",
+        f"## Multilingual Translation Deep-Linking Guide ({len(TRANSLATION_LANGUAGES)} Languages)",
         "Users can open any canonical text with side-by-side / sentence-level translations by appending `?l=[lang_code]`:",
         "",
         "\n".join(trans_table_rows),
         "",
-        "## Multi-Script Deep-Linking Guide for AI Agents",
+        "## Multi-Script Deep-Linking Guide (17 Pāḷi Scripts)",
         "Users can open any canonical text directly in their preferred script by prefixing the book code:",
         "",
         "\n".join(script_table_rows),
         "",
-        "## Canonical Books Directory (217 Books)",
-        "| Book Code | Title | Piṭaka | Category | Chapters | Default Roman URL |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        f"## Complete Canonical Books Directory ({len(books)} Books with MAT Cross-Links)",
+        "| Book Code | Title | Collection / Path | Category | Chapters | MAT Siblings (M / A / T) | Canonical URL |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
 
     for b in books:
         code = b['code']
-        title = b['title']
-        nikaya = b['nikaya'] or ''
-        category = b['category'] or ''
+        cat_entry = catalog.get(code, {}) if isinstance(catalog, dict) else {}
+        nav_parts = [p.strip() for p in str(cat_entry.get('longNavPath') or '').split('/') if p.strip()]
+        own_title = nav_parts[-1] if nav_parts else (b['title'] or code)
+        parent_path = nav_parts[-2] if len(nav_parts) >= 2 else (b['nikaya'] or '')
+        category = b['category'] or cat_entry.get('matn') or ''
         ch_count = b['chapter_count'] or 1
+        mat = cat_entry.get('mat') or {}
+        sibs = []
+        if mat.get('mula_code') and mat['mula_code'] != code:
+            sibs.append(f"M:`{mat['mula_code']}`")
+        if mat.get('attha_code') and mat['attha_code'] != code:
+            sibs.append(f"A:`{mat['attha_code']}`")
+        if mat.get('tika_code') and mat['tika_code'] != code:
+            sibs.append(f"T:`{mat['tika_code']}`")
+        sib_str = ", ".join(sibs) if sibs else "—"
         url = f"{site_url}/book/{code}"
-        lines.append(f"| `{code}` | {title} | {nikaya} | {category} | {ch_count} | [{title}]({url}) |")
+        lines.append(f"| `{code}` | {own_title} | {parent_path} | {category} | {ch_count} | {sib_str} | [{own_title}]({url}) |")
 
-    lines.extend([
-        "",
-        "## Complete REST & JSON API Reference",
-        "",
-        "### 1. Navigation Tree Hierarchy",
-        f"- Endpoint: `GET {site_url}/api/tree`",
-        "- Description: Full hierarchical navigation JSON containing Nikayas, Vaggas, and book nodes.",
-        "",
-        "### 2. Books Catalog",
-        f"- Endpoint: `GET {site_url}/api/books`",
-        "- Description: Returns summary metadata, chapter counts, and Piṭaka classification for all 217 books.",
-        "",
-        "### 3. Book Metadata & Content",
-        f"- Endpoint: `GET {site_url}/api/book/{{book_code}}`",
-        "- Example: `GET /api/book/s0101m.mul`",
-        "- Description: Returns table of contents, paragraph mapping, and initial chapter content.",
-        "",
-        "### 4. Chapter Content",
-        f"- Endpoint: `GET {site_url}/api/book/{{book_code}}/chapter/{{chapter_index}}`",
-        "- Example: `GET /api/book/s0101m.mul/chapter/1`",
-        "- Description: Returns pure HTML content of the requested chapter.",
-        "",
-        "### 5. Full-Text Search (FTS5) — Direct VPS",
-        f"- Endpoint: `GET https://api.tipitakapali.org/api/search?q={{query}}&pitaka={{all|vinaya|sutta|abhidhamma}}&mat={{all|mula|attha|tika}}&limit=50`",
-        "- Example: `GET https://api.tipitakapali.org/api/search?q=anatta&pitaka=sutta` (also `GET {site_url}/api/search?q=anatta`)",
-        "- Description: Ultra-fast FTS5 across 520,000+ paragraphs. CORS `*`, `Cache-Control: public, max-age=86400`.",
-        "",
-        "### 6. Pāḷi Dictionary Lookup — AI Tool-Use (Direct VPS)",
-        f"- Endpoint: `GET https://api.tipitakapali.org/api/dict/lookup?w={{pali_word}}&dict={{dpd|others|all|pts|abd|psd|sans|splitter}}`",
-        "- Example DPD (primary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd` → `{word,counts:{dpd:2}, dpd:[{word,html}]}`",
-        "- Example Others (secondary): `GET https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others` → `{counts:{pts,abd,psd,sans,splitter}, pts:[], ...}`",
-        "- All-in-one: `GET https://api.tipitakapali.org/api/dict/lookup?w=dhamma&dict=all`",
-        "- Also via edge: `GET {site_url}/api/dict/lookup?w=dhamma&dict=dpd` (proxied, slower)",
-        "- Description: DPD (90k+ entries), PTS PED 2015, Abhidhānappadīpikā, Pāḷi-Sinhala, Sanskrit. `w` accepts Velthuis/`ṁ→ṃ`. No auth, `GET` preferred, `POST {w,dict}` also.",
-        "",
-        "### 7. Sentence-Level Pāḷi & Translation APIs (epitaka shared line_id, 99.7% match)",
-        f"- Pāḷi Sentences (book-level): `GET {site_url}/api/book/{{book_code}}/pali_sentences` or `GET https://api.tipitakapali.org/api/book/{{book_code}}/pali_sentences`",
-        "- Example: `GET /api/book/s0101m.mul/pali_sentences` → `{book_code, chapters: {chapter: {para_index: [{line,text}]}}}`",
-        f"- Translation Sentences (chapter): `GET https://api.tipitakapali.org/api/book/{{book_code}}/chapter/{{chapter_index}}/translation?lang={{lang}}&sentences=1`",
-        "- Example: `GET /api/book/s0101m.mul/chapter/0/translation?lang=en&sentences=1` → `{sentences: {en: {para_index: [{line_id, translation}]}}}`",
-        f"- AI Agent: `GET https://api.tipitakapali.org/api/ai/sentences?book={{book_code}}&chapter={{chapter_index}}&para_index={{para_index}}&langs=en,vi` → sentence-aligned Pāḷi + translations",
-        "- Note: Pāḷi sentences built from `ref/epitaka_app/assets/db/epitaka.db` (`pali_sentences.db`, 1.2M sentences) — same segmentation that produced `translation_*.db`, hence shared `line_id`.",
-        "",
-        "### 8. Inflection Lookup",
-        f"- Endpoint: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_{{lemma}}_1`",
-        "- Example: `GET https://api.tipitakapali.org/api/dict/inf?w=declension_mett%C4%81_1`",
-        "- Description: Declension/conjugation tables. Returns `{word, html}`.",
-        "",
-        "### 9. OpenAPI & AI Plugin",
-        f"- OpenAPI: `GET {site_url}/openapi.json` (for ChatGPT/MCP tool import)",
-        f"- AI Plugin: `GET {site_url}/.well-known/ai-plugin.json`",
-        f"- Human Guide (features, shortcuts, dictionaries, scripts): `{site_url}/info`",
-        f"- Human Script Converter (17 scripts, Velthuis input, offline .zip): `{site_url}/pali-script-converter`",
-    ])
+    return "\n".join(lines) + "\n"
 
-    return "\n".join(lines)
 
-def generate_schema_jsonld(site_url, books):
-    """Generate Schema.org JSON-LD structured data for Google Rich Results."""
+def generate_schema_jsonld(site_url, books, catalog=None, bold_def_count=387006):
+    """Generate Schema.org JSON-LD structured data for Search Engines and Knowledge Graphs."""
     api_url = "https://api.tipitakapali.org"
-    lang_list = ["pi", "pi-Latn", "en"] + [t["code"] for t in TRANSLATION_LANGUAGES] + [sc["lang"] for sc in PALI_SCRIPTS]
+    lang_list = sorted(set(
+        ["pi", "pi-Latn", "en"]
+        + [t["lang"] for t in TRANSLATION_LANGUAGES]
+        + [sc["lang"] for sc in PALI_SCRIPTS]
+    ))
+
+    datasets = []
+    for b in books:
+        code = b['code']
+        cat_entry = (catalog or {}).get(code, {}) if isinstance(catalog, dict) else {}
+        nav_parts = [p.strip() for p in str(cat_entry.get('longNavPath') or '').split('/') if p.strip()]
+        own_title = nav_parts[-1] if nav_parts else b['title']
+        parent = nav_parts[-2] if len(nav_parts) >= 2 else (b['nikaya'] or 'Buddhism')
+        datasets.append({
+            "@type": "Dataset",
+            "name": f"{own_title} ({parent})" if parent and parent.lower() != own_title.lower() else own_title,
+            "identifier": code,
+            "inLanguage": "pi",
+            "genre": parent,
+            "isAccessibleForFree": True,
+            "license": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+            "url": f"{site_url}/book/{code}",
+        })
+
     schema = {
         "@context": "https://schema.org",
         "@graph": [
+            {
+                "@type": "Organization",
+                "@id": f"{site_url}/#organization",
+                "name": "TipitakaPali.org",
+                "url": f"{site_url}/",
+                "logo": f"{site_url}/android-chrome-512x512.png",
+                "sameAs": [
+                    "https://github.com/tipitakapali/tipitakapali.org",
+                    "https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213",
+                    "https://play.google.com/store/apps/details?id=org.tipitakapali.android",
+                ],
+            },
             {
                 "@type": "WebSite",
                 "@id": f"{site_url}/#website",
                 "url": f"{site_url}/",
                 "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
-                "alternateName": ["Tipitaka Pali", "CSCD Pali Canon", "VRI Tipitaka"],
-                "description": f"Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with {len(TRANSLATION_LANGUAGES)} modern translations, 16 multi-script typography options, DPD dictionary, and full-text search.",
+                "alternateName": ["Tipitaka Pali", "TipitakaPali.org", "CSCD Pali Canon", "VRI Tipitaka"],
+                "description": f"Complete {len(books)}-book Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon in 17 scripts with {len(TRANSLATION_LANGUAGES)} modern translations, Digital Pāḷi Dictionary (DPD), {bold_def_count:,} bold definitions, and high-speed full-text search.",
                 "inLanguage": lang_list,
+                "publisher": {"@id": f"{site_url}/#organization"},
                 "potentialAction": [
                     {
                         "@type": "SearchAction",
@@ -538,24 +643,18 @@ def generate_schema_jsonld(site_url, books):
             {
                 "@type": "DataCatalog",
                 "@id": f"{site_url}/#catalog",
-                "name": "Chaṭṭha Saṅgāyana Pali Canon Canonical Corpus",
-                "description": f"217 books of the Theravada Buddhist Pali Canon with {len(TRANSLATION_LANGUAGES)} modern translations across 16 scripts.",
+                "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canonical Corpus",
+                "description": f"{len(books)} canonical books (Mūla, Aṭṭhakathā, Ṭīkā, Añña) of the Theravāda Pāḷi Canon with {len(TRANSLATION_LANGUAGES)} modern translations, 17 scripts, and {bold_def_count:,} bold definitions.",
                 "url": f"{site_url}/",
-                "dataset": [
-                    {
-                        "@type": "Dataset",
-                        "name": b['title'],
-                        "identifier": b['code'],
-                        "inLanguage": "pi",
-                        "genre": b['nikaya'] or "Buddhism",
-                        "url": f"{site_url}/book/{b['code']}"
-                    }
-                    for b in books[:30] # Top 30 canonical entry dataset sample
-                ]
+                "isAccessibleForFree": True,
+                "license": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+                "publisher": {"@id": f"{site_url}/#organization"},
+                "dataset": datasets,
             }
         ]
     }
     return json.dumps(schema, indent=2, ensure_ascii=False)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate SEO and AI metadata files for Tipitaka web app")
@@ -563,6 +662,11 @@ def main():
         "--site-url",
         default=os.environ.get("SITE_URL", DEFAULT_SITE_URL),
         help=f"Canonical website URL (default: {DEFAULT_SITE_URL})"
+    )
+    parser.add_argument(
+        "--public-only",
+        action="store_true",
+        help="Write only to public/ (skip cloudflare_pages_dist and next_tipitakapali.org)"
     )
     args = parser.parse_args()
 
@@ -587,6 +691,8 @@ def main():
     chapters = [dict(r) for r in cur.fetchall()]
     conn.close()
 
+    bold_def_count = get_bold_definitions_count(paths.get('bold_db_path'))
+
     catalog = {}
     if paths['catalog_path'].exists():
         try:
@@ -595,27 +701,27 @@ def main():
         except Exception:
             pass
 
-    print(f"[*] Loaded {len(books)} books and {len(chapters)} chapters.")
+    print(f"[*] Loaded {len(books)} books, {len(chapters)} chapters, and {bold_def_count:,} bold definitions.")
 
-    # 1. Generate all sitemaps (index + main + translations + 16 scripts)
-    print(f"[*] Generating XML Sitemaps (Root Index + Main + Translations + 16 Scripts)...")
+    # 1. Generate clean canonical sitemap (222 prerendered canonical URLs only)
+    print("[*] Generating canonical sitemap.xml (222 self-canonical URLs)...")
     sitemaps = generate_all_sitemaps(books, chapters, site_url)
 
     # 2. Generate robots.txt, llms.txt, llms-full.txt, site.jsonld
     print("[*] Generating robots.txt...")
     robots_content = generate_robots_txt(site_url)
 
-    print("[*] Generating llms.txt (AI Agent Standard)...")
-    llms_content = generate_llms_txt(site_url, len(books), len(chapters))
+    print("[*] Generating llms.txt (AI Agent Playbook & Bold Definitions)...")
+    llms_content = generate_llms_txt(site_url, len(books), len(chapters), bold_def_count)
 
-    print("[*] Generating llms-full.txt (Comprehensive AI Corpus)...")
-    llms_full_content = generate_llms_full_txt(site_url, books, catalog)
+    print("[*] Generating llms-full.txt (Comprehensive AI Corpus & 217-Book Catalog)...")
+    llms_full_content = generate_llms_full_txt(site_url, books, catalog, bold_def_count)
 
     print("[*] Generating site.jsonld (Schema.org Structured Data)...")
-    jsonld_content = generate_schema_jsonld(site_url, books)
+    jsonld_content = generate_schema_jsonld(site_url, books, catalog, bold_def_count)
 
     # 3. Target output directories
-    target_dirs = [
+    target_dirs = [paths['public_dir']] if args.public_only else [
         paths['public_dir'],
         paths['dist_dir'],
         paths['next_git_dir'],
@@ -626,12 +732,17 @@ def main():
 
     for t_dir in target_dirs:
         if t_dir.exists():
-            # Write all sitemaps
+            # Prune obsolete bloated non-canonical child sitemaps
+            removed_old = cleanup_obsolete_sitemaps(t_dir)
+            if removed_old:
+                print(f"[*] Removed {removed_old} obsolete non-canonical sitemap-*.xml files from {t_dir}")
+
+            # Write canonical sitemap.xml
             for filename, content in sitemaps.items():
                 with open(t_dir / filename, 'w', encoding='utf-8') as f:
                     f.write(content)
 
-            # Write other metadata files
+            # Write metadata & AI files
             with open(t_dir / 'robots.txt', 'w', encoding='utf-8') as f:
                 f.write(robots_content)
             with open(t_dir / 'llms.txt', 'w', encoding='utf-8') as f:
@@ -641,31 +752,26 @@ def main():
             with open(t_dir / 'site.jsonld', 'w', encoding='utf-8') as f:
                 f.write(jsonld_content)
 
-            # Sync AI tool files to dist/next_git if they exist
+            # Sync AI tool files & IndexNow key to dist/next_git if applicable
             if t_dir != paths['public_dir']:
                 if openapi_src.exists():
                     (t_dir / 'openapi.json').write_text(openapi_src.read_text(encoding='utf-8'), encoding='utf-8')
                 if ai_plugin_src.exists():
                     (t_dir / '.well-known').mkdir(parents=True, exist_ok=True)
                     (t_dir / '.well-known' / 'ai-plugin.json').write_text(ai_plugin_src.read_text(encoding='utf-8'), encoding='utf-8')
+                sync_indexnow_key(paths['public_dir'], t_dir)
             print(f"[✓] Saved {len(sitemaps) + 4} SEO & AI files into: {t_dir}")
 
-    total_indexed_urls = (
-        1
-        + len(books)
-        + len(chapters)
-        + len(TRANSLATION_LANGUAGES) * len(books)
-        + len(PALI_SCRIPTS) * (len(books) + len(chapters))
-    )
+    total_canonical_urls = 5 + len(books)
     print("\n" + "=" * 60)
-    print(" [✓] MULTI-SCRIPT & TRANSLATION SEO & AI METADATA COMPLETE!")
+    print(" [✓] CANONICAL SEO & AI METADATA GENERATION COMPLETE!")
     print("=" * 60)
-    print(f" Total Sitemaps    : {len(sitemaps)} (sitemap.xml index + main + translations + 16 child sitemaps)")
-    print(f" Total Indexed URLs: {total_indexed_urls:,} URLs across 17 scripts and {len(TRANSLATION_LANGUAGES)} translation languages")
-    print(f" AI Agent Standards: /llms.txt, /llms-full.txt ({len(TRANSLATION_LANGUAGES)} translations and 16 Pali scripts documented)")
-    print(f" Search Engine Rule: /robots.txt (AI-Enabled with {len(sitemaps)} sitemap declarations)")
-    print(f" Structured Data   : /site.jsonld (Schema.org with {len(TRANSLATION_LANGUAGES)} translation languages)")
+    print(f" Canonical Sitemap : sitemap.xml ({total_canonical_urls} prerendered self-canonical URLs)")
+    print(f" AI Agent Standards: /llms.txt, /llms-full.txt ({bold_def_count:,} bold definitions + {len(TRANSLATION_LANGUAGES)} translations + 17 scripts)")
+    print(f" Search Engine Rule: /robots.txt (single canonical sitemap + AI tool allowances)")
+    print(f" Structured Data   : /site.jsonld (WebSite, Organization, DataCatalog with {len(books)} books)")
     print("=" * 60 + "\n")
+
 
 if __name__ == '__main__':
     main()

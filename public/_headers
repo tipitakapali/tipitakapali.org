@@ -49,4 +49,10 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
 
+# IndexNow Key Verification File
+/ae6f8bf329e4fca113231f5647ff1549.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=86400
+  Access-Control-Allow-Origin: *
+
 

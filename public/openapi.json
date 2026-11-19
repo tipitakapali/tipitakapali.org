@@ -2,27 +2,124 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi API",
-    "version": "3.0.0",
-    "description": "Pāḷi Canon static edge API (tree/books/chapters) + dynamic VPS API (dict/search). Canonical AI tool base https://api.tipitakapali.org. CORS *."
+    "version": "3.2.0",
+    "description": "Pāḷi Canon static edge API (tree/books/chapters) + dynamic VPS API (387K+ canonical bold definitions, multi-concept boolean search, DPD dictionary, FTS5 search across Pāḷi & 23 translations, sentence-level alignment, and Aṭṭhakathā/Ṭīkā commentaries). Canonical AI tool base https://api.tipitakapali.org. Zero auth, CORS *."
   },
   "servers": [
     { "url": "https://api.tipitakapali.org", "description": "Canonical VPS (direct, fastest for AI tools)" },
-    { "url": "https://tipitakapali.org", "description": "Edge (proxied, also works)" }
+    { "url": "https://tipitakapali.org", "description": "Edge static CDN (tree, books, chapters, metadata)" }
   ],
   "paths": {
-    "/api/dict/lookup": {
+    "/api/ai/bold_definitions": {
       "get": {
-        "operationId": "dictLookup",
-        "summary": "Pāḷi dictionary lookup (DPD + secondary)",
-        "description": "Live example: w=mett%C4%81&dict=dpd and w=mett%C4%81&dict=others. w accepts Velthuis/Unicode (ṁ→ṃ). No auth, CORS *.",
+        "operationId": "getBoldDefinitions",
+        "summary": "Query 387,000+ pre-indexed canonical & commentarial bold definitions",
+        "description": "Primary API for defining Pāḷi doctrinal, Vinaya, and Abhidhamma terms from Aṭṭhakathā, Ṭīkā, Visuddhimagga, and Mūla bold lemmas. Ranked by definitional markers (ti attho, nāma, vuccati, lakkhaṇaṃ), with Markdown bold highlights, aligned translations, exact citation_ref [book:cX:pY-LZ], and clickable citation_url.",
         "parameters": [
-          { "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Pāḷi word", "example": "mettā" },
-          { "name": "dict", "in": "query", "required": false, "schema": { "type": "string", "enum": ["all", "dpd", "others", "pts", "abd", "psd", "sans", "splitter"], "default": "all" }, "example": "dpd" },
-          { "name": "d", "in": "query", "required": false, "schema": { "type": "string", "enum": ["yes"] }, "description": "useSplitter" }
+          { "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Pāḷi term (IAST, Velthuis, or Asian script; also accepts word=, term=, or q=)", "example": "mettā" },
+          { "name": "langs", "in": "query", "required": false, "schema": { "type": "string", "default": "en" }, "description": "Comma-separated translation language codes (e.g. en,vi)", "example": "en" },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 8, "maximum": 20 } }
         ],
         "responses": {
           "200": {
-            "description": "dict=all/dpd/others returns {word, counts:{dpd,pts,...}, dpd:[{word,html}], pts:[], ...}; single dict returns {word, results:[...]}",
+            "description": "{success, word, count, definitions:[{word, book_code, book_title, category, chapter_index, para_index, para_num, line_id, citation_ref, citation_url, pali_definition, translations}]}",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/api/ai/bold_definitions_batch": {
+      "post": {
+        "operationId": "getBoldDefinitionsBatch",
+        "summary": "Batch lookup canonical bold definitions for up to 5 Pāḷi terms",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "words": { "type": "array", "items": { "type": "string" }, "example": ["sati", "samādhi", "paññā"] },
+                  "langs": { "type": "array", "items": { "type": "string" }, "default": ["en"] },
+                  "limit": { "type": "integer", "default": 4 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "{success, count, definitions:[...]}" } }
+      }
+    },
+    "/api/ai/search_concepts": {
+      "post": {
+        "operationId": "searchConcepts",
+        "summary": "Multi-concept boolean intersection search (Pāḷi + English/translation synonyms)",
+        "description": "Breaks complex questions into 2–4 concept groups (AND across groups, OR within each group's Pāḷi terms/stems & English keywords) with automatic tiered fallback (all -> pairwise -> single) ranked by concept coverage and Mūla priority.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["concept_groups"],
+                "properties": {
+                  "concept_groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "concept": { "type": "string" },
+                        "pali_terms": { "type": "array", "items": { "type": "string" } },
+                        "pali_stems": { "type": "array", "items": { "type": "string" } },
+                        "english_keywords": { "type": "array", "items": { "type": "string" } }
+                      }
+                    }
+                  },
+                  "categories": { "type": "array", "items": { "type": "string" } },
+                  "nikayas": { "type": "array", "items": { "type": "string" } },
+                  "langs": { "type": "array", "items": { "type": "string" }, "default": ["en"] },
+                  "limit": { "type": "integer", "default": 12 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "{success, strategy, total, results:[{book_code, book_title, chapter_index, para_index, matched_concepts, citation_ref, citation_url, snippet}]}" } }
+      }
+    },
+    "/api/ai/understand": {
+      "post": {
+        "operationId": "understandQuery",
+        "summary": "Local zero-auth query understanding, concept extraction & canonical sutta grounding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": { "query": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "{success, understanding:{detected_language, intent, concept_groups, canonical_pali_terms, key_terms_for_bold_def, recommended_locations}}" } }
+      }
+    },
+    "/api/dict/lookup": {
+      "get": {
+        "operationId": "dictLookup",
+        "summary": "Pāḷi dictionary & bold definitions lookup (DPD, bold_def, PTS, ABD, PSD, Sanskrit, Splitter)",
+        "description": "Live examples: w=mett%C4%81&dict=dpd, w=mett%C4%81&dict=bold_def&langs=en, and w=mett%C4%81&dict=others. w accepts IAST, Velthuis, or Asian scripts (ṁ→ṃ). No auth, CORS *.",
+        "parameters": [
+          { "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Pāḷi word", "example": "mettā" },
+          { "name": "dict", "in": "query", "required": false, "schema": { "type": "string", "enum": ["all", "dpd", "others", "bold_def", "pts", "abd", "psd", "sans", "splitter"], "default": "all" }, "example": "dpd" },
+          { "name": "d", "in": "query", "required": false, "schema": { "type": "string", "enum": ["yes"] }, "description": "Enable DPD sandhi/compound splitter" },
+          { "name": "langs", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Translation language codes for dict=bold_def (e.g. en,vi)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "dict=all/dpd/others returns {word, counts:{dpd,pts,...}, dpd:[{word,html}], pts:[], ...}; dict=bold_def returns {word, results:[...]}",
             "content": { "application/json": { "schema": { "type": "object" } } }
           }
         }
@@ -30,14 +127,14 @@
       "post": {
         "operationId": "dictLookupPost",
         "summary": "Dictionary lookup via POST",
-        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "w": { "type": "string" }, "dict": { "type": "string" } } } } } },
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "w": { "type": "string" }, "dict": { "type": "string" }, "langs": { "type": "string" } } } } } },
         "responses": { "200": { "description": "same as GET" } }
       }
     },
     "/api/dict/inf": {
       "get": {
         "operationId": "dictInf",
-        "summary": "Inflection table",
+        "summary": "Inflection (declension/conjugation) table",
         "parameters": [{ "name": "w", "in": "query", "required": true, "schema": { "type": "string" }, "example": "declension_mettā_1" }],
         "responses": { "200": { "description": "{word, html}" } }
       }
@@ -45,39 +142,92 @@
     "/api/search": {
       "get": {
         "operationId": "ftsSearch",
-        "summary": "FTS5 search 520k paras",
+        "summary": "FTS5 full-text search across 520k Pāḷi paragraphs and 23 translation indexes",
         "parameters": [
           { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "example": "anatta" },
+          { "name": "l", "in": "query", "schema": { "type": "string", "default": "pali" }, "description": "Search corpus language: pali or any translation code (en, vi, my, th, si, de, zh, ...)" },
           { "name": "pitaka", "in": "query", "schema": { "type": "string" } },
           { "name": "mat", "in": "query", "schema": { "type": "string" } },
+          { "name": "distance", "in": "query", "schema": { "type": "integer" }, "description": "Proximity NEAR distance (1=exact phrase, 2..10=NEAR, 0=anywhere)" },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["canonical", "relevance", "bm25"] } },
           { "name": "limit", "in": "query", "schema": { "type": "integer" } },
           { "name": "offset", "in": "query", "schema": { "type": "integer" } }
         ],
-        "responses": { "200": { "description": "{total,count,results:[{book_code,snippet}]}}}" } }
+        "responses": { "200": { "description": "{total, count, results:[{book_code, chapter_index, para_index, para_num, snippet}]}" } }
       }
     },
-    "/api/tree": { "get": { "summary": "Navigation tree (edge static)", "responses": { "200": { "description": "tree json" } } } },
-    "/api/books": { "get": { "summary": "Books catalog", "responses": { "200": { "description": "books" } } } },
-    "/api/book/{code}/pali_sentences": {
+    "/api/ai/sections": {
       "get": {
-        "operationId": "paliSentences",
-        "summary": "Pāḷi sentences (epitaka shared line_id, 99.7% match with translations)",
-        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" }],
-        "responses": { "200": { "description": "{book_code, chapters: {chapter: {para_index: [{line,text}]}}}" } }
+        "operationId": "searchSections",
+        "summary": "Search sutta titles, vaggas, and section summaries",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "example": "satipatthana" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": { "200": { "description": "{success, results:[{book_code, title, chapter_index, para_index, citation_ref, citation_url}]}" } }
+      }
+    },
+    "/api/ai/paragraph_content": {
+      "get": {
+        "operationId": "getParagraphContent",
+        "summary": "Fetch exact Pāḷi paragraph range with aligned translations and citation URLs",
+        "parameters": [
+          { "name": "book", "in": "query", "required": true, "schema": { "type": "string" }, "example": "s0102m.mul" },
+          { "name": "chapter", "in": "query", "schema": { "type": "integer" }, "example": 8 },
+          { "name": "start", "in": "query", "schema": { "type": "integer" }, "example": 1341 },
+          { "name": "end", "in": "query", "schema": { "type": "integer" }, "example": 1345 },
+          { "name": "para_num", "in": "query", "schema": { "type": "string" }, "example": "373" },
+          { "name": "langs", "in": "query", "schema": { "type": "string", "default": "en" }, "example": "en,vi" }
+        ],
+        "responses": { "200": { "description": "{success, passages:[{book_code, chapter_index, para_index, para_num, citation_ref, citation_url, pali, translations}]}" } }
+      }
+    },
+    "/api/ai/commentaries": {
+      "get": {
+        "operationId": "getCommentaries",
+        "summary": "Fetch parallel Aṭṭhakathā and Ṭīkā commentaries for a Mūla paragraph",
+        "parameters": [
+          { "name": "book", "in": "query", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" },
+          { "name": "chapter", "in": "query", "schema": { "type": "integer" }, "example": 0 },
+          { "name": "para", "in": "query", "schema": { "type": "string" }, "example": "1" }
+        ],
+        "responses": { "200": { "description": "{success, atthakatha:[...], tika:[...]}" } }
       }
     },
     "/api/ai/sentences": {
       "get": {
         "operationId": "aiSentences",
-        "summary": "Sentence-level Pāḷi + aligned translations (shared line_id)",
+        "summary": "Sentence-level Pāḷi + aligned translations (shared line_id, 99.7% match)",
         "parameters": [
           { "name": "book", "in": "query", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" },
           { "name": "chapter", "in": "query", "schema": { "type": "integer" }, "example": 0 },
-          { "name": "para_index", "in": "query", "schema": { "type": "integer" } },
+          { "name": "para_index", "in": "query", "schema": { "type": "integer" }, "example": 5 },
           { "name": "line", "in": "query", "schema": { "type": "integer" }, "description": "1-based line_id" },
           { "name": "langs", "in": "query", "schema": { "type": "string" }, "example": "en" }
         ],
-        "responses": { "200": { "description": "{pali_sentences:[{line_id,sentence}], translations:{en:[{line_id,translation}]}}" } }
+        "responses": { "200": { "description": "{pali_sentences:[{line_id, sentence}], translations:{en:[{line_id, translation}]}}" } }
+      }
+    },
+    "/api/links/preview": {
+      "get": {
+        "operationId": "linksPreview",
+        "summary": "Linked Mūla/Aṭṭhakathā/Ṭīkā cross-reference preview with bold term highlighting",
+        "parameters": [
+          { "name": "book", "in": "query", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" },
+          { "name": "para", "in": "query", "required": true, "schema": { "type": "string" }, "example": "1" },
+          { "name": "langs", "in": "query", "schema": { "type": "string" }, "example": "en" }
+        ],
+        "responses": { "200": { "description": "{book_code, book_title, category, chapter_index, para_index, para_num, sentences, translations}" } }
+      }
+    },
+    "/api/tree": { "get": { "summary": "Navigation tree (edge static)", "responses": { "200": { "description": "tree json" } } } },
+    "/api/books": { "get": { "summary": "217-book canonical catalog", "responses": { "200": { "description": "books" } } } },
+    "/api/book/{code}/pali_sentences": {
+      "get": {
+        "operationId": "paliSentences",
+        "summary": "Pāḷi sentences (epitaka shared line_id, 99.7% match with translations)",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "s0101m.mul" }],
+        "responses": { "200": { "description": "{book_code, chapters: {chapter: {para_index: [{line, text}]}}}" } }
       }
     }
   }

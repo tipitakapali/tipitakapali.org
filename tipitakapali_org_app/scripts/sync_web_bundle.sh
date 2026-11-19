@@ -38,6 +38,7 @@ out_dir, staging_dir, zip_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
 skip_top = {'book', 'chapter', '.well-known'}
 skip_prefixes = ('sitemap', 'robots.txt', 'Google_Play_Store_badge_EN')
+indexnow_key_re = re.compile(r'^[0-9a-f]{32}\.txt$')
 skip_font_prefixes = ('Noto_Serif_SC', 'Noto_Serif_JP')
 play_store_link_re = re.compile(
     r'\s*<a\b[^>]*href=["\']https://play\.google\.com/[^"\']*["\'][^>]*>.*?</a>\s*',
@@ -54,7 +55,7 @@ for root, dirs, files in os.walk(out_dir):
         continue
 
     for fname in files:
-        if rel_root == '.' and fname.startswith(skip_prefixes):
+        if rel_root == '.' and (fname.startswith(skip_prefixes) or indexnow_key_re.match(fname)):
             continue
         if 'fonts' in rel_root.split(os.sep) and fname.startswith(skip_font_prefixes):
             continue

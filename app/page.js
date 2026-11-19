@@ -13,10 +13,11 @@ import DictionaryModal from '../components/DictionaryModal';
 import TtsPlayer from '../components/Tts/TtsPlayer';
 import BookmarkModal from '../components/BookmarkModal';
 import HistoryModal from '../components/HistoryModal';
-import NotFound from './not-found';
+import NotFoundView from '../components/NotFoundView';
 import { useTabs, normalizeLangCode } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
-import { convertPaliScript, capitalizePali } from '../services/transliterate';
+import { convertPaliScript, capitalizePali, splitScriptCode } from '../services/transliterate';
+import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, SITE_URL } from '../services/seoMetadata';
 export function MainAppContent({ params: rawParams }) {
   const params = rawParams && typeof rawParams.then === 'function' ? React.use(rawParams) : rawParams;
   const { openBook, openAiChatTab, openSearchModal, updateUrlParams, openTabs, activeTab, activeBookCode, isSidebarOpen, isHeaderVisible, setIsSidebarOpen, setIsHeaderVisible, isNotFound, isBookmarkOpen, setIsBookmarkOpen, isHistoryOpen, setIsHistoryOpen } = useTabs();
@@ -26,25 +27,31 @@ export function MainAppContent({ params: rawParams }) {
 
 
 
-  const { pageTitle, pageDesc } = useMemo(() => {
+  const { pageTitle, pageDesc, canonicalUrl } = useMemo(() => {
     if (isNotFound) {
       return {
-        pageTitle: 'Lost in Saṃsāra (404) | Tipiṭaka Pāḷi',
-        pageDesc: 'The page you seek has wandered — like all conditioned things, it is anicca, impermanent.',
+        pageTitle: 'Lost in Saṃsāra (404) — Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
+        pageDesc: 'The requested page could not be found on TipitakaPali.org. Return to the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon.',
+        canonicalUrl: null,
       };
     }
 
     if (activeTab?.type === 'ai_chat' || activeTab?.bookCode === 'ai_chat' || activeBookCode === 'ai_chat') {
       return {
-        pageTitle: 'Ani Assistant | Tipiṭaka Pāḷi',
-        pageDesc: 'AI-powered Dhamma study companion for the Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon.',
+        pageTitle: 'Ani (AI Nissaya) Study Companion | Tipiṭaka Pāḷi',
+        pageDesc: 'AI-powered Dhamma research companion for the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon with concept-group search, bold definitions, and canonical citations.',
+        canonicalUrl: `${SITE_URL}/`,
       };
     }
 
     if (!activeTab) {
+      const isNonRoman = settings?.paliScript && settings.paliScript !== 'roman';
       return {
-        pageTitle: convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings?.paliScript),
-        pageDesc: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich typography, multi-script support, and full-text search.',
+        pageTitle: isNonRoman
+          ? `${convertPaliScript('Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi', settings.paliScript)} — TipitakaPali.org`
+          : DEFAULT_SEO_TITLE,
+        pageDesc: DEFAULT_SEO_DESCRIPTION,
+        canonicalUrl: `${SITE_URL}/`,
       };
     }
 
@@ -72,9 +79,12 @@ export function MainAppContent({ params: rawParams }) {
       docTitle = `${bookTitle} | ${fullAppTitle}`;
     }
 
+    const cleanCode = splitScriptCode(activeTab.bookCode || '').bookCode;
+
     return {
       pageTitle: docTitle,
-      pageDesc: `Read ${subject} in original Pāḷi with side-by-side translations in English, Vietnamese, Burmese, and 15 modern languages, rich typography, multi-script support, and full-text search.`,
+      pageDesc: `Read ${subject} in original Pāḷi (17 scripts) with 23 modern translations, DPD dictionary, 387K+ bold definitions, and fast full-text search.`,
+      canonicalUrl: cleanCode ? `${SITE_URL}/book/${cleanCode}` : `${SITE_URL}/`,
     };
   }, [
     isNotFound,
@@ -88,28 +98,50 @@ export function MainAppContent({ params: rawParams }) {
     settings?.paliScript,
   ]);
 
-  // Dynamic Browser, Search & SEO friendly Title & Meta Synchronizer
+  // Dynamic Browser, Search & SEO friendly Title, Meta & Canonical Synchronizer
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    const setMetaDesc = (content) => {
-      let el = document.querySelector('meta[name="description"]');
+    // On prerendered /book/* or /chapter/* routes, keep SSR metadata intact until activeTab loads
+    const pathname = window.location?.pathname || '/';
+    if (!activeTab && !isNotFound && (pathname.startsWith('/book/') || pathname.startsWith('/chapter/'))) {
+      return;
+    }
+
+    const setMetaContent = (selector, attrName, attrVal, content) => {
+      let el = document.querySelector(selector);
       if (!el) {
         el = document.createElement('meta');
-        el.setAttribute('name', 'description');
+        el.setAttribute(attrName, attrVal);
         document.head.appendChild(el);
       }
       el.setAttribute('content', content);
+    };
 
-      // Also sync OpenGraph description if present
-      const ogEl = document.querySelector('meta[property="og:description"]');
-      if (ogEl) ogEl.setAttribute('content', content);
+    const setCanonicalHref = (href) => {
+      let link = document.querySelector('link[rel="canonical"]');
+      if (!href) {
+        if (link) link.remove();
+        return;
+      }
+      if (!link) {
+        link = document.createElement('link');
+        link.setAttribute('rel', 'canonical');
+        document.head.appendChild(link);
+      }
+      link.setAttribute('href', href);
     };
 
     document.title = pageTitle;
-    setMetaDesc(pageDesc);
+    setMetaContent('meta[name="description"]', 'name', 'description', pageDesc);
+    setMetaContent('meta[property="og:title"]', 'property', 'og:title', pageTitle);
+    setMetaContent('meta[property="og:description"]', 'property', 'og:description', pageDesc);
+    if (isNotFound) {
+      setMetaContent('meta[name="robots"]', 'name', 'robots', 'noindex, nofollow');
+    }
+    setCanonicalHref(canonicalUrl);
 
-    // Re-assert title after React 19 / Next.js layout metadata reconciliation passes
+    // Re-assert title after Next.js layout metadata reconciliation passes
     const timers = [
       setTimeout(() => {
         if (document.title !== pageTitle) {
@@ -121,20 +153,10 @@ export function MainAppContent({ params: rawParams }) {
           document.title = pageTitle;
         }
       }, 400),
-      setTimeout(() => {
-        if (document.title !== pageTitle) {
-          document.title = pageTitle;
-        }
-      }, 1200),
-      setTimeout(() => {
-        if (document.title !== pageTitle) {
-          document.title = pageTitle;
-        }
-      }, 2500),
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
-  }, [pageTitle, pageDesc]);
+  }, [pageTitle, pageDesc, canonicalUrl, activeTab, isNotFound]);
 
   // Listen for dynamic hash navigation (e.g. user changes URL hash or clicks an anchor link)
   useEffect(() => {
@@ -309,7 +331,7 @@ export function MainAppContent({ params: rawParams }) {
   }, [useWindowScroll]);
 
   if (isNotFound) {
-    return <NotFound />;
+    return <NotFoundView />;
   }
 
   return (
@@ -320,7 +342,6 @@ export function MainAppContent({ params: rawParams }) {
           : 'h-screen h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]'
       }
     >
-      <title>{pageTitle}</title>
       <Header />
       <div
         className={

@@ -6,14 +6,19 @@ import { TtsProvider } from '../context/TtsContext';
 import { DictionaryProvider } from '../context/DictionaryContext';
 import WebMcpRegistration from '../components/WebMcpRegistration';
 import AiTranslationNoticeBanner from '../components/AiTranslationNoticeBanner';
+import {
+  DEFAULT_SEO_TITLE,
+  DEFAULT_SEO_DESCRIPTION,
+  ALL_SCHEMA_LANGUAGES,
+} from '../services/seoMetadata';
 
 export const metadata = {
   metadataBase: new URL('https://tipitakapali.org'),
   title: {
-    default: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
+    default: DEFAULT_SEO_TITLE,
     template: '%s | Tipiṭaka Pāḷi',
   },
-  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, Digital Pāḷi Dictionary (DPD), and high-speed full-text search.',
+  description: DEFAULT_SEO_DESCRIPTION,
   keywords: [
     'Tipitaka',
     'Tipitaka Pali',
@@ -23,11 +28,14 @@ export const metadata = {
     'Vinaya Pitaka',
     'Sutta Pitaka',
     'Abhidhamma Pitaka',
+    'Atthakatha',
+    'Tika',
     'Dhammapada',
     'VRI',
     'CSCD',
     'Digital Pali Dictionary',
     'DPD',
+    'Pali bold definitions',
     'Tipitaka translations',
     'Pali English translation',
     'Kinh Phật Tiếng Việt',
@@ -40,7 +48,7 @@ export const metadata = {
   ],
   authors: [{ name: 'VRI / Chaṭṭha Saṅgāyana Tipiṭaka' }],
   creator: 'Chaṭṭha Saṅgāyana Tipiṭaka',
-  publisher: 'Chaṭṭha Saṅgāyana Tipiṭaka',
+  publisher: 'TipitakaPali.org',
   formatDetection: {
     email: false,
     address: false,
@@ -50,10 +58,10 @@ export const metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, and full-text search.',
-    url: 'https://tipitakapali.org',
-    siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka',
+    title: DEFAULT_SEO_TITLE,
+    description: DEFAULT_SEO_DESCRIPTION,
+    url: 'https://tipitakapali.org/',
+    siteName: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
     locale: 'pi_IN',
     alternateLocales: ['en_US', 'vi_VN', 'my_MM', 'th_TH', 'si_LK', 'de_DE', 'ja_JP', 'hi_IN', 'zh_CN', 'pt_PT'],
     type: 'website',
@@ -68,8 +76,8 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-    description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), rich multi-script typography, and full-text search.',
+    title: DEFAULT_SEO_TITLE,
+    description: DEFAULT_SEO_DESCRIPTION,
     images: ['/android-chrome-512x512.png'],
   },
   robots: {
@@ -102,8 +110,6 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   // Initial iOS Safari theme-color (classic bg-primary); updated dynamically per theme in ThemeSettingsContext.
   themeColor: '#f0eee5',
@@ -111,28 +117,46 @@ export const viewport = {
 
 const jsonLdWebsite = {
   '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
-  alternateName: ['Tipitaka Pali', 'CSCD Tipitaka', 'VRI Tipitaka'],
-  url: 'https://tipitakapali.org/',
-  description: 'Complete Chaṭṭha Saṅgāyana Tipiṭaka Pali Canon with 15 modern translations (English, Vietnamese, Burmese, Hindi, Sinhala, Thai, German, Japanese, Portuguese, Chinese, etc.), multi-script typography, DPD dictionary, and full-text search.',
-  inLanguage: ['pi', 'en', 'vi', 'my', 'si', 'th', 'hi', 'de', 'ja', 'pt', 'zh', 'km', 'lo', 'ru', 'ta'],
-  potentialAction: [
+  '@graph': [
     {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: 'https://tipitakapali.org/?q={search_term_string}',
-      },
-      'query-input': 'required name=search_term_string',
+      '@type': 'WebSite',
+      '@id': 'https://tipitakapali.org/#website',
+      name: 'Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi',
+      alternateName: ['Tipitaka Pali', 'TipitakaPali.org', 'CSCD Tipitaka', 'VRI Tipitaka'],
+      url: 'https://tipitakapali.org/',
+      description: DEFAULT_SEO_DESCRIPTION,
+      inLanguage: ALL_SCHEMA_LANGUAGES,
+      publisher: { '@id': 'https://tipitakapali.org/#organization' },
+      potentialAction: [
+        {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: 'https://tipitakapali.org/?q={search_term_string}',
+          },
+          'query-input': 'required name=search_term_string',
+        },
+        {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: 'https://api.tipitakapali.org/api/dict/lookup?w={search_term_string}&dict=dpd',
+          },
+          'query-input': 'required name=search_term_string',
+        },
+      ],
     },
     {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: 'https://api.tipitakapali.org/api/dict/lookup?w={search_term_string}&dict=dpd',
-      },
-      'query-input': 'required name=search_term_string',
+      '@type': 'Organization',
+      '@id': 'https://tipitakapali.org/#organization',
+      name: 'TipitakaPali.org',
+      url: 'https://tipitakapali.org/',
+      logo: 'https://tipitakapali.org/android-chrome-512x512.png',
+      sameAs: [
+        'https://github.com/tipitakapali/tipitakapali.org',
+        'https://apps.apple.com/vn/app/tipitaka-pali-cst/id6743404213',
+        'https://play.google.com/store/apps/details?id=org.tipitakapali.android',
+      ],
     },
   ],
 };
@@ -158,6 +182,12 @@ export default function RootLayout({ children }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var p=location.pathname||"/";if(p.indexOf("/book/")!==0&&p.indexOf("/chapter/")!==0)return;var c=document.querySelector(\'link[rel="canonical"]\');var h=(c&&c.getAttribute("href"))||"";if(h&&h!=="https://tipitakapali.org/"&&h!=="https://tipitakapali.org"&&h!=="/")return;var raw=p.replace(/^\\/(?:book|chapter)\\//,"").split("/")[0];if(!raw)return;raw=decodeURIComponent(raw).replace(/^(?:si|hi|thai|laos|my|km|beng|gurm|tham|guja|telu|kann|mala|brah|tibt|cyrl)\\./i,"");var m=raw.match(/^(.*?\\.(?:mul|att|tik|nrf))\\d+$/i);if(m)raw=m[1];if(!/^[a-z0-9_.-]+\\.(?:mul|att|tik|nrf)$/i.test(raw))return;var target="https://tipitakapali.org/book/"+raw;if(!c){c=document.createElement("link");c.setAttribute("rel","canonical");document.head.appendChild(c);}c.setAttribute("href",target);var r=document.querySelector(\'meta[name="robots"]\');if(!r){r=document.createElement("meta");r.setAttribute("name","robots");document.head.appendChild(r);}r.setAttribute("content","noindex, follow");}catch(e){}})();',
+          }}
         />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         {/* Agent & Machine Discovery Links */}

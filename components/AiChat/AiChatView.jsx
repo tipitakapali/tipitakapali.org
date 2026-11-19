@@ -82,6 +82,11 @@ function AniIcon({ size = 14, className = '' }) {
 
 function getToolMeta(toolName) {
   switch (toolName) {
+    case 'search_concepts':
+      return { label: 'Concept-Group Search', icon: Brain, color: 'text-indigo-500 dark:text-indigo-400' };
+    case 'get_bold_definitions':
+    case 'get_bold_definitions_batch':
+      return { label: 'Canonical Bold Definitions', icon: Quote, color: 'text-rose-500 dark:text-rose-400' };
     case 'search_sections':
       return { label: 'Sutta & Section Search', icon: Compass, color: 'text-blue-500 dark:text-blue-400' };
     case 'search_tipitaka':
@@ -193,16 +198,25 @@ function sortCitations(citations) {
 
 function formatIntentLabel(intent) {
   switch (intent) {
+    case 'sutta_lookup':
     case 'sutta_search':
       return 'Sutta Search';
     case 'canonical_search':
       return 'Canonical Search';
+    case 'term_analysis':
     case 'dictionary_definition':
-      return 'Pāḷi Lexicon';
+      return 'Term & Bold Definition';
+    case 'grammar_analysis':
+      return 'Pāḷi Grammar';
+    case 'monastic_rule':
+      return 'Vinaya / Monastic Rule';
+    case 'comparison':
+      return 'Comparative Study';
     case 'translation_lookup':
       return 'Translation Lookup';
     case 'doctrinal_explanation':
-      return 'Dhamma Exposition';
+    case 'general_dhamma':
+      return 'Dhamma Research';
     case 'cross_reference':
       return 'Cross-Reference';
     default:
@@ -216,8 +230,11 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
 
   const targetSuttas = understanding.target_sutta_names || [];
   const primaryTarget = targetSuttas[0];
+  const conceptGroups = Array.isArray(understanding.concept_groups) ? understanding.concept_groups : [];
   const terms = understanding.canonical_pali_terms || [];
   const stems = (understanding.pali_stems || []).filter((s) => !terms.includes(s));
+  const englishKeywords = understanding.english_keywords || [];
+  const boldDefTerms = understanding.key_terms_for_bold_def || [];
   const nikayas = understanding.recommended_locations?.nikayas || [];
   const strategy = understanding.initial_search_strategy || [];
 
@@ -225,6 +242,7 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
     <div className="ai-step-card ai-step-indigo mb-3 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-light)] overflow-hidden text-xs transition">
       <button
         type="button"
+        aria-expanded={isExpanded}
         onClick={() => setIsExpanded((v) => !v)}
         className="w-full px-3 py-2 flex items-center justify-between text-[var(--accent)] font-semibold hover:bg-[var(--accent-light)] transition cursor-pointer text-left"
       >
@@ -234,6 +252,11 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
           {understanding.intent && (
             <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent-light)] text-[10px] text-[var(--accent)] border border-[var(--accent-border)] font-medium">
               {formatIntentLabel(understanding.intent)}
+            </span>
+          )}
+          {conceptGroups.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-[10px] text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 font-medium">
+              {conceptGroups.length} concept{conceptGroups.length > 1 ? 's' : ''}
             </span>
           )}
           {understanding.detected_language && (
@@ -274,11 +297,71 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
             </div>
           )}
 
-          {/* Canonical Terms & Stems */}
-          {(terms.length > 0 || stems.length > 0) && (
+          {/* Concept Groups (Multi-concept Pāḷi + English Synonym Matrix) */}
+          {conceptGroups.length > 0 && (
+            <div className="space-y-1.5 pt-0.5">
+              <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)]">
+                Concept Groups &amp; Keywords:
+              </span>
+              <div className="space-y-1.5">
+                {conceptGroups.map((group, gIdx) => {
+                  const gPali = Array.isArray(group.pali_terms) ? group.pali_terms : [];
+                  const gStems = Array.isArray(group.pali_stems)
+                    ? group.pali_stems.filter((s) => !gPali.includes(s))
+                    : [];
+                  const gEng = Array.isArray(group.english_keywords) ? group.english_keywords : [];
+                  return (
+                    <div
+                      key={`cg-${gIdx}`}
+                      className="bg-[var(--bg-card)]/60 p-2 rounded-lg border border-[var(--accent-border)] space-y-1"
+                    >
+                      <div className="font-semibold text-[11px] text-[var(--text-primary)] flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.2 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[10px] font-mono">
+                          C{gIdx + 1}
+                        </span>
+                        <span>{group.concept}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {gPali.map((t, ti) => (
+                          <span
+                            key={`cg-p-${ti}`}
+                            className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 font-mono text-[10px]"
+                            title="Pāḷi keyword / synonym"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                        {gStems.map((s, si) => (
+                          <span
+                            key={`cg-s-${si}`}
+                            className="px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-800 dark:text-cyan-200 font-mono text-[10px]"
+                            title="Pāḷi stem / prefix"
+                          >
+                            ~{s}
+                          </span>
+                        ))}
+                        {gEng.map((e, ei) => (
+                          <span
+                            key={`cg-e-${ei}`}
+                            className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-[10px]"
+                            title="English keyword / synonym"
+                          >
+                            {e}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Canonical Terms & Stems (shown when concept_groups is empty or extra terms exist) */}
+          {conceptGroups.length === 0 && (terms.length > 0 || stems.length > 0 || englishKeywords.length > 0) && (
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)] mr-1">
-                Pāḷi Concepts:
+                Pāḷi &amp; English Keywords:
               </span>
               {terms.map((t, i) => (
                 <span
@@ -295,6 +378,31 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
                   title="Stem / Root"
                 >
                   ~{s}
+                </span>
+              ))}
+              {englishKeywords.map((e, i) => (
+                <span
+                  key={`eng-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-[10.5px]"
+                >
+                  {e}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Bold Definitions targets */}
+          {boldDefTerms.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="font-bold text-[10.5px] uppercase tracking-wider text-[var(--text-muted)] mr-1">
+                Bold Definitions:
+              </span>
+              {boldDefTerms.map((term, i) => (
+                <span
+                  key={`bdef-${i}`}
+                  className="px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-200 font-mono text-[10.5px] font-semibold"
+                >
+                  {term}
                 </span>
               ))}
             </div>
@@ -642,8 +750,9 @@ export default function AiChatView({ initialQuery = null }) {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const history = nextMessages
-      .filter((m) => m.id !== assistantMsgId)
+    // Pass only prior turns as conversationHistory (runClientAiAgent appends the active userQuery itself)
+    const history = messages
+      .filter((m) => m.role && m.content)
       .map((m) => ({ role: m.role, content: m.content }));
 
     let accumulatedContent = '';
@@ -827,6 +936,7 @@ export default function AiChatView({ initialQuery = null }) {
           <div className="relative" ref={threadMenuRef}>
             <button
               type="button"
+              aria-expanded={isThreadMenuOpen}
               onClick={() => setIsThreadMenuOpen((v) => !v)}
               className={`p-1.5 rounded-lg transition cursor-pointer border ${
                 isThreadMenuOpen
@@ -1051,6 +1161,7 @@ export default function AiChatView({ initialQuery = null }) {
                   <div className="ai-step-card ai-step-violet mb-4 rounded-xl border border-[var(--accent-border)] bg-[var(--accent-light)] overflow-hidden text-xs">
                     <button
                       type="button"
+                      aria-expanded={isExpanded}
                       onClick={() =>
                         setExpandedToolCalls((prev) => ({ ...prev, [msg.id]: !isExpanded }))
                       }
@@ -1088,10 +1199,14 @@ export default function AiChatView({ initialQuery = null }) {
                         {msg.toolCalls.map((tc, idx) => {
                           const meta = getToolMeta(tc.tool);
                           const IconComp = meta.icon;
-                          const paramDesc = tc.args?.query
+                          const paramDesc = Array.isArray(tc.args?.concept_groups) && tc.args.concept_groups.length > 0
+                            ? tc.args.concept_groups.map((g) => g.concept || (g.pali_terms || g.english_keywords || [])[0]).filter(Boolean).join(' ∩ ')
+                            : tc.args?.query
                             ? `"${tc.args.query}"`
                             : tc.args?.book_code
                             ? `${tc.args.book_code}${tc.args.para_index !== undefined ? ` §${tc.args.para_index}` : tc.args.para_start ? ` §${tc.args.para_start}` : tc.args.para_number ? ` §${tc.args.para_number}` : ''}${tc.args.line_id ? `:L${tc.args.line_id}` : ''}`
+                            : tc.args?.term
+                            ? `"${tc.args.term}"`
                             : tc.args?.word
                             ? `"${tc.args.word}"`
                             : tc.args?.terms

@@ -14,10 +14,9 @@ Allow: /
 Allow: /_next/
 Allow: /api/
 Allow: /book/
-Allow: /chapter/
 Disallow: /api/search*
 
-# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow dict tool use
+# 2. Leading AI Crawlers, Search Agents & LLM Scrapers — explicitly allow AI & Dict tools
 User-agent: GPTBot
 User-agent: ChatGPT-User
 User-agent: OAI-SearchBot
@@ -37,19 +36,10 @@ Allow: /
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /api/
-Allow: /api/dict/lookup
-Allow: /api/dict/inf
-Allow: /book/
-Allow: /chapter/
-
-# 2b. Canonical AI Tool API (direct VPS) — always allow
-# AI tools should call https://api.tipitakapali.org/api/dict/lookup?w={word}&dict=dpd|others
-# and https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd as live example
-User-agent: GPTBot
-User-agent: ClaudeBot
-User-agent: PerplexityBot
-Content-Signal: ai-train=yes, search=yes, ai-input=yes
+Allow: /api/ai/
 Allow: /api/dict/
+Allow: /api/links/
+Allow: /book/
 
 # 3. Default for all other user agents
 User-agent: *
@@ -57,34 +47,20 @@ Content-Signal: ai-train=yes, search=yes, ai-input=yes
 Allow: /
 Allow: /_next/
 Allow: /api/
-Allow: /api/dict/lookup
-Allow: /api/dict/inf
+Allow: /api/ai/
+Allow: /api/dict/
+Allow: /api/links/
 Disallow: /api/search*
 
-# 4. Sitemaps and AI Entry Points (Root Index, Main, and 16 Scripts)
+# 4. Canonical Sitemap & AI Discovery Entry Points
 Sitemap: https://tipitakapali.org/sitemap.xml
-Sitemap: https://tipitakapali.org/sitemap-main.xml
-Sitemap: https://tipitakapali.org/sitemap-translations.xml
-Sitemap: https://tipitakapali.org/sitemap-si.xml
-Sitemap: https://tipitakapali.org/sitemap-hi.xml
-Sitemap: https://tipitakapali.org/sitemap-thai.xml
-Sitemap: https://tipitakapali.org/sitemap-laos.xml
-Sitemap: https://tipitakapali.org/sitemap-my.xml
-Sitemap: https://tipitakapali.org/sitemap-km.xml
-Sitemap: https://tipitakapali.org/sitemap-beng.xml
-Sitemap: https://tipitakapali.org/sitemap-gurm.xml
-Sitemap: https://tipitakapali.org/sitemap-tham.xml
-Sitemap: https://tipitakapali.org/sitemap-guja.xml
-Sitemap: https://tipitakapali.org/sitemap-telu.xml
-Sitemap: https://tipitakapali.org/sitemap-kann.xml
-Sitemap: https://tipitakapali.org/sitemap-mala.xml
-Sitemap: https://tipitakapali.org/sitemap-brah.xml
-Sitemap: https://tipitakapali.org/sitemap-tibt.xml
-Sitemap: https://tipitakapali.org/sitemap-cyrl.xml
 Agentmap: https://tipitakapali.org/.well-known/ai-catalog.json
 Host: tipitakapali.org
-# AI Tool Docs
-# Canonical Dict API: https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd
-# Canonical Dict Others: https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=others
-# OpenAPI: https://tipitakapali.org/openapi.json
-# AI Plugin: https://tipitakapali.org/.well-known/ai-plugin.json
+
+# AI Tool Quick Reference (Direct VPS, CORS *, no auth)
+# Bold Definitions (387K+ canonical/commentary glosses): https://api.tipitakapali.org/api/ai/bold_definitions?w=mett%C4%81&langs=en
+# Concept-Group Search (multi-concept boolean FTS5):     POST https://api.tipitakapali.org/api/ai/search_concepts
+# Digital Pāḷi Dictionary (DPD primary):                 https://api.tipitakapali.org/api/dict/lookup?w=mett%C4%81&dict=dpd
+# Sentence-Aligned Pāḷi + Translations:                  https://api.tipitakapali.org/api/ai/sentences?book=s0101m.mul&chapter=0&para_index=5&langs=en
+# OpenAPI Specification:                                 https://tipitakapali.org/openapi.json
+# AI Agent Instructions:                                 https://tipitakapali.org/llms.txt

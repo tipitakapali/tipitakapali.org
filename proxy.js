@@ -16,7 +16,7 @@ export function proxy(request) {
     const response = NextResponse.rewrite(new URL(targetPath, request.url));
     response.headers.set('Content-Type', 'text/markdown; charset=utf-8');
     response.headers.set('Vary', 'Accept');
-    response.headers.set('x-markdown-tokens', pathname === '/' ? '1250' : '8500');
+    response.headers.set('x-markdown-tokens', pathname === '/' ? '3750' : '12900');
     return response;
   }
 

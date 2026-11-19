@@ -310,30 +310,38 @@ export default function AiMarkdown({ content, onCitationClick }) {
   const renderInline = (text) => {
     if (!text) return null;
 
-    // Pattern for citation tags: [book_code:c{chap}:p{para}], [book_code:c{chap}:p{start}-{end}], [book_code:{para}], or sentence-level [book_code:c{chap}:p{para}-L{line}] / [book_code:c{chap}:p{para}:L{line}]
-    const citationRegex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–]L?(\d+))?(?::L?(\d+))?\]/gi;
+    // Pattern for citation tags: [book_code:c{chap}:p{para}], [book_code:c{chap}:p{start}-p{end}], [book_code:c{chap}:p{start}-{end}], [book_code:{para}], or sentence-level [book_code:c{chap}:p{para}-L{line}] / [book_code:c{chap}:p{para}:L{line}]
+    const citationRegex = /\[([a-zA-Z0-9_.-]+)(?::c(\d+))?:p?(\d+)(?:[-–](?:([Ll])|[Pp])?(\d+))?(?::[Ll]?(\d+))?\]/g;
+    const isLikelyBookCode = (raw, hasChap) => {
+      const low = String(raw || '').toLowerCase();
+      if (/^\d+$/.test(low)) return false;
+      if (/\.(?:mul|att|tik|nrf)$/i.test(raw)) return true;
+      if (/^(?:dn|mn|sn|an|vin|abh|khp|dhp|ud|it|iti|snp|vv|pv|thag|thig|ja|jat|vism|mil)\d*(?:\.\d+)?$/i.test(low)) return true;
+      if (/^[dmsa]-(?:i|ii|iii|iv|v)$/i.test(low)) return true;
+      if (hasChap && /^(?:s0|vin|abh|e0)[a-z0-9_.-]+$/i.test(raw)) return true;
+      return false;
+    };
     const parts = [];
     let lastIndex = 0;
     let match;
 
     while ((match = citationRegex.exec(text)) !== null) {
+      const rawTag = match[0];
+      const bookCode = match[1];
+      const hasChap = match[2] !== undefined;
+      if (!isLikelyBookCode(bookCode, hasChap)) continue;
+
       const matchIndex = match.index;
       if (matchIndex > lastIndex) {
         parts.push(text.substring(lastIndex, matchIndex));
       }
 
-      const rawTag = match[0];
-      const bookCode = match[1];
-      const chapIdx = match[2] !== undefined ? parseInt(match[2], 10) : 0;
+      const chapIdx = hasChap ? parseInt(match[2], 10) : 0;
       const paraIdx = parseInt(match[3], 10);
-      let paraEnd = match[4] ? parseInt(match[4], 10) : null;
-      let lineId = match[5] ? parseInt(match[5], 10) : null;
-
-      // Sentence-level citation [book:cX:pY-LZ] uses dash-L; promote to lineId
-      if (/-L\d+/i.test(rawTag) && !lineId && paraEnd !== null) {
-        lineId = paraEnd;
-        paraEnd = null;
-      }
+      const isDashLine = Boolean(match[4]);
+      const dashNum = match[5] ? parseInt(match[5], 10) : null;
+      let paraEnd = !isDashLine ? dashNum : null;
+      let lineId = match[6] ? parseInt(match[6], 10) : (isDashLine ? dashNum : null);
 
       // Label to display on the interactive chip
       const displayLabel = lineId

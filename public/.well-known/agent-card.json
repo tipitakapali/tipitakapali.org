@@ -1,8 +1,8 @@
 {
   "$schema": "https://a2a-protocol.org/schemas/agent-card/v1.json",
   "name": "TipitakaPali Agent",
-  "version": "1.0.0",
-  "description": "Autonomous agent for querying the Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon, Digital Pāḷi Dictionary (DPD), grammatical analyses, and cross-edition references.",
+  "version": "1.2.0",
+  "description": "Autonomous agent for querying the 217-book Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon, 387,000+ pre-indexed canonical bold definitions, multi-concept boolean search, Digital Pāḷi Dictionary (DPD), 23 modern translations, and sentence-aligned citations.",
   "url": "https://tipitakapali.org",
   "supportedInterfaces": [
     {
@@ -17,19 +17,24 @@
   },
   "skills": [
     {
+      "id": "bold-definitions",
+      "name": "Canonical Bold Definitions Lookup",
+      "description": "Query 387,000+ pre-indexed Aṭṭhakathā, Ṭīkā, Visuddhimagga, and Mūla bold headword definitions with aligned translations and verifiable [book:cX:pY-LZ] citations."
+    },
+    {
+      "id": "concept-search",
+      "name": "Multi-Concept Boolean Canon Search",
+      "description": "Intersect 2–4 concept groups using Pāḷi terms/stems and English/translation synonyms across Pāḷi and 23 modern translation FTS5 indexes."
+    },
+    {
       "id": "dict-lookup",
       "name": "Pāḷi Dictionary Lookup",
-      "description": "Comprehensive lookup across the Digital Pāḷi Dictionary (DPD), PTS, and classical Burmese & Sinhala lexicons."
+      "description": "Comprehensive lookup across the Digital Pāḷi Dictionary (DPD), PTS PED 2015, compound splitter, and classical Burmese, Sinhala & Sanskrit lexicons."
     },
     {
       "id": "canon-reading",
-      "name": "Pāḷi Canon Reader",
-      "description": "Direct access to 217 canonical books and 2,695 chapters across Roman and 16 Brahmic scripts."
-    },
-    {
-      "id": "canon-search",
-      "name": "Full-Text Canon Search",
-      "description": "FTS5 search across all 520,000+ paragraphs of the Sixth Buddhist Council Pāḷi Canon."
+      "name": "Pāḷi Canon Reader & Sentence Alignment",
+      "description": "Direct access to 217 canonical books, 2,695 chapters, 1.2M aligned Pāḷi sentences, and 23 modern translations across 17 scripts."
     }
   ]
 }

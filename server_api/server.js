@@ -1697,7 +1697,7 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
   });
 
   // Initialize Ani (AI Nissaya) Controller & Register Endpoints
-  initAiController({ db, dbFts, resolveDbPath });
+  initAiController({ db, dbFts, resolveDbPath, boldLinkedEngine, translationEngine });
   registerAiRoutes(fastify);
 
   // Health and metrics endpoint

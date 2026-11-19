@@ -2,9 +2,9 @@
   "$schema": "https://modelcontextprotocol.io/schemas/server-card/v1.json",
   "serverInfo": {
     "name": "tipitakapali-mcp-server",
-    "title": "Tipitaka Pali Canon & DPD MCP Server",
-    "version": "1.0.0",
-    "description": "MCP server exposing Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon books, chapters, full-text search, and Digital Pāḷi Dictionary (DPD) lookups."
+    "title": "Tipitaka Pali Canon, Bold Definitions & DPD MCP Server",
+    "version": "1.2.0",
+    "description": "MCP server exposing Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon books, 387K+ canonical bold definitions, multi-concept boolean search, sentence-level Pāḷi/translation alignment, and Digital Pāḷi Dictionary (DPD) lookups."
   },
   "transport": {
     "type": "http",
@@ -13,8 +13,57 @@
   "capabilities": {
     "tools": [
       {
+        "name": "get_bold_definitions",
+        "description": "Query 387,000+ pre-indexed canonical & commentarial bold definitions (Aṭṭhakathā, Ṭīkā, Visuddhimagga, Mūla) with aligned translations and verifiable [book:cX:pY-LZ] citations.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "word": {
+              "type": "string",
+              "description": "Pāḷi term to define (IAST, Velthuis, or Asian script, e.g. mettā, sati, anatta)"
+            },
+            "langs": {
+              "type": "string",
+              "default": "en",
+              "description": "Comma-separated translation language codes (e.g. en,vi)"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 8,
+              "description": "Maximum ranked definitions to return (1–20)"
+            }
+          },
+          "required": ["word"]
+        }
+      },
+      {
+        "name": "search_concepts",
+        "description": "Multi-concept boolean intersection search across Pāḷi and translation FTS5 indexes (AND across concept groups, OR within each group's Pāḷi and English synonyms).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "concept_groups": {
+              "type": "array",
+              "description": "2–4 concept groups, each with concept label, pali_terms, pali_stems, and english_keywords",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "concept": { "type": "string" },
+                  "pali_terms": { "type": "array", "items": { "type": "string" } },
+                  "pali_stems": { "type": "array", "items": { "type": "string" } },
+                  "english_keywords": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "langs": { "type": "array", "items": { "type": "string" }, "default": ["en"] },
+            "limit": { "type": "integer", "default": 12 }
+          },
+          "required": ["concept_groups"]
+        }
+      },
+      {
         "name": "pali_dict_lookup",
-        "description": "Look up Pali words in the Digital Pāḷi Dictionary (DPD) and classical lexicons",
+        "description": "Look up Pāḷi words in the Digital Pāḷi Dictionary (DPD), canonical bold definitions, and classical lexicons",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -24,9 +73,9 @@
             },
             "dict": {
               "type": "string",
-              "enum": ["all", "dpd", "others"],
+              "enum": ["all", "dpd", "bold_def", "others"],
               "default": "dpd",
-              "description": "Dictionary to query (dpd for primary Digital Pali Dictionary, others for PTS/Burmese/Sinhala)"
+              "description": "Dictionary to query (dpd for Digital Pali Dictionary, bold_def for 387K+ canonical bold definitions, others for PTS/Burmese/Sinhala)"
             }
           },
           "required": ["word"]
@@ -34,13 +83,18 @@
       },
       {
         "name": "pali_canon_search",
-        "description": "Search the entire 520,000+ paragraph Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon",
+        "description": "Search the entire 520,000+ paragraph Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon and 23 translation indexes",
         "inputSchema": {
           "type": "object",
           "properties": {
             "query": {
               "type": "string",
-              "description": "Search phrase or term in Pali (e.g. anicca, dukkha, anatta)"
+              "description": "Search phrase or term in Pāḷi or a translation language (e.g. anicca, dukkha, anatta)"
+            },
+            "l": {
+              "type": "string",
+              "default": "pali",
+              "description": "Language index (pali or any translation code e.g. en, vi, my, th)"
             },
             "pitaka": {
               "type": "string",
@@ -54,7 +108,7 @@
       },
       {
         "name": "get_canonical_text",
-        "description": "Retrieve Pali canon book chapter content by book code and chapter number",
+        "description": "Retrieve Pāḷi canon book chapter content by book code and chapter number",
         "inputSchema": {
           "type": "object",
           "properties": {

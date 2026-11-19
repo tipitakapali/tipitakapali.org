@@ -3,10 +3,33 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>About &amp; User Guide | Tipiṭaka Pāḷi — Chaṭṭha Saṅgāyana Tipiṭaka</title>
-<meta name="description" content="About TipitakaPali.org: the complete Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi Canon with full-text search, multi-dictionary lookup, MAT cross-navigation, 17 scripts, and user guide." />
+<title>About &amp; User Guide — Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi | TipitakaPali.org</title>
+<meta name="description" content="Guide to TipitakaPali.org: 217-book Pāḷi Canon, parallel columns, 23 modern translations, 387K+ bold definitions, DPD dictionary, 17 scripts, and Ani AI." />
 <link rel="canonical" href="https://tipitakapali.org/info" />
+<meta property="og:title" content="About &amp; User Guide — Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi | TipitakaPali.org" />
+<meta property="og:description" content="Guide to TipitakaPali.org: 217-book Pāḷi Canon, parallel columns, 23 modern translations, 387K+ bold definitions, DPD dictionary, 17 scripts, and Ani AI." />
+<meta property="og:url" content="https://tipitakapali.org/info" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://tipitakapali.org/android-chrome-512x512.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="About &amp; User Guide — Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi | TipitakaPali.org" />
+<meta name="twitter:description" content="Guide to TipitakaPali.org: 217-book Pāḷi Canon, parallel columns, 23 modern translations, 387K+ bold definitions, DPD dictionary, 17 scripts, and Ani AI." />
+<meta name="twitter:image" content="https://tipitakapali.org/android-chrome-512x512.png" />
 <link rel="icon" href="/favicon.ico" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "About & User Guide — TipitakaPali.org",
+  "url": "https://tipitakapali.org/info",
+  "description": "Complete user guide and technical overview for Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi (TipitakaPali.org): 217 canonical books, 23 modern translations, 17 scripts, 387,000+ pre-indexed bold definitions, DPD dictionary, parallel reading, and Ani AI Nissaya.",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi",
+    "url": "https://tipitakapali.org/"
+  }
+}
+</script>
 <style>
   :root {
     --bg: #f0eee5;
@@ -111,7 +134,7 @@
   kbd { font-weight: 700; color: var(--accent); white-space: nowrap; }
   section.card a { color: var(--accent); }
   .stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
     gap: 0.7rem; margin-top: 1.4rem;
   }
   .stat {
@@ -156,71 +179,71 @@
   <div class="cta-row">
     <a class="btn primary" href="/">Open the Reader</a>
     <a class="btn ghost" href="/?q=mett%C4%81">Try Search</a>
-    <a class="btn ghost" href="/pali-script-converter.html">Script Converter</a>
+    <a class="btn ghost" href="/pali-script-converter">Script Converter</a>
   </div>
 </header>
 
 <nav class="toc" aria-label="Page contents">
   <a href="#overview">Overview</a>
-  <a href="#reading">Reading</a>
-  <a href="#translations">Translations</a>
+  <a href="#reading">Reading &amp; Columns</a>
+  <a href="#translations">Language Menu</a>
   <a href="#search">Search</a>
-  <a href="#dictionary">Dictionary</a>
+  <a href="#dictionary">Dictionary &amp; Bold Defs</a>
   <a href="#scripts">Scripts</a>
-  <a href="#mat">MAT</a>
+  <a href="#mat">MAT &amp; Previews</a>
   <a href="#ani">Ani AI</a>
   <a href="#shortcuts">Shortcuts</a>
   <a href="#editions">Editions</a>
   <a href="#apps">Apps</a>
-  <a href="#api">API</a>
+  <a href="#api">API &amp; AI Agents</a>
   <a href="#credits">Credits</a>
 </nav>
 
 <main>
-  <div class="stats" aria-label="Library statistics">
+  <section class="stats" aria-label="Library statistics">
     <div class="stat"><b>217</b><span>books</span></div>
     <div class="stat"><b>2,695+</b><span>chapters</span></div>
     <div class="stat"><b>520,000+</b><span>paragraphs</span></div>
-    <div class="stat"><b>2,860</b><span>navigation nodes</span></div>
+    <div class="stat"><b>387K+</b><span>bold definitions</span></div>
+    <div class="stat"><b>23</b><span>translations</span></div>
     <div class="stat"><b>17</b><span>Pāḷi scripts</span></div>
-  </div>
+  </section>
 
   <section class="card" id="overview">
     <h2><span class="dot"></span>Overview</h2>
     <p><strong>TipitakaPali.org</strong> presents the <strong class="pali">Chaṭṭha Saṅgāyana Tipiṭaka (CST)</strong> — the Pāḷi Canon as recited at the Sixth Buddhist Council — together with its <strong class="pali">Aṭṭhakathā</strong> (commentaries), <strong class="pali">Ṭīkā</strong> (sub-commentaries) and extra-canonical treatises, directly synchronized with the official <strong>Vipassana Research Institute (VRI)</strong> TEI XML corpus including all errata corrections.</p>
-    <p>Everything runs from a fast static edge distribution with a high-speed dictionary &amp; search API: paragraph-level navigation, multi-dictionary lookup on any word, live transliteration into 17 scripts, and one-click jumps between root text, commentary and sub-commentary.</p>
-    <div class="tip"><strong>Tip:</strong> every book, chapter and paragraph has a shareable address — e.g. <code>/book/s0101m.mul/1</code>, <code>/book/s0101m.mul/1#para8</code>, <code>/?q=anatta</code>. Copy the URL after navigating and it just works.</div>
+    <p>Everything runs from a fast static edge distribution paired with a dedicated dictionary, bold-definitions, and search API: non-shifting floating study panels, multi-column parallel reading, multi-dictionary lookup on any word, live transliteration into 17 scripts, and instant jumps between root text, commentary, and sub-commentary.</p>
+    <div class="tip"><strong>Tip:</strong> every book, chapter and paragraph has a shareable address — e.g. <code>/book/s0101m.mul</code>, <code>/book/s0101m.mul/1#para8</code>, <code>/?q=anatta</code>. Copy the URL after navigating and it just works.</div>
   </section>
 
   <section class="card" id="reading">
-    <h2><span class="dot"></span>Reading the Texts</h2>
+    <h2><span class="dot"></span>Reading, Parallel Columns &amp; Floating Panels</h2>
     <ul>
-      <li><strong>Navigation tree</strong> — browse Vinaya, Sutta, Abhidhamma and Añña collections; press <kbd>Ctrl + B</kbd> to show or hide it, and type in its filter box to find any book instantly.</li>
-      <li><strong>Book tabs</strong> — open several books side by side; each tab remembers its chapter, paragraph and scroll position, even after you close the browser.</li>
-      <li><strong>Table of contents</strong> — the <strong>Toc</strong> button lists every section of the open book for direct chapter and paragraph jumping.</li>
-      <li><strong>Go</strong> — jump straight to a paragraph number (<code>para</code>) or a printed-edition page (<code>M / V / P / T</code>).</li>
-      <li><strong>Read Aloud</strong> — the <strong>Read</strong> button in the footer reads the enabled translations aloud from the paragraph on your screen, continuing into the next chapter automatically. The mini-player offers play/pause, stop, previous/next paragraph, per-language voices, speed, pitch, volume and follow-along highlighting; <strong>Reset</strong> restores all voice settings to defaults.</li>
-      <li><strong>Bookmarks &amp; history</strong> — bookmark any paragraph and revisit your recent reading; both are stored privately in your own browser.</li>
-      <li><strong>Eka mode</strong> — distraction-free reading; press <kbd>Esc</kbd> or the floating button to exit.</li>
-      <li><strong>Themes &amp; typography</strong> — Classic, Sepia, Dark, OLED and Dusk themes, five accent colors, four reader fonts, adjustable size, line-height, alignment and page-break / paragraph-number / footnote display.</li>
+      <li><strong>Non-shifting floating overlays &amp; opt-in Pin</strong> — both the <strong>Tipiṭaka Navigation Tree</strong> (<kbd>Ctrl + B</kbd>) and the <strong>Dictionary panel</strong> (Left/Right Dock) open as floating overlays by default so your reading text never shifts or narrows. Click <strong>Pin</strong> on either panel to dock it beside the text whenever desired. Clicking empty space closes unpinned panels cleanly, while clicking Pāḷi words inside the dictionary continues looking up words seamlessly.</li>
+      <li><strong>Multi-column parallel reading &amp; Sync</strong> — choose your tab layout in the order <strong>Columns | Tabs | Single</strong>, with the <strong>Sync</strong> toggle placed right next to <strong>Columns</strong> for synchronized parallel scrolling across Mūla, Aṭṭhakathā, and Ṭīkā. Each column shows a <strong>live per-column section title</strong> as you scroll.</li>
+      <li><strong>Open Tabs switcher &amp; preserved scroll</strong> — when multiple tabs are open, an <strong>Open Tabs switcher button</strong> lets you switch or close books effortlessly. Opening <strong>+Aṭṭha</strong>, <strong>+Ṭīkā</strong>, or <strong>+Mūla</strong> alongside your current book preserves your exact scroll position.</li>
+      <li><strong>Clean app launch</strong> — the app opens cleanly without auto-reloading previous tabs, while your <strong>Bookmarks</strong>, <strong>Reading History</strong>, and <strong>per-book scroll positions</strong> remain safely preserved privately on your device.</li>
+      <li><strong>Table of contents &amp; Go</strong> — the <strong>Toc</strong> button lists every section of the open book for direct jumping, and <strong>Go</strong> jumps straight to a paragraph number (<code>para</code>) or printed-edition page (<code>M / V / P / T</code>), landing accurately even with translations enabled.</li>
+      <li><strong>Read Aloud (TTS)</strong> — the <strong>Read</strong> button in the footer reads enabled translations aloud from the top paragraph on screen, continuing into the next chapter automatically with per-language voices, speed, pitch, volume, follow-along highlighting, and <strong>Reset</strong>.</li>
+      <li><strong>Eka mode, themes &amp; typography</strong> — distraction-free reading (<kbd>Esc</kbd> to exit), Classic, Sepia, Dark, OLED and Dusk themes, five accent colors, four reader fonts, and customizable page-break / paragraph-number / footnote display.</li>
     </ul>
   </section>
 
   <section class="card" id="translations">
-    <h2><span class="dot"></span>Multilingual Translations &amp; Pāḷi Layers</h2>
-    <p>Study the Canon alongside <strong>24 modern translations</strong> (English, Vietnamese, Myanmar, Sinhala, Chinese, Khmer, Thai, Lao, Tamil, Hindi, German, Japanese, Korean, Indonesian, Nepali, Bengali, Spanish, French, Czech, Marathi, Portuguese, Russian, and Myanmar Nissaya word-by-word glosses).</p>
+    <h2><span class="dot"></span>Redesigned Language Menu &amp; Pāḷi Layers</h2>
+    <p>Study the Canon alongside <strong>23 modern translations</strong> (<strong>24 total reading layers including Pāḷi</strong>): English, Vietnamese, Myanmar, Myanmar Nissaya word-by-word glosses, Sinhala, Chinese, Khmer, Thai, Lao, Tamil, Hindi, Marathi, Indonesian, Czech, German, Spanish, French, Japanese, Portuguese, Russian, Korean, Nepali, and Bengali.</p>
     <div class="grid2">
       <div class="tile">
-        <b>Independent Pāḷi Layer</b>
-        <p>Pāḷi text is an independent layer. In the Language menu, you can reorder it above or below translations, move it to the top with one click, or disable it completely to read only the translation.</p>
+        <b>Two-Zone Language Menu</b>
+        <p><strong>Enabled layers</strong> (including Pāḷi as a first-class layer) let you move any language to the top (<code>⤒</code>), reorder (<code>▲</code>/<code>▼</code>), and customize per-language colors. <strong>Available languages</strong> display coverage info and quick toggle switches.</p>
+      </div>
+      <div class="tile">
+        <b>Offline Download, Update &amp; Delete Controls</b>
+        <p>In the offline mobile &amp; desktop apps, manage translation packs directly inside the Language Menu with <strong>Download</strong>, <strong>Update</strong>, <strong>Delete</strong>, and footer <strong>Check</strong> controls.</p>
       </div>
       <div class="tile">
         <b>Vertical vs. Side-by-Side Modes</b>
-        <p>Switch between <strong>Vertical</strong> where translations appear under each paragraph, <strong>Pāḷi - Translation</strong> (Pāḷi left, translation right), and <strong>Translation - Pāḷi</strong> (translation left, Pāḷi right) for simultaneous parallel reading.</p>
-      </div>
-      <div class="tile">
-        <b>Color-Coded Language Borders</b>
-        <p>Every language features a distinct colored left border (Royal Blue for English, Crimson for Vietnamese, Jade Green for Myanmar, etc.) for instant visual identification without distracting headers.</p>
+        <p>Switch between <strong>Vertical / Stacked</strong> (sentence-aligned under each paragraph), <strong>Pāḷi – Translation</strong> (Pāḷi left, translation right), and <strong>Translation – Pāḷi</strong> (translation left, Pāḷi right) with customizable color-coded borders.</p>
       </div>
       <div class="tile">
         <b>AI Translation Notice (Epitaka)</b>
@@ -231,27 +254,28 @@
 
   <section class="card" id="search">
     <h2><span class="dot"></span>Full-Text Search (FTS5)</h2>
-    <p>Search <strong>all 217 books and 520,000+ paragraphs</strong> instantly (press <kbd>/</kbd>). A dedicated SQLite FTS5 prefix engine powers it, including scholarly variant readings (<code>syā.</code>, <code>ka.</code>, <code>pī.</code>) and manuscript notes.</p>
+    <p>Search <strong>all 217 books and 520,000+ paragraphs</strong> instantly in Pāḷi or across the <strong>23 translation indexes</strong> (press <kbd>/</kbd>). A dedicated SQLite FTS5 prefix engine powers it, including scholarly variant readings (<code>syā.</code>, <code>ka.</code>, <code>pī.</code>) and manuscript notes.</p>
     <div class="grid2">
       <div class="tile"><b>MAT &amp; Piṭaka filters</b><p>Narrow to Mūla, Aṭṭhakathā, Ṭīkā or Añña; and to Vinaya, Sutta (Dīgha, Majjhima, Saṃyutta, Aṅguttara, Khuddaka), Abhidhamma or Añña.</p></div>
       <div class="tile"><b>Proximity (NEAR)</b><p>Exact phrase with distance 1 (<code>"evaṃ me sutaṃ"</code>), near-words within 2–10 words, or anywhere-in-paragraph matching; prefix wildcards like <code>buddha*</code> included.</p></div>
-      <div class="tile"><b>Three sort orders</b><p>Canonical Piṭaka order (default), relevance ranking, or BM25 statistical scoring.</p></div>
-      <div class="tile"><b>Shareable queries</b><p><code>/?q=mettā</code> opens the search directly — ideal for bookmarks, study notes and AI assistants.</p></div>
+      <div class="tile"><b>Accurate jump with translations</b><p>Clicking any search result lands accurately on the exact paragraph even when stacked or side-by-side translations are enabled.</p></div>
+      <div class="tile"><b>Sort orders &amp; shareable queries</b><p>Canonical Piṭaka order (default), relevance ranking, or BM25 scoring. Shareable links like <code>/?q=mettā</code> open search directly.</p></div>
     </div>
   </section>
 
   <section class="card" id="dictionary">
-    <h2><span class="dot"></span>Dictionaries — Click Any Word</h2>
-    <p>Click or tap any Pāḷi word while reading (or press <kbd>d</kbd> on a selection) for grammar, roots, inflections and compound analysis across six sources:</p>
+    <h2><span class="dot"></span>Dictionaries &amp; 387K+ Pre-Indexed Bold Definitions</h2>
+    <p>Click or tap any Pāḷi word while reading — or click words inside the dictionary panel itself — for grammar, roots, inflections, compound analysis, and canonical bold definitions across seven sources:</p>
     <p>
       <span class="badge">Primary</span> Digital Pāḷi Dictionary (DPD) — 90,000+ entries with declensions, conjugations and root families.<br />
+      <span class="badge">Canonical</span> Pre-Indexed Bold Definitions — <strong>387,000+ bold headword glosses</strong> from Aṭṭhakathā, Ṭīkā, Visuddhimagga, and Mūla with aligned translations and direct jumps to the source.<br />
       <span class="badge">Analysis</span> DPD compound splitter — breaks long <span class="pali">samāsa</span>/sandhi compounds into units.<br />
       <span class="badge">Classic</span> PTS Pāḷi–English Dictionary (Rhys Davids &amp; Stede, corrected 2015 reprint).<br />
       <span class="badge">Classic</span> Tipiṭaka Pāḷi–Myanmar Abhidhān.<br />
       <span class="badge">Sinhala</span> Pāḷi–Sinhala Dictionary.<br />
       <span class="badge">Comparative</span> Sanskrit lexicons (Monier-Williams, Apte, Edgerton Buddhist Hybrid Sanskrit).
     </p>
-    <p style="margin-top:0.5rem">Choose a center modal, left/right dock or drawer layout in Settings; reorder or disable dictionaries to taste.</p>
+    <p style="margin-top:0.5rem">Choose a Center Modal, Left Dock, or Right Dock in Settings. Side panels float above the text without shifting your reading line by default, with an opt-in <strong>Pin</strong> button and empty-space click dismissal.</p>
   </section>
 
   <section class="card" id="scripts">
@@ -264,22 +288,23 @@
       <tr><td><code>~n</code> or <code>,,n</code> · <code>"n</code></td><td class="pali">ñ · ṅ</td></tr>
       <tr><td><code>nibbaana</code> → <span class="pali">nibbāna</span></td><td><code>buddha.m</code> → <span class="pali">buddhaṃ</span></td></tr>
     </table>
-    <div class="tip"><strong>Standalone tool:</strong> convert any text between all 17 scripts in your browser with the <a href="/pali-script-converter.html">Pāḷi Script Converter</a> — free, instant, and also downloadable as a fully offline file.</div>
+    <div class="tip"><strong>Standalone tool:</strong> convert any text between all 17 scripts in your browser with the <a href="/pali-script-converter">Pāḷi Script Converter</a> — free, instant, and also downloadable as a fully offline file.</div>
   </section>
 
   <section class="card" id="mat">
-    <h2><span class="dot"></span>MAT Cross-Navigation</h2>
-    <p>While reading any paragraph, the <strong>MAT</strong> button lists the connected <strong class="pali">Mūla</strong> (root canon), <strong class="pali">Aṭṭhakathā</strong> (commentary) and <strong class="pali">Ṭīkā</strong> (sub-commentary) and jumps straight to the corresponding paragraph — exact match when it exists, otherwise the closest available paragraph (clearly labeled), otherwise the corresponding chapter.</p>
+    <h2><span class="dot"></span>MAT Cross-Navigation &amp; Linked Definition Previews</h2>
+    <p>While reading any paragraph, use <strong>MAT</strong> or <strong>+Aṭṭha / +Ṭīkā / +Mūla</strong> to jump to or open the connected <strong class="pali">Mūla</strong> (root canon), <strong class="pali">Aṭṭhakathā</strong> (commentary), and <strong class="pali">Ṭīkā</strong> (sub-commentary) side by side — preserving your scroll position in the active text.</p>
+    <p>Click inline linked definition indicators to open a <strong>Linked Definition Popup Preview</strong> featuring <strong>per-line selection</strong>, aligned translations, <strong>direct Open in Reader</strong>, and a wider <strong>Close</strong> button.</p>
   </section>
 
   <section class="card" id="ani">
-    <h2><span class="dot"></span>Ani AI Nissaya Assistant (Beta)</h2>
-    <p><strong>Ani (AI Nissaya)</strong> is your dedicated AI study companion for the Tipiṭaka — ask about suttas, Pāḷi terms, Vinaya, or Abhidhamma. Open it with the <strong>Ani</strong> button in the top header, or directly via <code>?tab=ai</code>.</p>
+    <h2><span class="dot"></span>Ani (AI Nissaya) Assistant (Beta)</h2>
+    <p><strong>Ani (AI Nissaya)</strong> is your dedicated AI research companion for studying the Tipiṭaka — ask about suttas, Pāḷi terms, Vinaya, or Abhidhamma. Open it with the <strong>Ani</strong> button in the top header, or directly via <code>?tab=ai</code>.</p>
     <div class="grid2">
-      <div class="tile"><b>Free Gemini API Key Required</b><p>Ani needs your own free Google Gemini API key: open Settings (gear icon) → AI Configuration &amp; API Keys and save it. Without a key Ani does not answer and instead opens the Configure prompt.</p></div>
-      <div class="tile"><b>RAG Mode (default) vs Knowledge Mode</b><p>RAG Mode verifies answers against the canonical Tipiṭaka database; Knowledge Mode answers from the model alone. Tap the mode badge in the chat header to change it.</p></div>
-      <div class="tile"><b>Canonical Research &amp; Citations</b><p>Answers stream with a collapsible Canonical Research card (sutta search, passage fetch, Aṭṭhakathā/Ṭīkā review, DPD lexicon). Sources chips open a passage preview and jump straight into the Reader.</p></div>
-      <div class="tile"><b>Threads, Models &amp; Starters</b><p>Multiple conversations with history, new/clear-all controls, copy &amp; retry per message, one-tap starters (English, Vietnamese, Myanmar), and configurable Gemini tool/answer models.</p></div>
+      <div class="tile"><b>Concept-Group Decomposition</b><p>Step 1 breaks complex research questions into main <strong>Concept Groups</strong> with suggested <strong>Pāḷi terms/stems</strong> and <strong>English keywords/synonyms</strong>, then runs tiered boolean-intersection search across Pāḷi and translations.</p></div>
+      <div class="tile"><b>387K+ Bold Definitions &amp; Citations</b><p>Automatically queries pre-indexed canonical bold definitions, DPD, sutta sections, parallel commentaries, and sentence-aligned translations. Clickable Sources chips (<code>[book:cX:pY-LZ]</code>) preview passages and open directly in the Reader.</p></div>
+      <div class="tile"><b>Zero-Key-Escape &amp; Multi-Provider</b><p>Keys stay strictly in your browser and never touch TipitakaPali.org servers. Configure a free Google Gemini key, OpenAI, OpenRouter, or custom/local OpenAI-compatible endpoint in Settings.</p></div>
+      <div class="tile"><b>RAG vs. Knowledge Mode &amp; Threads</b><p>RAG Mode (default) grounds answers in verified database tool calls; Knowledge Mode answers directly from the model. Includes multi-thread history, copy/retry, and multilingual starter prompts.</p></div>
     </div>
     <div class="tip"><strong>Note:</strong> Ani can make mistakes — please verify important info against the original Pāḷi text. Ani is inspired by and built on the <strong>summaries.db</strong> database of <a href="https://epitaka.org/about" target="_blank" rel="noopener noreferrer">Vīmaṃsa</a> in the ePitaka app.</div>
   </section>
@@ -319,14 +344,15 @@
 
   <section class="card" id="api">
     <h2><span class="dot"></span>For Developers &amp; AI Agents</h2>
-    <p>Reading data is served as edge-cached static JSON; dictionary and search are live at <code>https://api.tipitakapali.org</code> (CORS open). Machine-readable catalogs: <code>/openapi.json</code>, <code>/llms.txt</code>, <code>/llms-full.txt</code>, <code>/site.jsonld</code>.</p>
+    <p>Reading data is served as edge-cached static JSON; live search, bold definitions, concept search, and dictionary APIs run at <code>https://api.tipitakapali.org</code> (CORS open, zero auth). Machine-readable catalogs: <a href="/llms.txt">/llms.txt</a>, <a href="/llms-full.txt">/llms-full.txt</a>, <a href="/openapi.json">/openapi.json</a>, <a href="/.well-known/mcp.json">/.well-known/mcp.json</a>, <a href="/site.jsonld">/site.jsonld</a>, and <a href="/sitemap.xml">/sitemap.xml</a>.</p>
     <ul>
-      <li><code>GET /api/tree</code> — navigation tree</li>
-      <li><code>GET /api/books</code> — 217-book catalog</li>
-      <li><code>GET /api/book/:code</code> — book text, TOC, MAT data</li>
-      <li><code>GET /api/search?q=…</code> — FTS5 search</li>
-      <li><code>GET /api/dict/lookup?w=…</code> — dictionary lookup</li>
-      <li><code>GET /api/dict/inf?w=…</code> — inflection tables</li>
+      <li><code>GET /api/ai/bold_definitions?w=…&amp;langs=en</code> — ranked lookup across 387,000+ pre-indexed canonical bold definitions with <code>[book:cX:pY-LZ]</code> citations</li>
+      <li><code>POST /api/ai/search_concepts</code> — multi-concept boolean intersection search across Pāḷi &amp; translation FTS5 indexes</li>
+      <li><code>GET /api/ai/sentences?book=…&amp;chapter=0&amp;para_index=5&amp;langs=en</code> — sentence-aligned Pāḷi &amp; translations (shared <code>line_id</code>)</li>
+      <li><code>GET /api/dict/lookup?w=…&amp;dict=dpd|bold_def|others</code> — DPD, bold definitions, PTS, and classical lexicons</li>
+      <li><code>GET /api/search?q=…&amp;l=pali|en|…</code> — FTS5 search across 520K+ paragraphs &amp; 23 translations</li>
+      <li><code>GET /api/links/preview?book=…&amp;para=…&amp;langs=en</code> — linked Mūla / Aṭṭhakathā / Ṭīkā cross-reference previews</li>
+      <li><code>GET /api/tree</code>, <code>GET /api/books</code>, <code>GET /api/book/:code</code> — edge-cached static navigation &amp; canonical book JSON</li>
     </ul>
   </section>
 
@@ -339,7 +365,7 @@
       <li><strong>PTS PED</strong> — via <a href="https://buddhadust.net">Buddhadust</a>; Pāḷi Text Society, CC BY-NC 3.0.</li>
       <li><strong>Sanskrit lexicons</strong> — <a href="https://www.sanskrit-lexicon.uni-koeln.de">Cologne University</a> (Monier-Williams, Apte, Edgerton), CC BY-NC-SA 3.0.</li>
       <li><strong>Pāḷi–Myanmar Abhidhān</strong> — adapted from Ven. Pn Daza's Tipiṭaka App.</li>
-      <li><strong>AI-Assisted Translations</strong> — adapted from <a href="https://epitaka.org/about">Epitaka</a> (Epitaka AI Translation Project) for multi-language Pāḷi Canon study.</li>
+      <li><strong>AI-Assisted Translations</strong> — adapted from <a href="https://epitaka.org/about">Epitaka</a> (Epitaka AI Translation Project) across 23 modern languages (24 reading layers including Pāḷi).</li>
       <li><strong>App license</strong> — <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> for non-commercial Dhamma dāna.</li>
       <li><strong>Legal</strong> — <a href="/terms_of_service.html">Terms of Service</a> · <a href="/privacy_policy.html">Privacy Policy</a>.</li>
     </ul>
