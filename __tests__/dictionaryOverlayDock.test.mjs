@@ -467,6 +467,30 @@ test('shouldDismissUnpinnedDictionaryOnClick closes unpinned panel on empty spac
     false
   );
 
+  // 4b. Detached target inside dictionary panel (e.g. React unmounted .dp9 on setIsLoading(true)) -> stays open via composedPath / __tpoInsideDictPanel / startedInsidePanel
+  const detachedChild = makeTarget(); // panelEl.contains(detachedChild) === false
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: detachedChild, composedPath: () => [detachedChild, panelEl, {}] },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: detachedChild, nativeEvent: { __tpoInsideDictPanel: true } },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, now: 1000 }
+    ),
+    false
+  );
+  assert.equal(
+    shouldDismissUnpinnedDictionaryOnClick(
+      { target: detachedChild },
+      { isOpen: true, isPinned: false, dockMode: 'side', panelEl, startedInsidePanel: true, now: 1000 }
+    ),
+    false
+  );
+
   // 5. Dictionary trigger button / interactive controls -> stays open (false)
   assert.equal(
     shouldDismissUnpinnedDictionaryOnClick(
@@ -541,6 +565,13 @@ test('shouldDismissUnpinnedDictionaryOnClick closes unpinned panel on empty spac
   assert.ok(emptyHandlerMatch, 'handleEmptySpaceClick should exist');
   assert.match(emptyHandlerMatch[1], /closeDictionary\(\{\s*suppressGhostClick:\s*false\s*\}\)/);
   assert.doesNotMatch(emptyHandlerMatch[1], /handleSafeDismiss\(/);
+
+  // 11. Panel elements capture clicks/pointerdowns so unmounted in-dictionary word clicks never trigger empty-space dismissal
+  assert.match(dictModalSrc, /onPointerDownCapture=\{markPointerDownInsideDictPanel\}/);
+  assert.match(dictModalSrc, /onClickCapture=\{markInsideDictPanel\}/);
+  assert.match(dictModalSrc, /e\.nativeEvent\.__tpoWordClicked\s*=\s*true/);
+  assert.match(dictModalSrc, /e\.nativeEvent\.__tpoInsideDictPanel\s*=\s*true/);
+  assert.match(dictModalSrc, /clearTimeout\(timer\);\s*pointerDownInsidePanelRef\.current\s*=\s*false;/);
 });
 
 test('isPointInsideRangeRects distinguishes actual word glyphs from empty margins and end-of-line space', () => {

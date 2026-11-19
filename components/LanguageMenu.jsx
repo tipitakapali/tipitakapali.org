@@ -21,7 +21,6 @@ import {
   Download,
   Trash2,
   RefreshCw,
-  Database,
 } from 'lucide-react';
 import { useThemeSettings, getDefaultTranslationSlotColor } from '../context/ThemeSettingsContext';
 import { PALI_SCRIPTS_LIST } from '../services/transliterate';
@@ -322,7 +321,6 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateCheckSummary, setUpdateCheckSummary] = useState('');
   const [offlineBusyCode, setOfflineBusyCode] = useState(null);
-  const [downloadingPaliSentences, setDownloadingPaliSentences] = useState(false);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
 
   const applyOfflinePayload = useCallback((payload) => {
@@ -709,27 +707,6 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
     } finally {
       setIsCheckingUpdates(false);
     }
-  };
-
-  const handleGranularitySentenceClick = async () => {
-    if (isOffline && offlineState.loaded && !offlineState.hasPaliSentences) {
-      const bridge = typeof window !== 'undefined' ? window.flutter_inappwebview?.callHandler : null;
-      if (bridge && !downloadingPaliSentences) {
-        setDownloadingPaliSentences(true);
-        try {
-          const res = await bridge('downloadPaliSentences');
-          if (res?.success) {
-            setOfflineState((prev) => ({ ...prev, hasPaliSentences: true }));
-            updateSetting('translationGranularity', 'sentence');
-          }
-        } catch (_) {
-        } finally {
-          setDownloadingPaliSentences(false);
-        }
-        return;
-      }
-    }
-    updateSetting('translationGranularity', 'sentence');
   };
 
   const handleToggleTranslation = async (tId) => {

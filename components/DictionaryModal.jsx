@@ -634,18 +634,27 @@ export function shouldDismissUnpinnedDictionaryOnClick(
     panelEl = null,
     selectionText = '',
     lastResizeEndTime = 0,
+    startedInsidePanel = false,
     now = Date.now(),
   } = {}
 ) {
   if (!isOpen || isPinned || dockMode === 'modal') return false;
   if (now - lastResizeEndTime < 250) return false;
+  if (startedInsidePanel) return false;
   if (e?.__tpoWordClicked || e?.nativeEvent?.__tpoWordClicked) return false;
+  if (e?.__tpoInsideDictPanel || e?.nativeEvent?.__tpoInsideDictPanel) return false;
   if (selectionText && selectionText.trim().length > 1) return false;
 
   const target = e?.target;
   if (!target) return false;
   if (panelEl && typeof panelEl.contains === 'function' && panelEl.contains(target)) {
     return false;
+  }
+  if (panelEl && typeof e?.composedPath === 'function') {
+    const path = e.composedPath();
+    if (Array.isArray(path) && path.includes(panelEl)) {
+      return false;
+    }
   }
   if (typeof target.closest === 'function') {
     if (target.closest('[data-dict-trigger], .dict-quick-btn')) {
@@ -700,6 +709,18 @@ export default function DictionaryModal() {
   const contentContainerRef = useRef(null);
   const modalPanelRef = useRef(null);
   const contentPointerDownRef = useRef(null);
+  const pointerDownInsidePanelRef = useRef(false);
+
+  const markInsideDictPanel = useCallback((e) => {
+    if (!e) return;
+    e.__tpoInsideDictPanel = true;
+    if (e.nativeEvent) e.nativeEvent.__tpoInsideDictPanel = true;
+  }, []);
+
+  const markPointerDownInsideDictPanel = useCallback((e) => {
+    pointerDownInsidePanelRef.current = true;
+    markInsideDictPanel(e);
+  }, [markInsideDictPanel]);
 
   // History Dropdown State & Refs
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -987,24 +1008,37 @@ export default function DictionaryModal() {
   // - In unpinned side mode (!isPinned): closes when clicking empty space (not a word or panel/interactive control)
   // - In pinned side mode (isPinned): stays docked beside the reader
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      pointerDownInsidePanelRef.current = false;
+      return;
+    }
 
     const handlePointerDownOutside = (e) => {
+      const panelEl = modalPanelRef.current;
+      const insidePanel = Boolean(
+        panelEl &&
+          ((typeof panelEl.contains === 'function' && panelEl.contains(e.target)) ||
+            (typeof e?.composedPath === 'function' && e.composedPath().includes(panelEl)))
+      );
+      pointerDownInsidePanelRef.current = insidePanel;
+
       if (dockMode !== 'modal') {
         return;
       }
       // Don't close if click is inside the dictionary panel
-      if (modalPanelRef.current && modalPanelRef.current.contains(e.target)) {
+      if (insidePanel) {
         return;
       }
       // Don't close if clicking on an interactive trigger meant to open/toggle dictionary
-      if (e.target.closest('[data-dict-trigger]') || e.target.closest('.dict-quick-btn')) {
+      if (e.target.closest?.('[data-dict-trigger]') || e.target.closest?.('.dict-quick-btn')) {
         return;
       }
       handleSafeDismiss(e);
     };
 
     const handleEmptySpaceClick = (e) => {
+      const startedInsidePanel = pointerDownInsidePanelRef.current;
+      pointerDownInsidePanelRef.current = false;
       const sel = typeof window !== 'undefined' ? window.getSelection()?.toString() || '' : '';
       if (
         shouldDismissUnpinnedDictionaryOnClick(e, {
@@ -1014,6 +1048,7 @@ export default function DictionaryModal() {
           panelEl: modalPanelRef.current,
           selectionText: sel,
           lastResizeEndTime: lastResizeEndRef.current,
+          startedInsidePanel,
         })
       ) {
         // Already running in bubble-phase `click`: close immediately without setting
@@ -1031,6 +1066,7 @@ export default function DictionaryModal() {
 
     return () => {
       clearTimeout(timer);
+      pointerDownInsidePanelRef.current = false;
       document.removeEventListener('pointerdown', handlePointerDownOutside, true);
       document.removeEventListener('click', handleEmptySpaceClick, false);
     };
@@ -1456,6 +1492,12 @@ export default function DictionaryModal() {
           if (cleanWord && (cleanWord.length >= 2 || /\p{L}/u.test(cleanWord))) {
             e.preventDefault();
             e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.__tpoWordClicked = true;
+              e.nativeEvent.__tpoInsideDictPanel = true;
+            }
+            e.__tpoWordClicked = true;
+            e.__tpoInsideDictPanel = true;
             if (typeof window !== 'undefined') {
               try {
                 window.getSelection()?.removeAllRanges?.();
@@ -1497,6 +1539,12 @@ export default function DictionaryModal() {
       if (cleanClicked && (cleanClicked.length >= 2 || /\p{L}/u.test(cleanClicked))) {
         e.preventDefault();
         e.stopPropagation();
+        if (e.nativeEvent) {
+          e.nativeEvent.__tpoWordClicked = true;
+          e.nativeEvent.__tpoInsideDictPanel = true;
+        }
+        e.__tpoWordClicked = true;
+        e.__tpoInsideDictPanel = true;
         if (typeof window !== 'undefined') {
           try {
             window.getSelection()?.removeAllRanges?.();
@@ -2125,6 +2173,8 @@ export default function DictionaryModal() {
           role="dialog"
           aria-modal="true"
           aria-label="Pāḷi Dictionary"
+          onPointerDownCapture={markPointerDownInsideDictPanel}
+          onClickCapture={markInsideDictPanel}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           className="dict-panel-modal flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-color)]"
@@ -2142,6 +2192,8 @@ export default function DictionaryModal() {
     <aside
       ref={modalPanelRef}
       aria-label="Pāḷi Dictionary"
+      onPointerDownCapture={markPointerDownInsideDictPanel}
+      onClickCapture={markInsideDictPanel}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       className={`dict-dock-panel dock-${dockMode === 'left' ? 'left' : 'side'} ${
