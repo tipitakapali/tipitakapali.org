@@ -1191,7 +1191,13 @@ function heuristicQueryUnderstanding(userQuery, conversationHistory = [], dbTipi
     ...groupStems,
     ...fallbackTerms.map(extractPaliStem).filter((s) => s.length >= 3).map((s) => `${s}*`),
   ]));
-  const keyTermsForBoldDef = allTerms.filter((t) => !/\s/.test(t) && t.length >= 3).slice(0, 3);
+  const groupPrimaryTerms = conceptGroups
+    .map((g) => (g.pali_terms || []).find((t) => !/\s/.test(t) && t.length >= 3))
+    .filter(Boolean);
+  const keyTermsForBoldDef = Array.from(new Set([
+    ...groupPrimaryTerms,
+    ...allTerms.filter((t) => !/\s/.test(t) && t.length >= 3),
+  ])).slice(0, 3);
 
   // Detect explicit Piṭaka / Nikāya scope if mentioned in the user's inquiry.
   // Leave empty for general inquiries so Vinaya, Abhidhamma, Khuddaka, and Visuddhimagga are never masked out.
@@ -1389,27 +1395,37 @@ Dissect this prompt into main concept groups with Pāḷi terms/stems and Englis
 
   try {
     if (provider === 'gemini') {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey.trim()}`;
-      const payload = {
+      const isGemini3Model = /^gemini-(?:3|flash-lite-latest|flash-latest)/i.test(String(toolModel || '').trim());
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(toolModel)}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+      const baseGenCfg = {
+        response_mime_type: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 4096,
+      };
+      const buildUnderstandPayload = (thinkingLvl) => ({
         system_instruction: { parts: [{ text: kAiUnderstandingSystemPrompt }] },
         contents: [{ role: 'user', parts: [{ text: userAnalysisPrompt }] }],
-        generationConfig: {
-          response_mime_type: 'application/json',
-          temperature: 0.1,
-          maxOutputTokens: 1536,
-        },
-      };
-
-      const res = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15000),
+        generationConfig: thinkingLvl
+          ? { ...baseGenCfg, thinkingConfig: { thinkingLevel: thinkingLvl } }
+          : baseGenCfg,
       });
 
-      if (res.ok) {
+      const levelsToTry = isGemini3Model ? ['minimal', 'low', null] : [null];
+      let res = null;
+      for (const lvl of levelsToTry) {
+        res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildUnderstandPayload(lvl)),
+          signal: AbortSignal.timeout(35000),
+        });
+        if (res.status !== 400) break;
+      }
+
+      if (res && res.ok) {
         const json = await res.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parts = json.candidates?.[0]?.content?.parts || [];
+        const text = parts.filter((p) => p && typeof p.text === 'string' && !p.thought).map((p) => p.text).join('');
         const parsed = safeParseJsonObject(text);
         if (parsed) {
           return enrichUnderstandingResult(parsed, trimmed, dbTipitaka);

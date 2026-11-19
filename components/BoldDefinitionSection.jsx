@@ -242,7 +242,7 @@ export default function BoldDefinitionSection({
               </div>
 
               {/* Pāḷi Context + Highlighted Sentence (tap any word to lookup via DictionaryModal click handler) */}
-              <div className="bold-def-pali-text space-y-1.5 text-[var(--text-primary)]">
+              <div className="bold-def-pali-text cursor-pointer space-y-1.5 text-[var(--text-primary)]">
                 {beforeHtml && (
                   <div
                     className="text-[var(--text-secondary)] italic opacity-80"
@@ -261,9 +261,9 @@ export default function BoldDefinitionSection({
                 )}
               </div>
 
-              {/* Active Translations */}
+              {/* Active Translations (tap any translation word to continue dictionary lookup) */}
               {translations.length > 0 && (
-                <div className="bold-def-nonlookup pt-2 border-t border-[var(--border-color)]/50 space-y-1.5">
+                <div className="pt-2 border-t border-[var(--border-color)]/50 space-y-1.5">
                   {translations.map(([langCode, txt]) => {
                     const transColor = resolveTranslationTextColor(langCode, null, settings);
                     return (
@@ -272,11 +272,11 @@ export default function BoldDefinitionSection({
                         data-trans-lang={langCode}
                         className="bold-def-trans-row flex items-start gap-2"
                       >
-                        <span className="uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-1">
+                        <span className="bold-def-nonlookup uppercase text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-muted)] shrink-0 mt-1">
                           {langCode}
                         </span>
                         <span
-                          className="bold-def-trans-text min-w-0 flex-1"
+                          className="bold-def-trans-text cursor-pointer min-w-0 flex-1"
                           style={transColor ? { color: transColor } : undefined}
                           dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
                         />

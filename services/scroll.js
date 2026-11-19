@@ -31,6 +31,27 @@ function setContainerScrollTop(container, useWin, top) {
   else container.scrollTop = top;
 }
 
+export function cancelSmartScroll(container) {
+  if (typeof window === 'undefined' && !container) return;
+  const keys = [];
+  if (container) keys.push(container);
+  if (typeof window !== 'undefined' && (!container || shouldUseWindow(container))) {
+    keys.push(window);
+  }
+  for (const key of keys) {
+    const prevAnimId = activeAnimationByContainer.get(key);
+    if (prevAnimId) {
+      cancelAnimationFrame(prevAnimId);
+      activeAnimationByContainer.delete(key);
+    }
+    const prevSmoothCleanup = activeSmoothCleanupByContainer.get(key);
+    if (prevSmoothCleanup) {
+      prevSmoothCleanup();
+      activeSmoothCleanupByContainer.delete(key);
+    }
+  }
+}
+
 export function smartScrollTo(container, targetTop, options = {}) {
   if (!container) return;
 

@@ -100,8 +100,216 @@ export function buildLinkedOpenOptions(preview, link, selectedLine = null) {
   };
 }
 
-function extractClickedWord(e) {
-  if (typeof document === 'undefined') return '';
+const LINKED_WORD_CHAR_RE = /[\p{L}\p{M}]/u;
+
+const LINKED_LOCALE_MAP = {
+  pali: 'pi',
+  pi: 'pi',
+  english: 'en',
+  en: 'en',
+  vietnamese: 'vi',
+  vi: 'vi',
+  myanmar: 'my',
+  my: 'my',
+  my_nissaya: 'my',
+  sinhala: 'si',
+  si: 'si',
+  chinese: 'zh',
+  zh: 'zh',
+  khmer: 'km',
+  km: 'km',
+  thai: 'th',
+  th: 'th',
+  lao: 'lo',
+  lo: 'lo',
+  tamil: 'ta',
+  ta: 'ta',
+  hindi: 'hi',
+  hi: 'hi',
+  german: 'de',
+  de: 'de',
+  japanese: 'ja',
+  ja: 'ja',
+  korean: 'ko',
+  ko: 'ko',
+  indonesian: 'id',
+  id: 'id',
+  nepali: 'ne',
+  ne: 'ne',
+  bengali: 'bn',
+  be: 'bn',
+  spanish: 'es',
+  es: 'es',
+  french: 'fr',
+  fr: 'fr',
+  portuguese: 'pt',
+  pt: 'pt',
+  russian: 'ru',
+  ru: 'ru',
+  czech: 'cs',
+  cs: 'cs',
+  marathi: 'mr',
+  mr: 'mr',
+};
+
+const linkedSegmenterCache = new Map();
+
+function getLinkedSegmenter(locale) {
+  if (typeof Intl === 'undefined' || !Intl.Segmenter) return null;
+  if (linkedSegmenterCache.has(locale)) return linkedSegmenterCache.get(locale);
+  try {
+    const seg = new Intl.Segmenter(locale, { granularity: 'word' });
+    linkedSegmenterCache.set(locale, seg);
+    return seg;
+  } catch (_) {
+    linkedSegmenterCache.set(locale, null);
+    return null;
+  }
+}
+
+export function extractLinkedWordAtOffset(text, offset, lang = 'pali') {
+  if (!text || typeof text !== 'string') return null;
+  const safeOffset = Math.max(0, Math.min(offset || 0, text.length));
+  const normLang = String(lang || 'pali').trim().toLowerCase();
+
+  // Translation languages (except Pāḷi and Myanmar Nissaya, which are space-delimited) use Intl.Segmenter
+  if (normLang !== 'pali' && normLang !== 'pi' && normLang !== 'my_nissaya') {
+    const locale = LINKED_LOCALE_MAP[normLang] || 'en';
+    const segmenter = getLinkedSegmenter(locale);
+    if (segmenter) {
+      const probe = Math.min(safeOffset, Math.max(0, text.length - 1));
+      const segments = Array.from(segmenter.segment(text));
+      for (const seg of segments) {
+        const s = seg.index;
+        const e = s + seg.segment.length;
+        if (seg.isWordLike && probe >= s && probe < e) {
+          return { word: seg.segment, start: s, end: e };
+        }
+      }
+      for (const seg of segments) {
+        const s = seg.index;
+        const e = s + seg.segment.length;
+        if (seg.isWordLike && (safeOffset === e || probe === e)) {
+          return { word: seg.segment, start: s, end: e };
+        }
+      }
+    }
+  }
+
+  let start = safeOffset;
+  let end = start;
+  if (
+    start > 0 &&
+    (start >= text.length || !LINKED_WORD_CHAR_RE.test(text[start])) &&
+    LINKED_WORD_CHAR_RE.test(text[start - 1])
+  ) {
+    start--;
+    end = start;
+  }
+  while (start > 0 && LINKED_WORD_CHAR_RE.test(text[start - 1])) start--;
+  while (end < text.length && LINKED_WORD_CHAR_RE.test(text[end])) end++;
+  const word = text.slice(start, end).trim();
+  return word ? { word, start, end } : null;
+}
+
+function isPointInsideLinkedRangeRects(range, clientX, clientY, tolerance = 6) {
+  if (!range || typeof range.getClientRects !== 'function') return true;
+  if (typeof clientX !== 'number' || typeof clientY !== 'number') return true;
+  const rects = range.getClientRects();
+  if (!rects || rects.length === 0) return true;
+  const nonZero = Array.from(rects).filter((r) => r.width > 0 || r.height > 0);
+  if (nonZero.length === 0) return true;
+  return nonZero.some(
+    (r) =>
+      clientX >= r.left - tolerance &&
+      clientX <= r.right + tolerance &&
+      clientY >= r.top - tolerance &&
+      clientY <= r.bottom + tolerance
+  );
+}
+
+function resolveLinkedTextNodeAndOffset(container, rawOffset, clientX, clientY) {
+  if (!container) return null;
+  if (container.nodeType === 3) {
+    return { node: container, offset: rawOffset || 0 };
+  }
+  if (container.nodeType !== 1 || typeof document === 'undefined') return null;
+
+  const children = container.childNodes || [];
+  const direct = [];
+  if (children[rawOffset]) direct.push(children[rawOffset]);
+  if (rawOffset > 0 && children[rawOffset - 1]) direct.push(children[rawOffset - 1]);
+
+  const seen = new Set();
+  const textNodes = [];
+  const collect = (root) => {
+    if (!root) return;
+    if (root.nodeType === 3) {
+      if (!seen.has(root) && (root.textContent || '').trim()) {
+        seen.add(root);
+        textNodes.push(root);
+      }
+      return;
+    }
+    if (typeof document.createTreeWalker === 'function') {
+      const walker = document.createTreeWalker(root, 4, null, false);
+      let n;
+      while ((n = walker.nextNode())) {
+        if (!seen.has(n) && (n.textContent || '').trim()) {
+          seen.add(n);
+          textNodes.push(n);
+        }
+      }
+    }
+  };
+  for (const c of direct) collect(c);
+  collect(container);
+  if (textNodes.length === 0) return null;
+
+  if (typeof document.createRange === 'function' && typeof clientX === 'number' && typeof clientY === 'number') {
+    const probe = document.createRange();
+    for (const tol of [0, 6]) {
+      for (const tn of textNodes) {
+        const r = document.createRange();
+        r.selectNodeContents(tn);
+        if (!isPointInsideLinkedRangeRects(r, clientX, clientY, tol)) continue;
+        const len = (tn.textContent || '').length;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < len; i++) {
+          probe.setStart(tn, i);
+          probe.setEnd(tn, i + 1);
+          const rects = probe.getClientRects?.();
+          if (!rects) continue;
+          for (let j = 0; j < rects.length; j++) {
+            const rect = rects[j];
+            if (rect.width === 0 && rect.height === 0) continue;
+            if (
+              clientX >= rect.left - tol &&
+              clientX <= rect.right + tol &&
+              clientY >= rect.top - tol &&
+              clientY <= rect.bottom + tol
+            ) {
+              if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                return { node: tn, offset: i };
+              }
+              const d = Math.hypot(clientX - (rect.left + rect.right) / 2, clientY - (rect.top + rect.bottom) / 2);
+              if (d < bestDist) {
+                bestDist = d;
+                bestIdx = i;
+              }
+            }
+          }
+        }
+        return { node: tn, offset: bestIdx };
+      }
+    }
+  }
+  return { node: textNodes[0], offset: 0 };
+}
+
+export function extractClickedWord(e, lang = 'pali') {
+  if (typeof document === 'undefined' || !e) return '';
   let range = null;
   if (document.caretRangeFromPoint) {
     range = document.caretRangeFromPoint(e.clientX, e.clientY);
@@ -113,15 +321,21 @@ function extractClickedWord(e) {
       range.collapse(true);
     }
   }
-  if (!range || range.startContainer?.nodeType !== Node.TEXT_NODE) return '';
-  const text = range.startContainer.textContent || '';
-  const isWordChar = (ch) =>
-    /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u1000-\u109F\u0D80-\u0DFF\u0E00-\u0E7F]/.test(ch);
-  let start = range.startOffset;
-  let end = range.startOffset;
-  while (start > 0 && isWordChar(text[start - 1])) start--;
-  while (end < text.length && isWordChar(text[end])) end++;
-  return text.slice(start, end).trim();
+  if (!range || !range.startContainer) return '';
+  const resolved = resolveLinkedTextNodeAndOffset(range.startContainer, range.startOffset, e.clientX, e.clientY);
+  if (!resolved?.node) return '';
+  const text = resolved.node.textContent || '';
+  const extracted = extractLinkedWordAtOffset(text, resolved.offset, lang);
+  if (!extracted?.word) return '';
+  if (typeof document.createRange === 'function') {
+    const wordRange = document.createRange();
+    wordRange.setStart(resolved.node, extracted.start);
+    wordRange.setEnd(resolved.node, extracted.end);
+    if (!isPointInsideLinkedRangeRects(wordRange, e.clientX, e.clientY, 6)) {
+      return '';
+    }
+  }
+  return extracted.word.trim();
 }
 
 export default function LinkedDefinitionModal({
@@ -154,6 +368,7 @@ export default function LinkedDefinitionModal({
   const [selectedLineKey, setSelectedLineKey] = useState(null);
   const bodyRef = useRef(null);
   const targetRef = useRef(null);
+  const pointerDownRef = useRef(null);
 
   useEffect(() => {
     setSelectedLineKey(null);
@@ -283,19 +498,40 @@ export default function LinkedDefinitionModal({
 
   const handleOpenInReader = () => openLineInReader(null);
 
-  const handlePaliBodyClick = (e) => {
+  const handleWordLookupClick = (e, langCode = 'pali') => {
     if (e.target.closest('button, a')) return;
-    const sel = window.getSelection()?.toString()?.trim();
-    const raw = sel && sel.length > 0 && sel.length < 50 ? sel : extractClickedWord(e);
+    const downPos = pointerDownRef.current;
+    pointerDownRef.current = null;
+    const pointerMoved =
+      downPos &&
+      typeof e.clientX === 'number' &&
+      typeof e.clientY === 'number' &&
+      Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 6;
+
+    const sel = typeof window !== 'undefined' ? window.getSelection()?.toString()?.trim() : '';
+    const raw =
+      pointerMoved && sel && sel.length > 0 && sel.length < 50
+        ? sel
+        : extractClickedWord(e, langCode) || (sel && sel.length > 0 && sel.length < 50 ? sel : '');
     const clean = raw ? cleanDictionaryQuery(raw) : '';
-    if (clean && clean.length >= 2) {
+    if (
+      clean &&
+      (clean.length >= 2 || /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(clean))
+    ) {
+      if (e.nativeEvent) e.nativeEvent.__tpoWordClicked = true;
+      e.__tpoWordClicked = true;
+      if (typeof window !== 'undefined') {
+        try {
+          window.getSelection()?.removeAllRanges?.();
+        } catch (_) {}
+      }
       openDictionary(clean);
     }
   };
 
   return (
     <div
-      className="fixed inset-0 z-[1150] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 sm:p-4"
+      className="linked-def-modal-backdrop fixed inset-0 z-[1150] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-xs p-0 sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -352,6 +588,9 @@ export default function LinkedDefinitionModal({
         {/* Body */}
         <div
           ref={bodyRef}
+          onPointerDown={(e) => {
+            pointerDownRef.current = { x: e.clientX, y: e.clientY };
+          }}
           className="linked-def-modal-body scroll-auto flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 bg-[var(--bg-primary)] text-[var(--text-primary)]"
         >
           {loading && (
@@ -414,7 +653,7 @@ export default function LinkedDefinitionModal({
                 data-target={isTarget ? '1' : undefined}
                 data-selected={isSelected ? '1' : undefined}
                 onClick={(e) => {
-                  if (e.target.closest('button, a, .linked-def-pali-text')) return;
+                  if (e.target.closest('button, a, .linked-def-pali-text, .linked-def-trans-text')) return;
                   const sel = window.getSelection()?.toString()?.trim();
                   if (sel && sel.length > 0) return;
                   setSelectedLineKey(lineKey);
@@ -472,7 +711,7 @@ export default function LinkedDefinitionModal({
                 </div>
 
                 <div
-                  onClick={handlePaliBodyClick}
+                  onClick={(e) => handleWordLookupClick(e, 'pali')}
                   className="linked-def-pali-text text-[var(--text-primary)] cursor-pointer"
                   style={paliColor ? { color: paliColor } : undefined}
                   dangerouslySetInnerHTML={{ __html: paliHtml }}
@@ -495,7 +734,8 @@ export default function LinkedDefinitionModal({
                             {langCode}
                           </span>
                           <span
-                            className="linked-def-trans-text min-w-0 flex-1"
+                            onClick={(e) => handleWordLookupClick(e, langCode)}
+                            className="linked-def-trans-text min-w-0 flex-1 cursor-pointer"
                             style={transColor ? { color: transColor } : undefined}
                             dangerouslySetInnerHTML={{ __html: formatSafeTranslationHtml(txt, langCode) }}
                           />

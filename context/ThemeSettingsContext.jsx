@@ -73,6 +73,19 @@ export function isComputerBrowser() {
   return !isMobileDevice();
 }
 
+// Responsive default tabView: 'tabbed' (Tabs) on mobile / small screens (<900px),
+// 'columns' (Columns) on larger desktop screens (>=900px).
+export function getDefaultTabView(viewportWidth = null) {
+  if (typeof viewportWidth === 'number' && Number.isFinite(viewportWidth)) {
+    return viewportWidth < 900 ? 'tabbed' : 'columns';
+  }
+  if (typeof window === 'undefined') return 'columns';
+  if (window.innerWidth < 900 || isMobileDevice()) {
+    return 'tabbed';
+  }
+  return 'columns';
+}
+
 const DEFAULT_SETTINGS = {
   theme: 'classic',
   accentColor: 'burgundy',
@@ -195,8 +208,11 @@ export function ThemeSettingsProvider({ children }) {
           if (!hasAnyActive) {
             merged.translations.pali = true;
           }
+          const deviceDefaultTabView = getDefaultTabView();
           if (!['single', 'tabbed', 'columns'].includes(merged.tabView)) {
-            merged.tabView = 'columns';
+            merged.tabView = deviceDefaultTabView;
+          } else if (!parsed.tabViewExplicit && merged.tabView === 'columns' && deviceDefaultTabView === 'tabbed') {
+            merged.tabView = 'tabbed';
           }
           if (typeof merged.syncScroll !== 'boolean') {
             merged.syncScroll = false;
@@ -229,14 +245,22 @@ export function ThemeSettingsProvider({ children }) {
           } catch (e) {}
           return finalMerged;
         });
-      } else if (preLoadOverridesRef.current.length > 0) {
-        // Persist any pre-load overrides when no prior localStorage snapshot existed
-        setSettingsState((prev) => {
-          try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(prev));
-          } catch (e) {}
-          return prev;
-        });
+      } else {
+        const deviceDefaultTabView = getDefaultTabView();
+        const needsInitialUpdate =
+          deviceDefaultTabView !== DEFAULT_SETTINGS.tabView || preLoadOverridesRef.current.length > 0;
+        if (needsInitialUpdate) {
+          setSettingsState((prev) => {
+            const hasTabViewOverride = preLoadOverridesRef.current.some((ov) => ov.key === 'tabView');
+            const next = hasTabViewOverride ? prev : { ...prev, tabView: deviceDefaultTabView };
+            if (preLoadOverridesRef.current.length > 0) {
+              try {
+                localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
+              } catch (e) {}
+            }
+            return next;
+          });
+        }
       }
     } catch (e) {
       console.error('Error loading settings from localStorage:', e);
@@ -260,6 +284,9 @@ export function ThemeSettingsProvider({ children }) {
       if (key === 'fontFamily') {
         updated.fontFamilyExplicit = true;
       }
+      if (key === 'tabView') {
+        updated.tabViewExplicit = true;
+      }
       if (isStorageLoadedRef.current) {
         try {
           localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
@@ -280,6 +307,9 @@ export function ThemeSettingsProvider({ children }) {
       if ('fontFamily' in sanitized) {
         sanitized.fontFamilyExplicit = true;
       }
+      if ('tabView' in sanitized) {
+        sanitized.tabViewExplicit = true;
+      }
       const updated = { ...prev, ...sanitized };
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
@@ -291,9 +321,10 @@ export function ThemeSettingsProvider({ children }) {
   };
 
   const resetToDefaults = () => {
-    setSettingsState(DEFAULT_SETTINGS);
+    const defaults = { ...DEFAULT_SETTINGS, tabView: getDefaultTabView() };
+    setSettingsState(defaults);
     try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(defaults));
     } catch (e) {}
   };
 

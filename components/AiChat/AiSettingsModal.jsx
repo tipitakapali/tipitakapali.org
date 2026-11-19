@@ -68,6 +68,25 @@ function compareGeminiModels(a, b) {
   return a.id.localeCompare(b.id);
 }
 
+// Filter out non-chat / media / research-agent models returned by Google's /v1beta/models endpoint.
+export const NON_CHAT_GEMINI_MODEL_RE = /(?:^|[-_])(image|tts|audio|embedding|aqa|veo|imagen|robotics|computer-use|lyria|transcribe|nano-banana|deep-research)(?:$|[-_])/i;
+
+export function filterGeminiChatModels(rawModels = []) {
+  const seen = new Set();
+  return (rawModels || [])
+    .filter(
+      (m) =>
+        m &&
+        (!m.supportedGenerationMethods ||
+          m.supportedGenerationMethods.includes('generateContent'))
+    )
+    .map((m) => ({
+      id: String(m.name || m.id || '').replace(/^models\//, ''),
+      displayName: m.displayName || '',
+    }))
+    .filter((m) => m.id && !NON_CHAT_GEMINI_MODEL_RE.test(m.id) && !seen.has(m.id) && (seen.add(m.id), true));
+}
+
 // From a fetched Gemini model list, pick the latest flash-lite (for both tool calls and answers),
 // falling back to the newest available model.
 export function pickLatestGeminiModels(models) {
@@ -230,18 +249,8 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
         throw new Error(err.error?.message || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const seen = new Set();
-      const list = (data.models || [])
-        .filter(
-          (m) =>
-            !m.supportedGenerationMethods ||
-            m.supportedGenerationMethods.includes('generateContent')
-        )
-        .map((m) => ({
-          id: String(m.name || '').replace(/^models\//, ''),
-          displayName: m.displayName || '',
-        }))
-        .filter((m) => m.id && !seen.has(m.id) && (seen.add(m.id), true));
+      const list = filterGeminiChatModels(data.models || []);
+      const seen = new Set(list.map((m) => m.id));
       const aliases = [
         { id: 'gemini-flash-lite-latest', displayName: 'gemini-flash-lite-latest (Latest Flash Lite Alias • Recommended)' },
         { id: 'gemini-flash-latest', displayName: 'gemini-flash-latest (Latest Flash Alias)' },
@@ -320,7 +329,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
       }
 
       if (config.provider === 'gemini') {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey.trim()}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(config.apiKey.trim())}`;
         const res = await fetch(url);
         if (res.ok) {
           setTestStatus('success');

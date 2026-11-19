@@ -74,17 +74,108 @@ function highlightInflections(searchTerm, container, targetScript = 'roman') {
 
 const DICT_WORD_CHAR_RE = /[\p{L}\p{M}]/u;
 
-export function extractWordAtTextOffset(text, offset) {
-  if (!text || typeof text !== 'string') return '';
-  let start = Math.max(0, Math.min(offset || 0, text.length));
+const DICT_LOCALE_MAP = {
+  pali: 'pi',
+  pi: 'pi',
+  english: 'en',
+  en: 'en',
+  vietnamese: 'vi',
+  vi: 'vi',
+  myanmar: 'my',
+  my: 'my',
+  my_nissaya: 'my',
+  sinhala: 'si',
+  si: 'si',
+  chinese: 'zh',
+  zh: 'zh',
+  khmer: 'km',
+  km: 'km',
+  thai: 'th',
+  th: 'th',
+  lao: 'lo',
+  lo: 'lo',
+  tamil: 'ta',
+  ta: 'ta',
+  hindi: 'hi',
+  hi: 'hi',
+  german: 'de',
+  de: 'de',
+  japanese: 'ja',
+  ja: 'ja',
+  korean: 'ko',
+  ko: 'ko',
+  indonesian: 'id',
+  id: 'id',
+  nepali: 'ne',
+  ne: 'ne',
+  bengali: 'bn',
+  be: 'bn',
+  spanish: 'es',
+  es: 'es',
+  french: 'fr',
+  fr: 'fr',
+  portuguese: 'pt',
+  pt: 'pt',
+  russian: 'ru',
+  ru: 'ru',
+  czech: 'cs',
+  cs: 'cs',
+  marathi: 'mr',
+  mr: 'mr',
+};
+
+const dictSegmenterCache = new Map();
+
+function getDictSegmenter(locale) {
+  if (typeof Intl === 'undefined' || !Intl.Segmenter) return null;
+  if (dictSegmenterCache.has(locale)) return dictSegmenterCache.get(locale);
+  try {
+    const seg = new Intl.Segmenter(locale, { granularity: 'word' });
+    dictSegmenterCache.set(locale, seg);
+    return seg;
+  } catch (_) {
+    dictSegmenterCache.set(locale, null);
+    return null;
+  }
+}
+
+export function extractWordBoundsAtTextOffset(text, offset, lang = null) {
+  if (!text || typeof text !== 'string') return null;
+  const safeOffset = Math.max(0, Math.min(offset || 0, text.length));
+  const normLang = lang ? String(lang).trim().toLowerCase() : null;
+
+  // Non-Pāḷi / non-Nissaya translation text uses Intl.Segmenter so Thai, CJK, Khmer, Lao, Myanmar, etc. segment cleanly
+  if (normLang && normLang !== 'pali' && normLang !== 'pi' && normLang !== 'my_nissaya') {
+    const locale = DICT_LOCALE_MAP[normLang] || 'en';
+    const segmenter = getDictSegmenter(locale);
+    if (segmenter) {
+      const probe = Math.min(safeOffset, Math.max(0, text.length - 1));
+      const segments = Array.from(segmenter.segment(text));
+      for (const seg of segments) {
+        const s = seg.index;
+        const e = s + seg.segment.length;
+        if (seg.isWordLike && probe >= s && probe < e) {
+          return { word: seg.segment.trim(), start: s, end: e };
+        }
+      }
+      for (const seg of segments) {
+        const s = seg.index;
+        const e = s + seg.segment.length;
+        if (seg.isWordLike && (safeOffset === e || probe === e)) {
+          return { word: seg.segment.trim(), start: s, end: e };
+        }
+      }
+    }
+  }
+
+  let start = safeOffset;
   let end = start;
 
   // If cursor landed immediately after a word char (e.g. on boundary or space right after word),
   // step back 1 when current char is not a word char and previous char is.
   if (
     start > 0 &&
-    start < text.length &&
-    !DICT_WORD_CHAR_RE.test(text[start]) &&
+    (start >= text.length || !DICT_WORD_CHAR_RE.test(text[start])) &&
     DICT_WORD_CHAR_RE.test(text[start - 1])
   ) {
     start--;
@@ -98,7 +189,12 @@ export function extractWordAtTextOffset(text, offset) {
     end++;
   }
 
-  return text.slice(start, end).trim();
+  const word = text.slice(start, end).trim();
+  return word ? { word, start, end } : null;
+}
+
+export function extractWordAtTextOffset(text, offset, lang = null) {
+  return extractWordBoundsAtTextOffset(text, offset, lang)?.word || '';
 }
 
 export function isPointInsideDictRangeRects(range, clientX, clientY, tolerance = 6) {
@@ -243,28 +339,14 @@ export function extractWordFromPointerEvent(e) {
 
   const text = resolved.node.textContent || '';
   const offset = resolved.offset || 0;
-  let start = Math.max(0, Math.min(offset, text.length));
-  let end = start;
-
-  if (
-    start > 0 &&
-    start < text.length &&
-    !DICT_WORD_CHAR_RE.test(text[start]) &&
-    DICT_WORD_CHAR_RE.test(text[start - 1])
-  ) {
-    start--;
-    end = start;
-  }
-
-  while (start > 0 && DICT_WORD_CHAR_RE.test(text[start - 1])) {
-    start--;
-  }
-  while (end < text.length && DICT_WORD_CHAR_RE.test(text[end])) {
-    end++;
-  }
-
-  const raw = text.slice(start, end).trim();
-  if (!raw) return '';
+  const transEl =
+    resolved.node.parentElement?.closest?.('[data-trans-lang]') ||
+    e.target?.closest?.('[data-trans-lang]') ||
+    null;
+  const transLang = transEl?.getAttribute?.('data-trans-lang') || null;
+  const extracted = extractWordBoundsAtTextOffset(text, offset, transLang);
+  if (!extracted?.word) return '';
+  const { word: raw, start, end } = extracted;
 
   if (typeof document.createRange === 'function') {
     const wordRange = document.createRange();

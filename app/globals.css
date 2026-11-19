@@ -3248,6 +3248,60 @@ footer.app-footer.hidden-footer,
   flex-direction: column;
 }
 
+#fts-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-lang-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 7px 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.search-lang-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.search-lang-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.search-lang-select {
+  min-width: 148px;
+  max-width: 240px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+.search-lang-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
 .search-filter-toolbar {
   display: flex;
   align-items: center;
@@ -4452,13 +4506,19 @@ div.dict-dock-panel.dict-pinned.dock-side {
   border-bottom-color: var(--accent);
 }
 
+/* Keep Dictionary visible above LinkedDefinitionModal when clicking words inside a linked definition */
+body:has(.linked-def-modal-backdrop) .dict-overlay {
+  z-index: 1160;
+}
+body:has(.linked-def-modal-backdrop) aside.dict-dock-panel,
+body:has(.linked-def-modal-backdrop) div.dict-dock-panel {
+  z-index: 1160 !important;
+}
+
 /* Clicked/Tapped Word Highlight in Reader & Dictionary (High contrast yellow for all themes including OLED) */
 ::highlight(reader-clicked-word) {
   background-color: #ffff00;
   color: #000000;
-  text-decoration: underline solid rgba(0, 0, 0, 0.5);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 2px;
 }
 
 .reader-clicked-word,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, X, Loader2, Filter, SlidersHorizontal, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Search, X, Loader2, Filter, SlidersHorizontal, ArrowUpDown, ChevronDown, Languages } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
 import { searchTipitaka, fetchSearchDatabases, invalidateSearchDatabasesCache } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
@@ -742,11 +742,17 @@ export default function SearchModal() {
 
   if (!isSearchOpen) return null;
 
+  const selectedDbMeta = displayedDatabases.find((d) => d.id === selectedDb);
+  const selectedDbLabel =
+    selectedDbMeta?.label ||
+    (isPaliDb ? 'Pāḷi CST' : (normalizeLangCode(selectedDb) || selectedDb).toUpperCase());
+
   return (
     <div className="modal-overlay active" onClick={closeSearchModal}>
       <div className="modal-card modal-card-search" onClick={(e) => e.stopPropagation()}>
-        {/* Search Header Row — redesigned with FTS database selector before input field */}
-        <div className="p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+        <search className="shrink-0">
+          {/* Search Header Row — full-width search field with Close button */}
+          <div className="p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -760,39 +766,24 @@ export default function SearchModal() {
             }}
             className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0"
           >
-            {/* Dropdown menu to select the FTS database to search */}
-            <div className="relative shrink-0">
-              <select
-                value={selectedDb}
-                onChange={handleDbChange}
-                aria-label="Select FTS database"
-                title={isPaliDb ? 'Pāḷi CST' : `Translation FTS: ${displayedDatabases.find((d) => d.id === selectedDb)?.label || selectedDb}`}
-                className={`search-select-dropdown text-xs sm:text-sm py-1.5 sm:py-2 px-2 rounded-xl font-medium transition cursor-pointer max-w-[125px] sm:max-w-[190px] text-ellipsis ${
-                  !isPaliDb
-                    ? '!border-red-500 !text-red-600 !bg-red-50 font-semibold dark:!bg-red-950/30 dark:!border-red-400 dark:!text-red-400'
-                    : 'bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)]'
-                }`}
-              >
-                {displayedDatabases.map((dbOpt) => (
-                  <option key={dbOpt.id} value={dbOpt.id}>
-                    {dbOpt.flag ? `${dbOpt.flag} ` : ''}{dbOpt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="relative flex-1 min-w-0">
+              <label htmlFor="fts-search-input" className="sr-only">
+                Full text search query
+              </label>
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
               <input
+                id="fts-search-input"
                 ref={inputRef}
-                type="text"
+                type="search"
+                enterKeyHint="search"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                aria-describedby="fts-db-help"
                 placeholder={
                   isPaliDb
-                    ? 'Full text search - Velthuis & 17 pāḷi scripts input accepted'
-                    : `Search ${
-                        displayedDatabases.find((d) => d.id === selectedDb)?.label ||
-                        (normalizeLangCode(selectedDb) || '').toUpperCase()
-                      } translation...`
+                    ? 'Search Pāḷi CST (Velthuis or 17 Pāḷi scripts)…'
+                    : `Search ${selectedDbLabel} translation…`
                 }
                 value={query}
                 onChange={handleInputChange}
@@ -849,6 +840,39 @@ export default function SearchModal() {
           >
             <span>Close</span>
           </button>
+          </div>
+
+        {/* Language / FTS Database Selector Bar — directly above Group filters */}
+        <div className="search-lang-bar">
+          <div className="search-lang-control">
+            <label htmlFor="fts-db-select" className="search-lang-label">
+              <Languages size={13} className="text-[var(--accent)] shrink-0" aria-hidden="true" />
+              <span>Language to search:</span>
+            </label>
+            <select
+              id="fts-db-select"
+              value={selectedDb}
+              onChange={handleDbChange}
+              aria-describedby="fts-db-help"
+              title={isPaliDb ? 'Pāḷi CST' : `Translation FTS: ${selectedDbLabel}`}
+              className={`search-select-dropdown search-lang-select font-medium transition cursor-pointer ${
+                !isPaliDb
+                  ? '!border-red-500 !text-red-600 !bg-red-50 font-semibold dark:!bg-red-950/30 dark:!border-red-400 dark:!text-red-400'
+                  : 'bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)]'
+              }`}
+            >
+              {displayedDatabases.map((dbOpt) => (
+                <option key={dbOpt.id} value={dbOpt.id}>
+                  {dbOpt.flag ? `${dbOpt.flag} ` : ''}{dbOpt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p id="fts-db-help" className="search-lang-hint">
+            {isPaliDb
+              ? 'Searching Tipiṭaka Pāḷi CST text. Choose a translation database to search in the target language.'
+              : `Searching ${selectedDbLabel} translation. Choose Pāḷi CST here to search Tipiṭaka Pāḷi text.`}
+          </p>
         </div>
 
         {/* Search Filters & Controls Toolbar */}
@@ -918,6 +942,7 @@ export default function SearchModal() {
             </select>
           </div>
         </div>
+        </search>
 
         {/* Modal Body / Results */}
         <div className="modal-body">
@@ -959,6 +984,11 @@ export default function SearchModal() {
                     {distanceFilter !== 'any' ? `Distance=${distanceFilter} ` : ''})
                   </div>
                 ) : null}
+                <div className="mt-2.5 text-xs text-[var(--text-secondary)]">
+                  {isPaliDb
+                    ? 'Tip: You are searching Pāḷi CST. If you typed English or another language, switch "Language to search" above.'
+                    : `Tip: You are searching ${selectedDbLabel} translation. Switch "Language to search" above to search Pāḷi CST or another language.`}
+                </div>
               </div>
               <SupportedSearchTable onSelectExample={handleSelectExample} isPaliDb={isPaliDb} />
             </div>

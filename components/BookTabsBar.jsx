@@ -66,12 +66,12 @@ export default function BookTabsBar() {
   const { settings, updateSetting } = useThemeSettings();
 
   const isHidden = !isHeaderVisible && !isSidebarOpen;
-  const tabView = settings?.tabView || 'columns';
   const syncScroll = settings?.syncScroll === true;
 
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
+  const tabView = settings?.tabView || (viewportWidth < 900 ? 'tabbed' : 'columns');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

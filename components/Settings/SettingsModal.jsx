@@ -799,7 +799,7 @@ export default function SettingsModal() {
                         { id: 'tabbed', label: 'Multi-Tabs', desc: 'Keep tabs in bar' },
                         { id: 'single', label: 'Single Tab', desc: 'Replace active tab' },
                       ].map((mode) => {
-                        const isSelected = (settings.tabView || 'columns') === mode.id;
+                        const isSelected = (settings.tabView || (isMobileScreen ? 'tabbed' : 'columns')) === mode.id;
                         return (
                           <button
                             key={mode.id}

@@ -3227,29 +3227,39 @@ Execute this strategy systematically. Use search_concepts with the concept group
 
     while (!toolsDone && iterations < maxIterations) {
       iterations++;
-      const geminiToolUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey}`;
       const payload = {
         system_instruction: { parts: [{ text: toolSystemPrompt }] },
         contents: conversation,
         tools: [{ functionDeclarations: kAiToolDeclarations }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
       };
 
-      let toolRes;
-      try {
-        toolRes = await fetch(geminiToolUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(35000),
-        });
-      } catch (err) {
-        console.warn(`[Gemini Tool Loop Round ${iterations} Error]:`, err.message);
-        break;
+      let toolRes = null;
+      const modelsToTry = [
+        toolModel,
+        ...['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview'].filter((m) => m !== toolModel),
+      ];
+      for (const mName of modelsToTry) {
+        const geminiToolUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(mName)}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+        try {
+          const r = await fetch(geminiToolUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(45000),
+          });
+          toolRes = r;
+          if (r.ok || (r.status !== 404 && r.status !== 429 && r.status !== 503 && r.status !== 500 && r.status !== 502 && r.status !== 504)) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        } catch (err) {
+          console.warn(`[Gemini Tool Loop Round ${iterations} (${mName}) Error]:`, err.message);
+        }
       }
 
-      if (!toolRes.ok) {
-        console.warn(`[Gemini Tool Loop Round ${iterations} HTTP ${toolRes.status}]`);
+      if (!toolRes || !toolRes.ok) {
+        console.warn(`[Gemini Tool Loop Round ${iterations} HTTP ${toolRes?.status || 'ERR'}]`);
         break;
       }
 
@@ -3933,53 +3943,131 @@ ${contextBlock || 'No direct text matches found in search; please synthesize str
 Please write a comprehensive, clearly structured answer. Quote Pāḷi verses or phrases accurately and format EVERY citation as [book_code:c{chapter_index}:p{para_index}].`;
 
       if (provider === 'gemini') {
-        const geminiStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${answerModel}:streamGenerateContent?alt=sse&key=${apiKey.trim()}`;
-        const payload = {
-          system_instruction: { parts: [{ text: answerSystemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: synthesisPrompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
-        };
-
-        const res = await fetch(geminiStreamUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60000),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          sendEvent('error', { message: `Gemini API Error (${res.status}): ${errText.substring(0, 200)}` });
-          reply.raw.end();
-          return;
-        }
-
+        const isGemini3Model = (m) => /^gemini-(?:3|flash-lite-latest|flash-latest)/i.test(String(m || '').trim());
+        const baseContents = [{ role: 'user', parts: [{ text: synthesisPrompt }] }];
+        const streamModels = [
+          answerModel,
+          ...['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview'].filter((m) => m !== answerModel),
+        ];
+        let activeServerModel = answerModel;
         let fullAnswer = '';
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        const runServerGeminiStream = async (contents) => {
+          const modelsToTry = [activeServerModel, ...streamModels.filter((m) => m !== activeServerModel)];
+          let res = null;
+          let usedModel = activeServerModel;
+          for (const mName of modelsToTry) {
+            const genCfg = {
+              temperature: 0.3,
+              maxOutputTokens: 16384,
+              ...(isGemini3Model(mName) ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
+            };
+            const payload = {
+              system_instruction: { parts: [{ text: answerSystemPrompt }] },
+              contents,
+              generationConfig: genCfg,
+            };
+            const geminiStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(mName)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey.trim())}`;
+            let r = await fetch(geminiStreamUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(60000),
+            });
+            if (r.status === 400 && genCfg.thinkingConfig) {
+              const fallbackPayload = { ...payload, generationConfig: { temperature: 0.3, maxOutputTokens: 16384 } };
+              r = await fetch(geminiStreamUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fallbackPayload),
+                signal: AbortSignal.timeout(60000),
+              });
+            }
+            res = r;
+            usedModel = mName;
+            if (r.ok || (r.status !== 404 && r.status !== 429 && r.status !== 503 && r.status !== 500 && r.status !== 502 && r.status !== 504)) {
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 900));
+          }
 
-          for (const line of lines) {
+          if (!res || !res.ok) {
+            const errText = res ? await res.text() : 'Network error';
+            return { ok: false, status: res?.status || 'ERR', errText };
+          }
+
+          activeServerModel = usedModel;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let turnText = '';
+          let finishReason = null;
+          let sawUsageMetadata = false;
+
+          const processServerGeminiLine = (line) => {
             const trimmed = line.trim();
-            if (!trimmed.startsWith('data: ')) continue;
-            const dataStr = trimmed.substring(6).trim();
-            if (dataStr === '[DONE]') break;
+            if (!trimmed.startsWith('data:')) return;
+            const dataStr = trimmed.substring(5).trim();
+            if (!dataStr || dataStr === '[DONE]') return;
             try {
               const json = JSON.parse(dataStr);
-              const textChunk = json.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (json.usageMetadata) sawUsageMetadata = true;
+              const cand = json.candidates?.[0];
+              if (cand?.finishReason) finishReason = cand.finishReason;
+              const parts = cand?.content?.parts || [];
+              const textChunk = parts.filter((p) => p && typeof p.text === 'string' && !p.thought).map((p) => p.text).join('');
               if (textChunk) {
+                turnText += textChunk;
                 fullAnswer += textChunk;
                 sendEvent('token', { text: textChunk });
               }
             } catch (e) {}
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              processServerGeminiLine(line);
+            }
           }
+          if (buffer.trim()) processServerGeminiLine(buffer);
+
+          return { ok: true, turnText, finishReason, sawUsageMetadata };
+        };
+
+        const first = await runServerGeminiStream(baseContents);
+        if (!first.ok) {
+          sendEvent('error', { message: `Gemini API Error (${first.status}): ${String(first.errText || '').substring(0, 200)}` });
+          reply.raw.end();
+          return;
+        }
+
+        let lastFinishReason = first.finishReason;
+        let lastSawUsage = first.sawUsageMetadata;
+        for (
+          let cont = 0;
+          cont < 2 &&
+          fullAnswer.trim().length > 0 &&
+          lastFinishReason !== 'STOP' &&
+          lastFinishReason !== 'SAFETY' &&
+          lastFinishReason !== 'RECITATION' &&
+          (lastFinishReason === 'MAX_TOKENS' || lastSawUsage);
+          cont++
+        ) {
+          sendEvent('status', { message: 'Completing interrupted response…' });
+          const next = await runServerGeminiStream([
+            ...baseContents,
+            { role: 'model', parts: [{ text: fullAnswer }] },
+            { role: 'user', parts: [{ text: 'Continue immediately from the exact character/word where you stopped without repeating anything already written, and finish the answer completely.' }] },
+          ]);
+          if (!next.ok || !next.turnText) break;
+          lastFinishReason = next.finishReason;
+          lastSawUsage = next.sawUsageMetadata;
         }
 
         const citations = parseCitations(fullAnswer);

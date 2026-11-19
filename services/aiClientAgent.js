@@ -554,6 +554,201 @@ export function sanitizeConversationHistory(conversationHistory = [], currentUse
   return alternating;
 }
 
+export function extractGeminiTextFromParts(parts) {
+  if (!Array.isArray(parts) || parts.length === 0) return "";
+  return parts
+    .filter((p) => p && typeof p.text === "string" && !p.thought)
+    .map((p) => p.text)
+    .join("");
+}
+
+export function getGeminiFallbackModels(primaryModel = "gemini-flash-lite-latest") {
+  const clean = String(primaryModel || "").trim();
+  const candidates = [
+    "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+  ];
+  return candidates.filter((m) => m !== clean);
+}
+
+function createAttemptSignal(parentSignal, timeoutMs) {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return { signal: parentSignal, clearTimer: () => {}, cleanup: () => {} };
+  }
+  const controller = new AbortController();
+  let timedOut = false;
+  const onParentAbort = () => controller.abort(parentSignal?.reason);
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      controller.abort(parentSignal.reason);
+      return { signal: controller.signal, clearTimer: () => {}, cleanup: () => {}, didTimeout: () => false };
+    }
+    parentSignal.addEventListener("abort", onParentAbort, { once: true });
+  }
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error(`Gemini request timed out after ${timeoutMs}ms`));
+  }, timeoutMs);
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    clearTimer: () => clearTimeout(timer),
+    cleanup: () => {
+      clearTimeout(timer);
+      if (parentSignal) parentSignal.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
+function sleepWithAbort(ms, signal) {
+  if (!ms || ms <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+    const t = setTimeout(() => {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+    };
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export function isGemini3ThinkingModel(model = "") {
+  return /^gemini-(?:3|flash-lite-latest|flash-latest)/i.test(String(model || "").trim());
+}
+
+function buildModelPayload(payload, activeModel, thinkingLevel, stripThinking = false) {
+  if (!payload || typeof payload !== "object") return payload;
+  const genCfg = payload.generationConfig ? { ...payload.generationConfig } : {};
+  if (stripThinking) {
+    delete genCfg.thinkingConfig;
+  } else if (thinkingLevel && isGemini3ThinkingModel(activeModel) && !genCfg.thinkingConfig) {
+    genCfg.thinkingConfig = { thinkingLevel };
+  }
+  return Object.keys(genCfg).length > 0 ? { ...payload, generationConfig: genCfg } : payload;
+}
+
+export async function fetchGeminiWithRetry({
+  model = "gemini-flash-lite-latest",
+  action = "generateContent",
+  queryExtra = "",
+  apiKey,
+  payload,
+  thinkingLevel = null,
+  signal,
+  timeoutMs = 40000,
+  maxRetries = 2,
+  allowFallback = true,
+  onStatus = null,
+}) {
+  const encodedKey = encodeURIComponent(String(apiKey || "").trim());
+  const retryableStatuses = new Set([429, 500, 502, 503, 504]);
+  const fallbacks = allowFallback ? getGeminiFallbackModels(model).slice(0, 3) : [];
+  const modelsToTry = [model, ...fallbacks];
+
+  let lastResponse = null;
+  let lastError = null;
+
+  for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+    const activeModel = modelsToTry[mIdx];
+    const attemptsForModel = mIdx === 0 ? maxRetries + 1 : 1;
+    let effectiveThinkingLevel = thinkingLevel;
+    let downgradedToLow = false;
+    let stripThinking = false;
+
+    for (let attempt = 0; attempt < attemptsForModel; attempt++) {
+      if (signal?.aborted) {
+        throw Object.assign(new Error("Inquiry cancelled by user"), { name: "AbortError" });
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModel)}:${action}?${queryExtra ? `${queryExtra}&` : ""}key=${encodedKey}`;
+      const attemptPayload = buildModelPayload(payload, activeModel, effectiveThinkingLevel, stripThinking);
+      const attemptCtl = createAttemptSignal(signal, timeoutMs);
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(attemptPayload),
+          signal: attemptCtl.signal,
+        });
+
+        if (res.ok) {
+          // Clear connection timeout while preserving parent abort forwarding for SSE streaming bodies
+          attemptCtl.clearTimer();
+          return { res, modelUsed: activeModel, cleanupAbort: attemptCtl.cleanup };
+        }
+        attemptCtl.cleanup();
+
+        lastResponse = res;
+
+        // If a model rejects thinkingConfig with 400, first downgrade minimal -> low, then strip thinkingConfig
+        if (res.status === 400 && !stripThinking && attemptPayload?.generationConfig?.thinkingConfig) {
+          if (effectiveThinkingLevel === "minimal" && !downgradedToLow) {
+            effectiveThinkingLevel = "low";
+            downgradedToLow = true;
+            attempt--;
+            continue;
+          }
+          stripThinking = true;
+          attempt--;
+          continue;
+        }
+
+        // 404 (e.g. deprecated gemini-2.5-flash for new keys): skip straight to next fallback model
+        if (res.status === 404 && mIdx < modelsToTry.length - 1) {
+          onStatus?.(`Model ${activeModel} unavailable (404), switching to ${modelsToTry[mIdx + 1]}…`);
+          break;
+        }
+
+        if (retryableStatuses.has(res.status)) {
+          const isLastAttemptForModel = attempt >= attemptsForModel - 1;
+          if (!isLastAttemptForModel) {
+            const delayMs = 900 * (attempt + 1);
+            onStatus?.(`Gemini busy (HTTP ${res.status}), retrying…`);
+            await sleepWithAbort(delayMs, signal);
+            continue;
+          }
+          if (mIdx < modelsToTry.length - 1) {
+            onStatus?.(`Model ${activeModel} overloaded (HTTP ${res.status}), falling back to ${modelsToTry[mIdx + 1]}…`);
+            await sleepWithAbort(400, signal);
+            break;
+          }
+        }
+
+        // Non-retryable error (e.g. 400, 401, 403) or all fallbacks exhausted
+        return { res, modelUsed: activeModel };
+      } catch (err) {
+        attemptCtl.cleanup();
+        if (signal?.aborted) {
+          throw err;
+        }
+        lastError = err;
+        const isLastAttemptForModel = attempt >= attemptsForModel - 1;
+        if (!isLastAttemptForModel) {
+          onStatus?.(`Gemini request timed out, retrying…`);
+          await sleepWithAbort(700, signal);
+          continue;
+        }
+        if (mIdx < modelsToTry.length - 1) {
+          onStatus?.(`Switching from ${activeModel} to ${modelsToTry[mIdx + 1]}…`);
+          break;
+        }
+      }
+    }
+  }
+
+  if (lastResponse) {
+    return { res: lastResponse, modelUsed: modelsToTry[modelsToTry.length - 1] };
+  }
+  throw lastError || new Error("Gemini request failed");
+}
+
 export function parseJsonResponse(rawText) {
   if (!rawText || typeof rawText !== "string") return null;
   const trimmed = rawText.trim();
@@ -681,8 +876,15 @@ export function mergeUnderstandingWithLocal(aiUnd, localUnd, userQuery) {
     ...(Array.isArray(base.target_sutta_names) ? base.target_sutta_names : []),
   ])).filter(Boolean).slice(0, 6);
 
+  // Pick one primary single-word Pāḷi term per concept group first so multi-concept questions
+  // fetch bold definitions across ALL concepts (e.g. both "kodha" and "mettā").
+  const groupPrimaryBoldTerms = conceptGroups
+    .map((g) => (g.pali_terms || []).find((t) => !/\s/.test(t) && t.length >= 3))
+    .filter(Boolean);
+
   const keyTermsForBoldDef = Array.from(new Set([
     ...(Array.isArray(base.key_terms_for_bold_def) ? base.key_terms_for_bold_def : []),
+    ...groupPrimaryBoldTerms,
     ...(Array.isArray(local.key_terms_for_bold_def) ? local.key_terms_for_bold_def : []),
     ...canonicalTerms.filter((t) => !/\s/.test(t) && t.length >= 3),
   ])).slice(0, 3);
@@ -921,7 +1123,9 @@ Your duty is to systematically investigate the Dhamma through precise canonical 
 4. **Canonical Bold Definitions, Commentaries & Lexicon**:
    - For doctrinal term definitions, use \`get_bold_definitions\` / \`get_bold_definitions_batch\` (387k pre-indexed Aṭṭhakathā/Ṭīkā/Mūla definitions with \`[book:cX:pY-LZ]\` citations).
    - Consult \`get_commentaries\` for key Mūla paragraphs and \`get_dictionary_batch\` for DPD etymology/grammar/compounds.
-5. **Conclude Decisively**: Once sufficient authentic canonical evidence is verified, call \`final_answer(summary)\` promptly.`;
+5. **Parallel Batching & Prompt Completion**:
+   - Issue MULTIPLE independent tool calls together in the SAME turn (e.g., \`get_paragraph_content_batch\`, \`get_commentaries\`, and \`get_dictionary_batch\` in one round instead of separate one-tool turns).
+   - Aim to complete verification in 1–2 tool rounds and call \`final_answer(summary)\` promptly once authentic canonical evidence is verified.`;
 
 function buildAnswerSystemPrompt({ groundRAGMode = true, languageDirective = "" }) {
   const grounding = groundRAGMode
@@ -1295,6 +1499,8 @@ export async function runClientAiAgent({
   const provider = aiSettings?.provider || "gemini";
   const toolModel = aiSettings?.toolModel || "gemini-flash-lite-latest";
   const answerModel = aiSettings?.answerModel || "gemini-flash-lite-latest";
+  let activeToolModel = toolModel;
+  let activeAnswerModel = answerModel;
   const groundRAGMode = aiSettings?.groundRAGMode !== false;
   const customSystemPrompt = aiSettings?.customSystemPrompt || "";
   const baseUrl = aiSettings?.baseUrl || "";
@@ -1336,20 +1542,33 @@ export async function runClientAiAgent({
     const llmUnderstandPromise = (async () => {
       try {
         if (provider === "gemini") {
-          const understandUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey}`;
-          const uRes = await fetch(understandUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+          const { res: uRes, modelUsed, cleanupAbort } = await fetchGeminiWithRetry({
+            model: activeToolModel,
+            action: "generateContent",
+            apiKey,
+            payload: {
               contents: [{ role: "user", parts: [{ text: understandingPrompt }] }],
-              generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1536 },
-            }),
+              generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 4096 },
+            },
+            thinkingLevel: "minimal",
             signal,
+            timeoutMs: 35000,
+            maxRetries: 1,
+            allowFallback: true,
+            onStatus,
           });
-          if (uRes.ok) {
-            const uJson = await uRes.json();
-            const text = uJson.candidates?.[0]?.content?.parts?.[0]?.text;
-            return parseJsonResponse(text);
+          try {
+            if (uRes.ok) {
+              if (modelUsed && modelUsed !== activeToolModel) {
+                if (activeAnswerModel === activeToolModel) activeAnswerModel = modelUsed;
+                activeToolModel = modelUsed;
+              }
+              const uJson = await uRes.json();
+              const text = extractGeminiTextFromParts(uJson.candidates?.[0]?.content?.parts);
+              return parseJsonResponse(text);
+            }
+          } finally {
+            cleanupAbort?.();
           }
         } else {
           // OpenAI / OpenRouter / Custom / Ollama
@@ -1545,28 +1764,51 @@ Read full Pāḷi paragraphs & translations for the strongest candidate citation
         if (signal?.aborted) throw new Error("Inquiry cancelled by user");
         iterations++;
 
-        const geminiToolUrl = `https://generativelanguage.googleapis.com/v1beta/models/${toolModel}:generateContent?key=${apiKey}`;
         const payload = {
           system_instruction: { parts: [{ text: toolSystemPrompt }] },
           contents: conversation,
           tools: [{ functionDeclarations: kAiToolDeclarations }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
         };
 
-        const toolRes = await fetch(geminiToolUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal,
-        });
-
-        if (!toolRes.ok) {
-          const errText = await toolRes.text();
-          console.warn(`[Gemini Tool Call HTTP ${toolRes.status}]:`, errText);
+        let toolRes;
+        let cleanupToolAbort;
+        try {
+          const out = await fetchGeminiWithRetry({
+            model: activeToolModel,
+            action: "generateContent",
+            apiKey,
+            payload,
+            thinkingLevel: "low",
+            signal,
+            timeoutMs: 45000,
+            maxRetries: 1,
+            allowFallback: true,
+            onStatus,
+          });
+          toolRes = out.res;
+          cleanupToolAbort = out.cleanupAbort;
+          if (out.res?.ok && out.modelUsed && out.modelUsed !== activeToolModel) {
+            if (activeAnswerModel === activeToolModel) activeAnswerModel = out.modelUsed;
+            activeToolModel = out.modelUsed;
+          }
+        } catch (err) {
+          if (signal?.aborted || err?.name === "AbortError") throw err;
+          console.warn("[Gemini Tool Call Error]:", err.message);
           break;
         }
 
-        const resJson = await toolRes.json();
+        let resJson;
+        try {
+          if (!toolRes.ok) {
+            const errText = await toolRes.text();
+            console.warn(`[Gemini Tool Call HTTP ${toolRes.status}]:`, errText);
+            break;
+          }
+          resJson = await toolRes.json();
+        } finally {
+          cleanupToolAbort?.();
+        }
         const candidate = resJson.candidates?.[0];
         const content = candidate?.content;
         const parts = content?.parts || [];
@@ -1586,7 +1828,7 @@ Read full Pāḷi paragraphs & translations for the strongest candidate citation
             const fc = part.functionCall;
             if (fc.name === "final_answer") hasFinalAnswer = true;
             callSpecs.push({ name: fc.name, args: enrichToolArgs(fc.name, fc.args) });
-          } else if (part.text && parts.length === 1) {
+          } else if (part.text && !part.thought && parts.length === 1) {
             onStatus(`Ani: ${part.text.slice(0, 100)}…`);
           }
         }
@@ -1759,67 +2001,212 @@ Read full Pāḷi paragraphs & translations for the strongest candidate citation
     const synthesisUserPrompt = `${evidenceContext}\nUser Inquiry: "${userQuery}"\n\nWrite a complete, well-structured scholarly explanation strictly following the language directive and citing every passage or bold definition as [book_code:c{chapter_index}:p{para_index}] or [book_code:c{chapter_index}:p{para_index}-L{line_id}].`;
 
     if (provider === "gemini") {
-      const geminiStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${answerModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
-      const answerPayload = {
-        system_instruction: { parts: [{ text: answerSysPrompt }] },
-        contents: [
-          ...safeHistory.map((m) => ({
-            role: m.role === "assistant" ? "model" : "user",
-            parts: [{ text: m.content }],
-          })),
+      const baseAnswerContents = [
+        ...safeHistory.map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+        {
+          role: "user",
+          parts: [{ text: synthesisUserPrompt }],
+        },
+      ];
+
+      const streamGeminiTurn = async (contents, modelToUse) => {
+        const answerPayload = {
+          system_instruction: { parts: [{ text: answerSysPrompt }] },
+          contents,
+          generationConfig: { temperature: 0.3, maxOutputTokens: 16384 },
+        };
+
+        const { res: streamRes, modelUsed, cleanupAbort } = await fetchGeminiWithRetry({
+          model: modelToUse,
+          action: "streamGenerateContent",
+          queryExtra: "alt=sse",
+          apiKey,
+          payload: answerPayload,
+          thinkingLevel: "low",
+          signal,
+          timeoutMs: 60000,
+          maxRetries: 2,
+          allowFallback: true,
+          onStatus,
+        });
+
+        if (!streamRes.ok) {
+          cleanupAbort?.();
+          throw new Error(`Gemini Stream Error HTTP ${streamRes.status}: ${await streamRes.text()}`);
+        }
+        if (modelUsed) activeAnswerModel = modelUsed;
+
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let turnText = "";
+        let finishReason = null;
+        let sawUsageMetadata = false;
+
+        const processGeminiLine = (line) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data:")) {
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr && dataStr !== "[DONE]") {
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.usageMetadata) sawUsageMetadata = true;
+                const cand = parsed.candidates?.[0];
+                if (cand?.finishReason) finishReason = cand.finishReason;
+                const textPart = extractGeminiTextFromParts(cand?.content?.parts);
+                if (textPart) {
+                  turnText += textPart;
+                  fullAnswerText += textPart;
+                  onToken(textPart);
+                }
+              } catch (e) {}
+            }
+          }
+        };
+
+        try {
+          while (true) {
+            if (signal?.aborted) {
+              try { await reader.cancel(); } catch (_) {}
+              throw Object.assign(new Error("Inquiry cancelled by user"), { name: "AbortError" });
+            }
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              processGeminiLine(line);
+            }
+          }
+          if (buffer.trim()) processGeminiLine(buffer);
+        } finally {
+          cleanupAbort?.();
+        }
+
+        return { turnText, finishReason, sawUsageMetadata, answerPayload };
+      };
+
+      const firstStream = await streamGeminiTurn(baseAnswerContents, activeAnswerModel);
+      let lastFinishReason = firstStream.finishReason;
+      let lastSawUsage = firstStream.sawUsageMetadata;
+
+      // Auto-recover if Gemini's SSE stream silently terminated early (finishReason === null with usageMetadata,
+      // or abrupt mid-sentence cut, or MAX_TOKENS).
+      const needsContinuation = (reason, sawUsage, text) => {
+        if (!text || !text.trim()) return false;
+        if (reason === "STOP" || reason === "SAFETY" || reason === "RECITATION") return false;
+        if (reason === "MAX_TOKENS") return true;
+        if (reason === null) {
+          if (sawUsage) return true;
+          return !/[.!?。！？။\]\)"'”*]\s*$/.test(text.trim());
+        }
+        return false;
+      };
+
+      const MAX_CONTINUATIONS = 2;
+      for (
+        let cont = 0;
+        cont < MAX_CONTINUATIONS &&
+        !signal?.aborted &&
+        needsContinuation(lastFinishReason, lastSawUsage, fullAnswerText);
+        cont++
+      ) {
+        onStatus("Completing interrupted response…");
+        const contContents = [
+          ...baseAnswerContents,
+          { role: "model", parts: [{ text: fullAnswerText }] },
           {
             role: "user",
-            parts: [{ text: synthesisUserPrompt }],
+            parts: [
+              {
+                text: "Your previous response was cut off mid-stream. Continue immediately from the exact character/word where you stopped without repeating anything already written, and finish the answer completely.",
+              },
+            ],
           },
-        ],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 6144 },
-      };
-
-      const streamRes = await fetch(geminiStreamUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(answerPayload),
-        signal,
-      });
-
-      if (!streamRes.ok) {
-        throw new Error(`Gemini Stream Error HTTP ${streamRes.status}: ${await streamRes.text()}`);
-      }
-
-      const reader = streamRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      const processGeminiLine = (line) => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("data: ")) {
-          const dataStr = trimmed.slice(6).trim();
-          if (dataStr && dataStr !== "[DONE]") {
+        ];
+        try {
+          const nextStream = await streamGeminiTurn(contContents, activeAnswerModel);
+          lastFinishReason = nextStream.finishReason;
+          lastSawUsage = nextStream.sawUsageMetadata;
+          if (!nextStream.turnText) break;
+        } catch (contErr) {
+          if (signal?.aborted || contErr?.name === "AbortError") throw contErr;
+          console.warn("[Gemini Stream Continuation Error]:", contErr.message);
+          try {
+            onStatus("Completing interrupted response (non-stream fallback)…");
+            const { res: contFbRes, modelUsed: contFbModel, cleanupAbort: contFbCleanup } = await fetchGeminiWithRetry({
+              model: activeAnswerModel,
+              action: "generateContent",
+              apiKey,
+              payload: {
+                system_instruction: { parts: [{ text: answerSysPrompt }] },
+                contents: contContents,
+                generationConfig: { temperature: 0.3, maxOutputTokens: 16384 },
+              },
+              thinkingLevel: "low",
+              signal,
+              timeoutMs: 60000,
+              maxRetries: 1,
+              allowFallback: true,
+              onStatus,
+            });
+            if (contFbModel) activeAnswerModel = contFbModel;
             try {
-              const parsed = JSON.parse(dataStr);
-              const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (textPart) {
-                fullAnswerText += textPart;
-                onToken(textPart);
+              if (contFbRes.ok) {
+                const contFbJson = await contFbRes.json();
+                const contCand = contFbJson.candidates?.[0];
+                const contFbText = extractGeminiTextFromParts(contCand?.content?.parts);
+                if (contFbText) {
+                  fullAnswerText += contFbText;
+                  onToken(contFbText);
+                  lastFinishReason = contCand?.finishReason || "STOP";
+                  lastSawUsage = Boolean(contFbJson.usageMetadata);
+                }
               }
-            } catch (e) {}
+            } finally {
+              contFbCleanup?.();
+            }
+          } catch (fbErr) {
+            if (signal?.aborted || fbErr?.name === "AbortError") throw fbErr;
+            console.warn("[Gemini Non-Stream Continuation Error]:", fbErr.message);
           }
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          processGeminiLine(line);
+          break;
         }
       }
-      if (buffer.trim()) processGeminiLine(buffer);
+
+      if (!fullAnswerText.trim() && !signal?.aborted) {
+        onStatus("Retrying synthesis response…");
+        const { res: fbRes, cleanupAbort: fbCleanup } = await fetchGeminiWithRetry({
+          model: activeAnswerModel,
+          action: "generateContent",
+          apiKey,
+          payload: firstStream.answerPayload,
+          thinkingLevel: "low",
+          signal,
+          timeoutMs: 60000,
+          maxRetries: 1,
+          allowFallback: true,
+          onStatus,
+        });
+        try {
+          if (fbRes.ok) {
+            const fbJson = await fbRes.json();
+            const fbText = extractGeminiTextFromParts(fbJson.candidates?.[0]?.content?.parts);
+            if (fbText) {
+              fullAnswerText += fbText;
+              onToken(fbText);
+            }
+          }
+        } finally {
+          fbCleanup?.();
+        }
+      }
     } else {
       // OpenAI / OpenRouter / Custom streaming
       const streamRes = await fetch(openAiEndpoint, {

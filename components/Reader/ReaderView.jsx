@@ -12,7 +12,7 @@ import { useThemeSettings, getDefaultTranslationColorsForTheme } from '../../con
 import { useDictionary } from '../../context/DictionaryContext';
 
 import { transliterateHtml, convertPaliScript, highlightHtmlText, highlightTranslationText, capitalizePali, convertAnyToRoman, cleanDictionaryQuery } from '../../services/transliterate';
-import { smartScrollTo } from '../../services/scroll';
+import { smartScrollTo, cancelSmartScroll } from '../../services/scroll';
 import {
   fetchChapterTranslations,
   fetchPaliSentences,
@@ -42,6 +42,53 @@ export function computeBlockCompensationDelta({
   const safeRatio = Math.max(0, Math.min(1, Number.isFinite(subRatio) ? subRatio : 0));
   const currentAnchorY = rectTopAfter + safeRatio * Math.max(0, rectHeightAfter);
   return currentAnchorY - anchorViewportYBefore;
+}
+
+// Peak/trough scroll-direction state machine for header/footer auto-hide.
+// Tolerates mobile sub-pixel touch jitter and iOS bottom rubber-band overscroll
+// while guaranteeing reliable hide on downward scroll and reveal on upward scroll.
+export function computeNextHeaderVisibility({
+  top = 0,
+  isHeaderVisible = true,
+  upPeakY = 0,
+  downPeakY = 0,
+  viewportHeight = 0,
+  scrollHeight = 0,
+  isJumping = false,
+}) {
+  const safeTop = Number.isFinite(top) ? top : 0;
+  const hasRange = scrollHeight > viewportHeight && viewportHeight > 0;
+  const maxScroll = hasRange ? Math.max(0, scrollHeight - viewportHeight) : Math.max(0, safeTop);
+  const clampedTop = Math.max(0, Math.min(safeTop, maxScroll));
+  const isBottomOverscroll = hasRange && safeTop > maxScroll + 1;
+
+  if (isJumping) {
+    const nextVisible = clampedTop <= 24 ? true : isHeaderVisible;
+    return { nextVisible, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+
+  if (clampedTop <= 24) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+
+  if (isHeaderVisible) {
+    const baseUp = Number.isFinite(upPeakY) ? Math.min(upPeakY, clampedTop) : clampedTop;
+    if (clampedTop > 64 && clampedTop - baseUp >= 36) {
+      return { nextVisible: false, upPeakY: clampedTop, downPeakY: clampedTop };
+    }
+    return { nextVisible: true, upPeakY: baseUp, downPeakY: clampedTop };
+  }
+
+  if (isBottomOverscroll) {
+    const baseDown = Number.isFinite(downPeakY) ? Math.max(downPeakY, maxScroll) : maxScroll;
+    return { nextVisible: false, upPeakY: clampedTop, downPeakY: baseDown };
+  }
+
+  const baseDown = Number.isFinite(downPeakY) ? Math.max(downPeakY, clampedTop) : clampedTop;
+  if (baseDown - clampedTop >= 24) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+  return { nextVisible: false, upPeakY: clampedTop, downPeakY: baseDown };
 }
 
 const READER_CLICKED_WORD_HIGHLIGHT = 'reader-clicked-word';
@@ -2706,6 +2753,7 @@ const ReaderPane = memo(function ReaderPane({
   const scrollTimeoutRef = useRef(null);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollTimerRef = useRef(null);
+  const programmaticSafetyTimerRef = useRef(null);
   const [isTargetScrollWaiting, setIsTargetScrollWaiting] = useState(false);
   const targetWaitTimeoutRef = useRef(null);
   const attemptScrollTimerRef = useRef(null);
@@ -2717,8 +2765,8 @@ const ReaderPane = memo(function ReaderPane({
   const isHeaderVisibleRef = useRef(isHeaderVisible);
   isHeaderVisibleRef.current = isHeaderVisible;
   const lastScrollYRef = useRef(0);
-  const scrollDirectionRef = useRef(0);
-  const scrollTravelRef = useRef(0);
+  const scrollUpPeakYRef = useRef(0);
+  const scrollDownPeakYRef = useRef(0);
   const jumpResizeObserverRef = useRef(null);
   const anchorPinRef = useRef({
     active: false,
@@ -2732,7 +2780,13 @@ const ReaderPane = memo(function ReaderPane({
 
   const getScrollTop = useCallback(() => {
     if (useWindowScroll && typeof window !== 'undefined') {
-      return window.scrollY || document.documentElement.scrollTop || 0;
+      return (
+        window.scrollY ||
+        document.scrollingElement?.scrollTop ||
+        document.documentElement?.scrollTop ||
+        document.body?.scrollTop ||
+        0
+      );
     }
     return containerRef.current?.scrollTop || 0;
   }, [useWindowScroll]);
@@ -2757,10 +2811,18 @@ const ReaderPane = memo(function ReaderPane({
 
   const getViewportBounds = useCallback(() => {
     if (useWindowScroll && typeof window !== 'undefined') {
+      const docHeight = document.documentElement?.clientHeight || window.innerHeight;
+      const visualHeight = window.visualViewport?.height || window.innerHeight;
+      const effectiveHeight = Math.min(window.innerHeight, docHeight, visualHeight);
+      const scrollHeight = Math.max(
+        document.scrollingElement?.scrollHeight || 0,
+        document.documentElement?.scrollHeight || 0,
+        document.body?.scrollHeight || 0
+      );
       return {
         top: 0,
-        height: window.innerHeight,
-        scrollHeight: document.documentElement.scrollHeight,
+        height: effectiveHeight,
+        scrollHeight,
       };
     }
     const c = containerRef.current;
@@ -2831,12 +2893,26 @@ const ReaderPane = memo(function ReaderPane({
     if (typeof window !== 'undefined') {
       window.__tpoProgrammaticScroll = true;
     }
-    lastScrollYRef.current = Math.max(0, offset);
+    const safeOffset = Math.max(0, offset);
+    lastScrollYRef.current = safeOffset;
+    scrollUpPeakYRef.current = safeOffset;
+    scrollDownPeakYRef.current = safeOffset;
     clearTimeout(programmaticScrollTimerRef.current);
+    clearTimeout(programmaticSafetyTimerRef.current);
+    // Safety fallback: guarantee isProgrammaticScrollRef never remains stuck true if a scroll animation is superseded
+    programmaticSafetyTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      if (typeof window !== 'undefined') {
+        window.__tpoProgrammaticScroll = false;
+      }
+    }, 1200);
     smartScrollTo(container, offset, {
       scrollMotion: options.scrollMotion || 'fast',
       onComplete: () => {
-        lastScrollYRef.current = Math.max(0, offset);
+        clearTimeout(programmaticSafetyTimerRef.current);
+        lastScrollYRef.current = safeOffset;
+        scrollUpPeakYRef.current = safeOffset;
+        scrollDownPeakYRef.current = safeOffset;
         programmaticScrollTimerRef.current = setTimeout(() => {
           isProgrammaticScrollRef.current = false;
           if (typeof window !== 'undefined') {
@@ -2850,6 +2926,13 @@ const ReaderPane = memo(function ReaderPane({
 
   const cancelJump = useCallback(() => {
     isTabSwitchingRef.current = false;
+    isProgrammaticScrollRef.current = false;
+    if (typeof window !== 'undefined') {
+      window.__tpoProgrammaticScroll = false;
+    }
+    clearTimeout(programmaticScrollTimerRef.current);
+    clearTimeout(programmaticSafetyTimerRef.current);
+    cancelSmartScroll?.(containerRef.current);
     anchorPinRef.current.active = false;
     if (jumpResizeObserverRef.current) {
       jumpResizeObserverRef.current.disconnect();
@@ -2888,6 +2971,8 @@ const ReaderPane = memo(function ReaderPane({
       }
       clearTimeout(chapterJumpRef.current.timer);
       clearTimeout(paraJumpRef.current.timer);
+      clearTimeout(programmaticScrollTimerRef.current);
+      clearTimeout(programmaticSafetyTimerRef.current);
       if (tabSwitchRetryTimerRef.current) {
         clearInterval(tabSwitchRetryTimerRef.current);
         tabSwitchRetryTimerRef.current = null;
@@ -2895,9 +2980,11 @@ const ReaderPane = memo(function ReaderPane({
     };
   }, [tab.bookCode, isVisible]);
 
+  const hasRenderableChapters = Boolean(tab.chapters?.length || tab.html);
+  const isTocMode = Boolean(tab.viewMode === 'toc' || tab.isTocView);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
     const onUserInput = (e) => {
       if (e?.target?.closest?.('.modal-overlay, .search-modal, .dict-dock-panel')) return;
       if (!anchorPinRef.current.resizing) {
@@ -2916,25 +3003,33 @@ const ReaderPane = memo(function ReaderPane({
         cancelJump();
       }
     };
-    container.addEventListener('wheel', onUserInput, { passive: true });
-    container.addEventListener('touchstart', onUserInput, { passive: true });
-    container.addEventListener('mousedown', onUserInput, { passive: true });
+    if (container) {
+      container.addEventListener('wheel', onUserInput, { passive: true });
+      container.addEventListener('touchstart', onUserInput, { passive: true });
+      container.addEventListener('touchmove', onUserInput, { passive: true });
+      container.addEventListener('mousedown', onUserInput, { passive: true });
+    }
     if (useWindowScroll && isVisible && typeof window !== 'undefined') {
       window.addEventListener('wheel', onUserInput, { passive: true });
       window.addEventListener('touchstart', onUserInput, { passive: true });
+      window.addEventListener('touchmove', onUserInput, { passive: true });
       window.addEventListener('keydown', onKeyDown, { passive: true });
     }
     return () => {
-      container.removeEventListener('wheel', onUserInput);
-      container.removeEventListener('touchstart', onUserInput);
-      container.removeEventListener('mousedown', onUserInput);
+      if (container) {
+        container.removeEventListener('wheel', onUserInput);
+        container.removeEventListener('touchstart', onUserInput);
+        container.removeEventListener('touchmove', onUserInput);
+        container.removeEventListener('mousedown', onUserInput);
+      }
       if (typeof window !== 'undefined') {
         window.removeEventListener('wheel', onUserInput);
         window.removeEventListener('touchstart', onUserInput);
+        window.removeEventListener('touchmove', onUserInput);
         window.removeEventListener('keydown', onKeyDown);
       }
     };
-  }, [cancelJump, onColumnUserInteract, tab.bookCode, tab.isLoading, tab.viewMode, useWindowScroll, isVisible]);
+  }, [cancelJump, onColumnUserInteract, tab.bookCode, tab.isLoading, tab.viewMode, isTocMode, hasRenderableChapters, useWindowScroll, isVisible]);
 
   // Task 3: Reading-position anchor preservation across Left/Right dock open, close, resize, and sidebar toggles
   const captureReadingAnchor = useCallback(
@@ -3022,6 +3117,8 @@ const ReaderPane = memo(function ReaderPane({
       const nextTop = Math.max(0, getScrollTop() + delta);
       isProgrammaticScrollRef.current = true;
       lastScrollYRef.current = nextTop;
+      scrollUpPeakYRef.current = nextTop;
+      scrollDownPeakYRef.current = nextTop;
       setScrollTop(nextTop, 'auto');
       if (activeTabRef.current?.bookCode && activeTabRef.current.bookCode !== 'ai_chat') {
         saveTabScroll(activeTabRef.current.bookCode, nextTop);
@@ -3099,6 +3196,8 @@ const ReaderPane = memo(function ReaderPane({
     if (targetScroll > 0 || Math.abs(getScrollTop() - targetScroll) > 1) {
       isProgrammaticScrollRef.current = true;
       lastScrollYRef.current = targetScroll;
+      scrollUpPeakYRef.current = targetScroll;
+      scrollDownPeakYRef.current = targetScroll;
       setScrollTop(targetScroll, 'auto');
       if (targetScroll !== savedScroll && tab?.bookCode && tab.bookCode !== 'ai_chat') {
         saveTabScroll(tab.bookCode, targetScroll);
@@ -4744,52 +4843,46 @@ const ReaderPane = memo(function ReaderPane({
     }
   }, [isActive, paneParaNum, setActiveParaNum]);
 
+  // Keep scroll peak anchors synchronized when header visibility changes externally (e.g. breadcrumb / sidebar / tab switch)
+  useEffect(() => {
+    if (!isVisible) return;
+    const curTop = Math.max(0, getScrollTop());
+    scrollUpPeakYRef.current = curTop;
+    scrollDownPeakYRef.current = curTop;
+  }, [isHeaderVisible, isVisible, getScrollTop]);
+
   // Direct fast scroll listener — auto-toggles header/footer, preserves tab scroll, drives parallel sync & detects active paragraph
   const processScrollTop = useCallback(
     (top) => {
       if (!isVisible || isTabSwitchingRef.current) return;
 
-      const prevTop = lastScrollYRef.current;
-      const delta = top - prevTop;
       lastScrollYRef.current = top;
 
       const isJumping = Boolean(isProgrammaticScrollRef.current || paraJumpRef.current.key || chapterJumpRef.current.key);
-      if (!isJumping) {
-        if (top <= 24) {
-          scrollDirectionRef.current = 0;
-          scrollTravelRef.current = 0;
-          if (!isHeaderVisibleRef.current) setIsHeaderVisible?.(true);
-        } else if (delta > 0) {
-          if (scrollDirectionRef.current !== 1) {
-            scrollDirectionRef.current = 1;
-            scrollTravelRef.current = 0;
-          }
-          scrollTravelRef.current += delta;
-          if (top > 64 && scrollTravelRef.current >= 36 && isHeaderVisibleRef.current) {
-            setIsHeaderVisible?.(false);
-          }
-        } else if (delta < 0) {
-          const { height, scrollHeight } = getViewportBounds();
-          const atBottomBounce = scrollHeight > height && top + height >= scrollHeight - 6;
-          if (!atBottomBounce) {
-            if (scrollDirectionRef.current !== -1) {
-              scrollDirectionRef.current = -1;
-              scrollTravelRef.current = 0;
-            }
-            scrollTravelRef.current += -delta;
-            if (scrollTravelRef.current >= 24 && !isHeaderVisibleRef.current) {
-              setIsHeaderVisible?.(true);
-            }
-          }
-        }
+      const { height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
+      const { nextVisible, upPeakY, downPeakY } = computeNextHeaderVisibility({
+        top,
+        isHeaderVisible: isHeaderVisibleRef.current,
+        upPeakY: scrollUpPeakYRef.current,
+        downPeakY: scrollDownPeakYRef.current,
+        viewportHeight: vpHeight,
+        scrollHeight: vpScrollHeight,
+        isJumping,
+      });
+      scrollUpPeakYRef.current = upPeakY;
+      scrollDownPeakYRef.current = downPeakY;
+      if (nextVisible !== isHeaderVisibleRef.current) {
+        isHeaderVisibleRef.current = nextVisible;
+        setIsHeaderVisible?.(nextVisible);
       }
 
-      if (activeTab?.bookCode && activeTab.bookCode !== 'ai_chat') {
-        saveTabScroll(activeTab.bookCode, top);
+      const curTabNow = activeTabRef.current;
+      if (curTabNow?.bookCode && curTabNow.bookCode !== 'ai_chat') {
+        saveTabScroll(curTabNow.bookCode, top);
       }
 
-      if (isColumnsMode && isParallelSyncActive && !isProgrammaticScrollRef.current) {
-        onColumnScrollSync?.(activeTab.bookCode, top);
+      if (isColumnsMode && isParallelSyncActive && !isProgrammaticScrollRef.current && curTabNow?.bookCode) {
+        onColumnScrollSync?.(curTabNow.bookCode, top);
       }
 
       if (scrollTimeoutRef.current) {
@@ -4894,13 +4987,11 @@ const ReaderPane = memo(function ReaderPane({
       isActive,
       isColumnsMode,
       isParallelSyncActive,
-      activeTab,
       saveTabScroll,
       saveTabPosition,
       setActiveParaNum,
       detectActiveEditionPages,
       addToHistory,
-      cancelJump,
       onColumnScrollSync,
       getViewportBounds,
       getTopReadingInset,
@@ -4908,24 +4999,36 @@ const ReaderPane = memo(function ReaderPane({
     ]
   );
 
-  const handleScroll = useCallback(
-    (e) => {
-      if (useWindowScrollRef.current) return;
-      processScrollTop(e.target.scrollTop);
-    },
-    [processScrollTop]
-  );
+  const processScrollTopRef = useRef(processScrollTop);
+  processScrollTopRef.current = processScrollTop;
+
+  const handleScroll = useCallback((e) => {
+    if (useWindowScrollRef.current) return;
+    processScrollTopRef.current(e.target.scrollTop);
+  }, []);
 
   useEffect(() => {
     if (!useWindowScroll || !isVisible || typeof window === 'undefined') return;
-    lastScrollYRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    const readWinTop = () =>
+      window.scrollY ||
+      document.scrollingElement?.scrollTop ||
+      document.documentElement?.scrollTop ||
+      document.body?.scrollTop ||
+      0;
+    const initTop = readWinTop();
+    lastScrollYRef.current = initTop;
+    scrollUpPeakYRef.current = initTop;
+    scrollDownPeakYRef.current = initTop;
+    if (initTop <= 24 && !isHeaderVisibleRef.current) {
+      setIsHeaderVisible?.(true);
+    }
     const onWinScroll = () => {
       if (!useWindowScrollRef.current) return;
-      processScrollTop(window.scrollY || document.documentElement.scrollTop || 0);
+      processScrollTopRef.current(readWinTop());
     };
     window.addEventListener('scroll', onWinScroll, { passive: true });
     return () => window.removeEventListener('scroll', onWinScroll);
-  }, [useWindowScroll, isVisible, processScrollTop]);
+  }, [useWindowScroll, isVisible, setIsHeaderVisible]);
 
   const handleReaderClick = useCallback((e) => {
     if (isColumnsMode && !isActive) {
@@ -5287,7 +5390,7 @@ const ReaderPane = memo(function ReaderPane({
   const handleNikayaClick = (e) => {
     e.stopPropagation();
     if (containerRef.current) {
-      smartScrollTo(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
+      performProgrammaticScroll(containerRef.current, 0, { scrollMotion: settings?.scrollMotion || 'fast' });
     }
   };
 
@@ -5314,7 +5417,7 @@ const ReaderPane = memo(function ReaderPane({
         currentScroll,
         stickyInset: getTopReadingInset(),
       });
-      smartScrollTo(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
+      performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
       // No pulse-highlight on whole-chapter jumps (see section 4 above).
     }
   };
