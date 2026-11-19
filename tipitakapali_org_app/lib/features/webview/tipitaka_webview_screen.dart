@@ -299,7 +299,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       'ftsCodes': ftsCodes,
       'updates': updates,
       'catalog': catalog,
-      'hasPaliSentences': dlState.installedDbs.containsKey('pali_sentences.db'),
+      'hasPaliSentences':
+          dlState.installedDbs.containsKey('pali_sentences.db') ||
+          ref.read(tipitakaLocalServerProvider).api.hasPaliSentencesSupport(),
       'paliSentencesAsset': dlState.manifest?.core['pali_sentences'] != null
           ? {
               'zipSize': dlState.manifest!.core['pali_sentences']!.zipSize,
@@ -1659,8 +1661,8 @@ const String _languageMenuBridgeScript = r'''
     for (var i = 0; i < candidates.length; i++) {
       var text = (candidates[i].textContent || '').trim().toUpperCase();
       if (text.indexOf('TRANSLATION DISPLAY SETTINGS') !== -1) {
-        var parent = candidates[i].closest('.fixed') ||
-            candidates[i].closest('[role="dialog"]') ||
+        var parent = candidates[i].closest('[role="dialog"]') ||
+            candidates[i].closest('.fixed') ||
             candidates[i].parentElement;
         if (parent) return parent;
       }
@@ -1720,7 +1722,12 @@ const String _languageMenuBridgeScript = r'''
 
   function syncModal(modal) {
     if (!modal || !loadedOnce) return;
-    if (modal.dataset && modal.dataset.tpoNativeLangMenu === '1') return;
+    if (
+      (modal.dataset && modal.dataset.tpoNativeLangMenu === '1') ||
+      (modal.querySelector && modal.querySelector('[data-tpo-native-lang-menu="1"]'))
+    ) {
+      return;
+    }
 
     var countSpans = modal.querySelectorAll('span');
     for (var s = 0; s < countSpans.length; s++) {
@@ -1770,28 +1777,6 @@ const String _languageMenuBridgeScript = r'''
           }
         } else {
           updateDownloadIconBadge(existingBadge, activeDownloadingCode === code);
-        }
-      }
-    }
-
-    if (!modal.dataset.tpoFooterHooked) {
-      var buttons = modal.querySelectorAll('button');
-      for (var k = 0; k < buttons.length; k++) {
-        if ((buttons[k].textContent || '').trim() === 'Done' && buttons[k].parentNode) {
-          modal.dataset.tpoFooterHooked = '1';
-          var dbBtn = document.createElement('button');
-          dbBtn.type = 'button';
-          dbBtn.textContent = 'Databases';
-          dbBtn.style.cssText = 'margin-right:auto;padding:6px 10px;font-size:12px;font-weight:500;border-radius:8px;opacity:0.85;cursor:pointer;';
-          dbBtn.addEventListener('click', function(ev) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
-              window.flutter_inappwebview.callHandler('openDatabaseManager');
-            }
-          });
-          buttons[k].parentNode.insertBefore(dbBtn, buttons[k]);
-          break;
         }
       }
     }

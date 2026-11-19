@@ -449,16 +449,17 @@ test('LanguageMenu renders 2 zones (Enabled including Pali + order/colors; Avail
   assert.match(enabledHtml, /Move English up/);
   assert.match(enabledHtml, /type="checkbox" switch=""/);
 
-  // Available has Vietnamese with info + switch, and web mode does NOT render Check for Update / Download / Delete
+  // Available has Vietnamese with info + switch, and web mode does NOT render Check / Databases / Download / Delete
   assert.match(availHtml, /data-lang-id="vietnamese"/);
   assert.doesNotMatch(availHtml, /data-lang-id="pali"/);
   assert.match(availHtml, /Bản dịch Tiếng Việt/);
   assert.match(availHtml, /type="checkbox" switch=""/);
-  assert.doesNotMatch(html, /Check for Update/);
+  assert.doesNotMatch(html, /aria-label="Check for translation updates"/);
+  assert.doesNotMatch(html, />Databases</);
   assert.doesNotMatch(availHtml, /aria-label="Download Vietnamese"/);
 });
 
-test('LanguageMenu offline mode renders Check for Update, Update on enabled/outdated, Download and Delete on available', () => {
+test('LanguageMenu offline mode renders Check in footer (no Databases button, no As Sentence download icon), Update on enabled/outdated, Download and Delete on available', () => {
   const mod = loadLanguageMenuWithSettings();
   const html = renderToStaticMarkup(
     React.createElement(mod.default, {
@@ -481,9 +482,30 @@ test('LanguageMenu offline mode renders Check for Update, Update on enabled/outd
     })
   );
 
-  assert.match(html, /Check for Update/);
+  // Task 1: Databases button removed; Check button with RefreshCw icon moved to footer before Restore default
+  assert.doesNotMatch(html, />Databases</);
+  assert.doesNotMatch(html, />Check for Update</);
+  assert.match(html, /aria-label="Check for translation updates"[^>]*>[\s\S]*?data-icon="RefreshCw"[\s\S]*?<span>Check<\/span><\/button>/);
+  const checkBtnIdx = html.indexOf('aria-label="Check for translation updates"');
+  const restoreBtnIdx = html.indexOf('>Restore default<');
+  assert.ok(checkBtnIdx !== -1 && restoreBtnIdx !== -1 && checkBtnIdx < restoreBtnIdx, 'Check button sits in footer before Restore default');
+
+  // Task 2: "As Sentence" button does NOT render a Download icon even when hasPaliSentences is false
+  const asSentenceMatch = html.match(/<button[^>]*aria-label="Show Pāḷi and translations sentence by sentence"[\s\S]*?<\/button>/);
+  assert.ok(asSentenceMatch, 'As Sentence button rendered');
+  assert.doesNotMatch(asSentenceMatch[0], /data-icon="Download"/);
+
   assert.match(html, /2 downloaded \/ 23/);
   assert.match(html, /2 translation updates available/);
+  const availSectionEndIdx = html.lastIndexOf('</section>');
+  const updateBannerIdx = html.indexOf('2 translation updates available');
+  assert.ok(
+    availSectionEndIdx !== -1 &&
+      updateBannerIdx > availSectionEndIdx &&
+      updateBannerIdx < checkBtnIdx,
+    'Offline update status banner sits pinned above footer directly above Check button'
+  );
+  assert.match(html, /<button[^>]*whitespace-nowrap[^>]*aria-label="Check for translation updates"/);
 
   const enabledHtml = html.match(/<section data-zone="enabled"[\s\S]*?<\/section>/)?.[0] || '';
   const availHtml = html.match(/<section data-zone="available"[\s\S]*?<\/section>/)?.[0] || '';

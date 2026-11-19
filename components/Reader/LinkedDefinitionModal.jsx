@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight, ArrowLeft, BookOpen, Check, ExternalLink, X, Layers, Columns } from 'lucide-react';
+import { ArrowRight, ArrowLeft, BookOpen, Check, ExternalLink, X, Layers } from 'lucide-react';
 import { fetchLinkedPreview, getCachedLinkedPreview } from '../../services/api';
 import { convertPaliScript, cleanDictionaryQuery } from '../../services/transliterate';
 import { formatSafeTranslationHtml } from '../../services/translationFormat';
@@ -130,7 +130,7 @@ export default function LinkedDefinitionModal({
   currentScript = 'roman',
   onClose,
 }) {
-  const { openBook, openAlongside } = useTabs();
+  const { openBook } = useTabs();
   const { openDictionary } = useDictionary();
   const { settings } = useThemeSettings() || {};
 
@@ -281,23 +281,7 @@ export default function LinkedDefinitionModal({
     onClose?.();
   };
 
-  const openLineAlongside = (lineOverride = null) => {
-    const payload = buildLinkedOpenOptions(preview, link, lineOverride || selectedLineObj);
-    if (!payload) return;
-    const opts = {
-      ...payload.opts,
-      sourceBookCode: link.sourceBookCode || null,
-    };
-    if (typeof openAlongside === 'function') {
-      openAlongside(payload.targetBook, opts);
-    } else {
-      openBook(payload.targetBook, opts);
-    }
-    onClose?.();
-  };
-
   const handleOpenInReader = () => openLineInReader(null);
-  const handleOpenAlongside = () => openLineAlongside(null);
 
   const handlePaliBodyClick = (e) => {
     if (e.target.closest('button, a')) return;
@@ -466,7 +450,7 @@ export default function LinkedDefinitionModal({
                           setSelectedLineKey(lineKey);
                         }}
                         className="linked-def-line-select-btn inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition cursor-pointer"
-                        title="Select this line for Open in Reader / Open Alongside"
+                        title="Select this line for Open in Reader"
                       >
                         <span>Select</span>
                       </button>
@@ -526,34 +510,25 @@ export default function LinkedDefinitionModal({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex items-center justify-between gap-3 shrink-0">
+        <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shrink-0">
           <span className="text-[11px] font-mono text-[var(--text-muted)] truncate">
             {openPayload?.targetBook || preview?.book_code || link.target_book}
             {openPayload?.opts?.targetParaNum ? ` · § ${openPayload.opts.targetParaNum}` : ''}
             {openPayload?.opts?.targetLineId ? ` · line ${openPayload.opts.targetLineId}` : ''}
           </span>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+              className="flex-1 sm:flex-initial sm:min-w-[140px] inline-flex items-center justify-center px-6 py-2 rounded-lg text-xs font-semibold border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]/40 transition cursor-pointer"
             >
               Close
             </button>
             <button
               type="button"
-              onClick={handleOpenAlongside}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--accent)]/45 bg-[var(--accent)]/12 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition cursor-pointer"
-              title="Open alongside current text in parallel column / adjacent tab"
-            >
-              <Columns size={13} />
-              <span>Open Alongside</span>
-            </button>
-            <button
-              type="button"
               onClick={handleOpenInReader}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition cursor-pointer shadow-xs"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent)] text-white hover:opacity-90 transition cursor-pointer shadow-xs shrink-0"
             >
               <BookOpen size={13} />
               <span>Open in Reader</span>

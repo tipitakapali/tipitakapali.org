@@ -1107,13 +1107,17 @@ class TipitakaWebApi {
     return out;
   }
 
+  bool hasPaliSentencesSupport() {
+    return TipitakaCoreReader.hasPaliSentencesSupport(
+      _openDb('pali_sentences.db'),
+      _openDb('tipitaka.db'),
+    );
+  }
+
   ApiResponse getAvailableTranslations() {
     return ApiResponse({
       'available': _discoverTranslations(),
-      'has_pali_sentences': TipitakaCoreReader.hasPaliSentencesSupport(
-        _openDb('pali_sentences.db'),
-        _openDb('tipitaka.db'),
-      ),
+      'has_pali_sentences': hasPaliSentencesSupport(),
     });
   }
 

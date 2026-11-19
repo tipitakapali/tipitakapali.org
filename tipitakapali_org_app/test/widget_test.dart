@@ -715,6 +715,9 @@ void main() {
     expect(tipitakaWebBridgeScript, isNot(contains("'Download'")));
     expect(tipitakaWebBridgeScript, contains('stripAndroidStoreBadges'));
     expect(tipitakaWebBridgeScript, contains('a[href*="play.google.com"]'));
+    expect(tipitakaWebBridgeScript, isNot(contains('tpoFooterHooked')));
+    expect(tipitakaWebBridgeScript, isNot(contains("'Databases'")));
+    expect(tipitakaWebBridgeScript, contains('[data-tpo-native-lang-menu="1"]'));
   });
 
   testWidgets(

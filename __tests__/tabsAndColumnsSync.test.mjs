@@ -275,13 +275,13 @@ test('LinkedDefinitionModal renders linked-def-passage-target highlight border a
   assert.match(css, /\.linked-def-line-selected\s*\{[^}]*border:\s*2px\s+solid\s+var\(--accent\)/);
 
   const noopComp = () => null;
-  const { buildLinkedOpenOptions, getLinkedLineKey } = compileModule('../components/Reader/LinkedDefinitionModal.jsx', {
+  const { default: LinkedDefinitionModal, buildLinkedOpenOptions, getLinkedLineKey } = compileModule('../components/Reader/LinkedDefinitionModal.jsx', {
     react: Object.assign({}, React, { __esModule: true, default: React }),
     'lucide-react': new Proxy({}, { get: () => noopComp }),
-    '../../services/api': { fetchLinkedPreview: async () => null, getCachedLinkedPreview: () => null },
+    '../../services/api': { fetchLinkedPreview: async () => null, getCachedLinkedPreview: () => preview },
     '../../services/transliterate': { convertPaliScript: (s) => s, cleanDictionaryQuery: (s) => s },
     '../../services/translationFormat': { formatSafeTranslationHtml: (s) => s },
-    '../../context/TabContext': { useTabs: () => ({ openBook: () => {}, openAlongside: () => {} }) },
+    '../../context/TabContext': { useTabs: () => ({ openBook: () => {} }) },
     '../../context/DictionaryContext': { useDictionary: () => ({ openDictionary: () => {} }) },
     '../../context/ThemeSettingsContext': {
       useThemeSettings: () => ({ settings: {} }),
@@ -344,6 +344,19 @@ test('LinkedDefinitionModal renders linked-def-passage-target highlight border a
   assert.equal(getLinkedLineKey({ para_index: 1377, line_id: 1 }, 3), '1377-1-3');
   assert.match(src, /linked-def-line-open-btn/);
   assert.match(src, /linked-def-line-select-btn/);
+
+  // Task 3: Open Alongside removed; Close button is widened/longer for easier closing
+  const modalHtml = renderToStaticMarkup(
+    React.createElement(LinkedDefinitionModal, {
+      link: { ...link, word: 'dhamma' },
+      activeLangs: ['en'],
+      currentScript: 'roman',
+      onClose: () => {},
+    })
+  );
+  assert.doesNotMatch(modalHtml, /Open Alongside/);
+  assert.match(modalHtml, /Open in Reader/);
+  assert.match(modalHtml, /<button[^>]*class="[^"]*flex-1[^"]*min-w-\[140px\][^"]*px-6 py-2[^"]*"[^>]*>Close<\/button>/);
 });
 
 test('increasingChain and interpolateMonotonicY: filters cross-reference outliers and interpolates smoothly', () => {

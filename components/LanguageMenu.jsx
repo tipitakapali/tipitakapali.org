@@ -866,21 +866,6 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                         Translation Display Settings
                       </span>
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {isOffline && (
-                          <button
-                            type="button"
-                            onClick={handleCheckForUpdates}
-                            disabled={isCheckingUpdates || offlineState.isFetchingManifest}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--bg-card)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent-light)] transition cursor-pointer disabled:opacity-50"
-                            title="Load online release manifest and check if newer translation databases are available"
-                          >
-                            <RefreshCw
-                              size={10}
-                              className={isCheckingUpdates || offlineState.isFetchingManifest ? 'animate-spin' : ''}
-                            />
-                            <span>{isCheckingUpdates ? 'Checking...' : 'Check for Update'}</span>
-                          </button>
-                        )}
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                           {isOffline
                             ? `${installedCodeSet.size} downloaded / ${AVAILABLE_TRANSLATION_COUNT}`
@@ -888,20 +873,6 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                         </span>
                       </div>
                     </div>
-                    {isOffline && (updateCheckSummary || availableUpdateCount > 0) && (
-                      <div
-                        className={`mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex items-center justify-between gap-2 border ${
-                          availableUpdateCount > 0
-                            ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25'
-                            : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25'
-                        }`}
-                      >
-                        <span>
-                          {updateCheckSummary ||
-                            `${availableUpdateCount} translation update${availableUpdateCount === 1 ? '' : 's'} available`}
-                        </span>
-                      </div>
-                    )}
                   <p className="text-[10.5px] text-[var(--text-muted)] mt-1 normal-case tracking-normal">
                     Pāḷi vs Translation layout
                   </p>
@@ -979,11 +950,10 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                     </button>
                     <button
                       type="button"
-                      onClick={handleGranularitySentenceClick}
-                      disabled={downloadingPaliSentences}
+                      onClick={() => updateSetting('translationGranularity', 'sentence')}
                       aria-label="Show Pāḷi and translations sentence by sentence"
                       title="Show Pāḷi and translations sentence by sentence"
-                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer disabled:opacity-60 ${
+                      className={`p-2 rounded-xl border transition flex items-center justify-center cursor-pointer ${
                         translationGranularity === 'sentence'
                           ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                           : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-gray-400 text-[var(--text-primary)]'
@@ -992,9 +962,6 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                       <span className="flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-center">
                         <ListOrdered size={14} className="shrink-0" />
                         <span>As Sentence</span>
-                        {isOffline && offlineState.loaded && !offlineState.hasPaliSentences && (
-                          <Download size={11} className="shrink-0 text-amber-500" />
-                        )}
                       </span>
                     </button>
                   </div>
@@ -1395,22 +1362,41 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
               </div>
             </div>
 
+            {/* Offline Update Status Banner (always visible above footer) */}
+            {isOffline && (updateCheckSummary || availableUpdateCount > 0) && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`px-4 py-1.5 border-t text-[11px] font-medium flex items-center justify-between gap-2 shrink-0 ${
+                  availableUpdateCount > 0
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25'
+                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25'
+                }`}
+              >
+                <span>
+                  {updateCheckSummary ||
+                    `${availableUpdateCount} translation update${availableUpdateCount === 1 ? '' : 's'} available`}
+                </span>
+              </div>
+            )}
+
             {/* Modal Footer */}
             <div className="px-4 py-2.5 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex items-center justify-between gap-2 shrink-0 flex-wrap">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {isOffline && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const bridge =
-                        typeof window !== 'undefined' ? window.flutter_inappwebview?.callHandler : null;
-                      if (bridge) bridge('openDatabaseManager');
-                    }}
-                    className="px-3 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5"
-                    title="Open offline Database Manager"
+                    onClick={handleCheckForUpdates}
+                    disabled={isCheckingUpdates || offlineState.isFetchingManifest}
+                    className="px-2.5 sm:px-3 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
+                    title="Load online release manifest and check if newer translation databases are available"
+                    aria-label="Check for translation updates"
                   >
-                    <Database size={12} />
-                    <span>Databases</span>
+                    <RefreshCw
+                      size={12}
+                      className={isCheckingUpdates || offlineState.isFetchingManifest ? 'animate-spin' : ''}
+                    />
+                    <span>{isCheckingUpdates ? 'Checking...' : 'Check'}</span>
                   </button>
                 )}
                 <button
@@ -1422,7 +1408,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                     updateSetting('showBookLinks', true);
                     handleResetEnabledColors();
                   }}
-                  className="px-3 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-bold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5"
+                  className="px-2.5 sm:px-3 py-1.5 border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-bold rounded-lg shadow-sm text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                   title="Reset to defaults: Stacked layout, sentence unit, borders off, default colors"
                 >
                   <RotateCcw size={12} />
@@ -1432,7 +1418,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition cursor-pointer"
+                className="px-3.5 sm:px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition cursor-pointer whitespace-nowrap"
               >
                 Done
               </button>
