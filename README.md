@@ -234,12 +234,13 @@ npm run build
            - **Rule 5b — `Markdown for Agents: Homepage & Fallback`** (Place **Last**):
              - Expression:
                ```text
-               any(http.request.headers["accept"][*] contains "text/markdown") and not ends_with(http.request.uri.path, ".md") and not ends_with(http.request.uri.path, ".txt") and not starts_with(http.request.uri.path, "/api/")
+               any(http.request.headers["accept"][*] contains "text/markdown") and http.request.uri.path eq "/"
                ```
              - Rewrite to (**Static**):
                ```text
-               /llms.txt
+               /index.md
                ```
+             *(Because Rule 5a rewrites `/book/...` to `/book/...md`, matching `http.request.uri.path eq "/"` in Rule 5b guarantees Rule 5b ONLY triggers on the homepage `/` — or on SPA-fallback routes like `/translation/...` and `/book/si....` that Rules 1 and 3 rewrote to `/` — and NEVER overwrites `/book/s0101m.mul/1.md`!)*
 - If migrating from static Cloudflare Pages, **disable** the legacy SPA-shell URL Rewrite Rules (Rules 1–3 below) for `/book/*` and `/chapter/*` so Cloudflare does not overwrite SSR HTML with `/`.
 
 ---
@@ -398,11 +399,9 @@ Rewrite to (Dynamic): concat(http.request.uri.path, ".md")
 
 Rule 5b — "Markdown for Agents: Homepage & Fallback" [Place at: LAST]
 any(http.request.headers["accept"][*] contains "text/markdown") and
-not ends_with(http.request.uri.path, ".md") and
-not ends_with(http.request.uri.path, ".txt") and
-not starts_with(http.request.uri.path, "/api/")
+http.request.uri.path eq "/"
 
-Rewrite to (Static): /llms.txt
+Rewrite to (Static): /index.md
 ```
 
 Design notes (do not "simplify" without re-testing):
