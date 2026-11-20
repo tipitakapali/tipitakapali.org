@@ -206,8 +206,19 @@ npm run build
 - Route `/book/*`, `/translation/*`, and `/sitemap*.xml` to your VPS Next.js SSR origin, with Cloudflare Cache Rules set to **Respect origin `Cache-Control`**.
 - Legacy `/book/{code}?l={lang}` and `/book/{code}{N}` links automatically `301` redirect in `proxy.js` to `/translation/{lang}/{code}` or `/book/{code}/{N+1}`.
 - **Markdown for Agents (`Accept: text/markdown`)**:
-  - When deployed via VPS Next.js SSR, `proxy.js` and `/api/markdown/[[...path]]` automatically negotiate `Accept: text/markdown`, returning structured Markdown with YAML frontmatter, JSON-LD, `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes` while keeping HTML as the default for browsers.
-  - On Cloudflare (or if serving static pages via Cloudflare Pages without hitting the VPS origin on `/` or `/info`), also enable **Agent Readiness → Markdown for Agents → Serve Markdown to AI agents** in the Cloudflare Dashboard (or add a Cloudflare URL Rewrite Rule when `any(http.request.headers["accept"][*] contains "text/markdown")`: rewrite `/` → `/llms.txt` and `/book/*` or `/translation/*` → `/llms-full.txt`). Both `/llms.txt` and `/llms-full.txt` are configured in `_headers` with `Content-Type: text/markdown; charset=utf-8` and `x-markdown-tokens`.
+  - **VPS Next.js SSR**: `proxy.js` and `/api/markdown/[[...path]]` automatically negotiate `Accept: text/markdown`, returning structured Markdown with YAML frontmatter, JSON-LD, `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes` while keeping HTML as the default for browsers.
+  - **Cloudflare Free Plan (Zero Workers Quota — Required when `/` is served by Cloudflare Pages)**:
+    Go to **Cloudflare Dashboard → zone `tipitakapali.org` → Rules → Overview → Create rule → URL Rewrite Rule**:
+    - **Rule name**: `Markdown for Agents (Accept: text/markdown)`
+    - **Place at (Order)**: **First** *(CRITICAL: Cloudflare evaluates all matching URL Rewrite Rules sequentially from top to bottom. If this rule is placed First and an agent requests `/book/s0101m.mul/1` with `Accept: text/markdown`, a later SPA-shell rule like Rule 1/2/3 would overwrite `/llms.txt` back to `/` if those rules don't exclude `text/markdown` — OR even better, place this rule **Last** so it runs after Rules 1–4 and has the final word on `http.request.uri.path`!)*
+    - **Recommended Order**: **Last** (after Rules 1–4) so its rewrite to `/llms.txt` is never overwritten by the SPA shell rules (`/`).
+    - **If incoming requests match → Custom filter expression**:
+      ```text
+      any(http.request.headers["accept"][*] contains "text/markdown") and not ends_with(http.request.uri.path, ".md") and not ends_with(http.request.uri.path, ".txt") and not starts_with(http.request.uri.path, "/api/")
+      ```
+    - **Then → Path → Rewrite to → Static**: `/llms.txt`
+    - **Query → Preserve**
+    *(Because `/llms.txt` is configured in `public/_headers` with `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens: 4263`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes`, Cloudflare immediately serves a valid Markdown response with token count for any `Accept: text/markdown` request while browsers without `Accept: text/markdown` continue receiving HTML at zero Workers quota cost.)*
 - If migrating from static Cloudflare Pages, **disable** the legacy SPA-shell URL Rewrite Rules (Rules 1–3 below) for `/book/*` and `/chapter/*` so Cloudflare does not overwrite SSR HTML with `/`.
 
 ---
@@ -351,6 +362,13 @@ starts_with(http.request.uri.path, "/api/book/") and
 ends_with(http.request.uri.path, ".json") and
 http.request.uri.path contains "/translation/"
 Rewrite to (Dynamic): substring(http.request.uri.path, 0, -5)
+
+Rule 5 — "Markdown for Agents (Accept: text/markdown)" [Place at: LAST]
+any(http.request.headers["accept"][*] contains "text/markdown") and
+not ends_with(http.request.uri.path, ".md") and
+not ends_with(http.request.uri.path, ".txt") and
+not starts_with(http.request.uri.path, "/api/")
+Rewrite to (Static): /llms.txt
 ```
 
 Design notes (do not "simplify" without re-testing):
