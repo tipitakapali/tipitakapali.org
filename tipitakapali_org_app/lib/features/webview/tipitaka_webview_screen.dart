@@ -73,7 +73,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     final updated = await DatabaseUpdatesDialog.show(context);
     if (updated == true && mounted) {
       final server = ref.read(tipitakaLocalServerProvider);
-      server.api.invalidateDatabases();
+      await server.invalidateDatabases();
       unawaited(server.warmUpIndexes());
       await _webViewController?.reload();
     }
@@ -133,14 +133,15 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
         _serverUri = uri;
         _starting = false;
       });
-      unawaited(server.warmUpIndexes());
       unawaited(
         ref
             .read(downloadControllerProvider.notifier)
             .ensureMissingFtsIndexed()
-            .then((builtAny) {
+            .then((builtAny) async {
               if (!mounted) return;
-              ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+              final srv = ref.read(tipitakaLocalServerProvider);
+              await srv.invalidateDatabases();
+              unawaited(srv.warmUpIndexes());
               if (builtAny) {
                 _webViewController?.evaluateJavascript(
                   source:
@@ -174,7 +175,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     );
     if (!mounted) return;
     final server = ref.read(tipitakaLocalServerProvider);
-    server.api.invalidateDatabases();
+    await server.invalidateDatabases();
     unawaited(server.warmUpIndexes());
     await _webViewController?.reload();
   }
@@ -186,9 +187,10 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     bool enableOnComplete = true,
   }) async {
     if (!mounted) return false;
-    final api = ref.read(tipitakaLocalServerProvider).api;
+    final server = ref.read(tipitakaLocalServerProvider);
     if (isUpdate) {
-      api.invalidateDatabases();
+      await server.invalidateDatabases();
+      if (!mounted) return false;
     }
     final ok = await showDialog<bool>(
       context: context,
@@ -201,9 +203,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       ),
     );
     if (ok == true && mounted) {
-      final server = ref.read(tipitakaLocalServerProvider);
-      server.api.invalidateDatabases();
-      unawaited(server.warmUpIndexes());
+      final srv = ref.read(tipitakaLocalServerProvider);
+      await srv.invalidateDatabases();
+      unawaited(srv.warmUpIndexes());
       final normalized = langCode.trim().toLowerCase();
       if (!isUpdate && enableOnComplete) {
         final settingsKey = translationCodeToSettingsKey[normalized];
@@ -222,8 +224,8 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
   Future<bool> _handleLanguageDeleteRequest(String langCode) async {
     final normalized = langCode.trim().toLowerCase();
     if (normalized.isEmpty || normalized == 'pali') return false;
-    final api = ref.read(tipitakaLocalServerProvider).api;
-    api.invalidateDatabases();
+    final server = ref.read(tipitakaLocalServerProvider);
+    await server.invalidateDatabases();
     final ok = await ref
         .read(downloadControllerProvider.notifier)
         .deleteTranslationLanguage(normalized);
@@ -234,7 +236,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
             .read(webLocalStorageStoreProvider)
             .disableTranslationSetting(settingsKey);
       }
-      api.invalidateDatabases();
+      await server.invalidateDatabases();
       _notifyOfflineLangStateChanged();
     }
     return ok;
@@ -302,7 +304,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       'catalog': catalog,
       'hasPaliSentences':
           dlState.installedDbs.containsKey('pali_sentences.db') ||
-          ref.read(tipitakaLocalServerProvider).api.hasPaliSentencesSupport(),
+          ref.read(tipitakaLocalServerProvider).hasPaliSentencesSupport,
       'paliSentencesAsset': dlState.manifest?.core['pali_sentences'] != null
           ? {
               'zipSize': dlState.manifest!.core['pali_sentences']!.zipSize,
@@ -333,7 +335,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       builder: (_) => const PaliSentencesDownloadDialog(),
     );
     if (ok == true && mounted) {
-      ref.read(tipitakaLocalServerProvider).api.invalidateDatabases();
+      await ref.read(tipitakaLocalServerProvider).invalidateDatabases();
       return true;
     }
     return false;
@@ -404,7 +406,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       (prev, active) {
         if (prev == true && !active) {
           final server = ref.read(tipitakaLocalServerProvider);
-          server.api.invalidateDatabases();
+          unawaited(server.invalidateDatabases());
           unawaited(server.warmUpIndexes());
           _webViewController?.evaluateJavascript(
             source: 'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();',

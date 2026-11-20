@@ -617,38 +617,29 @@ class DownloadController extends Notifier<DownloadCenterState> {
     required DatabaseManifest bundled,
     required Map<String, InstalledDbInfo> installed,
   }) async {
-    var deletedAny = false;
-    for (final asset in bundled.compulsoryAssets) {
-      final info = installed[asset.filename];
-      if (info == null) continue;
-      final ok = _storage.hasValidSqliteSchema(
-        info.path,
-        requiredTables: asset.requiredTables,
-      );
-      if (!ok) {
-        await _storage.deleteDatabase(asset.filename);
-        deletedAny = true;
-      }
-    }
+    if (installed.isEmpty) return false;
+    final compulsoryChecks =
+        <({String filename, String path, List<String> requiredTables})>[
+          for (final asset in bundled.compulsoryAssets)
+            if (installed[asset.filename] != null)
+              (
+                filename: asset.filename,
+                path: installed[asset.filename]!.path,
+                requiredTables: asset.requiredTables,
+              ),
+        ];
+    final installedEntries = installed.entries
+        .map((e) => (filename: e.key, path: e.value.path))
+        .toList(growable: false);
 
-    final transRegex = RegExp(r'^translation_(.+)\.db$');
-    for (final entry in installed.entries) {
-      final name = entry.key;
-      if (name == 'fts_tipitaka.db' ||
-          RegExp(r'^fts_translation_.+\.db$').hasMatch(name)) {
-        if (!_storage.isPopulatedFtsDb(entry.value.path)) {
-          await _storage.deleteDatabase(name);
-          deletedAny = true;
-        }
-      } else if (transRegex.hasMatch(name)) {
-        if (!_storage.hasValidSqliteSchema(
-          entry.value.path,
-          requiredTables: const ['paragraph_translations'],
-        )) {
-          await _storage.deleteDatabase(name);
-          deletedAny = true;
-        }
-      }
+    final invalidFilenames = await _storage.findInvalidInstalledDatabases(
+      compulsoryChecks: compulsoryChecks,
+      installedEntries: installedEntries,
+    );
+    var deletedAny = false;
+    for (final name in invalidFilenames) {
+      await _storage.deleteDatabase(name);
+      deletedAny = true;
     }
     return deletedAny;
   }
@@ -1201,8 +1192,22 @@ class DownloadController extends Notifier<DownloadCenterState> {
         if (!installed.containsKey('tipitaka.db')) {
           return (builtAny: false, hadError: false);
         }
+        final transRegex = RegExp(r'^translation_(.+)\.db$');
+        final translationFiles = installed.keys
+            .map((name) => transRegex.firstMatch(name))
+            .whereType<RegExpMatch>()
+            .map((m) => m.group(1)!)
+            .toList()
+          ..sort();
+
+        final validity = await _storage.inspectFtsAndBoldValidity(
+          dbDirPath: dir.path,
+          translationLangCodes: translationFiles,
+        );
+        if (_disposed) return (builtAny: builtAny, hadError: hadError);
+
         final paliFtsPath = '${dir.path}/fts_tipitaka.db';
-        final paliFtsValid = _storage.isPopulatedFtsDb(paliFtsPath);
+        final paliFtsValid = validity.paliFtsValid;
         if (force || forceTipitaka || !paliFtsValid) {
           jobs.add((
             langCode: null,
@@ -1213,7 +1218,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
           ));
         }
 
-        final boldIndexValid = BoldDefinitionIndexService.isUpToDate(dir.path);
+        final boldIndexValid = validity.boldIndexValid;
         if (force || forceTipitaka || !boldIndexValid) {
           jobs.add((
             langCode: null,
@@ -1224,17 +1229,9 @@ class DownloadController extends Notifier<DownloadCenterState> {
           ));
         }
 
-        final transRegex = RegExp(r'^translation_(.+)\.db$');
-        final translationFiles = installed.keys
-            .map((name) => transRegex.firstMatch(name))
-            .whereType<RegExpMatch>()
-            .map((m) => m.group(1)!)
-            .toList()
-          ..sort();
-
         for (final langCode in translationFiles) {
           final ftsFilename = 'fts_translation_$langCode.db';
-          final ftsValid = _storage.isPopulatedFtsDb('${dir.path}/$ftsFilename');
+          final ftsValid = validity.validTranslationFtsLangs.contains(langCode);
           final shouldRebuildLang =
               force ||
               forceTranslationLang == langCode ||
@@ -1254,6 +1251,7 @@ class DownloadController extends Notifier<DownloadCenterState> {
           }
         }
 
+        var corePaliFtsVerified = paliFtsValid;
         final totalTasks = jobs.length;
         for (var i = 0; i < jobs.length; i++) {
           if (_disposed) return (builtAny: builtAny, hadError: hadError);
@@ -1317,7 +1315,10 @@ class DownloadController extends Notifier<DownloadCenterState> {
                 force: job.forceRebuild,
                 onProgress: emitProgress,
               );
-              if (!_storage.isPopulatedFtsDb(paliFtsPath)) {
+              corePaliFtsVerified = await _storage.isPopulatedFtsDbAsync(
+                paliFtsPath,
+              );
+              if (!corePaliFtsVerified) {
                 throw StateError(
                   'Core Pāḷi FTS index verification failed.',
                 );
@@ -1325,9 +1326,11 @@ class DownloadController extends Notifier<DownloadCenterState> {
             } else {
               // Core Pāḷi FTS must always exist and be valid before any
               // translation FTS is processed.
-              if (!_storage.isPopulatedFtsDb(paliFtsPath)) {
+              if (!corePaliFtsVerified &&
+                  !(await _storage.isPopulatedFtsDbAsync(paliFtsPath))) {
                 return (builtAny: builtAny, hadError: hadError);
               }
+              corePaliFtsVerified = true;
               await _ftsService.buildTranslationFtsIndex(
                 dbDirPath: dir.path,
                 langCode: job.langCode!,

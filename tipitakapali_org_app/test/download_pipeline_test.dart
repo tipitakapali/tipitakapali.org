@@ -540,4 +540,64 @@ void main() {
     expect(prefs.getString('installed_asset_meta_translation_vi.db'), isNull);
     expect(prefs.getString('installed_asset_meta_fts_translation_vi.db'), isNull);
   });
+
+  test(
+    'verifyAndPrepareSqliteDb and findInvalidInstalledDatabases execute in background isolate and detect corrupt or incomplete DBs',
+    () async {
+      final tmp = await Directory.systemTemp.createTemp('tp_dl_bg_verify_');
+      addTearDown(() => tmp.delete(recursive: true));
+
+      final storage = DbStorageService(overrideDirectory: tmp);
+      expect(DbStorageService.shouldUseBackgroundIsolate, isTrue);
+
+      // 1. Corrupt non-SQLite file must fail verification cleanly in background isolate.
+      final corruptFile = File(p.join(tmp.path, 'corrupt.db'));
+      await corruptFile.writeAsBytes(List<int>.filled(256, 0x42));
+      final corruptRes = await storage.verifyAndPrepareSqliteDb(
+        corruptFile.path,
+        requiredTables: const ['books'],
+      );
+      expect(corruptRes.valid, isFalse);
+
+      // 2. Valid SQLite DB missing a required table must report missingTables.
+      final partialPath = p.join(tmp.path, 'partial.db');
+      final partialDb = sqlite3.open(partialPath);
+      partialDb.execute('CREATE TABLE books (id INTEGER PRIMARY KEY);');
+      partialDb.close();
+      final partialRes = await storage.verifyAndPrepareSqliteDb(
+        partialPath,
+        requiredTables: const ['books', 'chapters'],
+      );
+      expect(partialRes.valid, isFalse);
+      expect(partialRes.missingTables, equals(['chapters']));
+
+      // 3. findInvalidInstalledDatabases flags corrupt compulsory DB and empty FTS DB.
+      final emptyFtsPath = p.join(tmp.path, 'fts_tipitaka.db');
+      final emptyFts = sqlite3.open(emptyFtsPath);
+      emptyFts.execute('CREATE TABLE paragraphs_fts (content TEXT);');
+      emptyFts.close();
+
+      final invalidList = await storage.findInvalidInstalledDatabases(
+        compulsoryChecks: [
+          (
+            filename: 'corrupt.db',
+            path: corruptFile.path,
+            requiredTables: const ['books'],
+          ),
+          (
+            filename: 'partial.db',
+            path: partialPath,
+            requiredTables: const ['books'],
+          ),
+        ],
+        installedEntries: [
+          (filename: 'corrupt.db', path: corruptFile.path),
+          (filename: 'partial.db', path: partialPath),
+          (filename: 'fts_tipitaka.db', path: emptyFtsPath),
+        ],
+      );
+      expect(invalidList, containsAll(['corrupt.db', 'fts_tipitaka.db']));
+      expect(invalidList, isNot(contains('partial.db')));
+    },
+  );
 }

@@ -1222,6 +1222,15 @@ void main() {
       expect(prev2, isNotNull);
       expect(prev2!.targetParaIndex, 21);
       expect(prev2.targetLineId, 1);
+
+      // Concurrent cross-isolate builds on the same directory must not collide on .tmp files.
+      final concurrentResults = await Future.wait([
+        boldService.ensureBuilt(dbDirPath: tmpDir.path, force: true),
+        boldService.ensureBuilt(dbDirPath: tmpDir.path, force: true),
+      ]);
+      expect(concurrentResults[0].indexedRows, greaterThan(0));
+      expect(concurrentResults[1].indexedRows, greaterThan(0));
+      expect(BoldDefinitionIndexService.isUpToDate(tmpDir.path), isTrue);
     });
   });
 }

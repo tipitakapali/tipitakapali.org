@@ -154,13 +154,13 @@ class TipitakaWebApi {
     if (newPath != dbDirectoryPath) {
       dbDirectoryPath = newPath;
     }
-    invalidateDatabases();
+    invalidateDatabases(notifyListener: false);
     onDbDirectoryChanged?.call(newPath);
   }
 
   /// Closes cached SQLite connections and drops RAM caches so newly downloaded
   /// or removed `.db` files take effect immediately.
-  void invalidateDatabases() {
+  void invalidateDatabases({bool notifyListener = true}) {
     for (final db in _dbs.values) {
       try {
         db.close();
@@ -179,7 +179,9 @@ class TipitakaWebApi {
     _linkedPreviewCache.clear();
     _boldIndexVerified = false;
     _warmUpCooldownUntil = null;
-    onInvalidate?.call();
+    if (notifyListener) {
+      onInvalidate?.call();
+    }
   }
 
   /// Ensures derived offline indexes (such as `bold_definitions.db`) are built

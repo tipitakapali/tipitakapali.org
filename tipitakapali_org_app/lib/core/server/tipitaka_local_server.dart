@@ -716,6 +716,7 @@ class _TipitakaHttpRouter {
 void _serverIsolateMain(
   ({
     SendPort readyPort,
+    SendPort statusPort,
     int preferredPort,
     String dbDirectoryPath,
     String? webRootPath,
@@ -759,9 +760,11 @@ void _serverIsolateMain(
       );
     }
 
+    final hasPaliSentences = workerApi.hasPaliSentencesSupport();
     args.readyPort.send({
       'port': httpServer.port,
       'control': controlPort.sendPort,
+      'hasPaliSentences': hasPaliSentences,
     });
   } catch (e, st) {
     controlPort.close();
@@ -776,14 +779,26 @@ void _serverIsolateMain(
     switch (cmd) {
       case 'invalidate':
         workerApi.invalidateDatabases();
-        reply?.send(true);
+        final hasPs = workerApi.hasPaliSentencesSupport();
+        try {
+          args.statusPort.send({
+            'hasPaliSentences': hasPs,
+          });
+        } catch (_) {}
+        reply?.send({'ok': true, 'hasPaliSentences': hasPs});
         break;
       case 'updateDbDir':
         final newPath = msg['path']?.toString();
         if (newPath != null) {
           workerApi.updateDbDirectory(newPath);
         }
-        reply?.send(true);
+        final hasPs = workerApi.hasPaliSentencesSupport();
+        try {
+          args.statusPort.send({
+            'hasPaliSentences': hasPs,
+          });
+        } catch (_) {}
+        reply?.send({'ok': true, 'hasPaliSentences': hasPs});
         break;
       case 'warmUpIndexes':
         unawaited(
@@ -825,6 +840,8 @@ class TipitakaLocalServer {
   Isolate? _workerIsolate;
   int? _isolatePort;
   SendPort? _isolateControlPort;
+  ReceivePort? _isolateStatusPort;
+  bool? _isolateHasPaliSentences;
 
   TipitakaLocalServer({
     required this.api,
@@ -848,6 +865,20 @@ class TipitakaLocalServer {
   int? get port => _server?.port ?? _isolatePort;
   Uri? get baseUri =>
       port != null ? Uri.parse('http://127.0.0.1:$port/') : null;
+
+  /// Returns `true` when sentence-level Pāḷi data is available, using the
+  /// background worker isolate's cached status when [useBackgroundIsolate] is
+  /// enabled so the main UI thread never opens `tipitaka.db`.
+  bool get hasPaliSentencesSupport {
+    if (useBackgroundIsolate) {
+      final cached = _isolateHasPaliSentences;
+      if (cached != null) return cached;
+      final dir = api.dbDirectoryPath;
+      if (dir.isEmpty) return false;
+      return File(p.join(dir, 'pali_sentences.db')).existsSync();
+    }
+    return api.hasPaliSentencesSupport();
+  }
 
   Future<Uri> ensureStarted() {
     final existing = baseUri;
@@ -908,11 +939,20 @@ class TipitakaLocalServer {
     } catch (_) {}
 
     final readyPort = ReceivePort();
+    final statusPort = ReceivePort();
+    _isolateStatusPort?.close();
+    _isolateStatusPort = statusPort;
+    statusPort.listen((msg) {
+      if (msg is Map && msg['hasPaliSentences'] is bool) {
+        _isolateHasPaliSentences = msg['hasPaliSentences'] as bool;
+      }
+    });
     try {
       _workerIsolate = await Isolate.spawn(
         _serverIsolateMain,
         (
           readyPort: readyPort.sendPort,
+          statusPort: statusPort.sendPort,
           preferredPort: preferredPort,
           dbDirectoryPath: api.dbDirectoryPath,
           webRootPath: _webRootDir?.path,
@@ -927,12 +967,19 @@ class TipitakaLocalServer {
       }
       _isolatePort = readyMsg['port'] as int;
       _isolateControlPort = readyMsg['control'] as SendPort;
+      if (readyMsg['hasPaliSentences'] is bool) {
+        _isolateHasPaliSentences = readyMsg['hasPaliSentences'] as bool;
+      }
       return baseUri!;
     } catch (e) {
       _workerIsolate?.kill(priority: Isolate.immediate);
       _workerIsolate = null;
       _isolatePort = null;
       _isolateControlPort = null;
+      statusPort.close();
+      if (identical(_isolateStatusPort, statusPort)) {
+        _isolateStatusPort = null;
+      }
       rethrow;
     } finally {
       readyPort.close();
@@ -956,13 +1003,16 @@ class TipitakaLocalServer {
   }
 
   Future<void> invalidateDatabases() async {
-    api.invalidateDatabases();
+    api.invalidateDatabases(notifyListener: false);
     final ctrl = _isolateControlPort;
     if (ctrl != null) {
       final replyPort = ReceivePort();
       try {
         ctrl.send({'cmd': 'invalidate', 'reply': replyPort.sendPort});
-        await replyPort.first.timeout(const Duration(seconds: 5));
+        final res = await replyPort.first.timeout(const Duration(seconds: 5));
+        if (res is Map && res['hasPaliSentences'] is bool) {
+          _isolateHasPaliSentences = res['hasPaliSentences'] as bool;
+        }
       } catch (_) {
       } finally {
         replyPort.close();
@@ -982,9 +1032,13 @@ class TipitakaLocalServer {
 
     final ctrl = _isolateControlPort;
     final isolate = _workerIsolate;
+    final statusPort = _isolateStatusPort;
     _isolateControlPort = null;
     _workerIsolate = null;
     _isolatePort = null;
+    _isolateStatusPort = null;
+    _isolateHasPaliSentences = null;
+    statusPort?.close();
 
     if (ctrl != null) {
       final ackPort = ReceivePort();

@@ -420,11 +420,8 @@ class BoldDefinitionIndexService {
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chapter_links' LIMIT 1",
       );
       if (linkTbl.isEmpty) return false;
-      final cnt =
-          (db.select('SELECT COUNT(*) AS c FROM bold_definitions').first['c']
-                  as num)
-              .toInt();
-      return cnt > 0;
+      final hasRow = db.select('SELECT 1 FROM bold_definitions LIMIT 1');
+      return hasRow.isNotEmpty;
     } catch (_) {
       return false;
     } finally {
@@ -452,10 +449,18 @@ class BoldDefinitionIndexService {
     if (!force && _isUpToDate(dbDirPath)) {
       final existing = sqlite3.open(dstPath, mode: OpenMode.readOnly);
       try {
-        final cnt = (existing
-                .select('SELECT COUNT(*) AS c FROM bold_definitions')
-                .first['c'] as num)
-            .toInt();
+        final metaCntRows = existing.select(
+          "SELECT value FROM meta WHERE key = 'total_rows' LIMIT 1",
+        );
+        final parsedMetaCnt = metaCntRows.isNotEmpty
+            ? int.tryParse((metaCntRows.first['value'] ?? '').toString())
+            : null;
+        final cnt = (parsedMetaCnt != null && parsedMetaCnt > 0)
+            ? parsedMetaCnt
+            : (existing
+                      .select('SELECT COUNT(*) AS c FROM bold_definitions')
+                      .first['c'] as num)
+                  .toInt();
         return BoldDefinitionBuildResult(
           filename: dbFilename,
           indexedRows: cnt,
@@ -467,7 +472,9 @@ class BoldDefinitionIndexService {
     }
 
     final stat = coreFile.statSync();
-    final tmpPath = '$dstPath.tmp';
+    final uniqueToken =
+        '${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(Object())}';
+    final tmpPath = '$dstPath.$uniqueToken.tmp';
     for (final suffix in ['', '-wal', '-shm']) {
       final f = File('$tmpPath$suffix');
       if (f.existsSync()) f.deleteSync();
@@ -899,19 +906,29 @@ class BoldDefinitionIndexService {
       } finally {
         metaStmt.close();
       }
+      for (final suffix in ['', '-wal', '-shm']) {
+        final f = File('$dstPath$suffix');
+        if (f.existsSync()) {
+          try {
+            f.deleteSync();
+          } catch (_) {}
+        }
+      }
+      dstDb.close();
+      File(tmpPath).renameSync(dstPath);
     } finally {
       coreDb.close();
-      dstDb.close();
-    }
-
-    for (final suffix in ['', '-wal', '-shm']) {
-      final f = File('$dstPath$suffix');
-      if (f.existsSync()) f.deleteSync();
-    }
-    File(tmpPath).renameSync(dstPath);
-    for (final suffix in ['-wal', '-shm']) {
-      final f = File('$tmpPath$suffix');
-      if (f.existsSync()) f.deleteSync();
+      try {
+        dstDb.close();
+      } catch (_) {}
+      for (final suffix in ['', '-wal', '-shm']) {
+        final f = File('$tmpPath$suffix');
+        if (f.existsSync()) {
+          try {
+            f.deleteSync();
+          } catch (_) {}
+        }
+      }
     }
 
     return BoldDefinitionBuildResult(

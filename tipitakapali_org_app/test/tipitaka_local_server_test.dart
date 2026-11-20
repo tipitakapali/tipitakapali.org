@@ -1102,13 +1102,23 @@ void main() {
         ),
       );
       try {
+        expect(bgServer.hasPaliSentencesSupport, isFalse);
         final bgUri = await bgServer.ensureStarted();
+        expect(bgServer.hasPaliSentencesSupport, isFalse);
         final warmUpFuture = bgServer.warmUpIndexes();
 
-        // Immediately send controlPort 'invalidate' and HTTP '/links' without
-        // waiting for warmUpIndexes to finish.
+        // Update site_metadata in tipitaka.db, then immediately send
+        // controlPort 'invalidate' and HTTP '/links' without waiting for
+        // warmUpIndexes to finish.
+        final core = sqlite3.open(p.join(isolatedDir.path, 'tipitaka.db'));
+        core.execute(
+          "INSERT OR REPLACE INTO site_metadata (key, value) VALUES ('has_pali_sentences', '1');",
+        );
+        core.close();
+
         final sw = Stopwatch()..start();
         await bgServer.invalidateDatabases();
+        expect(bgServer.hasPaliSentencesSupport, isTrue);
         final linksResp = await _httpGet(
           bgUri,
           '/api/book/s0101m.mul/chapter/0/links',

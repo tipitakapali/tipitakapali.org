@@ -402,21 +402,38 @@ class DownloadService {
         }
       });
 
+      Future<void> writeQueue = Future.value();
       sub = response.stream.listen(
         (chunk) {
           lastChunkAt = DateTime.now();
-          raf.writeFromSync(chunk);
-          receivedBytes += chunk.length;
-          sessionBytes += chunk.length;
+          sub.pause();
+          writeQueue = writeQueue
+              .then((_) async {
+                if (completer.isCompleted || token.isCancelled) return;
+                await raf.writeFrom(chunk);
+                lastChunkAt = DateTime.now();
+                receivedBytes += chunk.length;
+                sessionBytes += chunk.length;
 
-          final now = DateTime.now();
-          if (now.difference(lastEmitAt).inMilliseconds >= 120 ||
-              (totalBytes > 0 && receivedBytes >= totalBytes)) {
-            lastEmitAt = now;
-            final secs = stopwatch.elapsedMilliseconds / 1000.0;
-            final speed = secs > 0.1 ? sessionBytes / secs : 0.0;
-            onTransferProgress(receivedBytes, totalBytes, speed);
-          }
+                final now = DateTime.now();
+                if (now.difference(lastEmitAt).inMilliseconds >= 120 ||
+                    (totalBytes > 0 && receivedBytes >= totalBytes)) {
+                  lastEmitAt = now;
+                  final secs = stopwatch.elapsedMilliseconds / 1000.0;
+                  final speed = secs > 0.1 ? sessionBytes / secs : 0.0;
+                  onTransferProgress(receivedBytes, totalBytes, speed);
+                }
+              })
+              .catchError((Object err, StackTrace st) {
+                if (!completer.isCompleted) {
+                  completer.completeError(err, st);
+                }
+              })
+              .whenComplete(() {
+                if (!completer.isCompleted && !token.isCancelled) {
+                  sub.resume();
+                }
+              });
         },
         onError: (Object err, StackTrace st) {
           if (!completer.isCompleted) {
@@ -424,19 +441,23 @@ class DownloadService {
           }
         },
         onDone: () {
-          if (!completer.isCompleted) {
-            completer.complete();
-          }
+          writeQueue.then((_) {
+            if (!completer.isCompleted) {
+              completer.complete();
+            }
+          });
         },
         cancelOnError: true,
       );
 
       try {
         await completer.future;
+        await writeQueue;
         await raf.flush();
       } finally {
         watchdog.cancel();
         await sub.cancel();
+        await writeQueue.catchError((_) {});
         await raf.close();
       }
       return;

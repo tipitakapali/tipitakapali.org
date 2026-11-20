@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
+
+import '../services/bold_definition_index_service.dart';
 
 class InstalledDbInfo {
   final String filename;
@@ -110,8 +114,9 @@ class DbStorageService {
     }
   }
 
-  /// Removes abandoned `.staging.tmp` / FTS `.db.tmp` artifacts left by a
-  /// process kill while keeping `*.zip.part` files intact for HTTP Range resume.
+  /// Removes abandoned `.staging.tmp` / FTS `.db.tmp` / bold index `.tmp`
+  /// artifacts left by a process kill while keeping `*.zip.part` files intact
+  /// for HTTP Range resume.
   Future<void> cleanupInterruptedTempFiles() async {
     final dir = await getDatabaseDirectory();
     if (!dir.existsSync()) return;
@@ -120,16 +125,41 @@ class DbStorageService {
       final name = p.basename(entity.path);
       final isStagingTmp = name.contains('.staging.tmp');
       final isFtsTmp = name.startsWith('fts_') && name.contains('.db.tmp');
-      if (!isStagingTmp && !isFtsTmp) continue;
+      final isBoldTmp =
+          name.startsWith(BoldDefinitionIndexService.dbFilename) &&
+          name != BoldDefinitionIndexService.dbFilename &&
+          name.contains('.tmp');
+      if (!isStagingTmp && !isFtsTmp && !isBoldTmp) continue;
       try {
         entity.deleteSync();
       } catch (_) {}
     }
   }
 
-  /// Fast startup validation that [dbPath] opens as SQLite, has tables, and
+  /// Returns `true` when background worker isolates can be awaited without
+  /// deadlocking Flutter's `TestWidgetsFlutterBinding` (`FakeAsync`) pump loop.
+  /// In production and standard unit tests (`test(...)`), this is always `true`.
+  static bool get shouldUseBackgroundIsolate {
+    try {
+      final bindingType = WidgetsBinding.instance.runtimeType.toString();
+      if (bindingType.contains('TestWidgetsFlutterBinding')) {
+        return false;
+      }
+    } catch (_) {
+      // WidgetsBinding not initialized (pure Dart unit test): Isolate.run is safe.
+    }
+    return true;
+  }
+
+  /// Fast validation that [dbPath] opens as SQLite, has tables, and
   /// includes every table in [requiredTables].
   bool hasValidSqliteSchema(
+    String dbPath, {
+    List<String> requiredTables = const [],
+  }) =>
+      _hasValidSqliteSchemaSync(dbPath, requiredTables: requiredTables);
+
+  static bool _hasValidSqliteSchemaSync(
     String dbPath, {
     List<String> requiredTables = const [],
   }) {
@@ -161,7 +191,16 @@ class DbStorageService {
 
   /// Verifies that [dbPath] is a readable SQLite FTS5 DB whose
   /// `paragraphs_fts` virtual table contains at least one indexed row.
-  bool isPopulatedFtsDb(String dbPath) {
+  bool isPopulatedFtsDb(String dbPath) => _isPopulatedFtsDbSync(dbPath);
+
+  Future<bool> isPopulatedFtsDbAsync(String dbPath) {
+    if (!shouldUseBackgroundIsolate) {
+      return Future.value(_isPopulatedFtsDbSync(dbPath));
+    }
+    return Isolate.run(() => _isPopulatedFtsDbSync(dbPath));
+  }
+
+  static bool _isPopulatedFtsDbSync(String dbPath) {
     final file = File(dbPath);
     if (!file.existsSync() || file.lengthSync() <= 0) return false;
     Database? db;
@@ -178,6 +217,118 @@ class DbStorageService {
     } finally {
       db?.close();
     }
+  }
+
+  /// Validates all installed compulsory, translation, and FTS databases in a
+  /// single background isolate pass so startup never calls `libsqlite3.so`
+  /// (`unixRead`) on the Android/iOS main UI thread.
+  Future<List<String>> findInvalidInstalledDatabases({
+    required List<({String filename, String path, List<String> requiredTables})>
+        compulsoryChecks,
+    required List<({String filename, String path})> installedEntries,
+  }) {
+    if (!shouldUseBackgroundIsolate) {
+      return Future.value(
+        _findInvalidInstalledDatabasesSync(
+          compulsoryChecks: compulsoryChecks,
+          installedEntries: installedEntries,
+        ),
+      );
+    }
+    return Isolate.run(
+      () => _findInvalidInstalledDatabasesSync(
+        compulsoryChecks: compulsoryChecks,
+        installedEntries: installedEntries,
+      ),
+    );
+  }
+
+  static List<String> _findInvalidInstalledDatabasesSync({
+    required List<({String filename, String path, List<String> requiredTables})>
+        compulsoryChecks,
+    required List<({String filename, String path})> installedEntries,
+  }) {
+    final invalid = <String>{};
+    for (final check in compulsoryChecks) {
+      if (!_hasValidSqliteSchemaSync(
+        check.path,
+        requiredTables: check.requiredTables,
+      )) {
+        invalid.add(check.filename);
+      }
+    }
+
+    final transRegex = RegExp(r'^translation_(.+)\.db$');
+    final ftsTransRegex = RegExp(r'^fts_translation_.+\.db$');
+    for (final entry in installedEntries) {
+      final name = entry.filename;
+      if (invalid.contains(name)) continue;
+      if (name == 'fts_tipitaka.db' || ftsTransRegex.hasMatch(name)) {
+        if (!_isPopulatedFtsDbSync(entry.path)) {
+          invalid.add(name);
+        }
+      } else if (transRegex.hasMatch(name)) {
+        if (!_hasValidSqliteSchemaSync(
+          entry.path,
+          requiredTables: const ['paragraph_translations'],
+        )) {
+          invalid.add(name);
+        }
+      }
+    }
+    return invalid.toList(growable: false);
+  }
+
+  /// Checks whether `fts_tipitaka.db`, `bold_definitions.db`, and each
+  /// installed translation FTS index (`fts_translation_<lang>.db`) are valid
+  /// and populated inside a background isolate.
+  Future<({
+    bool paliFtsValid,
+    bool boldIndexValid,
+    Set<String> validTranslationFtsLangs,
+  })> inspectFtsAndBoldValidity({
+    required String dbDirPath,
+    required List<String> translationLangCodes,
+  }) {
+    if (!shouldUseBackgroundIsolate) {
+      return Future.value(
+        _inspectFtsAndBoldValiditySync(
+          dbDirPath: dbDirPath,
+          translationLangCodes: translationLangCodes,
+        ),
+      );
+    }
+    return Isolate.run(
+      () => _inspectFtsAndBoldValiditySync(
+        dbDirPath: dbDirPath,
+        translationLangCodes: translationLangCodes,
+      ),
+    );
+  }
+
+  static ({
+    bool paliFtsValid,
+    bool boldIndexValid,
+    Set<String> validTranslationFtsLangs,
+  }) _inspectFtsAndBoldValiditySync({
+    required String dbDirPath,
+    required List<String> translationLangCodes,
+  }) {
+    final paliFtsPath = p.join(dbDirPath, 'fts_tipitaka.db');
+    final paliFtsValid = _isPopulatedFtsDbSync(paliFtsPath);
+    final boldIndexValid = BoldDefinitionIndexService.isUpToDate(dbDirPath);
+    final validLangs = <String>{};
+    for (final langCode in translationLangCodes) {
+      final ftsPath = p.join(dbDirPath, 'fts_translation_$langCode.db');
+      if (_isPopulatedFtsDbSync(ftsPath)) {
+        validLangs.add(langCode);
+      }
+    }
+    return (
+      paliFtsValid: paliFtsValid,
+      boldIndexValid: boldIndexValid,
+      validTranslationFtsLangs: validLangs,
+    );
   }
 
   Future<void> deleteDatabase(String filename) async {
@@ -212,16 +363,60 @@ class DbStorageService {
   }
 
   static Future<String> computeFileSha256(String filePath) async {
+    if (!shouldUseBackgroundIsolate) {
+      return _computeFileSha256Sync(filePath);
+    }
+    return Isolate.run(() => _computeFileSha256InIsolate(filePath));
+  }
+
+  static String _computeFileSha256Sync(String filePath) {
+    final digest = sha256.convert(File(filePath).readAsBytesSync());
+    return digest.toString().toLowerCase();
+  }
+
+  static Future<String> _computeFileSha256InIsolate(String filePath) async {
     final digest = await sha256.bind(File(filePath).openRead()).first;
     return digest.toString().toLowerCase();
   }
 
+  /// Verifies and prepares [dbPath] inside a background isolate so
+  /// `libsqlite3.so` (`unixRead`) and SHA-256 hashing never block Flutter's
+  /// main UI thread (Android main Looper).
   Future<DbVerificationResult> verifyAndPrepareSqliteDb(
     String dbPath, {
     List<String> requiredTables = const [],
     int? expectedBytes,
     String? expectedSha256,
     bool computeHashWhenUnconstrained = false,
+  }) {
+    if (!shouldUseBackgroundIsolate) {
+      return _verifyAndPrepareSqliteDbInIsolate(
+        dbPath,
+        requiredTables: requiredTables,
+        expectedBytes: expectedBytes,
+        expectedSha256: expectedSha256,
+        computeHashWhenUnconstrained: computeHashWhenUnconstrained,
+        useSyncHashRead: true,
+      );
+    }
+    return Isolate.run(
+      () => _verifyAndPrepareSqliteDbInIsolate(
+        dbPath,
+        requiredTables: requiredTables,
+        expectedBytes: expectedBytes,
+        expectedSha256: expectedSha256,
+        computeHashWhenUnconstrained: computeHashWhenUnconstrained,
+      ),
+    );
+  }
+
+  static Future<DbVerificationResult> _verifyAndPrepareSqliteDbInIsolate(
+    String dbPath, {
+    List<String> requiredTables = const [],
+    int? expectedBytes,
+    String? expectedSha256,
+    bool computeHashWhenUnconstrained = false,
+    bool useSyncHashRead = false,
   }) async {
     final file = File(dbPath);
     if (!file.existsSync()) {
@@ -233,7 +428,7 @@ class DbStorageService {
       );
     }
 
-    final sizeBytes = await file.length();
+    final sizeBytes = file.lengthSync();
     if (sizeBytes <= 0) {
       return const DbVerificationResult(
         valid: false,
@@ -253,33 +448,47 @@ class DbStorageService {
     }
 
     var actualSha = '';
+    var verifiedByCryptographicHash = false;
     final normalizedExpected = expectedSha256?.trim().toLowerCase();
     if ((normalizedExpected != null && normalizedExpected.isNotEmpty) ||
         computeHashWhenUnconstrained) {
-      actualSha = await computeFileSha256(dbPath);
-      if (normalizedExpected != null &&
-          normalizedExpected.isNotEmpty &&
-          actualSha != normalizedExpected) {
-        return DbVerificationResult(
-          valid: false,
-          sizeBytes: sizeBytes,
-          sha256Hex: actualSha,
-          error: 'SHA-256 mismatch: expected $normalizedExpected, got $actualSha.',
-        );
+      actualSha = useSyncHashRead
+          ? _computeFileSha256Sync(dbPath)
+          : await _computeFileSha256InIsolate(dbPath);
+      if (normalizedExpected != null && normalizedExpected.isNotEmpty) {
+        if (actualSha != normalizedExpected) {
+          return DbVerificationResult(
+            valid: false,
+            sizeBytes: sizeBytes,
+            sha256Hex: actualSha,
+            error: 'SHA-256 mismatch: expected $normalizedExpected, got $actualSha.',
+          );
+        }
+        verifiedByCryptographicHash = true;
       }
     }
 
     Database? db;
     try {
       db = sqlite3.open(dbPath);
-      final quickCheck = db.select('PRAGMA quick_check(1)');
-      if (quickCheck.isEmpty || quickCheck.first.values.first?.toString() != 'ok') {
-        return DbVerificationResult(
-          valid: false,
-          sizeBytes: sizeBytes,
-          sha256Hex: actualSha,
-          error: 'SQLite integrity check failed.',
-        );
+      // Note: In SQLite, `PRAGMA quick_check(1)` scans EVERY B-tree page of the
+      // entire database file when there are 0 errors (`1` is the max errors to
+      // report, not the page count). For large databases (>= 16 MB) whose
+      // cryptographic SHA-256 has already matched the release manifest, we skip
+      // the redundant multi-hundred-MB full-file B-tree scan while still
+      // validating `sqlite_master` schema and setting `journal_mode=DELETE`.
+      const fullScanThresholdBytes = 16 * 1024 * 1024;
+      if (!verifiedByCryptographicHash || sizeBytes < fullScanThresholdBytes) {
+        final quickCheck = db.select('PRAGMA quick_check(1)');
+        if (quickCheck.isEmpty ||
+            quickCheck.first.values.first?.toString() != 'ok') {
+          return DbVerificationResult(
+            valid: false,
+            sizeBytes: sizeBytes,
+            sha256Hex: actualSha,
+            error: 'SQLite integrity check failed.',
+          );
+        }
       }
 
       // Match epitaka_app's DPD safeguard: force DELETE journal mode before swap
