@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Book, Layers, ArrowUpRight, CheckCircle2, ExternalLink, Columns } from 'lucide-react';
+import { X, Book, Layers, ArrowUpRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
@@ -524,15 +524,6 @@ export default function MatJumpModal({ isOpen, onClose }) {
                         >
                           <ExternalLink size={13} />
                         </a>
-                        <button
-                          type="button"
-                          onClick={item.jumpAlongside}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)] hover:text-white px-2 py-1 rounded-lg border border-[var(--accent)]/35 hover:border-[var(--accent)] transition cursor-pointer"
-                          title="Open alongside current text in parallel column / adjacent tab"
-                        >
-                          <Columns size={12} />
-                          <span>Alongside</span>
-                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
