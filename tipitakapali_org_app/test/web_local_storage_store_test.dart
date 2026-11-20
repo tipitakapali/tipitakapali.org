@@ -227,4 +227,45 @@ void main() {
       'vietnamese': false,
     }));
   });
+
+  test('WebLocalStorageStore skips transient tree and books caches from memory and disk', () async {
+    final store = WebLocalStorageStore(explicitDirectory: tempDir, bootToken: 'b1');
+    await store.ensureLoaded();
+
+    await store.applyOperation({
+      'op': 'set',
+      'key': 'tipitaka_tree_cache_v6',
+      'value': '{"huge":true}',
+    });
+    await store.applyOperation({
+      'op': 'set',
+      'key': 'tipitaka_books_cache_v2',
+      'value': '{"huge":true}',
+    });
+    await store.applyOperation({
+      'op': 'set',
+      'key': 'tipitaka_saved_tabs_v3',
+      'value': '[{"bookCode":"s0101m.mul"}]',
+    });
+
+    expect(store.entries.containsKey('tipitaka_tree_cache_v6'), isFalse);
+    expect(store.entries.containsKey('tipitaka_books_cache_v2'), isFalse);
+    expect(store.entries['tipitaka_saved_tabs_v3'], '[{"bookCode":"s0101m.mul"}]');
+
+    // Flush pending async persistence before inspecting disk
+    await store.applyOperation({'op': 'set', 'key': 'tipitaka_active_book_v3', 'value': 's0101m.mul'});
+    final jsonFile = File(p.join(tempDir.path, 'web_local_storage.json'));
+    // Wait briefly for serialized async write queue to settle on disk
+    for (var i = 0; i < 40 && !jsonFile.existsSync(); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    expect(jsonFile.existsSync(), isTrue);
+
+    final reopened = WebLocalStorageStore(explicitDirectory: tempDir, bootToken: 'b2');
+    await reopened.ensureLoaded();
+    expect(reopened.entries.containsKey('tipitaka_tree_cache_v6'), isFalse);
+    expect(reopened.entries.containsKey('tipitaka_books_cache_v2'), isFalse);
+    expect(reopened.entries['tipitaka_saved_tabs_v3'], '[{"bookCode":"s0101m.mul"}]');
+    expect(reopened.entries['tipitaka_active_book_v3'], 's0101m.mul');
+  });
 }

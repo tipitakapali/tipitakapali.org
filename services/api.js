@@ -8,12 +8,15 @@ const PREFER_VPS_API = process.env.NEXT_PUBLIC_PREFER_VPS_API === 'true';
 
 // Bounded LRU limits so long reading sessions / multi-tab browsing do not bloat
 // browser tab memory.
-const MAX_CACHE_ENTRIES = 60;
+const MAX_CACHE_ENTRIES = 120;
+const MAX_PREVIEW_CACHE_ENTRIES = 120;
 const MAX_STATIC_MAP_ENTRIES = 8;
 
 // Client-side Memory Cache & Request Deduplication for Ultra-Fast Navigation
 const cache = new Map();
 const pendingRequests = new Map();
+const linkedPreviewCache = new Map();
+const pendingPreviewRequests = new Map();
 
 function setBoundedCache(map, key, value, maxEntries) {
   if (map.has(key)) {
@@ -196,7 +199,7 @@ export async function fetchTree() {
       const res = await fetch('/api/tree');
       if (!res.ok) throw new Error('Failed to load navigation tree');
       const data = await res.json();
-      if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && Array.isArray(data) && data.length > 0) {
+      if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && !isLocalDynamicHost() && Array.isArray(data) && data.length > 0) {
         try {
           localStorage.setItem('tipitaka_tree_cache_v6', JSON.stringify(data));
         } catch (e) {}
@@ -231,7 +234,7 @@ export async function fetchBooks() {
     const res = await fetch('/api/books');
     if (!res.ok) throw new Error('Failed to load books list');
     const data = await res.json();
-    if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && data && Array.isArray(data.books)) {
+    if (ENABLE_CLIENT_CACHE && typeof window !== 'undefined' && !isLocalDynamicHost() && data && Array.isArray(data.books)) {
       try {
         localStorage.setItem('tipitaka_books_cache_v2', JSON.stringify(data));
       } catch (e) {}
@@ -326,7 +329,7 @@ const matStaticMapCache = new Map();
 const matStaticMapPending = new Map();
 const MAT_STATIC_MAP_TTL = 24 * 60 * 60 * 1000;
 
-function isLocalDynamicHost() {
+export function isLocalDynamicHost() {
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname;
   return h === '127.0.0.1' || h === 'localhost';
@@ -774,16 +777,42 @@ async function fetchBookTranslationStatic(cleanCode, lang) {
 }
 
 // Pāḷi sentence splits for sentence display mode (generated with the
-// epitaka splitter). Static per-book pali_sentences.json first, VPS
-// /api/book/:code/pali_sentences fallback (also covers local dev).
-// Book-level cached; only fetched on demand in sentence mode.
-export async function fetchPaliSentences(bookCode) {
+// epitaka splitter). On local dynamic hosts (offline app / local dev) with a
+// chapterIndex, fetches ONLY that single chapter to avoid full-book transfer.
+// On static hosts falls back to per-book pali_sentences.json.
+export async function fetchPaliSentences(bookCode, chapterIndex = null) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
-  const cacheKey = `pali_sent_${cleanCode}`;
 
-  return cachedFetch(cacheKey, async () => {
+  const wholeBookKey = `pali_sent_${cleanCode}`;
+  const existingWhole = cache.get(wholeBookKey);
+  if (existingWhole && existingWhole.data) {
+    touchBoundedCache(cache, wholeBookKey, existingWhole);
+    return existingWhole.data;
+  }
+
+  if (
+    chapterIndex !== null &&
+    chapterIndex !== undefined &&
+    (isLocalDynamicHost() || PREFER_VPS_API)
+  ) {
+    const chapCacheKey = `pali_sent_${cleanCode}_ch${chapterIndex}`;
+    return cachedFetch(
+      chapCacheKey,
+      async () => {
+        const base = getApiBase();
+        const res = await fetch(
+          `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/pali_sentences`
+        );
+        if (res.ok) return await res.json();
+        return null;
+      },
+      24 * 60 * 60 * 1000
+    );
+  }
+
+  return cachedFetch(wholeBookKey, async () => {
     if (!isLocalDynamicHost()) {
       try {
         const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/pali_sentences.json`);
@@ -804,12 +833,138 @@ export function getCachedPaliSentences(bookCode, chapterIndex = null) {
   let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
   const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
   if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
-  const cached = cache.get(`pali_sent_${cleanCode}`);
-  if (!cached || !cached.data) return null;
-  if (chapterIndex !== null && chapterIndex !== undefined) {
-    return cached.data?.chapters?.[String(chapterIndex)] || null;
+  const cachedWhole = cache.get(`pali_sent_${cleanCode}`);
+  if (cachedWhole && cachedWhole.data) {
+    if (chapterIndex !== null && chapterIndex !== undefined) {
+      return cachedWhole.data?.chapters?.[String(chapterIndex)] || null;
+    }
+    return cachedWhole.data;
   }
-  return cached.data;
+  if (chapterIndex !== null && chapterIndex !== undefined) {
+    const cachedChap = cache.get(`pali_sent_${cleanCode}_ch${chapterIndex}`);
+    if (cachedChap && cachedChap.data) {
+      return (
+        cachedChap.data?.chapters?.[String(chapterIndex)] ||
+        cachedChap.data?.paragraphs ||
+        null
+      );
+    }
+  }
+  return null;
+}
+
+/**
+ * Single-roundtrip chapter bundle for dynamic/offline hosts (`isLocalDynamicHost` /
+ * `PREFER_VPS_API`). Fetches translations + sentence splits + per-chapter Pāḷi
+ * sentences + linked definitions in one HTTP call and warms individual caches.
+ * Returns `null` on static hosts so callers use static files seamlessly.
+ */
+export async function fetchChapterBundle(bookCode, chapterIndex, options = {}) {
+  if (!bookCode || chapterIndex === undefined || chapterIndex === null) return null;
+  if (!isLocalDynamicHost() && !PREFER_VPS_API) return null;
+
+  let cleanCode = splitScriptCode((bookCode || '').replace('.xml', '')).bookCode;
+  const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+  if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+  const langArr = Array.isArray(options.langs)
+    ? options.langs.filter(Boolean)
+    : options.langs
+    ? String(options.langs).split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+  const withSentences = Boolean(options.sentences) && langArr.length > 0;
+  const withPaliSentences = Boolean(options.paliSentences);
+  const withLinks = Boolean(options.links);
+  const includeHtml = options.includeHtml !== false;
+
+  const inflightKey = `bundle_${cleanCode}_ch${chapterIndex}_${langArr.join(',')}_s${withSentences ? 1 : 0}_p${withPaliSentences ? 1 : 0}_l${withLinks ? 1 : 0}_h${includeHtml ? 1 : 0}`;
+  if (pendingRequests.has(inflightKey)) {
+    return raceWithSignal(pendingRequests.get(inflightKey), options.signal);
+  }
+
+  const params = new URLSearchParams();
+  if (!includeHtml) params.set('includeHtml', '0');
+  if (langArr.length > 0) params.set('lang', langArr.join(','));
+  if (withSentences) params.set('sentences', '1');
+  if (withPaliSentences) params.set('pali_sentences', '1');
+  if (withLinks) params.set('links', '1');
+
+  const base = getApiBase();
+  const url = `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/bundle?${params.toString()}`;
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(url, options.signal ? { signal: options.signal } : undefined);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || typeof data !== 'object') return null;
+      const now = Date.now();
+
+      if (ENABLE_CLIENT_CACHE) {
+        if (typeof data.html === 'string') {
+          setBoundedCache(
+            cache,
+            `chapter_${cleanCode}_${chapterIndex}`,
+            { data: { book_code: cleanCode, chapter_index: chapterIndex, html: data.html }, timestamp: now },
+            MAX_CACHE_ENTRIES
+          );
+        }
+        if (langArr.length > 0 && data.translations) {
+          const compKey = getChapterTransCompositeCacheKey(cleanCode, chapterIndex, langArr, withSentences);
+          const transPayload = {
+            book_code: cleanCode,
+            chapter_index: chapterIndex,
+            languages: data.languages || langArr,
+            translations: data.translations || {},
+          };
+          if (withSentences) {
+            transPayload.sentences = data.sentences || {};
+          }
+          setBoundedCache(cache, compKey, { data: transPayload, timestamp: now }, MAX_CACHE_ENTRIES);
+        }
+        if (withPaliSentences && data.pali_sentences) {
+          setBoundedCache(
+            cache,
+            `pali_sent_${cleanCode}_ch${chapterIndex}`,
+            {
+              data: {
+                book_code: cleanCode,
+                chapter_index: chapterIndex,
+                chapters: { [String(chapterIndex)]: data.pali_sentences },
+                paragraphs: data.pali_sentences,
+              },
+              timestamp: now,
+            },
+            MAX_CACHE_ENTRIES
+          );
+        }
+        if (withLinks && data.links) {
+          setBoundedCache(
+            cache,
+            `chapter_links_${cleanCode}_ch${chapterIndex}`,
+            {
+              data: {
+                book_code: cleanCode,
+                chapter_index: chapterIndex,
+                paragraphs: data.links,
+              },
+              timestamp: now,
+            },
+            MAX_CACHE_ENTRIES
+          );
+        }
+      }
+      return data;
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      return null;
+    } finally {
+      pendingRequests.delete(inflightKey);
+    }
+  })();
+
+  pendingRequests.set(inflightKey, promise);
+  return raceWithSignal(promise, options.signal);
 }
 
 // Sentence-split payload for sentence display mode. Static per-book file
@@ -1067,11 +1222,40 @@ function buildLinkedPreviewSpec({ book, chapter, paraIndex, paraNum, lineId, wor
   return { cleanCode, qs, cacheKey: `linked_preview_${qs}` };
 }
 
+async function cachedPreviewFetch(key, fetcher, ttlMs = 30 * 60 * 1000, signal = null) {
+  if (signal?.aborted) {
+    throw makeAbortError();
+  }
+  if (!ENABLE_CLIENT_CACHE) {
+    return raceWithSignal(fetcher(), signal);
+  }
+  const cached = linkedPreviewCache.get(key);
+  if (cached && Date.now() - cached.timestamp < ttlMs) {
+    touchBoundedCache(linkedPreviewCache, key, cached);
+    return cached.data;
+  }
+  if (pendingPreviewRequests.has(key)) {
+    return raceWithSignal(pendingPreviewRequests.get(key), signal);
+  }
+  const promise = fetcher()
+    .then((data) => {
+      setBoundedCache(linkedPreviewCache, key, { data, timestamp: Date.now() }, MAX_PREVIEW_CACHE_ENTRIES);
+      pendingPreviewRequests.delete(key);
+      return data;
+    })
+    .catch((err) => {
+      pendingPreviewRequests.delete(key);
+      throw err;
+    });
+  pendingPreviewRequests.set(key, promise);
+  return raceWithSignal(promise, signal);
+}
+
 export function getCachedLinkedPreview(args = {}) {
   if (!ENABLE_CLIENT_CACHE) return null;
   const spec = buildLinkedPreviewSpec(args);
   if (!spec) return null;
-  const cached = cache.get(spec.cacheKey);
+  const cached = linkedPreviewCache.get(spec.cacheKey);
   if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
     return cached.data;
   }
@@ -1087,7 +1271,7 @@ export async function fetchLinkedPreview(
 
   const base = getApiBase();
 
-  return cachedFetch(
+  return cachedPreviewFetch(
     spec.cacheKey,
     async () => {
       const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -1123,7 +1307,7 @@ export async function fetchLinkedPreview(
 export function prefetchLinkedPreview(args = {}) {
   const spec = buildLinkedPreviewSpec(args);
   if (!spec) return;
-  if (cache.has(spec.cacheKey) || pendingRequests.has(spec.cacheKey)) return;
+  if (linkedPreviewCache.has(spec.cacheKey) || pendingPreviewRequests.has(spec.cacheKey)) return;
   fetchLinkedPreview(args).catch(() => {});
 }
 
@@ -1131,6 +1315,9 @@ const _prefetchedPreviewBatches = new Set();
 
 export async function prefetchLinkedPreviewsBatch(paragraphsMap, langs = []) {
   if (!ENABLE_CLIENT_CACHE || !paragraphsMap || typeof paragraphsMap !== 'object') return;
+  // On local loopback SQLite (offline Flutter app / local dev), single clicks resolve
+  // in ~2-4ms directly without saturating SQLite or starving adjacent chapters.
+  if (isLocalDynamicHost()) return;
   const langList = Array.isArray(langs) ? langs.filter(Boolean) : [];
   const itemsToFetch = [];
   const seenKeys = new Set();
@@ -1148,7 +1335,7 @@ export async function prefetchLinkedPreviewsBatch(paragraphsMap, langs = []) {
         word: lnk.word,
         langs: langList,
       });
-      if (!spec || seenKeys.has(spec.cacheKey) || cache.has(spec.cacheKey) || _prefetchedPreviewBatches.has(spec.cacheKey)) {
+      if (!spec || seenKeys.has(spec.cacheKey) || linkedPreviewCache.has(spec.cacheKey) || _prefetchedPreviewBatches.has(spec.cacheKey)) {
         continue;
       }
       seenKeys.add(spec.cacheKey);
@@ -1162,33 +1349,35 @@ export async function prefetchLinkedPreviewsBatch(paragraphsMap, langs = []) {
         lineId: lnk.target_line_id ?? null,
         word: lnk.word || null,
       });
+      if (itemsToFetch.length >= 20) break;
     }
+    if (itemsToFetch.length >= 20) break;
   }
 
   if (itemsToFetch.length === 0) return;
 
-  const base = getApiBase();
-  const CHUNK_SIZE = 30;
-  // Cap pre-warm chunks per chapter so a giant commentary doesn't saturate bandwidth
-  for (let i = 0; i < Math.min(itemsToFetch.length, 60); i += CHUNK_SIZE) {
-    const chunk = itemsToFetch.slice(i, i + CHUNK_SIZE);
+  const scheduleIdle =
+    typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+      ? (fn) => new Promise((resolve) => window.requestIdleCallback(() => fn().then(resolve, resolve), { timeout: 2000 }))
+      : (fn) => new Promise((resolve) => setTimeout(() => fn().then(resolve, resolve), 800));
+
+  await scheduleIdle(async () => {
+    const base = getApiBase();
     try {
       const res = await fetch(`${base}/api/links/previews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: chunk, langs: langList }),
+        body: JSON.stringify({ items: itemsToFetch, langs: langList }),
       });
-      if (!res.ok) break;
+      if (!res.ok) return;
       const data = await res.json();
       const results = data?.results || {};
       const now = Date.now();
       for (const [k, preview] of Object.entries(results)) {
         if (preview) {
-          setBoundedCache(cache, k, { data: preview, timestamp: now }, MAX_CACHE_ENTRIES);
+          setBoundedCache(linkedPreviewCache, k, { data: preview, timestamp: now }, MAX_PREVIEW_CACHE_ENTRIES);
         }
       }
-    } catch (_) {
-      break;
-    }
-  }
+    } catch (_) {}
+  });
 }

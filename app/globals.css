@@ -3293,13 +3293,104 @@ footer.app-footer.hidden-footer,
   border-radius: 8px;
 }
 
-.search-lang-hint {
-  margin: 0;
+.search-filters-disclosure {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.search-filters-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px;
   font-size: 11.5px;
-  line-height: 1.35;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-filters-summary::-webkit-details-marker {
+  display: none;
+}
+
+.search-filters-summary::before {
+  content: "";
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat center / contain;
+  rotate: -90deg;
+}
+
+.search-filters-disclosure[open] > .search-filters-summary::before {
+  rotate: 0deg;
+}
+
+.search-filters-summary:hover {
+  color: var(--text-primary);
+}
+
+.search-filters-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.search-filters-summary-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+.search-filters-summary-meta {
+  font-size: 11px;
   color: var(--text-muted);
-  flex: 1 1 220px;
-  min-width: 0;
+}
+
+.search-filters-summary-badges {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.search-filters-active-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+
+.search-filters-disclosure::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+.search-filters-disclosure:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .search-filters-summary::before {
+    transition: rotate 0.2s ease;
+  }
+
+  .search-filters-disclosure::details-content {
+    transition: block-size, content-visibility, display;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-in-out;
+    transition-behavior: allow-discrete;
+  }
 }
 
 .search-filter-toolbar {
@@ -3309,7 +3400,7 @@ footer.app-footer.hidden-footer,
   gap: 8px 12px;
   padding: 8px 16px 10px 16px;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
   font-size: 12px;
 }
 
@@ -5492,6 +5583,27 @@ input.tpo-lang-switch[type="checkbox"]:disabled {
   cursor: not-allowed;
 }
 
+/* Longer track and expanded touch hit area for offline app language toggles */
+input.tpo-lang-switch.tpo-lang-switch-offline[type="checkbox"] {
+  width: 52px;
+  height: 28px;
+}
+
+input.tpo-lang-switch.tpo-lang-switch-offline[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
+input.tpo-lang-switch.tpo-lang-switch-offline[type="checkbox"]::after {
+  width: 22px;
+  height: 22px;
+}
+
+input.tpo-lang-switch.tpo-lang-switch-offline[type="checkbox"]:checked::after {
+  transform: translateX(24px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   input.tpo-lang-switch[type="checkbox"],
   input.tpo-lang-switch[type="checkbox"]::after,
@@ -5789,7 +5901,17 @@ body.window-scroll .app-footer.hidden-footer {
   }
 }
 
+/* Defer off-screen layout/paint for heavy chapter streams below the initial fold
+   while preserving exact intrinsic size memory during scrolling. */
+.chapter-content-block > div > .reader-para-row:nth-child(n + 15),
+.chapter-content-block > div > p[data-pindex]:nth-child(n + 15) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 7rem;
+}
 
-
-
+@supports not (content-visibility: auto) {
+  .chapter-content-block {
+    contain: layout style paint;
+  }
+}
 

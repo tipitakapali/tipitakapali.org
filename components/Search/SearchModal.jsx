@@ -749,6 +749,22 @@ export default function SearchModal() {
     selectedDbMeta?.label ||
     (isPaliDb ? 'Pāḷi CST' : (normalizeLangCode(selectedDb) || selectedDb).toUpperCase());
 
+  const activeFilterBadges = [];
+  if (matFilter !== 'all') {
+    activeFilterBadges.push(MAT_OPTIONS.find((o) => o.id === matFilter)?.label || matFilter);
+  }
+  if (pitakaFilter !== 'all') {
+    activeFilterBadges.push(
+      (PITAKA_OPTIONS.find((o) => o.id === pitakaFilter)?.label || pitakaFilter).replace(/^—\s*/, '')
+    );
+  }
+  if (distanceFilter !== 'any') {
+    activeFilterBadges.push(DISTANCE_OPTIONS.find((o) => o.id === distanceFilter)?.label || distanceFilter);
+  }
+  if (sortOption !== 'pitaka') {
+    activeFilterBadges.push(SORT_OPTIONS.find((o) => o.id === sortOption)?.label || sortOption);
+  }
+
   return (
     <div className="modal-overlay active" onClick={closeSearchModal}>
       <div className="modal-card modal-card-search" onClick={(e) => e.stopPropagation()}>
@@ -781,7 +797,6 @@ export default function SearchModal() {
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
-                aria-describedby="fts-db-help"
                 placeholder={
                   isPaliDb
                     ? 'Search Pāḷi CST (Velthuis or 17 Pāḷi scripts)…'
@@ -855,7 +870,6 @@ export default function SearchModal() {
               id="fts-db-select"
               value={selectedDb}
               onChange={handleDbChange}
-              aria-describedby="fts-db-help"
               title={isPaliDb ? 'Pāḷi CST' : `Translation FTS: ${selectedDbLabel}`}
               className={`search-select-dropdown search-lang-select font-medium transition cursor-pointer ${
                 !isPaliDb
@@ -870,15 +884,27 @@ export default function SearchModal() {
               ))}
             </select>
           </div>
-          <p id="fts-db-help" className="search-lang-hint">
-            {isPaliDb
-              ? 'Searching Tipiṭaka Pāḷi CST text. Choose a translation database to search in the target language.'
-              : `Searching ${selectedDbLabel} translation. Choose Pāḷi CST here to search Tipiṭaka Pāḷi text.`}
-          </p>
         </div>
 
-        {/* Search Filters & Controls Toolbar */}
-        <div className="search-filter-toolbar">
+        {/* Collapsible Search Filters & Sort Toolbar (collapsed by default) */}
+        <details className="search-filters-disclosure">
+          <summary className="search-filters-summary">
+            <SlidersHorizontal size={12} className="text-[var(--accent)] shrink-0" aria-hidden="true" />
+            <span className="search-filters-summary-title">Filters &amp; Sort</span>
+            {activeFilterBadges.length > 0 ? (
+              <span className="search-filters-summary-badges">
+                {activeFilterBadges.map((badge) => (
+                  <span key={badge} className="search-filters-active-badge">
+                    {badge}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="search-filters-summary-meta">Group · Piṭaka · Distance · Sort</span>
+            )}
+          </summary>
+
+          <div className="search-filter-toolbar">
           {/* MAT Filter Segmented Buttons */}
           <div className="search-filter-item">
             <span className="search-filter-label">Group:</span>
@@ -944,6 +970,7 @@ export default function SearchModal() {
             </select>
           </div>
         </div>
+        </details>
         </search>
 
         {/* Modal Body / Results */}

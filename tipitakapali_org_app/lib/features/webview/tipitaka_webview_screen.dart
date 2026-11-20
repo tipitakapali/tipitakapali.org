@@ -72,9 +72,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     _updateDialogShown = true;
     final updated = await DatabaseUpdatesDialog.show(context);
     if (updated == true && mounted) {
-      final api = ref.read(tipitakaLocalServerProvider).api;
-      api.invalidateDatabases();
-      unawaited(api.warmUpIndexes());
+      final server = ref.read(tipitakaLocalServerProvider);
+      server.api.invalidateDatabases();
+      unawaited(server.warmUpIndexes());
       await _webViewController?.reload();
     }
   }
@@ -133,7 +133,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
         _serverUri = uri;
         _starting = false;
       });
-      unawaited(server.api.warmUpIndexes());
+      unawaited(server.warmUpIndexes());
       unawaited(
         ref
             .read(downloadControllerProvider.notifier)
@@ -173,9 +173,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       MaterialPageRoute<void>(builder: (_) => const DatabaseManagerScreen()),
     );
     if (!mounted) return;
-    final api = ref.read(tipitakaLocalServerProvider).api;
-    api.invalidateDatabases();
-    unawaited(api.warmUpIndexes());
+    final server = ref.read(tipitakaLocalServerProvider);
+    server.api.invalidateDatabases();
+    unawaited(server.warmUpIndexes());
     await _webViewController?.reload();
   }
 
@@ -201,8 +201,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       ),
     );
     if (ok == true && mounted) {
-      api.invalidateDatabases();
-      unawaited(api.warmUpIndexes());
+      final server = ref.read(tipitakaLocalServerProvider);
+      server.api.invalidateDatabases();
+      unawaited(server.warmUpIndexes());
       final normalized = langCode.trim().toLowerCase();
       if (!isUpdate && enableOnComplete) {
         final settingsKey = translationCodeToSettingsKey[normalized];
@@ -402,9 +403,9 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       ),
       (prev, active) {
         if (prev == true && !active) {
-          final api = ref.read(tipitakaLocalServerProvider).api;
-          api.invalidateDatabases();
-          unawaited(api.warmUpIndexes());
+          final server = ref.read(tipitakaLocalServerProvider);
+          server.api.invalidateDatabases();
+          unawaited(server.warmUpIndexes());
           _webViewController?.evaluateJavascript(
             source: 'window.__tpoOnFtsUpdated && window.__tpoOnFtsUpdated();',
           );
@@ -520,7 +521,10 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       paliScript: downloadState.selectedPaliScript,
     );
     return InAppWebView(
-      initialUrlRequest: URLRequest(url: WebUri(serverUri.toString())),
+      initialUrlRequest: URLRequest(
+        url: WebUri(serverUri.toString()),
+        cachePolicy: URLRequestCachePolicy.RELOAD_IGNORING_LOCAL_CACHE_DATA,
+      ),
       initialUserScripts: UnmodifiableListView<UserScript>([
         UserScript(
           source: lsPersistenceScript,
@@ -1370,6 +1374,48 @@ String buildLocalStoragePersistenceScript(
         typeof window.flutter_inappwebview.callHandler === 'function');
     };
 
+    var isTransientCacheKey = function(k) {
+      return k.indexOf('tipitaka_tree_cache_') === 0 ||
+        k.indexOf('tipitaka_books_cache_') === 0;
+    };
+
+    var isDeferredScrollKey = function(k) {
+      return k === 'tipitaka_tab_scrolls_v3' ||
+        k === 'tipitaka_recent_history_v1' ||
+        k === 'tipitaka_saved_tabs_v3';
+    };
+
+    var lastSentValues = {};
+    var deferredOpsByKey = {};
+    var deferredTimer = null;
+
+    var flushDeferredOps = function() {
+      if (deferredTimer) {
+        clearTimeout(deferredTimer);
+        deferredTimer = null;
+      }
+      var keys = Object.keys(deferredOpsByKey);
+      if (keys.length === 0) return;
+      var ops = [];
+      for (var i = 0; i < keys.length; i++) {
+        ops.push(deferredOpsByKey[keys[i]]);
+      }
+      deferredOpsByKey = {};
+      if (canCallNative()) {
+        flushPending();
+        try {
+          window.flutter_inappwebview.callHandler('syncLocalStorage', {
+            op: 'batch',
+            ops: ops
+          });
+          return;
+        } catch (_) {}
+      }
+      for (var j = 0; j < ops.length; j++) {
+        window.__tpoLsPending.push(ops[j]);
+      }
+    };
+
     var flushPending = function() {
       if (!canCallNative()) return;
       if (window.__tpoLsPending && window.__tpoLsPending.length > 0) {
@@ -1395,6 +1441,12 @@ String buildLocalStoragePersistenceScript(
     };
 
     window.addEventListener('flutterInAppWebViewPlatformReady', flushPending);
+    window.addEventListener('pagehide', flushDeferredOps);
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        flushDeferredOps();
+      }
+    });
 
     var isLocalStorageInstance = function(target) {
       try {
@@ -1407,32 +1459,61 @@ String buildLocalStoragePersistenceScript(
     proto.setItem = function(key, value) {
       origSetItem.call(this, key, value);
       if (isLocalStorageInstance(this)) {
-        sendOp({ op: 'set', key: String(key), value: String(value) });
+        var k = String(key);
+        if (isTransientCacheKey(k)) return;
+        var v = String(value);
+        if (lastSentValues[k] === v) return;
+        lastSentValues[k] = v;
+        if (isDeferredScrollKey(k)) {
+          deferredOpsByKey[k] = { op: 'set', key: k, value: v };
+          if (!deferredTimer) {
+            deferredTimer = setTimeout(flushDeferredOps, 400);
+          }
+          return;
+        }
+        sendOp({ op: 'set', key: k, value: v });
       }
     };
 
     proto.removeItem = function(key) {
       origRemoveItem.call(this, key);
       if (isLocalStorageInstance(this)) {
-        sendOp({ op: 'remove', key: String(key) });
+        var k = String(key);
+        delete lastSentValues[k];
+        if (isTransientCacheKey(k)) return;
+        if (isDeferredScrollKey(k)) {
+          deferredOpsByKey[k] = { op: 'remove', key: k };
+          if (!deferredTimer) {
+            deferredTimer = setTimeout(flushDeferredOps, 400);
+          }
+          return;
+        }
+        sendOp({ op: 'remove', key: k });
       }
     };
 
     proto.clear = function() {
       origClear.call(this);
       if (isLocalStorageInstance(this)) {
+        lastSentValues = {};
+        deferredOpsByKey = {};
+        if (deferredTimer) {
+          clearTimeout(deferredTimer);
+          deferredTimer = null;
+        }
         sendOp({ op: 'clear' });
       }
     };
 
     window.__tpoSyncLocalStorageBridge = function() {
       if (!canCallNative()) return;
+      flushDeferredOps();
       flushPending();
       try {
         var all = {};
         for (var i = 0; i < window.localStorage.length; i++) {
           var k = window.localStorage.key(i);
-          if (k !== null) {
+          if (k !== null && !isTransientCacheKey(k)) {
             all[k] = window.localStorage.getItem(k);
           }
         }
@@ -1538,8 +1619,10 @@ const String _languageMenuBridgeScript = r'''
         document.body.classList.contains('tpo-bars-hidden') ||
         document.body.classList.contains('zen-mode') ||
         !header ||
-        header.classList.contains('hidden-header') ||
-        header.offsetHeight <= 0;
+        header.classList.contains('hidden-header');
+    if (!headerHidden) {
+      headerHidden = header.offsetHeight <= 0;
+    }
     var topRgb = !headerHidden
         ? (parseCssColor(getComputedStyle(header).backgroundColor) || secondaryBg)
         : primaryBg;
@@ -1657,14 +1740,18 @@ const String _languageMenuBridgeScript = r'''
   }
 
   function findLanguageModal() {
-    var candidates = document.querySelectorAll('span, h2, h3, h4');
-    for (var i = 0; i < candidates.length; i++) {
-      var text = (candidates[i].textContent || '').trim().toUpperCase();
-      if (text.indexOf('TRANSLATION DISPLAY SETTINGS') !== -1) {
-        var parent = candidates[i].closest('[role="dialog"]') ||
-            candidates[i].closest('.fixed') ||
-            candidates[i].parentElement;
-        if (parent) return parent;
+    var tagged = document.querySelector('[data-tpo-lang-modal="1"]');
+    if (tagged) return tagged;
+    var overlays = document.querySelectorAll('[role="dialog"], .modal-overlay, .fixed');
+    for (var k = 0; k < overlays.length; k++) {
+      var overlay = overlays[k];
+      if (overlay.closest && overlay.closest('.reader-container')) continue;
+      var candidates = overlay.querySelectorAll('span, h2, h3, h4');
+      for (var i = 0; i < candidates.length; i++) {
+        var text = (candidates[i].textContent || '').trim().toUpperCase();
+        if (text.indexOf('TRANSLATION DISPLAY SETTINGS') !== -1) {
+          return overlay;
+        }
       }
     }
     return null;
@@ -2256,12 +2343,16 @@ const String _languageMenuBridgeScript = r'''
   }
 
   var syncScheduled = false;
+  var badgeStrippedOnce = false;
   function scheduleSync() {
     if (syncScheduled) return;
     syncScheduled = true;
     var run = function() {
       syncScheduled = false;
-      try { stripAndroidStoreBadges(); } catch (_) {}
+      if (!badgeStrippedOnce) {
+        badgeStrippedOnce = true;
+        try { stripAndroidStoreBadges(); } catch (_) {}
+      }
       try { syncAutoHideState(); } catch (_) {}
       try { syncOpenModal(); } catch (_) {}
       try { syncSearchModal(); } catch (_) {}
@@ -2274,7 +2365,25 @@ const String _languageMenuBridgeScript = r'''
     }
   }
 
-  var observer = new MutationObserver(scheduleSync);
+  var observer = new MutationObserver(function(mutations) {
+    if (mutations && mutations.length > 0) {
+      var relevant = false;
+      for (var i = 0; i < mutations.length; i++) {
+        var t = mutations[i].target;
+        if (!t || !t.closest) {
+          relevant = true;
+          break;
+        }
+        var insideReader = t.closest('.reader-container, .chapter-content-block');
+        if (!insideReader) {
+          relevant = true;
+          break;
+        }
+      }
+      if (!relevant) return;
+    }
+    scheduleSync();
+  });
   var rootNode = document.body || document.documentElement;
   if (rootNode) {
     observer.observe(rootNode, { childList: true, subtree: true });

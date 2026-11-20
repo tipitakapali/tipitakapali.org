@@ -829,4 +829,94 @@ void main() {
     expect(p1['book_code'], 's0101m.mul');
     expect((p1['lines'] as List).any((l) => l['is_target'] == true), isTrue);
   });
+
+  test('serves per-chapter pali_sentences route and ?chapter= query filter', () async {
+    final chapRes = await _httpGet(
+      baseUri,
+      '/api/book/s0101m.mul/chapter/0/pali_sentences',
+    );
+    expect(chapRes.statusCode, 200);
+    final chapJson = jsonDecode(chapRes.body) as Map<String, dynamic>;
+    expect(chapJson['book_code'], 's0101m.mul');
+    expect(chapJson['chapter_index'], 0);
+    expect((chapJson['chapters']['0']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+    expect((chapJson['paragraphs']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+
+    final filteredRes = await _httpGet(
+      baseUri,
+      '/api/book/s0101m.mul/pali_sentences?chapter=0',
+    );
+    expect(filteredRes.statusCode, 200);
+    final filteredJson = jsonDecode(filteredRes.body) as Map<String, dynamic>;
+    expect(filteredJson['chapter_index'], 0);
+    expect((filteredJson['chapters']['0']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+  });
+
+  test('serves single-roundtrip /api/book/:code/chapter/:idx/bundle with and without html', () async {
+    final withHtml = await _httpGet(
+      baseUri,
+      '/api/book/s0101m.mul/chapter/0/bundle?lang=en&sentences=1&pali_sentences=1&links=1&includeHtml=1',
+    );
+    expect(withHtml.statusCode, 200);
+    final fullJson = jsonDecode(withHtml.body) as Map<String, dynamic>;
+    expect(fullJson['book_code'], 's0101m.mul');
+    expect(fullJson['chapter_index'], 0);
+    expect(fullJson['html'], contains('Evaṃ me sutaṃ.'));
+    expect(fullJson['translations']['en']['0'], 'Thus have I heard.');
+    expect((fullJson['sentences']['en']['0'] as List).first, 'Thus have I heard.');
+    expect((fullJson['pali_sentences']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+    expect(fullJson['links'], isA<Map<String, dynamic>>());
+
+    final withoutHtml = await _httpGet(
+      baseUri,
+      '/api/book/s0101m.mul/chapter/0/bundle?lang=en&sentences=1&pali_sentences=1&links=1&includeHtml=0',
+    );
+    expect(withoutHtml.statusCode, 200);
+    final liteJson = jsonDecode(withoutHtml.body) as Map<String, dynamic>;
+    expect(liteJson.containsKey('html'), isFalse);
+    expect(liteJson['translations']['en']['0'], 'Thus have I heard.');
+    expect((liteJson['pali_sentences']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+    expect(liteJson['links'], isA<Map<String, dynamic>>());
+  });
+
+  test('runs HTTP router in background Isolate when useBackgroundIsolate is true', () async {
+    final bgServer = TipitakaLocalServer(
+      preferredPort: 0,
+      explicitWebRootDir: webRoot,
+      useBackgroundIsolate: true,
+      aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+      api: TipitakaWebApi(
+        dbDirectoryPath: tmpDir.path,
+        dpdFamilyTemplates: DpdFamilyTemplates(),
+      ),
+    );
+    try {
+      final bgUri = await bgServer.ensureStarted();
+      final health = await _httpGet(bgUri, '/api/health');
+      expect(health.statusCode, 200);
+      expect(jsonDecode(health.body)['status'], 'healthy');
+
+      final bundle = await _httpGet(
+        bgUri,
+        '/api/book/s0101m.mul/chapter/0/bundle?includeHtml=0&lang=en&pali_sentences=1&links=1',
+      );
+      expect(bundle.statusCode, 200);
+      final bundleJson = jsonDecode(bundle.body) as Map<String, dynamic>;
+      expect(bundleJson['translations']['en']['0'], 'Thus have I heard.');
+      expect((bundleJson['pali_sentences']['0'] as List).first['text'], 'Evaṃ me sutaṃ.');
+
+      await bgServer.invalidateDatabases();
+      final afterInvalidate = await _httpGet(
+        bgUri,
+        '/api/book/s0101m.mul/chapter/0/pali_sentences',
+      );
+      expect(afterInvalidate.statusCode, 200);
+      expect(
+        (jsonDecode(afterInvalidate.body)['chapters']['0']['0'] as List).first['text'],
+        'Evaṃ me sutaṃ.',
+      );
+    } finally {
+      await bgServer.dispose();
+    }
+  });
 }

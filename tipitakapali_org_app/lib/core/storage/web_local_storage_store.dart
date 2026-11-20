@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +16,13 @@ import 'package:path_provider/path_provider.dart';
 class WebLocalStorageStore {
   static const String storageFileName = 'web_local_storage.json';
 
+  /// Huge regenerable corpus caches already served in <1ms by local SQLite;
+  /// keeping them out of `web_local_storage.json` shrinks snapshots from
+  /// ~500 KB to a few KB and eliminates WebView boot/scroll serialization lag.
+  static bool isTransientCacheKey(String key) =>
+      key.startsWith('tipitaka_tree_cache_') ||
+      key.startsWith('tipitaka_books_cache_');
+
   final Directory? explicitDirectory;
   final Future<Directory> Function()? resolveDirectory;
 
@@ -27,6 +35,7 @@ class WebLocalStorageStore {
   String? _filePath;
   bool _loaded = false;
   Future<void>? _loadFuture;
+  Future<void> _writeChain = Future<void>.value();
 
   WebLocalStorageStore({
     this.explicitDirectory,
@@ -56,9 +65,10 @@ class WebLocalStorageStore {
             if (decoded is Map) {
               _entries.clear();
               decoded.forEach((key, value) {
-                if (value != null) {
-                  _entries[key.toString()] = value.toString();
-                }
+                if (key == null || value == null) return;
+                final k = key.toString();
+                if (isTransientCacheKey(k)) return;
+                _entries[k] = value.toString();
               });
             }
           }
@@ -137,6 +147,7 @@ class WebLocalStorageStore {
           rawEntries.forEach((k, v) {
             if (k == null || v == null) return;
             final key = k.toString();
+            if (isTransientCacheKey(key)) return;
             if (!_entries.containsKey(key)) {
               _entries[key] = v.toString();
               changed = true;
@@ -149,9 +160,10 @@ class WebLocalStorageStore {
         if (rawEntries is Map) {
           final next = <String, String>{};
           rawEntries.forEach((k, v) {
-            if (k != null && v != null) {
-              next[k.toString()] = v.toString();
-            }
+            if (k == null || v == null) return;
+            final key = k.toString();
+            if (isTransientCacheKey(key)) return;
+            next[key] = v.toString();
           });
           if (!mapEquals(_entries, next)) {
             _entries
@@ -164,7 +176,7 @@ class WebLocalStorageStore {
     }
 
     if (changed) {
-      persistSync();
+      await _persistAsync();
     }
     return changed;
   }
@@ -201,7 +213,7 @@ class WebLocalStorageStore {
     parsed['translations'] = translations;
 
     if (_applySet(advancedSettingsKey, jsonEncode(parsed))) {
-      persistSync();
+      await _persistAsync();
     }
   }
 
@@ -237,13 +249,14 @@ class WebLocalStorageStore {
     parsed['translations'] = translations;
 
     if (_applySet(advancedSettingsKey, jsonEncode(parsed))) {
-      persistSync();
+      await _persistAsync();
     }
   }
 
   bool _applySet(dynamic rawKey, dynamic rawValue) {
     if (rawKey == null || rawValue == null) return false;
     final key = rawKey.toString();
+    if (isTransientCacheKey(key)) return false;
     final value = rawValue.toString();
     if (_entries[key] == value) return false;
     _entries[key] = value;
@@ -259,6 +272,28 @@ class WebLocalStorageStore {
     if (_entries.isEmpty) return false;
     _entries.clear();
     return true;
+  }
+
+  /// Serialized non-blocking atomic disk write so scroll-settled `localStorage`
+  /// updates never stall the Flutter UI thread on synchronous `fsync`.
+  Future<void> _persistAsync() {
+    final path = _filePath;
+    if (path == null) return Future<void>.value();
+    final encodedSnapshot = jsonEncode(_entries);
+    _writeChain = _writeChain.catchError((_) {}).then((_) async {
+      try {
+        final file = File(path);
+        if (!file.parent.existsSync()) {
+          await file.parent.create(recursive: true);
+        }
+        final tmp = File('$path.tmp');
+        await tmp.writeAsString(encodedSnapshot, flush: false);
+        await tmp.rename(path);
+      } catch (e, st) {
+        debugPrint('WebLocalStorageStore persist failed: $e\n$st');
+      }
+    });
+    return _writeChain;
   }
 
   /// Atomically writes the current entries map to disk with `flush: true`.

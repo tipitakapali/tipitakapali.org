@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
@@ -17,147 +18,28 @@ import 'dpd_family_templates.dart';
 import 'tipitaka_web_api.dart';
 import '../storage/web_local_storage_store.dart';
 
-/// Local loopback HTTP server (`shelf`) serving the static `tipitakapali.org`
-/// web bundle alongside `/api/...` routes backed by downloaded SQLite DBs.
-class TipitakaLocalServer {
-  static final Uri defaultAiUpstreamBaseUri = Uri.parse(
-    'https://api.tipitakapali.org',
-  );
-
+/// Shared request router used by both in-process [TipitakaLocalServer] instances
+/// (unit tests) and the dedicated background worker [Isolate] (runtime app)
+/// so SQLite queries never block Flutter's main UI thread.
+class _TipitakaHttpRouter {
   final TipitakaWebApi api;
-  final int preferredPort;
-  final Directory? explicitWebRootDir;
-  final Future<String> Function()? resolveDbDirectoryPath;
+  final Directory? webRootDir;
   final Uri aiUpstreamBaseUri;
+  final Map<String, ({Uint8List bytes, String mime, bool isImmutable})>
+      _staticCache = {};
+  int _staticCacheBytes = 0;
+  static const int _maxStaticCacheTotalBytes = 16 * 1024 * 1024;
+  static const int _maxSingleCachedFileBytes = 512 * 1024;
 
-  HttpServer? _server;
-  Directory? _webRootDir;
-  bool _starting = false;
-  Future<Uri>? _startFuture;
-
-  TipitakaLocalServer({
+  _TipitakaHttpRouter({
     required this.api,
-    this.preferredPort = 8899,
-    this.explicitWebRootDir,
-    this.resolveDbDirectoryPath,
-    Uri? aiUpstreamBaseUri,
-  }) : aiUpstreamBaseUri = aiUpstreamBaseUri ?? defaultAiUpstreamBaseUri;
+    required this.webRootDir,
+    required this.aiUpstreamBaseUri,
+  });
 
-  bool get isRunning => _server != null;
-  int? get port => _server?.port;
-  Uri? get baseUri =>
-      _server != null ? Uri.parse('http://127.0.0.1:${_server!.port}/') : null;
-
-  Future<Uri> ensureStarted() {
-    if (_server != null) return Future.value(baseUri!);
-    if (_starting && _startFuture != null) return _startFuture!;
-    _starting = true;
-    _startFuture = _startInternal().whenComplete(() {
-      _starting = false;
-    });
-    return _startFuture!;
-  }
-
-  Future<Uri> _startInternal() async {
-    if (api.dbDirectoryPath.isEmpty && resolveDbDirectoryPath != null) {
-      final resolved = await resolveDbDirectoryPath!();
-      if (resolved.isNotEmpty) {
-        api.updateDbDirectory(resolved);
-      }
-    }
-    _webRootDir ??= await _prepareWebRoot();
-    final handler = const Pipeline()
-        .addMiddleware(_corsMiddleware)
-        .addHandler(_handleRequest);
-
-    try {
-      _server = await shelf_io.serve(
-        handler,
-        InternetAddress.loopbackIPv4,
-        preferredPort,
-      );
-    } on SocketException {
-      // Fallback to an ephemeral port if preferredPort is occupied.
-      _server = await shelf_io.serve(
-        handler,
-        InternetAddress.loopbackIPv4,
-        0,
-      );
-    }
-    return baseUri!;
-  }
-
-  Future<void> restart() async {
-    await stop();
-    await ensureStarted();
-  }
-
-  Future<void> stop() async {
-    final s = _server;
-    _server = null;
-    _startFuture = null;
-    if (s != null) {
-      await s.close(force: true);
-    }
-  }
-
-  Future<void> dispose() async {
-    await stop();
-    api.close();
-  }
-
-  Future<Directory> _prepareWebRoot() async {
-    if (explicitWebRootDir != null) {
-      return explicitWebRootDir!;
-    }
-    final supportDir = await getApplicationSupportDirectory();
-    final targetDir = Directory(p.join(supportDir.path, 'web_root'));
-    final stampFile = File(p.join(targetDir.path, '.web_bundle_stamp'));
-
-    final zipByteData = await rootBundle.load('assets/web.zip');
-    final zipBytes = zipByteData.buffer.asUint8List(
-      zipByteData.offsetInBytes,
-      zipByteData.lengthInBytes,
-    );
-    final stamp = sha256.convert(zipBytes).toString();
-
-    if (targetDir.existsSync() &&
-        stampFile.existsSync() &&
-        stampFile.readAsStringSync().trim() == stamp &&
-        File(p.join(targetDir.path, 'index.html')).existsSync()) {
-      return targetDir;
-    }
-
-    if (targetDir.existsSync()) {
-      await targetDir.delete(recursive: true);
-    }
-    await targetDir.create(recursive: true);
-
-    await compute(_extractWebZipInIsolate, (
-      bytes: zipBytes,
-      targetPath: targetDir.path,
-    ));
-    await stampFile.writeAsString(stamp);
-    return targetDir;
-  }
-
-  static void _extractWebZipInIsolate(
-    ({List<int> bytes, String targetPath}) args,
-  ) {
-    final archive = ZipDecoder().decodeBytes(args.bytes);
-    final rootCanonical = p.normalize(args.targetPath);
-    for (final entry in archive) {
-      if (!entry.isFile) continue;
-      final normalized = p.normalize(p.join(rootCanonical, entry.name));
-      if (normalized != rootCanonical &&
-          !p.isWithin(rootCanonical, normalized)) {
-        continue;
-      }
-      final outFile = File(normalized);
-      outFile.parent.createSync(recursive: true);
-      outFile.writeAsBytesSync(entry.content as List<int>);
-    }
-  }
+  Handler get handler => const Pipeline()
+      .addMiddleware(_corsMiddleware)
+      .addHandler(_handleRequest);
 
   static Middleware get _corsMiddleware {
     const headers = {
@@ -183,7 +65,7 @@ class TipitakaLocalServer {
     }
     final accept = request.headers['accept'] ?? '';
     if (_prefersMarkdownAccept(accept)) {
-      final mdResp = await _serveMarkdownForAgents(request, segments);
+      final mdResp = await _serveMarkdownForAgents(segments);
       if (mdResp != null) return mdResp;
     }
     return _serveStaticFile(segments);
@@ -222,11 +104,8 @@ class TipitakaLocalServer {
     return mdQ >= htmlQ;
   }
 
-  Future<Response?> _serveMarkdownForAgents(
-    Request request,
-    List<String> rawSegments,
-  ) async {
-    final rootDir = _webRootDir;
+  Future<Response?> _serveMarkdownForAgents(List<String> rawSegments) async {
+    final rootDir = webRootDir;
     if (rootDir == null || !rootDir.existsSync()) return null;
     final rootCanonical = p.normalize(rootDir.path);
     final relSegments = rawSegments.where((s) => s.isNotEmpty).toList();
@@ -246,7 +125,7 @@ class TipitakaLocalServer {
       }
     }
 
-    String? mdFileRel;
+    String mdFileRel;
     if (relSegments.isEmpty ||
         (relSegments.length == 1 &&
             (relSegments.first == 'index' ||
@@ -450,7 +329,13 @@ class TipitakaLocalServer {
             );
           case 'pali_sentences':
           case 'pali_sentences.json':
-            return _toShelfResponse(api.getPaliSentences(code), noCache: true);
+            final chapFilter = query['chapter'] != null
+                ? int.tryParse(query['chapter']!)
+                : null;
+            return _toShelfResponse(
+              api.getPaliSentences(code, chapterIndex: chapFilter),
+              noCache: true,
+            );
           case 'translation':
             final chap =
                 int.tryParse(query['chapter'] ?? query['chapterIndex'] ?? '0') ??
@@ -467,25 +352,31 @@ class TipitakaLocalServer {
           return _toShelfResponse(api.getChapter(code, chapIdx));
         }
       }
-      if (segments.length == 6 &&
-          segments[3] == 'chapter' &&
-          segments[5] == 'translation') {
+      if (segments.length == 6 && segments[3] == 'chapter') {
         final chapIdx = int.tryParse(segments[4]);
         if (chapIdx != null) {
-          return _toShelfResponse(
-            api.getBookTranslation(code, chapIdx, query),
-            noCache: true,
-          );
-        }
-      }
-      if (segments.length == 6 &&
-          segments[3] == 'chapter' &&
-          segments[5] == 'links') {
-        final chapIdx = int.tryParse(segments[4]);
-        if (chapIdx != null) {
-          return _toShelfResponse(
-            await api.getChapterLinks(code, chapIdx),
-          );
+          switch (segments[5]) {
+            case 'translation':
+              return _toShelfResponse(
+                api.getBookTranslation(code, chapIdx, query),
+                noCache: true,
+              );
+            case 'pali_sentences':
+              return _toShelfResponse(
+                api.getChapterPaliSentences(code, chapIdx),
+                noCache: true,
+              );
+            case 'links':
+              return _toShelfResponse(
+                await api.getChapterLinks(code, chapIdx),
+                noCache: true,
+              );
+            case 'bundle':
+              return _toShelfResponse(
+                await api.getChapterBundle(code, chapIdx, query),
+                noCache: true,
+              );
+          }
         }
       }
     }
@@ -682,17 +573,36 @@ class TipitakaLocalServer {
       'Cache-Control':
           noCache ? 'no-store, max-age=0' : 'public, max-age=3600',
     };
+    if (resp.rawBytes != null) {
+      return Response(resp.statusCode, body: resp.rawBytes, headers: headers);
+    }
+    if (resp.rawJson != null) {
+      return Response(resp.statusCode, body: resp.rawJson, headers: headers);
+    }
     final encoded = jsonEncode(resp.body);
     return Response(resp.statusCode, body: encoded, headers: headers);
   }
 
   Future<Response> _serveStaticFile(List<String> rawSegments) async {
-    final rootDir = _webRootDir;
+    final rootDir = webRootDir;
     if (rootDir == null || !rootDir.existsSync()) {
       return Response.internalServerError(body: 'Web bundle not prepared');
     }
     final rootCanonical = p.normalize(rootDir.path);
     final relSegments = rawSegments.where((s) => s.isNotEmpty).toList();
+    final cacheKey = relSegments.join('/');
+    final memCached = _staticCache[cacheKey];
+    if (memCached != null) {
+      return Response.ok(
+        memCached.bytes,
+        headers: {
+          'Content-Type': memCached.mime,
+          'Cache-Control': memCached.isImmutable
+              ? 'public, max-age=31536000, immutable'
+              : 'no-store, no-cache, must-revalidate',
+        },
+      );
+    }
 
     File? resolveCandidate(String relPath) {
       final full = p.normalize(p.join(rootCanonical, relPath));
@@ -735,14 +645,25 @@ class TipitakaLocalServer {
 
     final bytes = await target.readAsBytes();
     final mime = _mimeTypeForPath(target.path);
-    final isImmutable = target.path.contains('${p.separator}_next${p.separator}static${p.separator}');
+    final isImmutable = target.path.contains(
+      '${p.separator}_next${p.separator}static${p.separator}',
+    );
+    if (bytes.length <= _maxSingleCachedFileBytes &&
+        _staticCacheBytes + bytes.length <= _maxStaticCacheTotalBytes) {
+      _staticCache[cacheKey] = (
+        bytes: bytes,
+        mime: mime,
+        isImmutable: isImmutable,
+      );
+      _staticCacheBytes += bytes.length;
+    }
     return Response.ok(
       bytes,
       headers: {
         'Content-Type': mime,
         'Cache-Control': isImmutable
             ? 'public, max-age=31536000, immutable'
-            : 'public, max-age=3600',
+            : 'no-store, no-cache, must-revalidate',
       },
     );
   }
@@ -791,6 +712,371 @@ class TipitakaLocalServer {
   }
 }
 
+void _serverIsolateMain(
+  ({
+    SendPort readyPort,
+    int preferredPort,
+    String dbDirectoryPath,
+    String? webRootPath,
+    String aiUpstreamBaseUri,
+    TransferableTypedData? dpdCompressedBytes,
+  })
+  args,
+) async {
+  late final TipitakaWebApi workerApi;
+  late final HttpServer httpServer;
+  final controlPort = ReceivePort();
+
+  try {
+    Uint8List? compressedBytes;
+    if (args.dpdCompressedBytes != null) {
+      compressedBytes = args.dpdCompressedBytes!.materialize().asUint8List();
+    }
+    final templates = DpdFamilyTemplates(compressedAssetBytes: compressedBytes);
+    workerApi = TipitakaWebApi(
+      dbDirectoryPath: args.dbDirectoryPath,
+      dpdFamilyTemplates: templates,
+    );
+    final router = _TipitakaHttpRouter(
+      api: workerApi,
+      webRootDir:
+          args.webRootPath != null ? Directory(args.webRootPath!) : null,
+      aiUpstreamBaseUri: Uri.parse(args.aiUpstreamBaseUri),
+    );
+
+    try {
+      httpServer = await shelf_io.serve(
+        router.handler,
+        InternetAddress.loopbackIPv4,
+        args.preferredPort,
+      );
+    } on SocketException {
+      httpServer = await shelf_io.serve(
+        router.handler,
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+    }
+
+    args.readyPort.send({
+      'port': httpServer.port,
+      'control': controlPort.sendPort,
+    });
+  } catch (e, st) {
+    controlPort.close();
+    args.readyPort.send({'error': '$e\n$st'});
+    return;
+  }
+
+  await for (final msg in controlPort) {
+    if (msg is! Map) continue;
+    final cmd = msg['cmd']?.toString();
+    final reply = msg['reply'] is SendPort ? msg['reply'] as SendPort : null;
+    switch (cmd) {
+      case 'invalidate':
+        workerApi.invalidateDatabases();
+        reply?.send(true);
+        break;
+      case 'updateDbDir':
+        final newPath = msg['path']?.toString();
+        if (newPath != null) {
+          workerApi.updateDbDirectory(newPath);
+        }
+        reply?.send(true);
+        break;
+      case 'warmUpIndexes':
+        await workerApi.warmUpIndexes();
+        reply?.send(true);
+        break;
+      case 'stop':
+        await httpServer.close(force: true);
+        workerApi.close();
+        controlPort.close();
+        reply?.send(true);
+        return;
+    }
+  }
+}
+
+/// Local loopback HTTP server (`shelf`) serving the static `tipitakapali.org`
+/// web bundle alongside `/api/...` routes backed by downloaded SQLite DBs.
+class TipitakaLocalServer {
+  static final Uri defaultAiUpstreamBaseUri = Uri.parse(
+    'https://api.tipitakapali.org',
+  );
+
+  final TipitakaWebApi api;
+  final int preferredPort;
+  final Directory? explicitWebRootDir;
+  final Future<String> Function()? resolveDbDirectoryPath;
+  final Uri aiUpstreamBaseUri;
+  final bool useBackgroundIsolate;
+
+  HttpServer? _server;
+  Directory? _webRootDir;
+  bool _starting = false;
+  Future<Uri>? _startFuture;
+  Isolate? _workerIsolate;
+  int? _isolatePort;
+  SendPort? _isolateControlPort;
+
+  TipitakaLocalServer({
+    required this.api,
+    this.preferredPort = 8899,
+    this.explicitWebRootDir,
+    this.resolveDbDirectoryPath,
+    Uri? aiUpstreamBaseUri,
+    this.useBackgroundIsolate = false,
+  }) : aiUpstreamBaseUri = aiUpstreamBaseUri ?? defaultAiUpstreamBaseUri {
+    if (useBackgroundIsolate) {
+      api.onInvalidate = () {
+        _isolateControlPort?.send({'cmd': 'invalidate'});
+      };
+      api.onDbDirectoryChanged = (newPath) {
+        _isolateControlPort?.send({'cmd': 'updateDbDir', 'path': newPath});
+      };
+    }
+  }
+
+  bool get isRunning => _server != null || _isolatePort != null;
+  int? get port => _server?.port ?? _isolatePort;
+  Uri? get baseUri =>
+      port != null ? Uri.parse('http://127.0.0.1:$port/') : null;
+
+  Future<Uri> ensureStarted() {
+    final existing = baseUri;
+    if (existing != null) return Future.value(existing);
+    if (_starting && _startFuture != null) return _startFuture!;
+    _starting = true;
+    _startFuture = _startInternal().whenComplete(() {
+      _starting = false;
+    });
+    return _startFuture!;
+  }
+
+  Future<Uri> _startInternal() async {
+    if (api.dbDirectoryPath.isEmpty && resolveDbDirectoryPath != null) {
+      final resolved = await resolveDbDirectoryPath!();
+      if (resolved.isNotEmpty) {
+        api.updateDbDirectory(resolved);
+      }
+    }
+    _webRootDir ??= await _prepareWebRoot();
+
+    if (useBackgroundIsolate) {
+      return _startWorkerIsolate();
+    }
+
+    final router = _TipitakaHttpRouter(
+      api: api,
+      webRootDir: _webRootDir,
+      aiUpstreamBaseUri: aiUpstreamBaseUri,
+    );
+
+    try {
+      _server = await shelf_io.serve(
+        router.handler,
+        InternetAddress.loopbackIPv4,
+        preferredPort,
+      );
+    } on SocketException {
+      // Fallback to an ephemeral port if preferredPort is occupied.
+      _server = await shelf_io.serve(
+        router.handler,
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+    }
+    return baseUri!;
+  }
+
+  Future<Uri> _startWorkerIsolate() async {
+    TransferableTypedData? transferableDpd;
+    try {
+      final data = await rootBundle.load('assets/dpd_family_data.json.gz');
+      final bytes = data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
+      transferableDpd = TransferableTypedData.fromList([bytes]);
+    } catch (_) {}
+
+    final readyPort = ReceivePort();
+    try {
+      _workerIsolate = await Isolate.spawn(
+        _serverIsolateMain,
+        (
+          readyPort: readyPort.sendPort,
+          preferredPort: preferredPort,
+          dbDirectoryPath: api.dbDirectoryPath,
+          webRootPath: _webRootDir?.path,
+          aiUpstreamBaseUri: aiUpstreamBaseUri.toString(),
+          dpdCompressedBytes: transferableDpd,
+        ),
+        debugName: 'TipitakaLocalServerWorker',
+      );
+      final readyMsg = await readyPort.first as Map;
+      if (readyMsg['error'] != null) {
+        throw StateError('Local server isolate failed: ${readyMsg['error']}');
+      }
+      _isolatePort = readyMsg['port'] as int;
+      _isolateControlPort = readyMsg['control'] as SendPort;
+      return baseUri!;
+    } catch (e) {
+      _workerIsolate?.kill(priority: Isolate.immediate);
+      _workerIsolate = null;
+      _isolatePort = null;
+      _isolateControlPort = null;
+      rethrow;
+    } finally {
+      readyPort.close();
+    }
+  }
+
+  Future<void> warmUpIndexes() async {
+    final ctrl = _isolateControlPort;
+    if (ctrl != null) {
+      final replyPort = ReceivePort();
+      try {
+        ctrl.send({'cmd': 'warmUpIndexes', 'reply': replyPort.sendPort});
+        await replyPort.first.timeout(const Duration(minutes: 5));
+      } catch (_) {
+      } finally {
+        replyPort.close();
+      }
+      return;
+    }
+    await api.warmUpIndexes();
+  }
+
+  Future<void> invalidateDatabases() async {
+    api.invalidateDatabases();
+    final ctrl = _isolateControlPort;
+    if (ctrl != null) {
+      final replyPort = ReceivePort();
+      try {
+        ctrl.send({'cmd': 'invalidate', 'reply': replyPort.sendPort});
+        await replyPort.first.timeout(const Duration(seconds: 5));
+      } catch (_) {
+      } finally {
+        replyPort.close();
+      }
+    }
+  }
+
+  Future<void> restart() async {
+    await stop();
+    await ensureStarted();
+  }
+
+  Future<void> stop() async {
+    final s = _server;
+    _server = null;
+    _startFuture = null;
+
+    final ctrl = _isolateControlPort;
+    final isolate = _workerIsolate;
+    _isolateControlPort = null;
+    _workerIsolate = null;
+    _isolatePort = null;
+
+    if (ctrl != null) {
+      final ackPort = ReceivePort();
+      try {
+        ctrl.send({'cmd': 'stop', 'reply': ackPort.sendPort});
+        await ackPort.first.timeout(const Duration(seconds: 2));
+      } catch (_) {
+      } finally {
+        ackPort.close();
+      }
+    }
+    isolate?.kill(priority: Isolate.immediate);
+
+    if (s != null) {
+      await s.close(force: true);
+    }
+  }
+
+  Future<void> dispose() async {
+    await stop();
+    api.close();
+  }
+
+  static String _computeSha256Hex(List<int> bytes) =>
+      sha256.convert(bytes).toString();
+
+  Future<Directory> _prepareWebRoot() async {
+    if (explicitWebRootDir != null) {
+      return explicitWebRootDir!;
+    }
+    final supportDir = await getApplicationSupportDirectory();
+    final targetDir = Directory(p.join(supportDir.path, 'web_root'));
+    final stampFile = File(p.join(targetDir.path, '.web_bundle_stamp'));
+
+    String? bundledStamp;
+    try {
+      final loaded = await rootBundle.loadString('assets/web_bundle_stamp.txt');
+      final trimmed = loaded.trim();
+      if (trimmed.isNotEmpty) {
+        bundledStamp = trimmed;
+      }
+    } catch (_) {}
+
+    if (bundledStamp != null &&
+        targetDir.existsSync() &&
+        stampFile.existsSync() &&
+        stampFile.readAsStringSync().trim() == bundledStamp &&
+        File(p.join(targetDir.path, 'index.html')).existsSync()) {
+      return targetDir;
+    }
+
+    final zipByteData = await rootBundle.load('assets/web.zip');
+    final zipBytes = zipByteData.buffer.asUint8List(
+      zipByteData.offsetInBytes,
+      zipByteData.lengthInBytes,
+    );
+    final String stamp =
+        bundledStamp ?? await compute<List<int>, String>(_computeSha256Hex, zipBytes);
+
+    if (targetDir.existsSync() &&
+        stampFile.existsSync() &&
+        stampFile.readAsStringSync().trim() == stamp &&
+        File(p.join(targetDir.path, 'index.html')).existsSync()) {
+      return targetDir;
+    }
+
+    if (targetDir.existsSync()) {
+      await targetDir.delete(recursive: true);
+    }
+    await targetDir.create(recursive: true);
+
+    await compute(_extractWebZipInIsolate, (
+      bytes: zipBytes,
+      targetPath: targetDir.path,
+    ));
+    await stampFile.writeAsString(stamp);
+    return targetDir;
+  }
+
+  static void _extractWebZipInIsolate(
+    ({List<int> bytes, String targetPath}) args,
+  ) {
+    final archive = ZipDecoder().decodeBytes(args.bytes);
+    final rootCanonical = p.normalize(args.targetPath);
+    for (final entry in archive) {
+      if (!entry.isFile) continue;
+      final normalized = p.normalize(p.join(rootCanonical, entry.name));
+      if (normalized != rootCanonical &&
+          !p.isWithin(rootCanonical, normalized)) {
+        continue;
+      }
+      final outFile = File(normalized);
+      outFile.parent.createSync(recursive: true);
+      outFile.writeAsBytesSync(entry.content as List<int>);
+    }
+  }
+}
+
 final dpdFamilyTemplatesProvider = Provider<DpdFamilyTemplates>((ref) {
   return DpdFamilyTemplates();
 });
@@ -808,6 +1094,7 @@ final tipitakaLocalServerProvider = Provider<TipitakaLocalServer>((ref) {
   );
   final server = TipitakaLocalServer(
     api: api,
+    useBackgroundIsolate: true,
     resolveDbDirectoryPath: () async {
       final dir = await storage.getDatabaseDirectory();
       return dir.path;

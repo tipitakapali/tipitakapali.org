@@ -28,6 +28,7 @@ cleanup() {
 trap cleanup EXIT
 
 python3 - "$WEB_DIR/out" "$TMP_WEB" "$ASSETS_DIR/web.zip" <<'PY'
+import hashlib
 import os
 import re
 import shutil
@@ -82,7 +83,19 @@ with zipfile.ZipFile(tmp_zip, 'w', compression=zipfile.ZIP_DEFLATED, compresslev
             zf.write(full, arc)
 
 os.replace(tmp_zip, zip_path)
-print(f"Packaged {count} files into {zip_path} ({os.path.getsize(zip_path) / (1024*1024):.2f} MB)")
+h = hashlib.sha256()
+with open(zip_path, 'rb') as zf_read:
+    while True:
+        chunk = zf_read.read(1024 * 1024)
+        if not chunk:
+            break
+        h.update(chunk)
+stamp = h.hexdigest()
+stamp_path = os.path.join(os.path.dirname(zip_path), 'web_bundle_stamp.txt')
+with open(stamp_path + '.tmp', 'w', encoding='utf-8') as sf:
+    sf.write(stamp + '\n')
+os.replace(stamp_path + '.tmp', stamp_path)
+print(f"Packaged {count} files into {zip_path} ({os.path.getsize(zip_path) / (1024*1024):.2f} MB), stamp={stamp[:12]}...")
 PY
 
 echo "3/3 Extracting DPD family tables to $ASSETS_DIR/dpd_family_data.json.gz..."

@@ -566,6 +566,51 @@ class LinkedDefinitionService {
     return false;
   }
 
+  /// Fast-path lookup returning the raw prebuilt `chapter_links.paragraphs_json`
+  /// string directly from SQLite without decoding/re-encoding multi-MB JSON.
+  /// Returns `null` when the `chapter_links` table is absent so callers can
+  /// fall back to runtime link computation.
+  Future<String?> getLinksForChapterRawJson({
+    required String dbDirPath,
+    required String bookCode,
+    required int chapterIndex,
+    Database? boldDbOverride,
+  }) async {
+    Database? ownedBoldDb;
+    Database? boldDb = boldDbOverride;
+    if (boldDb == null) {
+      final boldPath = p.join(dbDirPath, BoldDefinitionIndexService.dbFilename);
+      if (!BoldDefinitionIndexService.isUpToDate(dbDirPath)) {
+        await _boldService.ensureBuilt(dbDirPath: dbDirPath);
+      }
+      if (File(boldPath).existsSync()) {
+        ownedBoldDb = sqlite3.open(boldPath, mode: OpenMode.readOnly);
+        boldDb = ownedBoldDb;
+      }
+    }
+    if (boldDb == null) return null;
+
+    try {
+      if (!TipitakaCoreReader.tableAndViewNames(boldDb).contains('chapter_links')) {
+        return null;
+      }
+      final cachedRows = boldDb.select(
+        'SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1',
+        [bookCode, chapterIndex],
+      );
+      if (cachedRows.isEmpty) return '{}';
+      final raw = cachedRows.first['paragraphs_json']?.toString().trim();
+      if (raw != null && raw.startsWith('{') && raw.endsWith('}')) {
+        return raw;
+      }
+      return '{}';
+    } catch (_) {
+      return null;
+    } finally {
+      ownedBoldDb?.close();
+    }
+  }
+
   /// Computes word-level commentary/root links for all paragraphs in
   /// ([bookCode], [chapterIndex]).
   Future<Map<String, dynamic>> getLinksForChapter({

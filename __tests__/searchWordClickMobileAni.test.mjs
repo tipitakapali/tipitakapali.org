@@ -95,13 +95,14 @@ test('Task 1: SearchModal places "Language to search" selector above "Group:" ou
 
   // Full-width search input has proper search semantics and attributes
   assert.match(html, /<input[^>]*id="fts-search-input"[^>]*type="search"/);
-  assert.match(html, /aria-describedby="fts-db-help"/);
+  assert.doesNotMatch(html, /aria-describedby="fts-db-help"/);
   assert.match(html, /enterKeyHint="search"|enterkeyhint="search"/i);
 
-  // <select id="fts-db-select"> must NOT be inside the <form>, and MUST appear ABOVE "Group:"
+  // <select id="fts-db-select"> must NOT be inside the <form>, and MUST appear ABOVE the collapsible Filters & Sort section
   const formEndIdx = html.indexOf("</form>");
   const langBarIdx = html.indexOf('class="search-lang-bar"');
   const selectIdx = html.indexOf('id="fts-db-select"');
+  const detailsIdx = html.indexOf('class="search-filters-disclosure"');
   const groupIdx = html.indexOf(">Group:<");
 
   assert.ok(formEndIdx > 0, "Search header must contain a <form>");
@@ -114,19 +115,25 @@ test('Task 1: SearchModal places "Language to search" selector above "Group:" ou
     "Select FTS database dropdown must live inside .search-lang-bar",
   );
   assert.ok(
-    groupIdx > selectIdx,
-    "Select FTS database dropdown must appear strictly ABOVE the Group filter toolbar",
+    detailsIdx > selectIdx && groupIdx > detailsIdx,
+    "Collapsible filters & sort <details> must appear strictly below the Language selector and wrap Group:",
   );
 
-  // Visible label + persistent instruction text explaining Pāḷi CST vs translation selection
+  // Collapsible <details> starts collapsed (no open attribute) and wraps Group, Piṭaka, Distance, Sort
+  const detailsOpenTag = html.match(/<details\b[^>]*class="search-filters-disclosure"[^>]*>/)?.[0] || "";
+  assert.ok(detailsOpenTag, "Filters disclosure <details> must be rendered");
+  assert.doesNotMatch(detailsOpenTag, /\bopen\b/, "Filters disclosure must start collapsed by default");
+  assert.match(html, /<summary class="search-filters-summary">[\s\S]*?Filters &amp; Sort[\s\S]*?<\/summary>/);
+  assert.match(html, />Piṭaka:<[\s\S]*>Distance:<[\s\S]*>Sort:</);
+
+  // Visible label present; persistent instruction text removed for more result space
   assert.match(
     html,
     /<label[^>]*for="fts-db-select"[^>]*>[\s\S]*Language to search:/,
   );
-  assert.match(
-    html,
-    /<p[^>]*id="fts-db-help"[^>]*>[^<]*Searching Tipiṭaka Pāḷi CST text\. Choose a translation database to search in the target language\./,
-  );
+  assert.doesNotMatch(html, /fts-db-help/);
+  assert.doesNotMatch(html, /Searching Tipiṭaka Pāḷi CST text/);
+  assert.doesNotMatch(html, /Choose a translation database to search in the target language/);
 
   // Source also includes contextual empty-state tip when zero results are found
   const searchSrc = fs.readFileSync(
@@ -136,9 +143,10 @@ test('Task 1: SearchModal places "Language to search" selector above "Group:" ou
   assert.match(searchSrc, /Tip: You are searching/);
   assert.match(searchSrc, /switch "Language to search" above/);
 
-  // CSS styles the new .search-lang-bar and hides duplicate native webkit cancel icon
+  // CSS styles .search-lang-bar, .search-filters-disclosure, and hides duplicate native webkit cancel icon
   const cssSrc = fs.readFileSync(path.join(rootDir, "app/globals.css"), "utf8");
   assert.match(cssSrc, /\.search-lang-bar\s*\{/);
+  assert.match(cssSrc, /\.search-filters-disclosure\s*\{/);
   assert.match(cssSrc, /#fts-search-input::-webkit-search-cancel-button/);
 });
 
@@ -1437,5 +1445,229 @@ test("Task 6: Mobile inputs, textareas, and selects enforce >= 16px font-size to
   const layoutSrc = fs.readFileSync(path.join(rootDir, "app", "layout.js"), "utf8");
   assert.ok(!layoutSrc.includes("userScalable: false"), "app/layout.js must keep pinch-zoom enabled");
   assert.ok(!layoutSrc.includes("maximumScale: 1"), "app/layout.js must not re-add maximumScale: 1");
+});
+
+test("Offline performance optimizations: transliterate caching, single-pass data-link-ref injection, binary search helpers, and isolated preview LRU cache", async () => {
+  // 1. Transliteration Roman fast-path + scriptStrCache equivalence + tag preservation
+  const transMod = compileModule("services/transliterate.js", {});
+  assert.equal(transMod.convertPaliScript("Evaṃ me sutaṃ.", "roman"), "Evaṃ me sutaṃ.");
+  assert.equal(
+    transMod.transliterateHtml('<p class="bodytext" data-para="1">   </p>', "thai"),
+    '<p class="bodytext" data-para="1">   </p>',
+  );
+  const romanSample =
+    '<p class="bodytext" data-para="1"><span class="pb" data-ed="M" data-page="1.0001"></span>Evaṃ me sutaṃ. Ekaṃ samayaṃ bhagavā.</p>';
+  const thai1 = transMod.transliterateHtml(romanSample, "thai");
+  const thai2 = transMod.transliterateHtml(romanSample, "thai");
+  assert.equal(thai1, thai2);
+  assert.match(thai1, /data-ed="M" data-page="1\.0001"/);
+  assert.notEqual(thai1, romanSample);
+
+  const myan1 = transMod.transliterateHtml(romanSample, "myanmar");
+  const myan2 = transMod.transliterateHtml(romanSample, "myanmar");
+  assert.equal(myan1, myan2);
+  assert.notEqual(myan1, romanSample);
+
+  // 2. ReaderView single-pass translation + data-link-ref injection, legacy fallback, and binary-search helpers
+  const noopComp = () => null;
+  const readerMod = compileModule("components/Reader/ReaderView.jsx", {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    "lucide-react": iconProxy,
+    "./WelcomeView": { __esModule: true, default: noopComp },
+    "./MeditationLoader": { __esModule: true, default: noopComp },
+    "./BookTocView": { __esModule: true, default: noopComp },
+    "./LinkedDefinitionModal": { __esModule: true, default: noopComp },
+    "../AiChat/AiChatView": { __esModule: true, default: noopComp },
+    "../../context/TabContext": { useTabs: () => ({}) },
+    "../../context/ThemeSettingsContext": {
+      useThemeSettings: () => ({}),
+      getDefaultTranslationColorsForTheme: () => ({
+        text: "#000",
+        border: "#000",
+        bg: "",
+      }),
+    },
+    "../../context/DictionaryContext": { useDictionary: () => ({}) },
+    "../../services/transliterate": transMod,
+    "../../services/scroll": compileModule("services/scroll.js", {}),
+    "../../services/api": {
+      fetchChapterTranslations: async () => ({}),
+      fetchChapterBundle: async () => null,
+      isLocalDynamicHost: () => false,
+      fetchPaliSentences: async () => ({}),
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      getCachedPaliSentences: () => null,
+      getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
+    },
+  });
+
+  const sampleChapterLinks = {
+    0: {
+      all: [
+        {
+          word: "bhagavā",
+          target_book: "vin01a.att",
+          target_chapter: 2,
+          target_para_index: 5,
+          target_para_num: "12",
+          target_line_id: 1,
+          label: "Bhagavā",
+        },
+      ],
+      by_line: {},
+    },
+  };
+  const injectedHtml = readerMod.injectTranslationsIntoHtml(
+    '<p class="bodytext" data-pindex="0" data-para="1">Evaṃ me sutaṃ.</p>',
+    { en: { 0: "Thus have I heard." } },
+    [
+      { id: "pali", type: "pali" },
+      { id: "en", lang: "en", type: "trans" },
+    ],
+    true,
+    "stack",
+    {},
+    null,
+    false,
+    null,
+    "classic",
+    {
+      showBookLinks: true,
+      chapterLinks: sampleChapterLinks,
+      paliScript: "roman",
+      bookCode: "s0101m.mul",
+      chapterIndex: 0,
+    },
+  );
+  assert.match(injectedHtml, /data-link-ref="s0101m\.mul\|0\|0\|_all\|0"/);
+  assert.doesNotMatch(injectedHtml, /\sdata-link="/);
+  assert.match(injectedHtml, /Thus have I heard\./);
+
+  const refMatch = injectedHtml.match(/data-link-ref="([^"]+)"/);
+  assert.ok(refMatch);
+  const refChip = {
+    getAttribute: (name) => (name === "data-link-ref" ? refMatch[1] : null),
+  };
+  const resolvedRef = readerMod.resolveChipLinkElement(refChip);
+  assert.equal(resolvedRef.word, "bhagavā");
+  assert.equal(resolvedRef.target_book, "vin01a.att");
+  assert.equal(readerMod.resolveChipLinkElement(refChip), resolvedRef);
+
+  const legacyChip = {
+    getAttribute: (name) =>
+      name === "data-link"
+        ? JSON.stringify({ word: "evaṃ", target_book: "s0101a.att" })
+        : null,
+  };
+  assert.equal(readerMod.resolveChipLinkElement(legacyChip).word, "evaṃ");
+
+  // Binary search paragraph locator (>16 items + hidden 0x0 item handling)
+  const paraList = Array.from({ length: 24 }, (_, idx) => ({
+    id: idx,
+    getBoundingClientRect: () =>
+      idx === 12
+        ? { top: 0, bottom: 0, width: 0, height: 0 }
+        : { top: idx * 100, bottom: idx * 100 + 80, width: 320, height: 80 },
+  }));
+  assert.equal(readerMod.findFirstElementWithBottomAtOrBelow(paraList, 1320).id, 13);
+  assert.equal(readerMod.findFirstElementWithBottomAtOrBelow(paraList, 0).id, 0);
+  assert.equal(readerMod.findFirstElementWithBottomAtOrBelow(paraList, 5000), null);
+
+  // Binary search active edition page numbers + firstSeen fallback when cursor is above first pb
+  const mockPbs = [
+    { ed: "M", page: "1.0001", top: 200 },
+    { ed: "P", page: "1.0001", top: 220 },
+    { ed: "M", page: "1.0002", top: 600 },
+    { ed: "V", page: "1.0001", top: 900 },
+    { ed: "M", page: "1.0003", top: 1200 },
+  ].map((item) => {
+    const host = { getBoundingClientRect: () => ({ top: item.top, bottom: item.top + 30 }) };
+    return {
+      parentElement: host,
+      getAttribute: (k) => (k === "data-ed" ? item.ed : k === "data-page" ? item.page : null),
+    };
+  });
+  assert.deepEqual(readerMod.findActiveEditionPagesFromElements(mockPbs, 750), {
+    M: "1.0002",
+    P: "1.0001",
+    V: "1.0001",
+  });
+  assert.deepEqual(readerMod.findActiveEditionPagesFromElements(mockPbs, 100), {
+    M: "1.0001",
+    P: "1.0001",
+    V: "1.0001",
+  });
+
+  // 3. services/api.js preview LRU isolation (150 previews do not evict chapter cache)
+  const prevWindow = globalThis.window;
+  const prevFetch = globalThis.fetch;
+  globalThis.window = { location: { hostname: "127.0.0.1", port: "8899", protocol: "http:" } };
+  let fetchCount = 0;
+  globalThis.fetch = async (url) => {
+    fetchCount++;
+    if (String(url).includes("/links/preview")) {
+      return {
+        ok: true,
+        json: async () => ({ book_code: "s0101a.att", lines: [] }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({ book_code: "s0101m.mul", chapter_index: 0, paragraphs: { 0: { all: [] } } }),
+    };
+  };
+  try {
+    const apiMod = compileModule("services/api.js", {
+      "./transliterate": transMod,
+      "./dpdFeedback": compileModule("services/dpdFeedback.js", {}),
+    });
+    assert.equal(apiMod.isLocalDynamicHost(), true);
+    await apiMod.fetchChapterLinks("s0101m.mul", 0);
+    assert.ok(apiMod.getCachedChapterLinks("s0101m.mul", 0));
+
+    for (let i = 0; i < 150; i++) {
+      await apiMod.fetchLinkedPreview({
+        book: "s0101a.att",
+        chapter: 0,
+        paraIndex: i,
+        word: `w${i}`,
+        langs: ["en"],
+      });
+    }
+    assert.equal(
+      apiMod.getCachedLinkedPreview({
+        book: "s0101a.att",
+        chapter: 0,
+        paraIndex: 0,
+        word: "w0",
+        langs: ["en"],
+      }),
+      null,
+      "Oldest preview beyond 120-entry LRU limit should be evicted",
+    );
+    assert.ok(
+      apiMod.getCachedLinkedPreview({
+        book: "s0101a.att",
+        chapter: 0,
+        paraIndex: 149,
+        word: "w149",
+        langs: ["en"],
+      }),
+      "Most recent preview should remain cached",
+    );
+    assert.ok(
+      apiMod.getCachedChapterLinks("s0101m.mul", 0),
+      "150 preview fetches must not evict chapter cache entries",
+    );
+    assert.equal(fetchCount, 151);
+  } finally {
+    if (prevWindow === undefined) delete globalThis.window;
+    else globalThis.window = prevWindow;
+    if (prevFetch === undefined) delete globalThis.fetch;
+    else globalThis.fetch = prevFetch;
+  }
 });
 

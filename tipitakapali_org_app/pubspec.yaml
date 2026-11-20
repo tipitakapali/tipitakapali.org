@@ -75,6 +75,7 @@ flutter:
   assets:
     - assets/databases_manifest.json
     - assets/web.zip
+    - assets/web_bundle_stamp.txt
     - assets/dpd_family_data.json.gz
     - assets/icons/icon.png
     - assets/icons/128x128.png

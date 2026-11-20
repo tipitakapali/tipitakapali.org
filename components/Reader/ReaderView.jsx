@@ -17,6 +17,8 @@ import {
   fetchChapterTranslations,
   fetchPaliSentences,
   fetchChapterLinks,
+  fetchChapterBundle,
+  isLocalDynamicHost,
   getCachedChapterTranslations,
   getCachedPaliSentences,
   getCachedChapterLinks,
@@ -281,6 +283,128 @@ export function detectLiveSectionTitleFromElements(headings, thresholdY = 120) {
     }
   }
   return lastAbove || firstNear || null;
+}
+
+export function findFirstElementWithBottomAtOrBelow(elements, targetY) {
+  if (!elements || elements.length === 0) return null;
+  const len = elements.length;
+  if (len <= 16) {
+    for (let i = 0; i < len; i++) {
+      const el = elements[i];
+      if (!el || typeof el.getBoundingClientRect !== 'function') continue;
+      const rect = el.getBoundingClientRect();
+      if (!rect || (rect.width === 0 && rect.height === 0)) continue;
+      if (rect.bottom >= targetY) return el;
+    }
+    return null;
+  }
+
+  let lo = 0;
+  let hi = len - 1;
+  let ansIdx = -1;
+  while (lo <= hi) {
+    let mid = (lo + hi) >> 1;
+    let rect = elements[mid]?.getBoundingClientRect?.();
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      let probe = -1;
+      for (let step = 1; mid - step >= lo || mid + step <= hi; step++) {
+        if (mid + step <= hi) {
+          const r = elements[mid + step]?.getBoundingClientRect?.();
+          if (r && (r.width !== 0 || r.height !== 0)) {
+            probe = mid + step;
+            rect = r;
+            break;
+          }
+        }
+        if (mid - step >= lo) {
+          const r = elements[mid - step]?.getBoundingClientRect?.();
+          if (r && (r.width !== 0 || r.height !== 0)) {
+            probe = mid - step;
+            rect = r;
+            break;
+          }
+        }
+      }
+      if (probe === -1) break;
+      mid = probe;
+    }
+    if (rect.bottom >= targetY) {
+      ansIdx = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return ansIdx >= 0 ? elements[ansIdx] : null;
+}
+
+export function findActiveEditionPagesFromElements(pbElements, targetY) {
+  const pages = {};
+  if (!pbElements || pbElements.length === 0) return pages;
+
+  const len = pbElements.length;
+  const hostTopCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  const getPbHostTop = (pb) => {
+    if (!pb) return Infinity;
+    const hostEl =
+      pb.closest?.('[data-pindex], .reader-para-row, .sent-pair, p, .chapter-divider') ||
+      pb.parentElement ||
+      pb;
+    if (hostTopCache && hostTopCache.has(hostEl)) {
+      return hostTopCache.get(hostEl);
+    }
+    const rect = hostEl?.getBoundingClientRect?.();
+    const top = rect ? rect.top : Infinity;
+    if (hostTopCache && hostEl && typeof hostEl === 'object') {
+      hostTopCache.set(hostEl, top);
+    }
+    return top;
+  };
+
+  let lo = 0;
+  let hi = len - 1;
+  let cutoffIdx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const top = getPbHostTop(pbElements[mid]);
+    if (top <= targetY) {
+      cutoffIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  for (let i = cutoffIdx; i >= 0; i--) {
+    const pb = pbElements[i];
+    const ed = pb?.getAttribute?.('data-ed');
+    const page = pb?.getAttribute?.('data-page');
+    if (ed && page && !pages[ed]) {
+      pages[ed] = page;
+    }
+  }
+
+  for (let i = cutoffIdx + 1; i < len; i++) {
+    const pb = pbElements[i];
+    const ed = pb?.getAttribute?.('data-ed');
+    const page = pb?.getAttribute?.('data-page');
+    if (ed && page && !pages[ed]) {
+      pages[ed] = page;
+    }
+  }
+
+  return pages;
+}
+
+function extractPaliChapMap(data, chapterIndex) {
+  if (!data || typeof data !== 'object') return null;
+  if (data.chapters && typeof data.chapters === 'object') {
+    return data.chapters[String(chapterIndex)] || null;
+  }
+  if (data.paragraphs && typeof data.paragraphs === 'object') {
+    return data.paragraphs;
+  }
+  return data;
 }
 
 export function getMaxColumnsForWidth(viewportWidth = 1280) {
@@ -679,7 +803,8 @@ export function injectTranslationsIntoHtml(
   searchHighlight = null,
   sentenceMode = false,
   transSentences = null,
-  theme = 'classic'
+  theme = 'classic',
+  linkOptions = null
 ) {
   if (!html) return html;
 
@@ -697,7 +822,20 @@ export function injectTranslationsIntoHtml(
     formatCssColor(paliColors.bg) ||
     formatCssColor(paliColors.text)
   );
-  if (isPaliEnabled && !hasTranslations && !hasCustomPaliColors) {
+
+  const chapterLinks =
+    linkOptions?.showBookLinks && isPaliEnabled && linkOptions?.chapterLinks && typeof linkOptions.chapterLinks === 'object'
+      ? linkOptions.chapterLinks
+      : null;
+  const linkBookCode = linkOptions?.bookCode || null;
+  const linkChapterIndex = linkOptions?.chapterIndex;
+  const linkScript = linkOptions?.paliScript || 'roman';
+  if (chapterLinks && linkBookCode && linkChapterIndex !== undefined && linkChapterIndex !== null) {
+    registerChapterLinks(linkBookCode, linkChapterIndex, chapterLinks);
+  }
+  const hasLinkRefBase = Boolean(linkBookCode && linkChapterIndex !== undefined && linkChapterIndex !== null);
+
+  if (isPaliEnabled && !hasTranslations && !hasCustomPaliColors && !chapterLinks) {
     return html;
   }
 
@@ -716,6 +854,17 @@ export function injectTranslationsIntoHtml(
   });
 
   return html.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullMatch, pTag, pIndex) => {
+    const pLinks = chapterLinks ? chapterLinks[pIndex] : null;
+    const makeRef = (lineKey, idx) =>
+      hasLinkRefBase ? `${linkBookCode}|${linkChapterIndex}|${pIndex}|${lineKey}|${idx}` : null;
+    const allLinksStrip =
+      pLinks && Array.isArray(pLinks.all) && pLinks.all.length > 0
+        ? renderBookLinksStrip(pLinks.all, linkScript, {
+            inline: false,
+            getRef: hasLinkRefBase ? (_, idx) => makeRef('_all', idx) : null,
+          })
+        : '';
+
     const paraMatch = pTag.match(/\bdata-para="([^"]+)"/i);
     const paraFirstMatch = pTag.match(/\bdata-para-first="([^"]+)"/i);
     const paraLastMatch = pTag.match(/\bdata-para-last="([^"]+)"/i);
@@ -986,12 +1135,12 @@ export function injectTranslationsIntoHtml(
           .filter((_, i) => i !== paliIdx)
           .map((item) => item.html)
           .join('');
-        return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${leftHtml}</div></div><div class="reader-side-col reader-side-col-right reader-pali-col">${paliItem.html}</div></div>`;
+        return `<div class="reader-para-row reader-trans-side-row" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${leftHtml}</div></div><div class="reader-side-col reader-side-col-right reader-pali-col">${paliItem.html}${allLinksStrip}</div></div>`;
       }
       const col1 = renderedItems[0];
       const col2Items = renderedItems.slice(1);
-      const col1Html = col1.html;
-      const col2Html = col2Items.map((item) => item.html).join('');
+      const col1Html = col1.type === 'pali' ? `${col1.html}${allLinksStrip}` : col1.html;
+      const col2Html = col2Items.map((item) => (item.type === 'pali' ? `${item.html}${allLinksStrip}` : item.html)).join('');
       const col1Class = col1.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
       const col2Class = col2Items.some((item) => item.type === 'pali') ? 'reader-pali-col' : 'reader-trans-col';
       const col2Wrapped = col2Class === 'reader-trans-col'
@@ -1012,12 +1161,14 @@ export function injectTranslationsIntoHtml(
 
         if (isCol1) {
           const col1Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
-          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${singleItem.html}</div><div class="reader-side-col reader-side-col-right reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
+          const col1Body = singleItem.type === 'pali' ? `${singleItem.html}${allLinksStrip}` : singleItem.html;
+          return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left ${col1Class}">${col1Body}</div><div class="reader-side-col reader-side-col-right reader-trans-col reader-trans-col-empty"><div class="reader-translation-container reader-side-container" data-pindex="${pIndex}"></div></div></div>`;
         } else {
           const col2Class = singleItem.type === 'pali' ? 'reader-pali-col' : 'reader-trans-col';
+          const col2Body = singleItem.type === 'pali' ? `${singleItem.html}${allLinksStrip}` : singleItem.html;
           const col2Wrapped = col2Class === 'reader-trans-col'
-            ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${singleItem.html}</div>`
-            : singleItem.html;
+            ? `<div class="reader-translation-container reader-side-container" data-pindex="${pIndex}">${col2Body}</div>`
+            : col2Body;
           return `<div class="reader-para-row reader-trans-side-row reader-side-empty" ${rowAttrs}><div class="reader-side-col reader-side-col-left reader-trans-col reader-trans-col-empty"></div><div class="reader-side-col reader-side-col-right ${col2Class}">${col2Wrapped}</div></div>`;
         }
       }
@@ -1077,6 +1228,39 @@ export function injectTranslationsIntoHtml(
                 .filter(Boolean)
                 .join('; ')
             : '';
+
+          const injectedLines = new Set();
+          for (const ln of lineOrder) {
+            if (Array.isArray(pLinks?.by_line?.[ln]) && pLinks.by_line[ln].length > 0) {
+              injectedLines.add(ln);
+            }
+          }
+          const leftoverEntries = [];
+          if (pLinks?.by_line && typeof pLinks.by_line === 'object') {
+            for (const [ln, list] of Object.entries(pLinks.by_line)) {
+              if (!injectedLines.has(ln) && Array.isArray(list)) {
+                list.forEach((lnk, idx) => {
+                  leftoverEntries.push({
+                    link: lnk,
+                    ref: hasLinkRefBase ? `${linkBookCode}|${linkChapterIndex}|${pIndex}|${ln}|${idx}` : null,
+                  });
+                });
+              }
+            }
+          }
+          const leftoverStripHtml =
+            leftoverEntries.length > 0
+              ? renderBookLinksStrip(
+                  leftoverEntries.map((e) => e.link),
+                  linkScript,
+                  {
+                    inline: false,
+                    getRef: hasLinkRefBase ? (_, idx) => leftoverEntries[idx]?.ref || null : null,
+                  }
+                )
+              : '';
+
+          let placedLeftover = false;
           const pairs = lineOrder
             .map((ln) => {
               const pHtml = paliByLine.get(ln);
@@ -1089,10 +1273,22 @@ export function injectTranslationsIntoHtml(
                 })
                 .join('');
               if (pHtml === undefined && !cells) return '';
+              const lineLinks = injectedLines.has(ln) ? pLinks?.by_line?.[ln] : null;
+              const lineStrip =
+                lineLinks && lineLinks.length > 0
+                  ? renderBookLinksStrip(lineLinks, linkScript, {
+                      inline: false,
+                      getRef: hasLinkRefBase ? (_, idx) => makeRef(ln, idx) : null,
+                    })
+                  : '';
+              const extraLeftover =
+                !placedLeftover && leftoverStripHtml && pHtml !== undefined
+                  ? ((placedLeftover = true), leftoverStripHtml)
+                  : '';
               return `<div class="sent-pair" data-line="${ln}">` +
                 `<div class="sent-pair-body">` +
                 (pHtml !== undefined
-                  ? `<div class="sent-pair-pali reader-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-line="${ln}">${stripSentNumBadge(pHtml)}</div>`
+                  ? `<div class="sent-pair-pali reader-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-line="${ln}">${stripSentNumBadge(pHtml)}</div>${lineStrip}${extraLeftover}`
                   : '') +
                 cells +
                 `</div></div>`;
@@ -1103,6 +1299,7 @@ export function injectTranslationsIntoHtml(
             return `<div class="reader-para-row reader-sent-pairs" ${rowAttrs}>` +
               (numMatch ? `<div class="sent-paranum">${numMatch[0]}</div>` : '') +
               pairs +
+              (!placedLeftover && leftoverStripHtml ? leftoverStripHtml : '') +
               `</div>`;
           }
         }
@@ -1110,9 +1307,61 @@ export function injectTranslationsIntoHtml(
     }
 
     // Stack mode or single-layer side mode
-    const itemsHtml = renderedItems.map((item) => item.html).join('');
+    const itemsHtml = renderedItems
+      .map((item) => (item.type === 'pali' && allLinksStrip ? `${item.html}${allLinksStrip}` : item.html))
+      .join('');
     return `<div class="reader-para-row reader-trans-stack-row" ${rowAttrs}>${itemsHtml}</div>`;
   });
+}
+
+const _chapterLinksRegistry = new Map();
+const MAX_REGISTERED_CHAPTER_LINKS = 40;
+
+function registerChapterLinks(bookCode, chapterIndex, paragraphs) {
+  if (!bookCode || chapterIndex === undefined || chapterIndex === null || !paragraphs || typeof paragraphs !== 'object') {
+    return;
+  }
+  const key = `${bookCode}:${chapterIndex}`;
+  _chapterLinksRegistry.delete(key);
+  while (_chapterLinksRegistry.size >= MAX_REGISTERED_CHAPTER_LINKS) {
+    const oldest = _chapterLinksRegistry.keys().next().value;
+    if (oldest === undefined) break;
+    _chapterLinksRegistry.delete(oldest);
+  }
+  _chapterLinksRegistry.set(key, paragraphs);
+}
+
+export function resolveChipLinkElement(chip) {
+  if (!chip) return null;
+  if (chip.__parsedLink !== undefined) return chip.__parsedLink;
+  const ref = chip.getAttribute?.('data-link-ref');
+  if (ref) {
+    const parts = ref.split('|');
+    if (parts.length === 5) {
+      const [bookCode, chapIdx, pIdx, lineId, itemIdxStr] = parts;
+      const itemIdx = parseInt(itemIdxStr, 10);
+      const paras = _chapterLinksRegistry.get(`${bookCode}:${chapIdx}`);
+      const pLinks = paras?.[pIdx];
+      const link = pLinks
+        ? lineId !== '_all'
+          ? pLinks.by_line?.[lineId]?.[itemIdx] || null
+          : pLinks.all?.[itemIdx] || null
+        : null;
+      chip.__parsedLink = link;
+      return link;
+    }
+  }
+  const raw = chip.getAttribute?.('data-link');
+  if (!raw) {
+    chip.__parsedLink = null;
+    return null;
+  }
+  try {
+    chip.__parsedLink = JSON.parse(decodeURIComponent(raw));
+  } catch (_) {
+    chip.__parsedLink = null;
+  }
+  return chip.__parsedLink;
 }
 
 function escapeLinkText(str) {
@@ -1126,11 +1375,11 @@ function escapeLinkAttr(str) {
   return escapeLinkText(str).replace(/"/g, '&quot;');
 }
 
-function renderBookLinksStrip(links, paliScript = 'roman', { inline = false } = {}) {
+function renderBookLinksStrip(links, paliScript = 'roman', { inline = false, getRef = null } = {}) {
   if (!Array.isArray(links) || links.length === 0) return '';
   const MAX_INITIAL = 3;
 
-  const renderChip = (link) => {
+  const renderChip = (link, idx) => {
     const isSource = Boolean(link.is_source);
     const arrow = isSource ? '←' : '→';
     const rawWord = link.word || '';
@@ -1155,12 +1404,15 @@ function renderBookLinksStrip(links, paliScript = 'roman', { inline = false } = 
         : cat.includes('ṭīkā') || cat.includes('tika')
         ? 'linked-def-chip-tika'
         : '';
-    const payload = escapeLinkAttr(encodeURIComponent(JSON.stringify(link)));
+    const refVal = typeof getRef === 'function' ? getRef(link, idx) : null;
+    const dataAttr = refVal
+      ? `data-link-ref="${escapeLinkAttr(refVal)}"`
+      : `data-link="${escapeLinkAttr(encodeURIComponent(JSON.stringify(link)))}"`;
     const title = escapeLinkAttr(
       `${isSource ? 'Source' : 'Commentary'}: ${link.target_book_title || link.target_book}${link.target_para_num ? ` (§ ${link.target_para_num})` : ''}`
     );
     return (
-      `<button type="button" class="linked-def-chip ${isSource ? 'linked-def-chip-source' : 'linked-def-chip-forward'}${catClass ? ` ${catClass}` : ''}" data-link="${payload}" title="${title}">` +
+      `<button type="button" class="linked-def-chip ${isSource ? 'linked-def-chip-source' : 'linked-def-chip-forward'}${catClass ? ` ${catClass}` : ''}" ${dataAttr} title="${title}">` +
       `<span class="linked-def-arrow">${arrow}</span>` +
       `<span class="linked-def-word">${escapeLinkText(displayWord)}</span>` +
       (shortCat ? `<span class="linked-def-cat">${shortCat}</span>` : '') +
@@ -1168,11 +1420,11 @@ function renderBookLinksStrip(links, paliScript = 'roman', { inline = false } = 
     );
   };
 
-  const primaryHtml = links.slice(0, MAX_INITIAL).map(renderChip).join('');
+  const primaryHtml = links.slice(0, MAX_INITIAL).map((lnk, i) => renderChip(lnk, i)).join('');
   const extraCount = links.length - MAX_INITIAL;
   const extraHtml =
     extraCount > 0
-      ? `<span class="linked-def-more-group hidden">${links.slice(MAX_INITIAL).map(renderChip).join('')}</span>` +
+      ? `<span class="linked-def-more-group hidden">${links.slice(MAX_INITIAL).map((lnk, i) => renderChip(lnk, i + MAX_INITIAL)).join('')}</span>` +
         `<button type="button" class="linked-def-more-btn" data-more-count="${extraCount}">+${extraCount} more</button>`
       : '';
 
@@ -1181,12 +1433,38 @@ function renderBookLinksStrip(links, paliScript = 'roman', { inline = false } = 
   return `<${tag} class="${cls}">${primaryHtml}${extraHtml}</${tag}>`;
 }
 
-function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', sentenceMode = false) {
-  if (!htmlStr || !chapterLinks || typeof chapterLinks !== 'object' || typeof document === 'undefined') {
+function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', sentenceMode = false, linkMeta = null) {
+  if (!htmlStr || !chapterLinks || typeof chapterLinks !== 'object') {
     return htmlStr;
   }
   const keys = Object.keys(chapterLinks);
   if (keys.length === 0) return htmlStr;
+
+  const bookCode = linkMeta?.bookCode || null;
+  const chapterIndex = linkMeta?.chapterIndex;
+  const hasRefBase = Boolean(bookCode && chapterIndex !== undefined && chapterIndex !== null);
+  if (hasRefBase) {
+    registerChapterLinks(bookCode, chapterIndex, chapterLinks);
+  }
+
+  // Fast single-pass string injection for Pāḷi-only paragraphs without detached DOM parsing.
+  if (!htmlStr.includes('reader-para-row') && !(sentenceMode && htmlStr.includes('pali-sent'))) {
+    return htmlStr.replace(/(<p\b[^>]*\bdata-pindex="(\d+)"[^>]*>[\s\S]*?<\/p>)/gi, (fullP, _p, pIdx) => {
+      const pLinks = chapterLinks[pIdx];
+      if (!pLinks || !Array.isArray(pLinks.all) || pLinks.all.length === 0) {
+        return fullP;
+      }
+      const stripHtml = renderBookLinksStrip(pLinks.all, paliScript, {
+        inline: false,
+        getRef: hasRefBase ? (_, idx) => `${bookCode}|${chapterIndex}|${pIdx}|_all|${idx}` : null,
+      });
+      return `${fullP}${stripHtml}`;
+    });
+  }
+
+  if (typeof document === 'undefined') {
+    return htmlStr;
+  }
 
   const root = document.createElement('div');
   root.innerHTML = htmlStr;
@@ -1348,9 +1626,14 @@ export const ChapterBlock = memo(function ChapterBlock({
           sentences: effectiveSentenceMode,
         })
       : null;
+  const canUseBundle =
+    typeof isLocalDynamicHost === 'function' &&
+    isLocalDynamicHost() &&
+    typeof fetchChapterBundle === 'function';
+
   const initialCachedPaliSent =
     effectiveSentenceMode && isPaliEnabled && html && bookCode && typeof getCachedPaliSentences === 'function'
-      ? getCachedPaliSentences(bookCode)
+      ? getCachedPaliSentences(bookCode, chapter.chapter_index)
       : null;
   const initialCachedLinks =
     (showBookLinks || isParallelSyncActive) && html && bookCode && typeof getCachedChapterLinks === 'function'
@@ -1361,8 +1644,8 @@ export const ChapterBlock = memo(function ChapterBlock({
   const [transSentences, setTransSentences] = React.useState(() =>
     effectiveSentenceMode ? initialCachedTrans?.sentences || {} : {}
   );
-  const [paliSentMap, setPaliSentMap] = React.useState(
-    () => initialCachedPaliSent?.chapters?.[String(chapter.chapter_index)] || null
+  const [paliSentMap, setPaliSentMap] = React.useState(() =>
+    extractPaliChapMap(initialCachedPaliSent, chapter.chapter_index)
   );
   const [chapterLinks, setChapterLinks] = React.useState(() => initialCachedLinks || null);
   const [isTransLoading, setIsTransLoading] = React.useState(false);
@@ -1371,6 +1654,7 @@ export const ChapterBlock = memo(function ChapterBlock({
     initialCachedTrans ? activeLangsKeyWithMode : null
   );
   const [paliSentFetched, setPaliSentFetched] = React.useState(() => Boolean(initialCachedPaliSent));
+  const [linksFetched, setLinksFetched] = React.useState(() => Boolean(initialCachedLinks));
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const [isWithinDomWindow, setIsWithinDomWindow] = React.useState(true);
   const measuredHeightRef = useRef(0);
@@ -1409,6 +1693,8 @@ export const ChapterBlock = memo(function ChapterBlock({
     }
     if (!blockRef.current) return;
 
+    const loadRootMargin =
+      typeof window !== 'undefined' && window.innerWidth < 768 ? '400px 0px' : '800px 0px';
     const loadObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -1419,7 +1705,7 @@ export const ChapterBlock = memo(function ChapterBlock({
           setIsNearViewport(true);
         }
       },
-      { rootMargin: '800px 0px' } // Pre-load 800px before scrolling into view
+      { rootMargin: loadRootMargin }
     );
 
     const domObserver = new IntersectionObserver(
@@ -1445,8 +1731,202 @@ export const ChapterBlock = memo(function ChapterBlock({
     };
   }, [html, chapter.chapter_index, onVisible]);
 
+  // Fast single-roundtrip chapter bundle for local offline / VPS dynamic hosts
+  useEffect(() => {
+    if (!canUseBundle) return;
+
+    const langsToFetch = activeLangsKey ? activeLangsKey.split(',').filter(Boolean) : [];
+    const needTrans = Boolean(html && bookCode && activeLangsKey && langsToFetch.length > 0);
+    const needPaliSent = Boolean(html && bookCode && effectiveSentenceMode && isPaliEnabled);
+    const needLinks = Boolean(html && bookCode && ((showBookLinks && isPaliEnabled) || isParallelSyncActive));
+
+    if (!activeLangsKey) {
+      setTranslations({});
+      setTransSentences({});
+      setTransFetchedKey('');
+      setIsTransLoading(false);
+    }
+    if (!effectiveSentenceMode || !isPaliEnabled) {
+      if (!effectiveSentenceMode) {
+        setPaliSentMap(null);
+        setPaliSentFetched(false);
+      } else if (!isPaliEnabled && !paliSentMap) {
+        setPaliSentFetched(false);
+      }
+      setIsPaliSentLoading(false);
+    }
+    if (!needLinks && (!showBookLinks || !isPaliEnabled)) {
+      setChapterLinks(null);
+      setLinksFetched(false);
+    }
+    if (!html || !bookCode) return;
+
+    const near = Boolean(isNearViewport || isCurrentOrTarget);
+    const syncTrans =
+      needTrans && near && typeof getCachedChapterTranslations === 'function'
+        ? getCachedChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, {
+            sentences: effectiveSentenceMode,
+          })
+        : null;
+    if (syncTrans) {
+      setTranslations(syncTrans.translations || {});
+      setTransSentences(effectiveSentenceMode ? syncTrans.sentences || {} : {});
+      setTransFetchedKey(activeLangsKeyWithMode);
+      setIsTransLoading(false);
+      blockRef.current?.removeAttribute('data-trans-loading');
+      blockRef.current?.setAttribute('data-trans-settled', '1');
+    }
+
+    const syncPaliSent =
+      needPaliSent && typeof getCachedPaliSentences === 'function'
+        ? getCachedPaliSentences(bookCode, chapter.chapter_index)
+        : null;
+    if (syncPaliSent) {
+      setPaliSentMap(extractPaliChapMap(syncPaliSent, chapter.chapter_index));
+      setPaliSentFetched(true);
+      setIsPaliSentLoading(false);
+    }
+
+    const syncLinks =
+      needLinks && near && typeof getCachedChapterLinks === 'function'
+        ? getCachedChapterLinks(bookCode, chapter.chapter_index)
+        : null;
+    if (syncLinks) {
+      setChapterLinks(syncLinks);
+      setLinksFetched(true);
+      onLinksLoaded?.(chapter.chapter_index, syncLinks);
+    }
+
+    if (!near) return;
+
+    const missingTrans = Boolean(needTrans && !syncTrans && transFetchedKey !== activeLangsKeyWithMode);
+    const missingPaliSent = Boolean(needPaliSent && !syncPaliSent && !paliSentFetched);
+    const missingLinks = Boolean(needLinks && !syncLinks && !linksFetched);
+    if (!missingTrans && !missingPaliSent && !missingLinks) return;
+
+    let cancelled = false;
+    if (missingTrans) {
+      blockRef.current?.removeAttribute('data-trans-settled');
+      blockRef.current?.setAttribute('data-trans-loading', '1');
+      setIsTransLoading(true);
+    }
+    if (missingPaliSent) {
+      setIsPaliSentLoading(true);
+    }
+
+    const runFallbackIndividual = () => {
+      if (missingTrans) {
+        fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, {
+          sentences: effectiveSentenceMode,
+        })
+          .then((data) => {
+            if (cancelled) return;
+            setTranslations(data?.translations || {});
+            setTransSentences(effectiveSentenceMode ? data?.sentences || {} : {});
+            setTransFetchedKey(activeLangsKeyWithMode);
+            setIsTransLoading(false);
+          })
+          .catch((err) => {
+            console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
+            if (!cancelled) {
+              setTransFetchedKey(activeLangsKeyWithMode);
+              setIsTransLoading(false);
+            }
+          });
+      }
+      if (missingPaliSent) {
+        fetchPaliSentences(bookCode, chapter.chapter_index)
+          .then((data) => {
+            if (cancelled) return;
+            setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
+            setPaliSentFetched(true);
+            setIsPaliSentLoading(false);
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setPaliSentFetched(true);
+              setIsPaliSentLoading(false);
+            }
+          });
+      }
+      if (missingLinks) {
+        fetchChapterLinks(bookCode, chapter.chapter_index)
+          .then((data) => {
+            if (cancelled) return;
+            const paras = data?.paragraphs || null;
+            setChapterLinks(paras);
+            setLinksFetched(true);
+            onLinksLoaded?.(chapter.chapter_index, paras);
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setChapterLinks(null);
+              setLinksFetched(true);
+            }
+          });
+      }
+    };
+
+    fetchChapterBundle(bookCode, chapter.chapter_index, {
+      includeHtml: false,
+      langs: missingTrans ? langsToFetch : [],
+      sentences: missingTrans && effectiveSentenceMode,
+      paliSentences: missingPaliSent,
+      links: missingLinks,
+    })
+      .then((bundle) => {
+        if (cancelled) return;
+        if (!bundle) {
+          runFallbackIndividual();
+          return;
+        }
+        if (missingTrans) {
+          setTranslations(bundle.translations || {});
+          setTransSentences(effectiveSentenceMode ? bundle.sentences || {} : {});
+          setTransFetchedKey(activeLangsKeyWithMode);
+          setIsTransLoading(false);
+        }
+        if (missingPaliSent) {
+          setPaliSentMap(extractPaliChapMap(bundle.pali_sentences, chapter.chapter_index));
+          setPaliSentFetched(true);
+          setIsPaliSentLoading(false);
+        }
+        if (missingLinks) {
+          const paras = bundle.links || null;
+          setChapterLinks(paras);
+          setLinksFetched(true);
+          onLinksLoaded?.(chapter.chapter_index, paras);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) runFallbackIndividual();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canUseBundle,
+    html,
+    bookCode,
+    chapter.chapter_index,
+    activeLangsKey,
+    activeLangsKeyWithMode,
+    effectiveSentenceMode,
+    isPaliEnabled,
+    showBookLinks,
+    isParallelSyncActive,
+    isNearViewport,
+    isCurrentOrTarget,
+    transFetchedKey,
+    paliSentFetched,
+    linksFetched,
+    onLinksLoaded,
+  ]);
+
   // Task 3: Lazy load translations ONLY when chapter is near viewport (or current/target) and active translation languages exist
   useEffect(() => {
+    if (canUseBundle) return;
     if (!html || !bookCode || !activeLangsKey || (!isNearViewport && !isCurrentOrTarget)) {
       if (!activeLangsKey) {
         setTranslations({});
@@ -1509,11 +1989,12 @@ export const ChapterBlock = memo(function ChapterBlock({
     return () => {
       isMounted = false;
     };
-  }, [html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, effectiveSentenceMode, activeLangsKeyWithMode]);
+  }, [canUseBundle, html, bookCode, chapter.chapter_index, activeLangsKey, isNearViewport, isCurrentOrTarget, effectiveSentenceMode, activeLangsKeyWithMode]);
 
-  // Pāḷi sentence map for sentence display mode (book-level, shared cache).
+  // Pāḷi sentence map for sentence display mode (per-chapter on dynamic hosts, book-level static fallback).
   // Only needed when at least one translation is enabled; Pāḷi alone renders as paragraphs.
   useEffect(() => {
+    if (canUseBundle) return;
     if (!effectiveSentenceMode || !isPaliEnabled || !html || !bookCode) {
       if (!effectiveSentenceMode) {
         setPaliSentMap(null);
@@ -1525,21 +2006,21 @@ export const ChapterBlock = memo(function ChapterBlock({
       return;
     }
     const syncCached =
-      typeof getCachedPaliSentences === 'function' ? getCachedPaliSentences(bookCode) : null;
+      typeof getCachedPaliSentences === 'function'
+        ? getCachedPaliSentences(bookCode, chapter.chapter_index)
+        : null;
     if (syncCached) {
-      const chapMap = syncCached?.chapters?.[String(chapter.chapter_index)];
-      setPaliSentMap(chapMap || null);
+      setPaliSentMap(extractPaliChapMap(syncCached, chapter.chapter_index));
       setPaliSentFetched(true);
       setIsPaliSentLoading(false);
       return;
     }
     let cancelled = false;
     setIsPaliSentLoading(true);
-    fetchPaliSentences(bookCode)
+    fetchPaliSentences(bookCode, chapter.chapter_index)
       .then((data) => {
         if (cancelled) return;
-        const chapMap = data?.chapters?.[String(chapter.chapter_index)];
-        setPaliSentMap(chapMap || null);
+        setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
         setPaliSentFetched(true);
         setIsPaliSentLoading(false);
       })
@@ -1552,10 +2033,11 @@ export const ChapterBlock = memo(function ChapterBlock({
     return () => {
       cancelled = true;
     };
-  }, [effectiveSentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
+  }, [canUseBundle, effectiveSentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
 
   // Lazy load inline Linked Definitions for this chapter when visible and enabled (or when parallel column sync is active)
   useEffect(() => {
+    if (canUseBundle) return;
     const needLinks = (showBookLinks && isPaliEnabled) || isParallelSyncActive;
     if (!needLinks || !html || !bookCode || (!isNearViewport && !isCurrentOrTarget)) {
       if (!showBookLinks || !isPaliEnabled) setChapterLinks(null);
@@ -1585,7 +2067,7 @@ export const ChapterBlock = memo(function ChapterBlock({
     return () => {
       cancelled = true;
     };
-  }, [showBookLinks, isParallelSyncActive, isPaliEnabled, html, bookCode, chapter.chapter_index, isNearViewport, isCurrentOrTarget, onLinksLoaded]);
+  }, [canUseBundle, showBookLinks, isParallelSyncActive, isPaliEnabled, html, bookCode, chapter.chapter_index, isNearViewport, isCurrentOrTarget, onLinksLoaded]);
 
   const transFetchPending = isTransLoading || transFetchedKey !== activeLangsKeyWithMode;
   const paliSentFetchPending = effectiveSentenceMode && isPaliEnabled && (isPaliSentLoading || !paliSentFetched);
@@ -1614,7 +2096,8 @@ export const ChapterBlock = memo(function ChapterBlock({
     }
   }, [isTransPending, hasActiveTrans, transFetchedKey, activeLangsKeyWithMode]);
 
-  const displayHtml = React.useMemo(() => {
+  // Split expensive Pāḷi sentence injection + script transliteration from translation/link overlays
+  const paliBaseHtml = React.useMemo(() => {
     if (!html) return null;
     let processed = html;
     // Sentence display mode: Pāḷi sentence lines from the precomputed map.
@@ -1639,6 +2122,20 @@ export const ChapterBlock = memo(function ChapterBlock({
         searchHighlight.paraNum
       );
     }
+    return processed;
+  }, [
+    html,
+    effectiveSentenceMode,
+    isPaliEnabled,
+    paliSentMap,
+    showSentenceNumbers,
+    paliScript,
+    highlightSearchTerms,
+    searchHighlight,
+  ]);
+
+  const displayHtml = React.useMemo(() => {
+    if (!paliBaseHtml) return null;
     const currentPaliColors = translationColors?.pali || {};
     const hasCustomPaliColors = Boolean(
       formatCssColor(currentPaliColors.border) ||
@@ -1646,8 +2143,8 @@ export const ChapterBlock = memo(function ChapterBlock({
       formatCssColor(currentPaliColors.text)
     );
     if (hasActiveTrans || !isPaliEnabled || hasCustomPaliColors) {
-      processed = injectTranslationsIntoHtml(
-        processed,
+      return injectTranslationsIntoHtml(
+        paliBaseHtml,
         translations,
         orderedLayers,
         isPaliEnabled,
@@ -1656,15 +2153,25 @@ export const ChapterBlock = memo(function ChapterBlock({
         highlightSearchTerms ? searchHighlight : null,
         effectiveSentenceMode,
         transSentences,
-        theme
+        theme,
+        {
+          showBookLinks,
+          chapterLinks,
+          paliScript,
+          bookCode,
+          chapterIndex: chapter.chapter_index,
+        }
       );
     }
     if (showBookLinks && isPaliEnabled && chapterLinks) {
-      processed = injectBookLinksIntoHtml(processed, chapterLinks, paliScript, effectiveSentenceMode);
+      return injectBookLinksIntoHtml(paliBaseHtml, chapterLinks, paliScript, effectiveSentenceMode, {
+        bookCode,
+        chapterIndex: chapter.chapter_index,
+      });
     }
-    return processed;
+    return paliBaseHtml;
   }, [
-    html,
+    paliBaseHtml,
     paliScript,
     searchHighlight,
     highlightSearchTerms,
@@ -1675,12 +2182,12 @@ export const ChapterBlock = memo(function ChapterBlock({
     translationDisplayMode,
     translationColors,
     effectiveSentenceMode,
-    showSentenceNumbers,
     transSentences,
-    paliSentMap,
     showBookLinks,
     chapterLinks,
     theme,
+    bookCode,
+    chapter.chapter_index,
   ]);
 
   if (displayHtml) {
@@ -1705,7 +2212,7 @@ export const ChapterBlock = memo(function ChapterBlock({
           data-chapter={chapter.chapter_index}
           data-trans-loading="1"
           style={measuredHeightRef.current > 220 ? { minHeight: measuredHeightRef.current } : undefined}
-          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[220px]"
+          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[65vh]"
         >
           <div className="flex items-center gap-2.5 text-sm sm:text-base font-semibold text-[var(--text-primary)]">
             <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
@@ -1744,7 +2251,7 @@ export const ChapterBlock = memo(function ChapterBlock({
       id={`chap-${chapter.chapter_index}`}
       data-chapter={chapter.chapter_index}
       className="chapter-placeholder py-8 px-4 my-6 border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center gap-2 bg-[var(--bg-secondary)]/40 select-none"
-      style={{ minHeight: 240 }}
+      style={{ minHeight: 480 }}
     >
       <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] text-center">
         {convertPaliScript(capitalizePali(chapter.title), paliScript)}
@@ -2527,22 +3034,16 @@ export function buildParallelAnchors(
     return null;
   };
 
-  const parseChipLink = (chip) => {
-    if (chip.__parsedLink !== undefined) return chip.__parsedLink;
-    const raw = chip.getAttribute('data-link');
-    if (!raw) {
-      chip.__parsedLink = null;
-      return null;
-    }
-    try {
-      chip.__parsedLink = JSON.parse(decodeURIComponent(raw));
-    } catch (_) {
-      chip.__parsedLink = null;
-    }
-    return chip.__parsedLink;
-  };
+  const parseChipLink = (chip) => resolveChipLinkElement(chip);
 
-  const srcChips = srcContainer.querySelectorAll('.linked-def-chip[data-link]');
+  const legacySrcChips = Array.from(srcContainer.querySelectorAll('.linked-def-chip[data-link]') || []);
+  const refSrcChips = Array.from(srcContainer.querySelectorAll('.linked-def-chip[data-link-ref]') || []);
+  const srcChips =
+    refSrcChips.length > 0
+      ? legacySrcChips.length > 0
+        ? [...legacySrcChips, ...refSrcChips]
+        : refSrcChips
+      : legacySrcChips;
   for (const chip of srcChips) {
     const link = parseChipLink(chip);
     if (!link || link.target_book !== dstTab.bookCode) continue;
@@ -2553,7 +3054,14 @@ export function buildParallelAnchors(
     pairs.push([docY(srcEl, srcRect, srcScroll), docY(dstEl, dstRect, dstScroll)]);
   }
 
-  const dstChips = dstContainer.querySelectorAll('.linked-def-chip[data-link]');
+  const legacyDstChips = Array.from(dstContainer.querySelectorAll('.linked-def-chip[data-link]') || []);
+  const refDstChips = Array.from(dstContainer.querySelectorAll('.linked-def-chip[data-link-ref]') || []);
+  const dstChips =
+    refDstChips.length > 0
+      ? legacyDstChips.length > 0
+        ? [...legacyDstChips, ...refDstChips]
+        : refDstChips
+      : legacyDstChips;
   for (const chip of dstChips) {
     const link = parseChipLink(chip);
     if (!link || link.target_book !== srcTab.bookCode) continue;
@@ -2751,6 +3259,8 @@ const ReaderPane = memo(function ReaderPane({
   const containerRef = useRef(null);
   const contentHeaderRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
+  const vpBoundsCacheRef = useRef({ top: 0, height: 0, scrollHeight: 0, scrollY: -1, ts: 0 });
+  const lastHistoryKeyRef = useRef('');
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollTimerRef = useRef(null);
   const programmaticSafetyTimerRef = useRef(null);
@@ -2833,6 +3343,27 @@ const ReaderPane = memo(function ReaderPane({
       scrollHeight: c.scrollHeight,
     };
   }, [useWindowScroll]);
+
+  const getCachedViewportBounds = useCallback(
+    (scrollTop = 0) => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const cached = vpBoundsCacheRef.current;
+      const topDelta = Math.abs((scrollTop || 0) - cached.scrollY);
+      if (cached.height > 0 && topDelta < 120 && now - cached.ts < 300) {
+        return cached;
+      }
+      const fresh = getViewportBounds();
+      vpBoundsCacheRef.current = {
+        top: fresh.top,
+        height: fresh.height,
+        scrollHeight: fresh.scrollHeight,
+        scrollY: scrollTop || 0,
+        ts: now,
+      };
+      return vpBoundsCacheRef.current;
+    },
+    [getViewportBounds]
+  );
 
   const getTopReadingInset = useCallback(() => {
     if (!useWindowScroll || typeof window === 'undefined' || typeof document === 'undefined') {
@@ -4763,30 +5294,7 @@ const ReaderPane = memo(function ReaderPane({
     const pbElements = container.querySelectorAll('span.pb[data-ed][data-page]');
     if (pbElements.length === 0) return;
 
-    const pages = {};
-    const firstSeen = {};
-
-    for (const pb of pbElements) {
-      const ed = pb.getAttribute('data-ed');
-      const page = pb.getAttribute('data-page');
-      if (!ed || !page) continue;
-
-      if (!firstSeen[ed]) {
-        firstSeen[ed] = page;
-      }
-
-      const hostEl = pb.closest('[data-pindex], .reader-para-row, .sent-pair, p, .chapter-divider') || pb.parentElement || pb;
-      const rect = hostEl.getBoundingClientRect();
-      if (rect.top <= targetY) {
-        pages[ed] = page;
-      }
-    }
-
-    for (const [ed, firstPage] of Object.entries(firstSeen)) {
-      if (!pages[ed]) {
-        pages[ed] = firstPage;
-      }
-    }
+    const pages = findActiveEditionPagesFromElements(pbElements, targetY);
 
     if (Object.keys(pages).length > 0) {
       setPaneEditionPages((prev) => {
@@ -4820,19 +5328,25 @@ const ReaderPane = memo(function ReaderPane({
     };
     const timer = setTimeout(runDetect, 120);
     let moTimer = null;
-    let mo = null;
+    let moChild = null;
+    let moAttr = null;
     if (typeof MutationObserver !== 'undefined' && containerRef.current) {
       const inner = containerRef.current.querySelector('.reader-container') || containerRef.current;
-      mo = new MutationObserver(() => {
+      const scheduleDetect = () => {
         clearTimeout(moTimer);
         moTimer = setTimeout(runDetect, 80);
-      });
-      mo.observe(inner, { childList: true, subtree: true });
+      };
+      // Observe direct chapter mounts and settled attributes instead of subtree-wide DOM node churn
+      moChild = new MutationObserver(scheduleDetect);
+      moChild.observe(inner, { childList: true, subtree: false });
+      moAttr = new MutationObserver(scheduleDetect);
+      moAttr.observe(inner, { attributes: true, attributeFilter: ['data-trans-settled'], subtree: true });
     }
     return () => {
       clearTimeout(timer);
       clearTimeout(moTimer);
-      mo?.disconnect();
+      moChild?.disconnect();
+      moAttr?.disconnect();
     };
   }, [isVisible, isActive, activeTab?.bookCode, activeTab?.currentChapterIdx, activeTab?.loadedChapters, paneScrollIntent, settings?.paliScript, detectActiveEditionPages, getViewportBounds, getTopReadingInset]);
 
@@ -4851,7 +5365,137 @@ const ReaderPane = memo(function ReaderPane({
     scrollDownPeakYRef.current = curTop;
   }, [isHeaderVisible, isVisible, getScrollTop]);
 
-  // Direct fast scroll listener — auto-toggles header/footer, preserves tab scroll, drives parallel sync & detects active paragraph
+  const runPostScrollWork = useCallback(
+    (top) => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+      if (!isVisible || isTabSwitchingRef.current) return;
+      vpBoundsCacheRef.current.ts = 0;
+
+      const curTab = activeTabRef.current;
+      if (!curTab || !containerRef.current) return;
+
+      const container = containerRef.current;
+      const { top: vpTop } = getViewportBounds();
+      const targetY = vpTop + getTopReadingInset();
+
+      const headings = container.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
+      const detectedTitle = detectLiveSectionTitleFromElements(headings, targetY);
+      setPaneSectionTitle(detectedTitle);
+
+      let foundParaNum = null;
+      let foundPIndex = null;
+      let foundSnippet = '';
+      let foundChapterIdx = curTab.currentChapterIdx || 0;
+
+      const chapBlocks = container.querySelectorAll('[data-chapter]');
+      const activeChapEl = findFirstElementWithBottomAtOrBelow(chapBlocks, targetY);
+      if (activeChapEl) {
+        const activeRect = activeChapEl.getBoundingClientRect();
+        if (activeRect.top <= targetY && activeRect.bottom > targetY) {
+          const cIdx = parseInt(activeChapEl.getAttribute('data-chapter'), 10);
+          if (!isNaN(cIdx)) foundChapterIdx = cIdx;
+        }
+      }
+
+      let targetPara = null;
+      if (activeChapEl) {
+        const scopedParas = activeChapEl.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
+        targetPara = findFirstElementWithBottomAtOrBelow(scopedParas, targetY);
+      }
+      if (!targetPara) {
+        const allParas = container.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
+        targetPara = findFirstElementWithBottomAtOrBelow(allParas, targetY);
+      }
+
+      if (targetPara) {
+        foundPIndex = targetPara.getAttribute('data-pindex');
+        foundParaNum = targetPara.getAttribute('data-para');
+        if (!foundParaNum) {
+          let prev = targetPara.previousElementSibling;
+          while (prev) {
+            const prevNum = prev.getAttribute?.('data-para');
+            if (prevNum) {
+              foundParaNum = prevNum;
+              break;
+            }
+            prev = prev.previousElementSibling;
+          }
+        }
+
+        const text = targetPara.textContent?.replace(/\s+/g, ' ').trim() || '';
+        if (text) {
+          foundSnippet = text.length > 130 ? text.slice(0, 130) + '...' : text;
+        }
+
+        const chapBlock = targetPara.closest('[data-chapter]');
+        if (chapBlock) {
+          const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
+          if (!isNaN(cIdx)) foundChapterIdx = cIdx;
+        } else if (foundParaNum && curTab.sub_books_para_to_chapter && curTab.sub_book) {
+          const subChap = curTab.sub_books_para_to_chapter[curTab.sub_book]?.[foundParaNum];
+          if (subChap !== undefined) foundChapterIdx = subChap;
+        } else if (foundParaNum && curTab.para_to_chapter?.[foundParaNum] !== undefined) {
+          foundChapterIdx = curTab.para_to_chapter[foundParaNum];
+        }
+      }
+
+      if (activeChapEl) {
+        const activeRect = activeChapEl.getBoundingClientRect();
+        if (activeRect.top <= targetY && activeRect.bottom > targetY) {
+          const cIdx = parseInt(activeChapEl.getAttribute('data-chapter'), 10);
+          if (!isNaN(cIdx)) foundChapterIdx = cIdx;
+        }
+      }
+
+      if (foundParaNum) {
+        setPaneParaNum(foundParaNum);
+        if (isActive) {
+          setActiveParaNum(foundParaNum);
+        }
+      }
+
+      saveTabPosition(curTab.bookCode, foundChapterIdx, foundParaNum, top, foundPIndex);
+
+      const historyKey = `${curTab.bookCode}|${foundChapterIdx}|${foundParaNum || ''}|${foundPIndex || ''}`;
+      if (lastHistoryKeyRef.current !== historyKey) {
+        lastHistoryKeyRef.current = historyKey;
+        addToHistory({
+          bookCode: curTab.bookCode,
+          bookTitle: curTab.title,
+          nikaya: curTab.nikaya,
+          chapterIdx: foundChapterIdx,
+          chapterTitle: curTab.chapters?.[foundChapterIdx]?.title || '',
+          paraNum: foundParaNum || undefined,
+          paraIndex: foundPIndex ? parseInt(foundPIndex, 10) : undefined,
+          snippet:
+            foundSnippet ||
+            `${curTab.title} — ${curTab.chapters?.[foundChapterIdx]?.title || `Chapter ${foundChapterIdx + 1}`}${
+              foundParaNum ? ` (Para ${foundParaNum})` : ''
+            }`,
+        });
+      }
+
+      detectActiveEditionPages();
+    },
+    [
+      isVisible,
+      isActive,
+      saveTabPosition,
+      setActiveParaNum,
+      detectActiveEditionPages,
+      addToHistory,
+      getViewportBounds,
+      getTopReadingInset,
+    ]
+  );
+
+  const runPostScrollWorkRef = useRef(runPostScrollWork);
+  runPostScrollWorkRef.current = runPostScrollWork;
+
+  // Direct fast scroll listener — auto-toggles header/footer, preserves tab scroll, drives parallel sync & defers heavy DOM work until scroll settles
   const processScrollTop = useCallback(
     (top) => {
       if (!isVisible || isTabSwitchingRef.current) return;
@@ -4859,7 +5503,7 @@ const ReaderPane = memo(function ReaderPane({
       lastScrollYRef.current = top;
 
       const isJumping = Boolean(isProgrammaticScrollRef.current || paraJumpRef.current.key || chapterJumpRef.current.key);
-      const { height: vpHeight, scrollHeight: vpScrollHeight } = getViewportBounds();
+      const { height: vpHeight, scrollHeight: vpScrollHeight } = getCachedViewportBounds(top);
       const { nextVisible, upPeakY, downPeakY } = computeNextHeaderVisibility({
         top,
         isHeaderVisible: isHeaderVisibleRef.current,
@@ -4888,113 +5532,19 @@ const ReaderPane = memo(function ReaderPane({
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
+      const fallbackMs =
+        typeof window !== 'undefined' && 'onscrollend' in window ? 220 : 180;
       scrollTimeoutRef.current = setTimeout(() => {
-        if (!isVisible || isTabSwitchingRef.current) return;
-        const curTab = activeTabRef.current;
-        if (curTab && containerRef.current) {
-          const container = containerRef.current;
-          const { top: vpTop } = getViewportBounds();
-          const targetY = vpTop + getTopReadingInset();
-
-          const headings = container.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
-          const detectedTitle = detectLiveSectionTitleFromElements(headings, targetY);
-          setPaneSectionTitle(detectedTitle);
-
-          const paraElements = container.querySelectorAll('p[data-pindex], .reader-para-row[data-pindex]');
-          let foundParaNum = null;
-          let foundPIndex = null;
-          let foundSnippet = '';
-          let foundChapterIdx = curTab.currentChapterIdx || 0;
-
-          for (const p of paraElements) {
-            const rect = p.getBoundingClientRect();
-            if (rect.bottom >= targetY) {
-              foundPIndex = p.getAttribute('data-pindex');
-              foundParaNum = p.getAttribute('data-para');
-              if (!foundParaNum) {
-                let prev = p.previousElementSibling;
-                while (prev) {
-                  const prevNum = prev.getAttribute?.('data-para');
-                  if (prevNum) {
-                    foundParaNum = prevNum;
-                    break;
-                  }
-                  prev = prev.previousElementSibling;
-                }
-              }
-
-              const text = p.textContent?.replace(/\s+/g, ' ').trim() || '';
-              if (text) {
-                foundSnippet = text.length > 130 ? text.slice(0, 130) + '...' : text;
-              }
-
-              const chapBlock = p.closest('[data-chapter]');
-              if (chapBlock) {
-                const cIdx = parseInt(chapBlock.getAttribute('data-chapter'), 10);
-                if (!isNaN(cIdx)) foundChapterIdx = cIdx;
-              } else if (foundParaNum && curTab.sub_books_para_to_chapter && curTab.sub_book) {
-                const subChap = curTab.sub_books_para_to_chapter[curTab.sub_book]?.[foundParaNum];
-                if (subChap !== undefined) foundChapterIdx = subChap;
-              } else if (foundParaNum && curTab.para_to_chapter?.[foundParaNum] !== undefined) {
-                foundChapterIdx = curTab.para_to_chapter[foundParaNum];
-              }
-              break;
-            }
-          }
-
-          const chapBlocks = container.querySelectorAll('[data-chapter]');
-          for (const cb of chapBlocks) {
-            const r = cb.getBoundingClientRect();
-            if (r.top <= targetY && r.bottom > targetY) {
-              const cIdx = parseInt(cb.getAttribute('data-chapter'), 10);
-              if (!isNaN(cIdx)) {
-                foundChapterIdx = cIdx;
-                break;
-              }
-            }
-          }
-
-          if (foundParaNum) {
-            setPaneParaNum(foundParaNum);
-            if (isActive) {
-              setActiveParaNum(foundParaNum);
-            }
-          }
-
-          saveTabPosition(curTab.bookCode, foundChapterIdx, foundParaNum, top, foundPIndex);
-
-          addToHistory({
-            bookCode: curTab.bookCode,
-            bookTitle: curTab.title,
-            nikaya: curTab.nikaya,
-            chapterIdx: foundChapterIdx,
-            chapterTitle: curTab.chapters?.[foundChapterIdx]?.title || '',
-            paraNum: foundParaNum || undefined,
-            paraIndex: foundPIndex ? parseInt(foundPIndex, 10) : undefined,
-            snippet:
-              foundSnippet ||
-              `${curTab.title} — ${curTab.chapters?.[foundChapterIdx]?.title || `Chapter ${foundChapterIdx + 1}`}${
-                foundParaNum ? ` (Para ${foundParaNum})` : ''
-              }`,
-          });
-
-          detectActiveEditionPages();
-        }
-      }, 120);
+        runPostScrollWorkRef.current(top);
+      }, fallbackMs);
     },
     [
       isVisible,
-      isActive,
       isColumnsMode,
       isParallelSyncActive,
       saveTabScroll,
-      saveTabPosition,
-      setActiveParaNum,
-      detectActiveEditionPages,
-      addToHistory,
       onColumnScrollSync,
-      getViewportBounds,
-      getTopReadingInset,
+      getCachedViewportBounds,
       setIsHeaderVisible,
     ]
   );
@@ -5006,6 +5556,18 @@ const ReaderPane = memo(function ReaderPane({
     if (useWindowScrollRef.current) return;
     processScrollTopRef.current(e.target.scrollTop);
   }, []);
+
+  useEffect(() => {
+    if (useWindowScroll || !isVisible || typeof window === 'undefined' || !('onscrollend' in window)) return;
+    const node = containerRef.current;
+    if (!node) return;
+    const onContainerScrollEnd = () => {
+      if (useWindowScrollRef.current) return;
+      runPostScrollWorkRef.current(node.scrollTop);
+    };
+    node.addEventListener('scrollend', onContainerScrollEnd, { passive: true });
+    return () => node.removeEventListener('scrollend', onContainerScrollEnd);
+  }, [useWindowScroll, isVisible, activeTab?.bookCode, activeTab?.viewMode]);
 
   useEffect(() => {
     if (!useWindowScroll || !isVisible || typeof window === 'undefined') return;
@@ -5026,8 +5588,21 @@ const ReaderPane = memo(function ReaderPane({
       if (!useWindowScrollRef.current) return;
       processScrollTopRef.current(readWinTop());
     };
+    const onWinScrollEnd = () => {
+      if (!useWindowScrollRef.current) return;
+      runPostScrollWorkRef.current(readWinTop());
+    };
     window.addEventListener('scroll', onWinScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onWinScroll);
+    const hasNativeScrollEnd = 'onscrollend' in window;
+    if (hasNativeScrollEnd) {
+      window.addEventListener('scrollend', onWinScrollEnd, { passive: true });
+    }
+    return () => {
+      window.removeEventListener('scroll', onWinScroll);
+      if (hasNativeScrollEnd) {
+        window.removeEventListener('scrollend', onWinScrollEnd);
+      }
+    };
   }, [useWindowScroll, isVisible, setIsHeaderVisible]);
 
   const handleReaderClick = useCallback((e) => {
@@ -5062,12 +5637,9 @@ const ReaderPane = memo(function ReaderPane({
     if (linkChip) {
       e.preventDefault();
       e.stopPropagation();
-      const rawPayload = linkChip.getAttribute('data-link');
-      if (rawPayload) {
-        try {
-          const parsed = JSON.parse(decodeURIComponent(rawPayload));
-          setActiveLinkedItem({ ...parsed, sourceBookCode: activeTab.bookCode });
-        } catch (_) {}
+      const parsed = resolveChipLinkElement(linkChip);
+      if (parsed) {
+        setActiveLinkedItem({ ...parsed, sourceBookCode: activeTab.bookCode });
       }
       return;
     }
@@ -5219,22 +5791,18 @@ const ReaderPane = memo(function ReaderPane({
     (e) => {
       const linkChip = e.target.closest?.('.linked-def-chip');
       if (!linkChip) return;
-      const rawPayload = linkChip.getAttribute('data-link');
-      if (!rawPayload) return;
-      try {
-        const parsed = JSON.parse(decodeURIComponent(rawPayload));
-        if (parsed?.target_book) {
-          prefetchLinkedPreview({
-            book: parsed.target_book,
-            chapter: parsed.target_chapter,
-            paraIndex: parsed.target_para_index,
-            paraNum: parsed.target_para_num,
-            lineId: parsed.target_line_id,
-            word: parsed.word,
-            langs: activeLangs,
-          });
-        }
-      } catch (_) {}
+      const parsed = resolveChipLinkElement(linkChip);
+      if (parsed?.target_book) {
+        prefetchLinkedPreview({
+          book: parsed.target_book,
+          chapter: parsed.target_chapter,
+          paraIndex: parsed.target_para_index,
+          paraNum: parsed.target_para_num,
+          lineId: parsed.target_line_id,
+          word: parsed.word,
+          langs: activeLangs,
+        });
+      }
     },
     [activeLangs]
   );

@@ -386,7 +386,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
   }, []);
 
   useEffect(() => {
-    if (!isOpen || !isOffline) return;
+    if (!isOffline) return;
     refreshOfflineState();
     if (typeof window === 'undefined') return;
     const onPlatformReady = () => refreshOfflineState();
@@ -807,6 +807,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
 
       {isOpen && (
         <div
+          data-tpo-lang-modal="1"
           className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4 animate-fade-in"
           onClick={() => setIsOpen(false)}
         >
@@ -1091,7 +1092,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                           data-lang-id={trans.id}
                           className="tpo-lang-row px-3 py-2 rounded-xl border bg-[var(--bg-card)] border-[var(--border-color)] shadow-xs flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 transition select-none"
                         >
-                          <div className="flex items-center gap-2.5 min-w-[150px] flex-1">
+                          <div className="flex items-center gap-2.5 min-w-[120px] flex-1">
                             {settings.showTranslationBorders !== false && (
                               <span
                                 className="w-1 self-stretch rounded-full shrink-0"
@@ -1187,7 +1188,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                               checked={true}
                               disabled={isOnlyActive}
                               onChange={() => handleToggleTranslation(trans.id)}
-                              className="tpo-lang-switch ml-0.5"
+                              className={isOffline ? 'tpo-lang-switch tpo-lang-switch-offline ml-2.5' : 'tpo-lang-switch ml-0.5'}
                               aria-label={`Disable ${trans.label}`}
                               title={
                                 isOnlyActive
@@ -1244,7 +1245,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                               : 'bg-[var(--bg-secondary)]/55 border-[var(--border-color)]/75 hover:border-[var(--border-color)]'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-[150px] flex-1">
+                          <div className="flex items-center gap-2.5 min-w-[120px] flex-1">
                             {settings.showTranslationBorders !== false && (
                               <span
                                 className="w-1 self-stretch rounded-full shrink-0"
@@ -1295,7 +1296,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                                 type="button"
                                 onClick={() => handleOfflineDownload(trans, { enableOnComplete: false })}
                                 disabled={isDisabled || Boolean(offlineBusyCode)}
-                                className="px-2 py-1 rounded-md text-[10.5px] font-semibold inline-flex items-center gap-1 bg-[var(--bg-card)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent-light)] disabled:opacity-45 transition cursor-pointer"
+                                className="px-2 py-1 rounded-md text-[10.5px] font-semibold inline-flex items-center gap-1 whitespace-nowrap bg-[var(--bg-card)] text-[var(--accent)] border border-[var(--accent-border)] hover:bg-[var(--accent-light)] disabled:opacity-45 transition cursor-pointer"
                                 title={
                                   sizeLabel
                                     ? `Download ${trans.label} offline database (${sizeLabel}) & search index`
@@ -1303,8 +1304,8 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                                 }
                                 aria-label={`Download ${trans.label}`}
                               >
-                                <Download size={11} className={isBusy ? 'animate-bounce' : ''} />
-                                <span>{isBusy ? 'Downloading' : sizeLabel ? `Download (${sizeLabel})` : 'Download'}</span>
+                                <Download size={12} aria-hidden="true" className={isBusy ? 'animate-bounce' : ''} />
+                                {sizeLabel && <span>{sizeLabel}</span>}
                               </button>
                             )}
 
@@ -1343,7 +1344,7 @@ export default function LanguageMenu({ forceOfflineMode, initialOfflineState = n
                               checked={false}
                               disabled={isDisabled || isBusy}
                               onChange={() => !isDisabled && handleToggleTranslation(trans.id)}
-                              className="tpo-lang-switch"
+                              className={isOffline ? 'tpo-lang-switch tpo-lang-switch-offline ml-3.5' : 'tpo-lang-switch'}
                               aria-label={`Enable ${trans.label}`}
                               title={
                                 isDisabled

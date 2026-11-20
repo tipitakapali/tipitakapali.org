@@ -457,6 +457,7 @@ test('LanguageMenu renders 2 zones (Enabled including Pali + order/colors; Avail
   assert.doesNotMatch(html, /aria-label="Check for translation updates"/);
   assert.doesNotMatch(html, />Databases</);
   assert.doesNotMatch(availHtml, /aria-label="Download Vietnamese"/);
+  assert.doesNotMatch(html, /tpo-lang-switch-offline/);
 });
 
 test('LanguageMenu offline mode renders Check in footer (no Databases button, no As Sentence download icon), Update on enabled/outdated, Download and Delete on available', () => {
@@ -519,9 +520,14 @@ test('LanguageMenu offline mode renders Check in footer (no Databases button, no
   assert.match(availHtml, /aria-label="Delete Tiếng Việt"/);
   assert.match(availHtml, /Downloaded \+ Search/);
 
-  // Available Myanmar is NOT downloaded -> shows Download (size) + switch, no Delete
+  // Available Myanmar is NOT downloaded -> shows Download icon + MB size (no "Download" text) + longer separated switch
   assert.match(availHtml, /aria-label="Download မြန်မာ"/);
-  assert.match(availHtml, /Download \(90\.6 MB\)/);
+  assert.match(availHtml, /<button[^>]*aria-label="Download မြန်မာ"[^>]*>[\s\S]*?data-icon="Download"[\s\S]*?<span>90\.6 MB<\/span><\/button>/);
+  assert.doesNotMatch(availHtml, /Download \(90\.6 MB\)/);
+  assert.doesNotMatch(availHtml, />\(90\.6 MB\)</);
+  assert.doesNotMatch(availHtml, />Download</);
+  assert.match(enabledHtml, /class="[^"]*tpo-lang-switch-offline[^"]*ml-2\.5/);
+  assert.match(availHtml, /class="[^"]*tpo-lang-switch-offline[^"]*ml-3\.5/);
   assert.doesNotMatch(availHtml, /aria-label="Delete မြန်မာ"/);
 });
 

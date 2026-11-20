@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show AssetBundle, rootBundle;
 
@@ -36,6 +37,7 @@ class DpdFamilyTemplates {
   Map<String, dynamic> _familyWord;
   bool _loaded;
   Future<void>? _loadingFuture;
+  Uint8List? _preloadedCompressedBytes;
 
   DpdFamilyTemplates({
     Map<String, dynamic>? familyCompounds,
@@ -43,11 +45,13 @@ class DpdFamilyTemplates {
     Map<String, dynamic>? familyRoot,
     Map<String, dynamic>? familySets,
     Map<String, dynamic>? familyWord,
+    Uint8List? compressedAssetBytes,
   })  : _familyCompounds = familyCompounds ?? const {},
         _familyIdioms = familyIdioms ?? const {},
         _familyRoot = familyRoot ?? const {},
         _familySets = familySets ?? const {},
         _familyWord = familyWord ?? const {},
+        _preloadedCompressedBytes = compressedAssetBytes,
         _loaded = familyCompounds != null ||
             familyIdioms != null ||
             familyRoot != null ||
@@ -56,8 +60,42 @@ class DpdFamilyTemplates {
 
   bool get isLoaded => _loaded;
 
+  void setCompressedAssetBytes(Uint8List? bytes) {
+    if (_loaded || bytes == null || bytes.isEmpty) return;
+    _preloadedCompressedBytes = bytes;
+  }
+
+  void _applyCompressedBytes(Uint8List compressed) {
+    final rawBytes = gzip.decode(compressed);
+    final decoded = jsonDecode(utf8.decode(rawBytes));
+    if (decoded is Map<String, dynamic>) {
+      _familyCompounds =
+          (decoded['family_compounds'] as Map<String, dynamic>?) ?? const {};
+      _familyIdioms =
+          (decoded['family_idioms'] as Map<String, dynamic>?) ?? const {};
+      _familyRoot =
+          (decoded['family_root'] as Map<String, dynamic>?) ?? const {};
+      _familySets =
+          (decoded['family_sets'] as Map<String, dynamic>?) ?? const {};
+      _familyWord =
+          (decoded['family_word'] as Map<String, dynamic>?) ?? const {};
+    }
+    _preloadedCompressedBytes = null;
+    _loaded = true;
+  }
+
   Future<void> ensureLoaded({AssetBundle? bundle}) {
     if (_loaded) return Future.value();
+    final preloaded = _preloadedCompressedBytes;
+    if (preloaded != null) {
+      try {
+        _applyCompressedBytes(preloaded);
+      } catch (_) {
+        _preloadedCompressedBytes = null;
+        _loaded = true;
+      }
+      return Future.value();
+    }
     return _loadingFuture ??= _loadFromBundle(bundle ?? rootBundle);
   }
 
@@ -68,21 +106,7 @@ class DpdFamilyTemplates {
         data.offsetInBytes,
         data.lengthInBytes,
       );
-      final rawBytes = gzip.decode(compressed);
-      final decoded = jsonDecode(utf8.decode(rawBytes));
-      if (decoded is Map<String, dynamic>) {
-        _familyCompounds =
-            (decoded['family_compounds'] as Map<String, dynamic>?) ?? const {};
-        _familyIdioms =
-            (decoded['family_idioms'] as Map<String, dynamic>?) ?? const {};
-        _familyRoot =
-            (decoded['family_root'] as Map<String, dynamic>?) ?? const {};
-        _familySets =
-            (decoded['family_sets'] as Map<String, dynamic>?) ?? const {};
-        _familyWord =
-            (decoded['family_word'] as Map<String, dynamic>?) ?? const {};
-      }
-      _loaded = true;
+      _applyCompressedBytes(compressed);
     } catch (_) {
       // Allow graceful operation even if compressed family asset isn't bundled in unit tests.
       _loaded = true;

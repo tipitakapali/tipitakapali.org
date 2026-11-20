@@ -935,13 +935,13 @@ export function TabProvider({ children }) {
       if (!tab) return;
 
       const totalChaps = tab.chapters?.length || 1;
-      const toBuffer = [centerIdx + 1, centerIdx - 1, centerIdx + 2];
+      const toBuffer = [centerIdx + 1, centerIdx - 1];
 
-      toBuffer.forEach((idx) => {
+      toBuffer.forEach((idx, order) => {
         if (idx >= 0 && idx < totalChaps && !tab.loadedChapters?.[idx] && !tab.loadingChapters?.[idx]) {
           setTimeout(() => {
             loadChapter(cleanCode, idx);
-          }, 80);
+          }, (order + 1) * 200);
         }
       });
     },

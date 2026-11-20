@@ -728,6 +728,86 @@ async function main() {
     };
   });
 
+  // Combined single-roundtrip chapter bundle mirroring the offline Flutter server.
+  fastify.get('/api/book/:code/chapter/:chapterIndex/bundle', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    let cleanCode = req.params.code.replace('.xml', '');
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+
+    const chapIdx = parseInt(req.params.chapterIndex, 10);
+    if (isNaN(chapIdx) || chapIdx < 0) {
+      reply.code(404);
+      return { error: `Invalid chapter '${req.params.chapterIndex}' for book '${cleanCode}'` };
+    }
+
+    const includeHtml = req.query.includeHtml !== '0' && req.query.includeHtml !== 'false';
+    const langsParam = req.query.lang || req.query.langs || '';
+    const withSentences = req.query.sentences === 'true' || req.query.sentences === '1';
+    const withPaliSentences =
+      req.query.pali_sentences === 'true' ||
+      req.query.pali_sentences === '1' ||
+      req.query.paliSentences === 'true' ||
+      req.query.paliSentences === '1';
+    const withLinks = req.query.links === 'true' || req.query.links === '1';
+
+    const payload = {
+      book_code: cleanCode,
+      chapter_index: chapIdx,
+    };
+
+    if (includeHtml) {
+      const row = stmtGetChapterHtml.get(cleanCode, chapIdx);
+      const chHtml = row ? decodeTextOrZlib(row.html, hasChapterHtmlZ ? row.html_z : null) : null;
+      if (chHtml === null || chHtml === undefined) {
+        reply.code(404);
+        return { error: `Chapter ${chapIdx} not found in book '${cleanCode}'` };
+      }
+      payload.html = chHtml;
+    }
+
+    if (langsParam) {
+      const requestedLangs =
+        langsParam === 'all'
+          ? translationEngine.getAvailableLanguages().map((l) => l.code)
+          : String(langsParam)
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean);
+      if (requestedLangs.length > 0) {
+        const transRes = translationEngine.getChapterTranslations(
+          cleanCode,
+          chapIdx,
+          requestedLangs,
+          withSentences
+        );
+        payload.languages = transRes.languages || [];
+        payload.translations = transRes.translations || {};
+        if (withSentences) {
+          payload.sentences = transRes.sentences || {};
+        }
+      }
+    }
+
+    if (withPaliSentences && getPaliSentencesDb()) {
+      try {
+        const sentMap = readChapterSentences(db, paliSentDb, cleanCode, chapIdx);
+        const paraMap = {};
+        for (const [pi, list] of sentMap.entries()) {
+          paraMap[String(pi)] = list.map((s) => ({ line: s.lineId, text: s.text }));
+        }
+        payload.pali_sentences = paraMap;
+      } catch (_) {}
+    }
+
+    if (withLinks) {
+      const linkRes = boldLinkedEngine.getLinksForChapter(cleanCode, chapIdx);
+      payload.links = linkRes?.paragraphs || {};
+    }
+
+    return payload;
+  });
+
   // Get hierarchical TOC for a book (In-Memory Cached)
   fastify.get('/api/book/:code/toc', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
@@ -878,8 +958,8 @@ async function main() {
     return { results };
   });
 
-  // Per-book Pāḷi sentence splits for sentence display mode. Reads either
-  // standalone pali_sentences.db or unified chapter_text_pack inside tipitaka.db.
+  // Per-book (or per-chapter via ?chapter=idx) Pāḷi sentence splits for sentence display mode.
+  // Reads either standalone pali_sentences.db or unified chapter_text_pack inside tipitaka.db.
   const paliSentencesCache = new Map();
   fastify.get('/api/book/:code/pali_sentences', async (req, reply) => {
     applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
@@ -887,6 +967,24 @@ async function main() {
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
     if (chapSuffixMatch) {
       cleanCode = chapSuffixMatch[1];
+    }
+    const reqChap = req.query.chapter !== undefined ? parseInt(req.query.chapter, 10) : null;
+    if (reqChap !== null && !isNaN(reqChap) && reqChap >= 0) {
+      if (!getPaliSentencesDb()) {
+        reply.code(500);
+        return { error: 'Pali sentences unavailable' };
+      }
+      const cachedBook = paliSentencesCache.get(cleanCode);
+      if (cachedBook?.chapters) {
+        const paraMap = cachedBook.chapters[String(reqChap)] || {};
+        return { book_code: cleanCode, chapter_index: reqChap, chapters: { [String(reqChap)]: paraMap }, paragraphs: paraMap };
+      }
+      const sentMap = readChapterSentences(db, paliSentDb, cleanCode, reqChap);
+      const paraMap = {};
+      for (const [pi, list] of sentMap.entries()) {
+        paraMap[String(pi)] = list.map((s) => ({ line: s.lineId, text: s.text }));
+      }
+      return { book_code: cleanCode, chapter_index: reqChap, chapters: { [String(reqChap)]: paraMap }, paragraphs: paraMap };
     }
     if (paliSentencesCache.has(cleanCode)) return paliSentencesCache.get(cleanCode);
     if (!getPaliSentencesDb()) {
@@ -911,6 +1009,34 @@ async function main() {
       reply.code(404);
       return { error: `No Pali sentences found for '${cleanCode}'` };
     }
+  });
+
+  // Per-chapter Pāḷi sentence splits (avoids loading entire book on initial open)
+  fastify.get('/api/book/:code/chapter/:chapterIndex/pali_sentences', async (req, reply) => {
+    applyCacheHeader(reply, 'public, max-age=31536000, stale-while-revalidate=31536000, immutable');
+    let cleanCode = req.params.code.replace('.xml', '');
+    const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
+    if (chapSuffixMatch) cleanCode = chapSuffixMatch[1];
+    const chapIdx = parseInt(req.params.chapterIndex, 10);
+    if (isNaN(chapIdx) || chapIdx < 0) {
+      reply.code(404);
+      return { error: 'Invalid chapter index' };
+    }
+    if (!getPaliSentencesDb()) {
+      reply.code(500);
+      return { error: 'Pali sentences unavailable' };
+    }
+    const cachedBook = paliSentencesCache.get(cleanCode);
+    if (cachedBook?.chapters) {
+      const paraMap = cachedBook.chapters[String(chapIdx)] || {};
+      return { book_code: cleanCode, chapter_index: chapIdx, chapters: { [String(chapIdx)]: paraMap }, paragraphs: paraMap };
+    }
+    const sentMap = readChapterSentences(db, paliSentDb, cleanCode, chapIdx);
+    const paraMap = {};
+    for (const [pi, list] of sentMap.entries()) {
+      paraMap[String(pi)] = list.map((s) => ({ line: s.lineId, text: s.text }));
+    }
+    return { book_code: cleanCode, chapter_index: chapIdx, chapters: { [String(chapIdx)]: paraMap }, paragraphs: paraMap };
   });
 
   // Precomputed Canon-wide MAT Jump Resolver (immutable per DB build: cacheable)
