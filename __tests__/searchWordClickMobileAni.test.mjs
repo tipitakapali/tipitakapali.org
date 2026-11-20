@@ -1308,4 +1308,65 @@ test("Markdown for Agents: prefersMarkdownAccept, renderMarkdownForPath, route h
     "Browser requests without text/markdown must receive HTML default",
   );
   assert.equal(htmlBrowser.headers.get("Vary"), "Accept");
+
+  // 5. Verify VPS server_api/markdownEngine.js renders real book/chapter/script/translation markdown
+  const serverRequire = createRequire(
+    path.join(rootDir, "server_api", "package.json"),
+  );
+  const Database = serverRequire("better-sqlite3");
+  const { createMarkdownEngine } = require(
+    path.join(rootDir, "server_api", "markdownEngine.js"),
+  );
+  const { getTranslationEngine } = require(
+    path.join(rootDir, "server_api", "translationEngine.js"),
+  );
+  const { getColumnSet, decodeTextOrZlib } = require(
+    path.join(rootDir, "server_api", "tipitakaCoreHelper.js"),
+  );
+  const cstCatalog = JSON.parse(
+    fs.readFileSync(
+      path.join(rootDir, "server_api", "cst_books_catalog.json"),
+      "utf8",
+    ),
+  );
+  const db = new Database(
+    path.join(rootDir, "server_api", "db", "tipitaka.db"),
+    { readonly: true },
+  );
+  try {
+    const hasChapterHtmlZ = getColumnSet(db, "chapters").has("html_z");
+    const stmtGetChapters = db.prepare(
+      "SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index",
+    );
+    const stmtGetChapterHtml = db.prepare(
+      hasChapterHtmlZ
+        ? "SELECT html, html_z FROM chapters WHERE book_code = ? AND chapter_index = ?"
+        : "SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ?",
+    );
+    const mdEngine = createMarkdownEngine({
+      cstCatalog,
+      stmtGetChapters,
+      stmtGetChapterHtml,
+      hasChapterHtmlZ,
+      decodeTextOrZlib,
+      translationEngine: getTranslationEngine(),
+    });
+
+    const vpsDn1Ch1 = mdEngine.renderPath("/book/s0101m.mul/1");
+    assert.ok(vpsDn1Ch1 && vpsDn1Ch1.status === 200);
+    assert.match(vpsDn1Ch1.markdown, /Brahmajālasuttaṃ/);
+    assert.match(vpsDn1Ch1.markdown, /Evaṃ me sutaṃ/);
+    assert.match(vpsDn1Ch1.markdown, /\[s0101m\.mul:c0:p\d+\]/);
+    assert.ok(vpsDn1Ch1.tokens > 500);
+
+    const vpsSiDn1 = mdEngine.renderPath("/book/si.s0101m.mul/1");
+    assert.ok(vpsSiDn1 && vpsSiDn1.status === 200);
+    assert.match(vpsSiDn1.markdown, /බ්‍රහ්මජාලසුත්තං/);
+
+    const vpsViDn2 = mdEngine.renderPath("/translation/vi/s0102m.mul/9");
+    assert.ok(vpsViDn2 && vpsViDn2.status === 200);
+    assert.match(vpsViDn2.markdown, /Như vầy tôi đã nghe/);
+  } finally {
+    db.close();
+  }
 });

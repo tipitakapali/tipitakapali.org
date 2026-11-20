@@ -18,6 +18,7 @@ const {
   tryParseGuid,
 } = require('./tipitakaCoreHelper');
 const { BoldLinkedEngine } = require('./boldLinkedEngine');
+const { createMarkdownEngine } = require('./markdownEngine');
 
 // Keep the same internal port used by the existing api.tipitakapali.org reverse proxy.
 // Override with PORT when running in another environment.
@@ -287,6 +288,15 @@ if (fs.existsSync(catalogPath)) {
   }
 }
 
+const markdownEngine = createMarkdownEngine({
+  cstCatalog,
+  stmtGetChapters,
+  stmtGetChapterHtml,
+  hasChapterHtmlZ,
+  decodeTextOrZlib,
+  translationEngine,
+});
+
 // 2. Pre-computed Tree in RAM
 let precomputedTree = null;
 const treeJsonPath = path.join(__dirname, 'tree.json');
@@ -395,12 +405,48 @@ async function main() {
     logAsync(payload, req.ip, reply.statusCode >= 400 ? 'Error' : 'OK');
   });
 
+  // Server Cache Control Toggle: Re-enabled for ultra-low latency sub-millisecond serving
+  const ENABLE_HTTP_CACHE = true;
+
+  function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-while-revalidate=604800') {
+    if (ENABLE_HTTP_CACHE) {
+      reply.header('Cache-Control', publicHeader);
+    } else {
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
+  }
+
+  const sendMarkdownReply = (reply, rendered, targetPath = '/') => {
+    if (!rendered) {
+      const notFoundMd = `---\ntitle: "404 Not Found | Tipiṭaka Pāḷi"\n---\n\n# 404 Not Found\n\nThe requested page \`${targetPath}\` was not found on TipitakaPali.org.\n\n- [Home & Tipiṭaka Reader](https://tipitakapali.org/)\n- [AI Agent Guide (/llms.txt)](https://tipitakapali.org/llms.txt)\n- [Full 217-Book Catalog (/llms-full.txt)](https://tipitakapali.org/llms-full.txt)\n`;
+      const tokens = markdownEngine.estimateMarkdownTokens(notFoundMd);
+      reply.code(404);
+      reply.header('Content-Type', 'text/markdown; charset=utf-8');
+      reply.header('Vary', 'Accept');
+      reply.header('x-markdown-tokens', String(tokens));
+      reply.header('Content-Signal', 'ai-train=yes, search=yes, ai-input=yes');
+      reply.header('Access-Control-Expose-Headers', 'Content-Type, x-markdown-tokens, Content-Signal, Vary');
+      return notFoundMd;
+    }
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    reply.code(rendered.status || 200);
+    reply.header('Content-Type', 'text/markdown; charset=utf-8');
+    reply.header('Vary', 'Accept');
+    reply.header('x-markdown-tokens', String(rendered.tokens));
+    reply.header('Content-Signal', 'ai-train=yes, search=yes, ai-input=yes');
+    reply.header('Access-Control-Expose-Headers', 'Content-Type, x-markdown-tokens, Content-Signal, Vary');
+    return rendered.markdown;
+  };
+
   fastify.get('/', async (req, reply) => {
+    if (markdownEngine.prefersMarkdownAccept(req.headers.accept || '')) {
+      return sendMarkdownReply(reply, markdownEngine.renderPath('/', req.query), '/');
+    }
     return {
       name: 'Chaṭṭha Saṅgāyana Tipiṭaka Fastify API',
       status: 'online',
       version: '3.0.0',
-      features: ['2gb-mmap-sqlite', 'ram-resident-catalog', 'lru-search-cache', 'precomputed-chapters', 'sub-millisecond-serving'],
+      features: ['2gb-mmap-sqlite', 'ram-resident-catalog', 'lru-search-cache', 'precomputed-chapters', 'sub-millisecond-serving', 'markdown-for-agents'],
       endpoints: [
         'GET /api/tree',
         'GET /api/books',
@@ -412,22 +458,45 @@ async function main() {
         'GET /api/book/:code/mat_jump?para=..&chapter=..',
         'GET /api/mat',
         'GET /api/search?q=...',
+        'GET /api/markdown/*',
         'GET /api/health',
         'GET /log?filter=day|week|hour&timezone=Europe/Berlin (live visitor log)',
       ],
     };
   });
 
-// Server Cache Control Toggle: Re-enabled for ultra-low latency sub-millisecond serving
-const ENABLE_HTTP_CACHE = true;
+  // Markdown for Agents Endpoints (Direct /api/markdown/* or Cloudflare Origin Rule for /book/*, /translation/*, /info, etc.)
+  fastify.get('/api/markdown', async (req, reply) => {
+    const targetPath = req.query?.path || '/';
+    return sendMarkdownReply(reply, markdownEngine.renderPath(targetPath, req.query), targetPath);
+  });
 
-function applyCacheHeader(reply, publicHeader = 'public, max-age=86400, stale-while-revalidate=604800') {
-  if (ENABLE_HTTP_CACHE) {
-    reply.header('Cache-Control', publicHeader);
-  } else {
-    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  fastify.get('/api/markdown/*', async (req, reply) => {
+    const wildcard = req.params['*'] || '';
+    const targetPath = `/${wildcard}`;
+    return sendMarkdownReply(reply, markdownEngine.renderPath(targetPath, req.query), targetPath);
+  });
+
+  for (const pageRoute of [
+    '/book/*',
+    '/translation/*',
+    '/info',
+    '/info.html',
+    '/pali-script-converter',
+    '/pali-script-converter.html',
+    '/privacy_policy.html',
+    '/privacy_policy.md',
+    '/terms_of_service.html',
+    '/terms_of_service.md',
+    '/llms.txt',
+    '/llms-full.txt',
+    '/auth.md',
+  ]) {
+    fastify.get(pageRoute, async (req, reply) => {
+      const pathname = (req.url || '/').split('?')[0];
+      return sendMarkdownReply(reply, markdownEngine.renderPath(pathname, req.query), pathname);
+    });
   }
-}
 
   // Navigation tree endpoint (1 Year Immutable Cache + RAM-Resident)
   fastify.get('/api/tree', async (req, reply) => {

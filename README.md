@@ -207,18 +207,24 @@ npm run build
 - Legacy `/book/{code}?l={lang}` and `/book/{code}{N}` links automatically `301` redirect in `proxy.js` to `/translation/{lang}/{code}` or `/book/{code}/{N+1}`.
 - **Markdown for Agents (`Accept: text/markdown`)**:
   - **VPS Next.js SSR**: `proxy.js` and `/api/markdown/[[...path]]` automatically negotiate `Accept: text/markdown`, returning structured Markdown with YAML frontmatter, JSON-LD, `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes` while keeping HTML as the default for browsers.
-  - **Cloudflare Free Plan (Zero Workers Quota — Required when `/` is served by Cloudflare Pages)**:
-    Go to **Cloudflare Dashboard → zone `tipitakapali.org` → Rules → Overview → Create rule → URL Rewrite Rule**:
-    - **Rule name**: `Markdown for Agents (Accept: text/markdown)`
-    - **Place at (Order)**: **First** *(CRITICAL: Cloudflare evaluates all matching URL Rewrite Rules sequentially from top to bottom. If this rule is placed First and an agent requests `/book/s0101m.mul/1` with `Accept: text/markdown`, a later SPA-shell rule like Rule 1/2/3 would overwrite `/llms.txt` back to `/` if those rules don't exclude `text/markdown` — OR even better, place this rule **Last** so it runs after Rules 1–4 and has the final word on `http.request.uri.path`!)*
-    - **Recommended Order**: **Last** (after Rules 1–4) so its rewrite to `/llms.txt` is never overwritten by the SPA shell rules (`/`).
-    - **If incoming requests match → Custom filter expression**:
-      ```text
-      any(http.request.headers["accept"][*] contains "text/markdown") and not ends_with(http.request.uri.path, ".md") and not ends_with(http.request.uri.path, ".txt") and not starts_with(http.request.uri.path, "/api/")
-      ```
-    - **Then → Path → Rewrite to → Static**: `/llms.txt`
-    - **Query → Preserve**
-    *(Because `/llms.txt` is configured in `public/_headers` with `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens: 4263`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes`, Cloudflare immediately serves a valid Markdown response with token count for any `Accept: text/markdown` request while browsers without `Accept: text/markdown` continue receiving HTML at zero Workers quota cost.)*
+  - **Cloudflare Free Plan (Zero Workers Quota)**:
+    - **Step A (Origin Rule — so `/book/*`, `/translation/*`, `/info`, `/` with `Accept: text/markdown` render real page/chapter Markdown from your VPS Fastify server)**:
+      Go to **Cloudflare Dashboard → zone `tipitakapali.org` → Rules → Overview → Create rule → Origin Rule**:
+      - **Rule name**: `Route Markdown for Agents to VPS`
+      - **If incoming requests match → Custom filter expression**:
+        ```text
+        any(http.request.headers["accept"][*] contains "text/markdown") and not ends_with(http.request.uri.path, ".md") and not ends_with(http.request.uri.path, ".txt")
+        ```
+      - **Then → Host Header → Rewrite to**: `api.tipitakapali.org`
+      - **DNS Record → Override to**: `api.tipitakapali.org`
+      *(With this Origin Rule enabled, you can **delete or disable** the static `/llms.txt` URL Rewrite Rule 5, because `server_api/server.js` on `api.tipitakapali.org` now serves the exact Markdown of `/`, `/info`, `/book/s0101m.mul/1`, `/book/si.s0102m.mul/9`, `/translation/vi/s0102m.mul/9`, etc. with `Content-Type: text/markdown; charset=utf-8` and `x-markdown-tokens`!)*
+    - **Step B (Fallback URL Rewrite Rule — only if you do NOT use the Origin Rule above)**:
+      Go to **Rules → Overview → Create rule → URL Rewrite Rule** (Place at: **Last**):
+      - **If incoming requests match**:
+        ```text
+        any(http.request.headers["accept"][*] contains "text/markdown") and not ends_with(http.request.uri.path, ".md") and not ends_with(http.request.uri.path, ".txt") and not starts_with(http.request.uri.path, "/api/")
+        ```
+      - **Then → Path → Rewrite to → Static**: `/llms.txt` (Query → **Preserve**).
 - If migrating from static Cloudflare Pages, **disable** the legacy SPA-shell URL Rewrite Rules (Rules 1–3 below) for `/book/*` and `/chapter/*` so Cloudflare does not overwrite SSR HTML with `/`.
 
 ---
@@ -322,8 +328,9 @@ Why URL Rewrite rules and not `_redirects` or Functions:
 
 ```text
 Rule 1 — "SPA shell: chapter & translation paths"
-starts_with(http.request.uri.path, "/chapter/") or
-starts_with(http.request.uri.path, "/translation/")
+(starts_with(http.request.uri.path, "/chapter/") or
+ starts_with(http.request.uri.path, "/translation/")) and
+not any(http.request.headers["accept"][*] contains "text/markdown")
 
 Rule 2 — "SPA shell: book chapter deep-links"
 starts_with(http.request.uri.path, "/book/") and
@@ -337,7 +344,8 @@ starts_with(http.request.uri.path, "/book/") and
  ends_with(http.request.uri.path, "7") or
  ends_with(http.request.uri.path, "8") or
  ends_with(http.request.uri.path, "9")) and
-not (http.request.uri.path contains "/__next")
+not (http.request.uri.path contains "/__next") and
+not any(http.request.headers["accept"][*] contains "text/markdown")
 
 Rule 3 — "SPA shell: script-prefixed books"
 (starts_with(http.request.uri.path, "/book/si.") or
@@ -355,7 +363,8 @@ Rule 3 — "SPA shell: script-prefixed books"
  starts_with(http.request.uri.path, "/book/mala.") or
  starts_with(http.request.uri.path, "/book/brah.") or
   starts_with(http.request.uri.path, "/book/tibt.") or
-  starts_with(http.request.uri.path, "/book/cyrl."))
+  starts_with(http.request.uri.path, "/book/cyrl.")) and
+not any(http.request.headers["accept"][*] contains "text/markdown")
 
 Rule 4 — "Translation JSON: strip .json suffix"
 starts_with(http.request.uri.path, "/api/book/") and

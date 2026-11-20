@@ -577,4 +577,7 @@ module.exports = {
   convertAnyToRoman,
   capitalizePali,
   normalizePaliForSearch,
+  convertPaliScript,
+  splitScriptCode,
+  SCRIPT_URL_PREFIXES,
 };
