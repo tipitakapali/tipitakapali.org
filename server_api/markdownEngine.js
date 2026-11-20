@@ -356,6 +356,29 @@ function createMarkdownEngine({
     const html = getChapterHtml(bookCode, chapterIndex);
     const paliRows = html ? stripChapterHtmlToParagraphs(html) : [];
 
+    // On Roman Pāḷi book/chapter requests (/book/s0101m.mul/1), if no explicit translation
+    // language was requested, include aligned English (en) translation alongside the Pāḷi text
+    // when available so AI agents reading /book/* get both the Pāḷi and its English translation.
+    let defaultEnMap = null;
+    if (!langMeta && !scriptMeta && translationEngine) {
+      const enCode = translationEngine.ensureLanguage('en');
+      const enEntry = enCode ? translationEngine.databases.get(enCode) : null;
+      if (enEntry) {
+        try {
+          const rows = enEntry.stmtChapter.all(bookCode, chapterIndex);
+          defaultEnMap = new Map();
+          for (const r of rows) {
+            if (r.translation && String(r.translation).trim()) {
+              defaultEnMap.set(Number(r.para_index), {
+                paraNum: r.para_num !== null && r.para_num !== undefined ? String(r.para_num) : null,
+                text: cleanTranslationPlainText(r.translation),
+              });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
     const { ownTitle, parentLabel, pitakaLabel, layerLabel } = extractBookOwnTitleAndContext(bookCode, entry);
     const activeChapMeta = chaptersForBook[chapterIndex] || null;
     const rawChapTitle = activeChapMeta?.title
@@ -483,15 +506,22 @@ function createMarkdownEngine({
           scriptMeta && !langMeta ? convertPaliScript(row.pali, scriptMeta.scriptId) : row.pali;
         const trEntry = transMap ? transMap.get(row.paraIndex) : null;
         const trText = trEntry ? trEntry.text : null;
+        const enFallbackEntry = !trText && defaultEnMap ? defaultEnMap.get(row.paraIndex) : null;
+        const enFallbackText = enFallbackEntry ? enFallbackEntry.text : null;
 
-        charBudget += (paliDisplay?.length || 0) + (trText?.length || 0);
+        charBudget += (paliDisplay?.length || 0) + (trText?.length || enFallbackText?.length || 0);
         count++;
 
         const citeTag = `[${bookCode}:c${chapterIndex}:p${row.paraIndex}]`;
-        const paraNumBadge = (trEntry?.paraNum || row.paraNum) ? ` (§${trEntry?.paraNum || row.paraNum})` : '';
+        const effParaNum = trEntry?.paraNum || enFallbackEntry?.paraNum || row.paraNum;
+        const paraNumBadge = effParaNum ? ` (§${effParaNum})` : '';
 
         if (row.isHeading) {
-          const headingText = trText ? `${trText}${paliDisplay ? ` — ${paliDisplay}` : ''}` : paliDisplay;
+          const headingText = trText
+            ? `${trText}${paliDisplay ? ` — ${paliDisplay}` : ''}`
+            : enFallbackText && enFallbackText.toLowerCase() !== (paliDisplay || '').toLowerCase()
+              ? `${paliDisplay} — ${enFallbackText}`
+              : paliDisplay;
           lines.push(`### ${headingText} ${citeTag}${paraNumBadge}`, '');
         } else {
           if (trText) {
@@ -502,6 +532,9 @@ function createMarkdownEngine({
               trText ? `*Pāḷi:* ${paliDisplay}` : `${paliDisplay} ${citeTag}${paraNumBadge}`,
               ''
             );
+          }
+          if (!trText && enFallbackText) {
+            lines.push(`*English:* ${enFallbackText}`, '');
           }
         }
       }

@@ -517,6 +517,7 @@ export async function renderMarkdownForPath(rawPathname = '/') {
         bookCode: parsed.bookCode,
         chapterIndex: parsed.chapterIndex,
         scriptId: parsed.scriptId,
+        translationLang: parsed.scriptId ? null : 'en',
       }),
     ]);
 

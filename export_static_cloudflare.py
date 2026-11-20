@@ -762,6 +762,15 @@ def generate_cloudflare_headers(dist_dir: Path):
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
 
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+  Vary: Accept
+  x-markdown-tokens: 4263
+  Content-Signal: ai-train=yes, search=yes, ai-input=yes
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+  Access-Control-Expose-Headers: Content-Type, x-markdown-tokens, Content-Signal, Vary
+
 /llms.txt
   Content-Type: text/markdown; charset=utf-8
   Vary: Accept
@@ -829,6 +838,99 @@ def generate_cloudflare_headers(dist_dir: Path):
     with open(headers_file, 'w', encoding='utf-8') as f:
         f.write(content)
     log_success("Created Cloudflare Pages '_headers'")
+
+
+def export_static_markdown_files(paths: dict):
+    """
+    Generate static .md files (/index.md, /info.md, /pali-script-converter.md, and
+    /book/{code}.md + /book/{code}/{1_based_chapter}.md for all 217 books and 2,695 chapters)
+    using server_api/markdownEngine.js so Cloudflare Free Plan URL Rewrite Rules
+    (concat(http.request.uri.path, ".md")) can serve real canonical Markdown at zero Workers quota.
+    """
+    web_app_dir = paths['web_app_dir']
+    dist_dir = paths['dist_dir']
+    git_repo_dir = paths['git_repo_dir']
+    targets = [t for t in [dist_dir, git_repo_dir] if t and t.exists()]
+    if not targets:
+        return
+
+    log_info("Generating static Markdown for Agents (.md) files for all 217 books & 2,695 chapters...")
+    node_script = r"""
+const fs = require('fs');
+const path = require('path');
+const Database = require('./server_api/node_modules/better-sqlite3');
+const { createMarkdownEngine } = require('./server_api/markdownEngine');
+const { getTranslationEngine } = require('./server_api/translationEngine');
+const { getColumnSet, decodeTextOrZlib } = require('./server_api/tipitakaCoreHelper');
+
+const targets = process.argv.slice(1);
+const cstCatalog = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'server_api', 'cst_books_catalog.json'), 'utf8'));
+const db = new Database(path.join(process.cwd(), 'server_api', 'db', 'tipitaka.db'), { readonly: true });
+const hasChapterHtmlZ = getColumnSet(db, 'chapters').has('html_z');
+const stmtGetChapters = db.prepare('SELECT chapter_index, title, chunk_name, anchor_id, para_index FROM chapters WHERE book_code = ? ORDER BY chapter_index');
+const stmtGetChapterHtml = db.prepare(
+  hasChapterHtmlZ
+    ? 'SELECT html, html_z FROM chapters WHERE book_code = ? AND chapter_index = ?'
+    : 'SELECT html FROM chapters WHERE book_code = ? AND chapter_index = ?'
+);
+const mdEngine = createMarkdownEngine({
+  cstCatalog,
+  stmtGetChapters,
+  stmtGetChapterHtml,
+  hasChapterHtmlZ,
+  decodeTextOrZlib,
+  translationEngine: getTranslationEngine(),
+});
+
+function writeToTargets(relFile, content) {
+  for (const base of targets) {
+    const outPath = path.join(base, relFile);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, content, 'utf8');
+  }
+}
+
+let count = 0;
+for (const [routePath, outRel] of [
+  ['/', 'index.md'],
+  ['/info', 'info.md'],
+  ['/pali-script-converter', 'pali-script-converter.md'],
+]) {
+  const res = mdEngine.renderPath(routePath);
+  if (res && res.markdown) {
+    writeToTargets(outRel, res.markdown);
+    count++;
+  }
+}
+
+for (const code of Object.keys(cstCatalog)) {
+  const bookRes = mdEngine.renderPath(`/book/${code}`);
+  if (bookRes && bookRes.markdown) {
+    writeToTargets(`book/${code}.md`, bookRes.markdown);
+    count++;
+  }
+  const chaps = stmtGetChapters.all(code);
+  for (let i = 1; i <= chaps.length; i++) {
+    const chRes = mdEngine.renderPath(`/book/${code}/${i}`);
+    if (chRes && chRes.markdown) {
+      writeToTargets(`book/${code}/${i}.md`, chRes.markdown);
+      count++;
+    }
+  }
+}
+db.close();
+console.log(`Generated ${count} static .md files across ${targets.length} target(s).`);
+"""
+    res = subprocess.run(
+        ["node", "-e", node_script, *[str(t) for t in targets]],
+        cwd=str(web_app_dir),
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        log_success(res.stdout.strip() or "Generated static .md files for Markdown for Agents")
+    else:
+        log_warn(f"Static .md generation note: {res.stderr or res.stdout}")
 
 
 def generate_seo_and_ai_metadata(paths: dict, site_url: str):
@@ -1431,8 +1533,9 @@ def export_website(args, paths):
     generate_cloudflare_redirects(dist_dir)
     generate_cloudflare_headers(dist_dir)
 
-    # 6. Generate SEO & AI Agent Metadata (18 Sitemaps, robots.txt, llms.txt, etc.)
+    # 6. Generate SEO & AI Agent Metadata (18 Sitemaps, robots.txt, llms.txt, etc.) + Static .md files
     generate_seo_and_ai_metadata(paths, args.site_url)
+    export_static_markdown_files(paths)
 
     # 7. Synchronize with Git repository (protecting /api/book/*/translation/***)
     sync_website_to_git_repo(

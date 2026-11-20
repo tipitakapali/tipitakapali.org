@@ -39,6 +39,15 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
   Access-Control-Allow-Origin: *
 
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+  Vary: Accept
+  x-markdown-tokens: 4263
+  Content-Signal: ai-train=yes, search=yes, ai-input=yes
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+  Access-Control-Allow-Origin: *
+  Access-Control-Expose-Headers: Content-Type, x-markdown-tokens, Content-Signal, Vary
+
 /llms.txt
   Content-Type: text/markdown; charset=utf-8
   Vary: Accept
