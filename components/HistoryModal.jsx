@@ -122,7 +122,7 @@ export default function HistoryModal({ isOpen, onClose }) {
               placeholder="Search recent books..."
               value={filterText}
               onChange={(e) => setFilterText(typeVelthuis(e.target.value))}
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md py-1.5 pl-8 pr-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md py-1.5 pl-8 pr-3 text-base sm:text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             />
           </div>
         </div>

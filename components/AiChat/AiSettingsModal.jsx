@@ -181,7 +181,7 @@ function ModelSelect({ value, onChange, models, placeholder }) {
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
-        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
+        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-base sm:text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
       />
       {hasList && open && (
         <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl z-30 py-1">
@@ -445,7 +445,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                   answerModel: defaultAnswerModel,
                 });
               }}
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] cursor-pointer"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-base sm:text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] cursor-pointer"
             >
               <option value="gemini">Google Gemini — Free key • Recommended</option>
               <option value="openai">OpenAI compatible provider — custom endpoint • any model</option>
@@ -478,7 +478,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               value={config.apiKey}
               onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
               placeholder={config.provider === 'gemini' ? 'Paste AIzaSy… key here' : 'Paste API key here'}
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-base sm:text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
             <p className="text-[10.5px] text-[var(--text-muted)]">
               🔒 <strong>Zero-Key-Escape:</strong> Your API key is stored strictly in your browser's localStorage and never leaves your browser.
@@ -502,7 +502,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
                     ? 'https://api.openai.com/v1 (or any OpenAI-compatible endpoint)'
                     : 'http://localhost:11434/v1'
                 }
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
+                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-base sm:text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] font-mono"
               />
               {config.provider === 'openai' && (
                 <p className="text-[10.5px] text-[var(--text-muted)]">
@@ -637,7 +637,7 @@ export default function AiSettingsModal({ isOpen, onClose, onSave }) {
               value={config.customSystemPrompt}
               onChange={(e) => setConfig({ ...config, customSystemPrompt: e.target.value })}
               placeholder="Leave blank to use default Ani scholarly prompts…"
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 px-3 text-base sm:text-xs outline-none focus:border-violet-500 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none"
             />
           </div>
 

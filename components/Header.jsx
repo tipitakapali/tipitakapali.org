@@ -124,6 +124,7 @@ export default function Header() {
             type="text"
             placeholder="Full text Search (Press / to begin)"
             readOnly
+            onFocus={(e) => e.target.blur()}
             className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-full py-1.5 pl-8 pr-9 text-xs text-[var(--text-primary)] cursor-pointer outline-none transition focus:border-[var(--accent)]"
           />
         </div>
@@ -134,7 +135,7 @@ export default function Header() {
         {/* Mobile Search Button */}
         <button
           onClick={() => openSearchModal('')}
-          className="sm:hidden p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer"
+          className="sm:hidden p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition cursor-pointer touch-manipulation"
           title="Search books (/)"
           aria-label="Search books"
         >

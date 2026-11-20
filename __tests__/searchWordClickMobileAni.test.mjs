@@ -1370,3 +1370,72 @@ test("Markdown for Agents: prefersMarkdownAccept, renderMarkdownForPath, route h
     db.close();
   }
 });
+
+test("Task 6: Mobile inputs, textareas, and selects enforce >= 16px font-size to prevent iOS/WKWebView auto-zoom while preserving pinch-zoom", () => {
+  const globalsCss = fs.readFileSync(path.join(rootDir, "app", "globals.css"), "utf8");
+  assert.match(
+    globalsCss,
+    /@media\s*\(pointer:\s*coarse\),\s*\(hover:\s*none\),\s*\(max-width:\s*767px\)\s*\{[\s\S]*font-size:\s*max\(1rem,\s*1em\);/,
+    "app/globals.css must enforce >= 1rem font-size for mobile/touch text inputs, textareas, and selects",
+  );
+  assert.match(
+    globalsCss,
+    /input:not\(\[type="checkbox"\][^)]*\),\s*textarea,\s*select/,
+    "app/globals.css anti-zoom rule must cover text inputs, textareas, and selects while excluding checkboxes/radios/ranges",
+  );
+  assert.match(
+    globalsCss,
+    /\.search-lang-control\s*\{\s*flex-wrap:\s*wrap;\s*max-width:\s*100%;\s*\}/,
+    "app/globals.css must allow .search-lang-control to wrap without horizontal overflow on narrow mobile screens",
+  );
+
+  const paliFontsCss = fs.readFileSync(path.join(rootDir, "app", "pali-fonts.css"), "utf8");
+  assert.match(
+    paliFontsCss,
+    /html\[data-script="thai"\]\s+\.welcome-view\s+input,\s*html\[data-script="thai"\]\s+\.dict-header-bar\s+input,\s*html\[data-script="thai"\]\s+\.modal-header\s+input\s*\{\s*font-size:\s*max\(1rem,\s*calc\(1em \* 1\.32\)\);/,
+    "app/pali-fonts.css must keep Thai script inputs at least 1rem",
+  );
+
+  const searchSrc = fs.readFileSync(path.join(rootDir, "components", "Search", "SearchModal.jsx"), "utf8");
+  assert.match(
+    searchSrc,
+    /id="fts-search-input"[\s\S]*text-base sm:text-sm/,
+    "SearchModal #fts-search-input must use text-base sm:text-sm",
+  );
+  assert.match(
+    searchSrc,
+    /focus\(\{\s*preventScroll:\s*true\s*\}\)/,
+    "SearchModal must call focus({ preventScroll: true })",
+  );
+
+  const aniSrc = fs.readFileSync(path.join(rootDir, "components", "AiChat", "AiChatView.jsx"), "utf8");
+  assert.match(
+    aniSrc,
+    /<textarea[\s\S]*text-base sm:text-sm/,
+    "AiChatView Ani textarea must use text-base sm:text-sm",
+  );
+  assert.match(
+    aniSrc,
+    /focus\(\{\s*preventScroll:\s*true\s*\}\)/,
+    "AiChatView must call focus({ preventScroll: true })",
+  );
+
+  const dictSrc = fs.readFileSync(path.join(rootDir, "components", "DictionaryModal.jsx"), "utf8");
+  assert.match(
+    dictSrc,
+    /Dictionary - multi words[\s\S]*text-base sm:text-sm/,
+    "DictionaryModal search input must use text-base sm:text-sm",
+  );
+
+  const welcomeSrc = fs.readFileSync(path.join(rootDir, "components", "Reader", "WelcomeView.jsx"), "utf8");
+  assert.match(
+    welcomeSrc,
+    /Full-text search[\s\S]*text-base sm:text-sm[\s\S]*Dictionary - multi words[\s\S]*text-base sm:text-sm/,
+    "WelcomeView search and dictionary inputs must use text-base sm:text-sm",
+  );
+
+  const layoutSrc = fs.readFileSync(path.join(rootDir, "app", "layout.js"), "utf8");
+  assert.ok(!layoutSrc.includes("userScalable: false"), "app/layout.js must keep pinch-zoom enabled");
+  assert.ok(!layoutSrc.includes("maximumScale: 1"), "app/layout.js must not re-add maximumScale: 1");
+});
+

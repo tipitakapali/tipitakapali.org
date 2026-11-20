@@ -122,7 +122,7 @@ export default function BookTocView({ tab: propTab = null, isColumnsMode = false
             placeholder={`Filter ${tocList.length} sections… (e.g. “sutta”, “vagga”)`}
             value={filterQuery}
             onChange={(e) => setFilterQuery(typeVelthuis(e.target.value))}
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-9 text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-2 pl-9 pr-9 text-base sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
           />
           {filterQuery && (
             <button

@@ -233,7 +233,7 @@ export default function Footer() {
                           updateSetting('translationFontSize', val);
                         }
                       }}
-                      className="w-9 bg-transparent text-center font-bold outline-none"
+                      className="w-11 bg-transparent text-center font-bold outline-none"
                       aria-label="Translation font size in pixels"
                     />
                     <span>px</span>
@@ -313,7 +313,7 @@ export default function Footer() {
                             updateSetting('fontSize', val);
                           }
                         }}
-                        className="w-9 bg-transparent text-center font-bold text-[var(--accent)] outline-none"
+                        className="w-11 bg-transparent text-center font-bold text-[var(--accent)] outline-none"
                         aria-label="Pali font size in pixels"
                       />
                       <span>px</span>

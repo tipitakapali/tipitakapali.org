@@ -612,7 +612,7 @@ export default function AiChatView({ initialQuery = null }) {
     setActiveThreadId(newId);
     setMessages([]);
     localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify(nextThreads));
-    if (textareaRef.current) textareaRef.current.focus();
+    textareaRef.current?.focus({ preventScroll: true });
   };
 
   // 6. Delete thread
@@ -654,7 +654,7 @@ export default function AiChatView({ initialQuery = null }) {
       localStorage.setItem(THREADS_STORAGE_KEY, JSON.stringify([freshThread]));
     } catch (e) {}
     setIsThreadMenuOpen(false);
-    if (textareaRef.current) textareaRef.current.focus();
+    textareaRef.current?.focus({ preventScroll: true });
   };
 
   // 6c. Close thread history menu on outside click / Escape
@@ -1356,7 +1356,7 @@ export default function AiChatView({ initialQuery = null }) {
               }}
               placeholder="Ask Ani about Pāḷi grammar, or finding suttas..."
               disabled={isGenerating}
-              className="flex-1 bg-transparent py-1.5 px-2.5 text-xs sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 leading-relaxed"
+              className="flex-1 bg-transparent py-1.5 px-2.5 text-base sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 leading-relaxed"
             />
 
             {/* Send or Stop Button */}

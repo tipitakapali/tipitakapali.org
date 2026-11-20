@@ -77,7 +77,7 @@ export default function WelcomeView() {
               e.target.blur();
               openSearchModal('');
             }}
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] group-hover:border-[var(--accent)] rounded-xl py-3 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] cursor-pointer outline-none transition shadow-sm group-hover:shadow-md"
+            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] group-hover:border-[var(--accent)] rounded-xl py-3 pl-10 pr-4 text-base sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] cursor-pointer outline-none transition shadow-sm group-hover:shadow-md"
           />
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function WelcomeView() {
             }}
             onKeyDown={handleDictKeyDown}
             placeholder="Dictionary - multi words & 17 pāḷi scripts input accepted"
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] focus:border-[var(--accent)] group-hover:border-[var(--border-color)] rounded-xl py-3 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition shadow-sm focus:shadow-md group-hover:shadow-sm cursor-text"
+            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] focus:border-[var(--accent)] group-hover:border-[var(--border-color)] rounded-xl py-3 pl-10 pr-4 text-base sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition shadow-sm focus:shadow-md group-hover:shadow-sm cursor-text"
           />
         </form>
       </div>

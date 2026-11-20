@@ -5149,6 +5149,10 @@ section.MWS {
   opacity: 0.7;
 }
 
+.linked-def-word {
+  font-family: var(--font-reader);
+}
+
 .linked-def-cat {
   font-size: 9.5px;
   font-weight: 600;
@@ -5761,6 +5765,30 @@ body.window-scroll .app-footer.hidden-footer {
   background: var(--accent-light);
   color: var(--accent);
 }
+
+/* Prevent iOS Safari / WKWebView automatic viewport zoom on form control focus
+   while keeping pinch-to-zoom enabled for accessibility (WCAG 1.4.4).
+   WebKit auto-zooms whenever a focused input/textarea/select computes to < 16px. */
+@media (pointer: coarse), (hover: none), (max-width: 767px) {
+  :is(
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"], [type="button"], [type="submit"], [type="reset"]),
+    textarea,
+    select
+  ) {
+    font-size: max(1rem, 1em);
+  }
+
+  .search-lang-control {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .search-lang-select,
+  .search-select-dropdown {
+    max-width: 100%;
+  }
+}
+
 
 
 

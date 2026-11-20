@@ -565,9 +565,9 @@ export default function SearchModal() {
       return;
     }
 
-    setTimeout(() => {
+    const focusTimer = setTimeout(() => {
       if (inputRef.current) {
-        inputRef.current.focus();
+        inputRef.current.focus({ preventScroll: true });
         const len = inputRef.current.value.length;
         inputRef.current.setSelectionRange(len, len);
       }
@@ -600,6 +600,8 @@ export default function SearchModal() {
         performSearchRef.current?.(searchQuery, 0, effectiveDb);
       }
     }
+
+    return () => clearTimeout(focusTimer);
   }, [isSearchOpen, searchInitialQuery, displayedDatabases]);
 
   useEffect(() => {
@@ -695,7 +697,7 @@ export default function SearchModal() {
     const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
     const searchQuery = isPali ? convertAnyToRoman(exampleQuery).trim() : exampleQuery.trim();
     performSearch(searchQuery, 0, selectedDb);
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
   };
 
   const handleLoadMore = () => {
@@ -800,7 +802,7 @@ export default function SearchModal() {
                   }
                 }}
                 autoComplete="off"
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-xs sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
+                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-base sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
               />
               {query && (
                 <button
@@ -820,7 +822,7 @@ export default function SearchModal() {
                     setResults([]);
                     setTotal(0);
                     updateUrlParams({ q: null, l: null, db: null, lang: null });
-                    inputRef.current?.focus();
+                    inputRef.current?.focus({ preventScroll: true });
                   }}
                   className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
                   title="Clear input"

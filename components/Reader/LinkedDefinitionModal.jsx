@@ -570,8 +570,8 @@ export default function LinkedDefinitionModal({
             </div>
 
             <div className="flex items-baseline gap-2 flex-wrap">
-              <h3 className={`text-base font-bold ${catClass || 'text-[var(--accent)]'}`}>{displayWord}</h3>
-              <span className="text-xs text-[var(--text-secondary)] truncate">{displayBookTitle}</span>
+              <h3 className={`pali-script-text text-base font-bold ${catClass || 'text-[var(--accent)]'}`}>{displayWord}</h3>
+              <span className="pali-script-text text-xs text-[var(--text-secondary)] truncate">{displayBookTitle}</span>
             </div>
           </div>
 

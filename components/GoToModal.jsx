@@ -34,6 +34,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
   }, [initialEdition]);
 
   useEffect(() => {
+    let focusTimer;
     if (isOpen) {
       if (initialTab) {
         setActiveTabMode(initialTab);
@@ -42,8 +43,11 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
         setPageSystem(initialEdition);
       }
       setErrorMessage('');
-      setTimeout(() => inputRef.current?.focus(), 60);
+      focusTimer = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
     }
+    return () => {
+      if (focusTimer) clearTimeout(focusTimer);
+    };
   }, [isOpen, initialTab, initialEdition]);
 
   // 1. Direct precomputed paragraph limits (from server DB/JSON, 0ms compute)
@@ -147,16 +151,20 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
   }, [currentEdRange]);
 
   useEffect(() => {
+    let focusTimer;
     if (isOpen) {
       setErrorMessage('');
       setParaInput(activeParaNum || '');
-      setTimeout(() => {
+      focusTimer = setTimeout(() => {
         if (inputRef.current) {
-          inputRef.current.focus();
+          inputRef.current.focus({ preventScroll: true });
           inputRef.current.select();
         }
       }, 60);
     }
+    return () => {
+      if (focusTimer) clearTimeout(focusTimer);
+    };
   }, [isOpen, activeTabMode, activeParaNum]);
 
   useEffect(() => {
@@ -395,7 +403,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
                       setErrorMessage('');
                     }}
                     placeholder={`Enter paragraph (${paraRange.min} – ${paraRange.max})`}
-                    className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition font-mono"
+                    className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-base sm:text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition font-mono"
                   />
                 </div>
               </div>
@@ -509,7 +517,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
                     setErrorMessage('');
                   }}
                   placeholder={currentEdRange.available ? currentEdRange.hint : 'Unavailable in this book'}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition font-mono disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] text-base sm:text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition font-mono disabled:opacity-50"
                 />
               </div>
 

@@ -75,7 +75,7 @@ export default function BookTocModal({ isOpen, onClose }) {
 
     // Auto focus filter input & smoothly scroll to current reading section
     const timer = setTimeout(() => {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
       if (matchedIdx >= 0 && listContainerRef.current) {
         const targetEl = listContainerRef.current.querySelector(`[data-toc-idx="${matchedIdx}"]`);
         if (targetEl) {
@@ -187,7 +187,7 @@ export default function BookTocModal({ isOpen, onClose }) {
               placeholder={`Filter ${tocList.length} sections...`}
               value={filterQuery}
               onChange={(e) => setFilterQuery(typeVelthuis(e.target.value))}
-              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-2 pl-9 pr-3 text-[14px] outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-2 pl-9 pr-3 text-base sm:text-[14px] outline-none focus:border-[var(--accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
           </div>
         </div>
