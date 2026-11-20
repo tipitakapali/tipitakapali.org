@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -87,6 +88,14 @@ class TipitakaWebApi {
   final Map<String, Uint8List> _chapterLinksBytesCache = {};
   final Map<String, Map<String, dynamic>> _linkedPreviewCache = {};
   bool _boldIndexVerified = false;
+  Future<void>? _warmUpFuture;
+  String? _warmUpDir;
+  DateTime? _warmUpCooldownUntil;
+  static const Duration _warmUpFailureCooldown = Duration(seconds: 30);
+
+  bool get _isBoldWarmUpInFlight =>
+      (_warmUpFuture != null && _warmUpDir == dbDirectoryPath) ||
+      BoldDefinitionIndexService.isInFlight(dbDirectoryPath);
 
   void Function()? onInvalidate;
   void Function(String newPath)? onDbDirectoryChanged;
@@ -169,14 +178,33 @@ class TipitakaWebApi {
     _chapterLinksBytesCache.clear();
     _linkedPreviewCache.clear();
     _boldIndexVerified = false;
+    _warmUpCooldownUntil = null;
     onInvalidate?.call();
   }
 
   /// Ensures derived offline indexes (such as `bold_definitions.db`) are built
   /// in the background without blocking startup.
-  Future<void> warmUpIndexes() async {
+  Future<void> warmUpIndexes() {
+    final dirAtStart = dbDirectoryPath;
+    if (_warmUpFuture != null && _warmUpDir == dirAtStart) {
+      return _warmUpFuture!;
+    }
+    _warmUpCooldownUntil = null;
+    final future = _warmUpIndexesInternal(dirAtStart);
+    _warmUpFuture = future;
+    _warmUpDir = dirAtStart;
+    future.whenComplete(() {
+      if (identical(_warmUpFuture, future)) {
+        _warmUpFuture = null;
+        _warmUpDir = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _warmUpIndexesInternal(String dirAtStart) async {
     try {
-      if (!BoldDefinitionIndexService.isUpToDate(dbDirectoryPath)) {
+      if (!BoldDefinitionIndexService.isUpToDate(dirAtStart)) {
         final prev = _dbs.remove(BoldDefinitionIndexService.dbFilename);
         if (prev != null) {
           try {
@@ -185,9 +213,16 @@ class TipitakaWebApi {
         }
       }
       final result = await boldDefinitionService.ensureBuilt(
-        dbDirPath: dbDirectoryPath,
+        dbDirPath: dirAtStart,
       );
-      _boldIndexVerified = true;
+      if (dirAtStart != dbDirectoryPath) return;
+      _boldIndexVerified =
+          BoldDefinitionIndexService.isUpToDate(dbDirectoryPath);
+      if (_boldIndexVerified) {
+        _warmUpCooldownUntil = null;
+      } else {
+        _warmUpCooldownUntil = DateTime.now().add(_warmUpFailureCooldown);
+      }
       if (!result.skipped) {
         final prev = _dbs.remove(BoldDefinitionIndexService.dbFilename);
         if (prev != null) {
@@ -197,11 +232,23 @@ class TipitakaWebApi {
         }
         _chapterLinksBytesCache.clear();
       }
-    } catch (_) {}
+    } catch (_) {
+      if (dirAtStart == dbDirectoryPath) {
+        _warmUpCooldownUntil = DateTime.now().add(_warmUpFailureCooldown);
+      }
+    }
+  }
+
+  void _triggerBoldWarmUpIfNeeded() {
+    if (_isBoldWarmUpInFlight) return;
+    final cooldown = _warmUpCooldownUntil;
+    if (cooldown != null && DateTime.now().isBefore(cooldown)) return;
+    if (!File(p.join(dbDirectoryPath, 'tipitaka.db')).existsSync()) return;
+    unawaited(warmUpIndexes());
   }
 
   Database? _openFreshBoldDb() {
-    if (BoldDefinitionIndexService.isInFlight(dbDirectoryPath)) {
+    if (_isBoldWarmUpInFlight) {
       return null;
     }
     if (!_boldIndexVerified) {
@@ -231,9 +278,14 @@ class TipitakaWebApi {
 
     try {
       final db = sqlite3.open(filePath, mode: OpenMode.readOnly);
+      // Keep per-DB cache/mmap conservative on mobile (iOS Jetsam / WKWebView
+      // share memory budget with up to 10+ simultaneously opened SQLite DBs).
+      final isMobile = Platform.isIOS || Platform.isAndroid;
+      final cacheKb = isMobile ? -4000 : -12000;
+      final mmapBytes = isMobile ? 33554432 : 67108864;
       db.execute(
         'PRAGMA temp_store = MEMORY; PRAGMA query_only = 1; '
-        'PRAGMA cache_size = -16384; PRAGMA mmap_size = 134217728;',
+        'PRAGMA cache_size = $cacheKb; PRAGMA mmap_size = $mmapBytes;',
       );
       _dbs[filename] = db;
       return db;
@@ -2238,25 +2290,39 @@ class TipitakaWebApi {
     );
   }
 
-  Future<String> _resolveChapterLinksParagraphsRawJson(String cleanCode, int chapterIndex) async {
+  Future<({String rawJson, bool warmingUp})> _resolveChapterLinksParagraphs(
+    String cleanCode,
+    int chapterIndex, {
+    Database? boldDbOverride,
+  }) async {
+    // Never stall HTTP responses for 30-60s awaiting or triggering a cold
+    // bold_definitions.db build; return empty links until warmUpIndexes finishes.
+    if (_isBoldWarmUpInFlight) {
+      return (rawJson: '{}', warmingUp: true);
+    }
+    final boldDb = boldDbOverride ?? _openFreshBoldDb();
+    if (boldDb == null) {
+      _triggerBoldWarmUpIfNeeded();
+      return (rawJson: '{}', warmingUp: true);
+    }
     final raw = await linkedDefinitionService.getLinksForChapterRawJson(
       dbDirPath: dbDirectoryPath,
       bookCode: cleanCode,
       chapterIndex: chapterIndex,
-      boldDbOverride: _openFreshBoldDb(),
+      boldDbOverride: boldDb,
     );
-    if (raw != null) return raw;
+    if (raw != null) return (rawJson: raw, warmingUp: false);
 
     final result = await linkedDefinitionService.getLinksForChapter(
       dbDirPath: dbDirectoryPath,
       bookCode: cleanCode,
       chapterIndex: chapterIndex,
       tipitakaDbOverride: _openDb('tipitaka.db'),
-      boldDbOverride: _openFreshBoldDb(),
+      boldDbOverride: boldDb,
       paliSentencesDbOverride: _openDb('pali_sentences.db'),
     );
     final paragraphs = result['paragraphs'] ?? const <String, dynamic>{};
-    return jsonEncode(paragraphs);
+    return (rawJson: jsonEncode(paragraphs), warmingUp: false);
   }
 
   Future<ApiResponse> getChapterLinks(
@@ -2267,6 +2333,18 @@ class TipitakaWebApi {
     if (cleanCode.isEmpty || chapterIndex < 0) {
       return ApiResponse.notFound('Invalid chapter for links');
     }
+    if (_isBoldWarmUpInFlight) {
+      final jsonStr =
+          '{"book_code":${jsonEncode(cleanCode)},"chapter_index":$chapterIndex,"paragraphs":{},"warming_up":true}';
+      return ApiResponse.rawBytes(utf8.encode(jsonStr));
+    }
+    final boldDb = _openFreshBoldDb();
+    if (boldDb == null) {
+      _triggerBoldWarmUpIfNeeded();
+      final jsonStr =
+          '{"book_code":${jsonEncode(cleanCode)},"chapter_index":$chapterIndex,"paragraphs":{},"warming_up":true}';
+      return ApiResponse.rawBytes(utf8.encode(jsonStr));
+    }
     final cacheKey = '$cleanCode#$chapterIndex';
     final cached = _chapterLinksBytesCache.remove(cacheKey);
     if (cached != null) {
@@ -2274,19 +2352,23 @@ class TipitakaWebApi {
       return ApiResponse.rawBytes(cached);
     }
 
-    final rawParagraphs = await _resolveChapterLinksParagraphsRawJson(
+    final resolved = await _resolveChapterLinksParagraphs(
       cleanCode,
       chapterIndex,
+      boldDbOverride: boldDb,
     );
-    final jsonStr =
-        '{"book_code":${jsonEncode(cleanCode)},"chapter_index":$chapterIndex,"paragraphs":$rawParagraphs}';
+    final jsonStr = resolved.warmingUp
+        ? '{"book_code":${jsonEncode(cleanCode)},"chapter_index":$chapterIndex,"paragraphs":{},"warming_up":true}'
+        : '{"book_code":${jsonEncode(cleanCode)},"chapter_index":$chapterIndex,"paragraphs":${resolved.rawJson}}';
     final bytes = Uint8List.fromList(utf8.encode(jsonStr));
-    _putBoundedLru(
-      _chapterLinksBytesCache,
-      cacheKey,
-      bytes,
-      _maxChapterLinksBytesCache,
-    );
+    if (!resolved.warmingUp) {
+      _putBoundedLru(
+        _chapterLinksBytesCache,
+        cacheKey,
+        bytes,
+        _maxChapterLinksBytesCache,
+      );
+    }
     return ApiResponse.rawBytes(bytes);
   }
 
@@ -2395,13 +2477,16 @@ class TipitakaWebApi {
     }
 
     if (withLinks) {
-      final rawLinks = await _resolveChapterLinksParagraphsRawJson(
+      final resolvedLinks = await _resolveChapterLinksParagraphs(
         cleanCode,
         chapterIndex,
       );
       out
         ..write(',"links":')
-        ..write(rawLinks);
+        ..write(resolvedLinks.rawJson);
+      if (resolvedLinks.warmingUp) {
+        out.write(',"links_warming_up":true');
+      }
     }
 
     out.write('}');

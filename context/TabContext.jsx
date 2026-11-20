@@ -1,7 +1,16 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
-import { fetchBook, fetchChapter, fetchMat, fetchMatJump, lookupBookInfo, fetchBookTocOnly } from '../services/api';
+import {
+  fetchBook,
+  fetchChapter,
+  fetchChapterBundle,
+  isLocalDynamicHost,
+  fetchMat,
+  fetchMatJump,
+  lookupBookInfo,
+  fetchBookTocOnly,
+} from '../services/api';
 import { splitScriptCode } from '../services/transliterate';
 import { useThemeSettings } from './ThemeSettingsContext';
 
@@ -407,6 +416,93 @@ export function toLangKey(langOrDb) {
   if (!code) return null;
   if (code === 'pali') return 'pali';
   return CODE_TO_LANG_KEY[code] || code;
+}
+
+export function resolveBundlePrefsFromSettings(settingsObj, extraLangCode = null) {
+  const isPaliEnabled = settingsObj?.translations?.pali !== false;
+  const order = settingsObj?.translationOrder || [];
+  const normExtraCode =
+    extraLangCode && extraLangCode !== 'pali' ? normalizeLangCode(extraLangCode) : null;
+  const extraLangKey =
+    normExtraCode && normExtraCode !== 'pali' ? toLangKey(normExtraCode) : null;
+  const langs = [];
+  for (const id of order) {
+    if (
+      id !== 'pali' &&
+      LANG_KEY_TO_CODE[id] &&
+      (settingsObj?.translations?.[id] || (extraLangKey && id === extraLangKey))
+    ) {
+      const code = LANG_KEY_TO_CODE[id];
+      if (!langs.includes(code)) langs.push(code);
+    }
+  }
+  if (settingsObj?.translations) {
+    for (const [id, enabled] of Object.entries(settingsObj.translations)) {
+      if (id !== 'pali' && enabled && LANG_KEY_TO_CODE[id]) {
+        const code = LANG_KEY_TO_CODE[id];
+        if (!langs.includes(code)) langs.push(code);
+      }
+    }
+  }
+  if (normExtraCode && normExtraCode !== 'pali' && !langs.includes(normExtraCode)) {
+    langs.push(normExtraCode);
+  }
+  const effectiveSentenceMode = Boolean(
+    settingsObj?.translationGranularity === 'sentence' && langs.length > 0
+  );
+  return {
+    langs,
+    sentences: effectiveSentenceMode,
+    paliSentences: Boolean(effectiveSentenceMode && isPaliEnabled),
+  };
+}
+
+export function prefetchOpenBookAdjacentBundles({
+  bookCode,
+  targetChapIdx = 0,
+  chaptersData = null,
+  settingsObj = null,
+  extraLangCode = null,
+  prefetchedChapters = null,
+  isLocalHost = isLocalDynamicHost,
+  fetchBundle = fetchChapterBundle,
+}) {
+  if (
+    !bookCode ||
+    typeof isLocalHost !== 'function' ||
+    !isLocalHost() ||
+    typeof fetchBundle !== 'function' ||
+    !chaptersData ||
+    typeof chaptersData !== 'object'
+  ) {
+    return [];
+  }
+  const prefs = resolveBundlePrefsFromSettings(
+    settingsObj,
+    extraLangCode && extraLangCode !== 'pali' ? extraLangCode : null
+  );
+  if (!prefs.langs.length) return [];
+
+  const baseIdx = Number.isInteger(targetChapIdx) ? targetChapIdx : 0;
+  const candidates = [baseIdx, baseIdx + 1];
+  if (baseIdx > 0) candidates.push(baseIdx - 1);
+
+  const launched = [];
+  for (const idx of candidates) {
+    if (prefetchedChapters && prefetchedChapters.has(idx)) continue;
+    if (chaptersData[idx] === undefined && chaptersData[String(idx)] === undefined) continue;
+    launched.push(idx);
+    Promise.resolve(
+      fetchBundle(bookCode, idx, {
+        includeHtml: false,
+        langs: prefs.langs,
+        sentences: prefs.sentences,
+        paliSentences: prefs.paliSentences,
+        links: false,
+      })
+    ).catch(() => {});
+  }
+  return launched;
 }
 
 export function TabProvider({ children }) {
@@ -898,11 +994,34 @@ export function TabProvider({ children }) {
     );
 
     try {
-      const res = await fetchChapter(cleanCode, chapterIdx);
+      let chapHtml = null;
+      const useBundle =
+        typeof isLocalDynamicHost === 'function' &&
+        isLocalDynamicHost() &&
+        typeof fetchChapterBundle === 'function';
+      if (useBundle) {
+        const prefs = resolveBundlePrefsFromSettings(settingsRef.current);
+        if (prefs.langs.length > 0) {
+          const bundle = await fetchChapterBundle(cleanCode, chapterIdx, {
+            includeHtml: true,
+            langs: prefs.langs,
+            sentences: prefs.sentences,
+            paliSentences: prefs.paliSentences,
+            links: false,
+          }).catch(() => null);
+          if (bundle && typeof bundle.html === 'string') {
+            chapHtml = bundle.html;
+          }
+        }
+      }
+      if (chapHtml === null) {
+        const res = await fetchChapter(cleanCode, chapterIdx);
+        chapHtml = res.html;
+      }
       setOpenTabs((prev) =>
         prev.map((t) => {
           if (t.bookCode !== cleanCode) return t;
-          const newLoaded = { ...t.loadedChapters, [chapterIdx]: res.html };
+          const newLoaded = { ...t.loadedChapters, [chapterIdx]: chapHtml };
           const newLoading = { ...t.loadingChapters, [chapterIdx]: false };
           return {
             ...t,
@@ -935,13 +1054,21 @@ export function TabProvider({ children }) {
       if (!tab) return;
 
       const totalChaps = tab.chapters?.length || 1;
-      const toBuffer = [centerIdx + 1, centerIdx - 1];
+      const isLocal = typeof isLocalDynamicHost === 'function' && isLocalDynamicHost();
+      const toBuffer = isLocal
+        ? [centerIdx + 1, centerIdx + 2, centerIdx - 1]
+        : [centerIdx + 1, centerIdx - 1];
 
       toBuffer.forEach((idx, order) => {
         if (idx >= 0 && idx < totalChaps && !tab.loadedChapters?.[idx] && !tab.loadingChapters?.[idx]) {
-          setTimeout(() => {
+          const delayMs = isLocal ? order * 30 : (order + 1) * 200;
+          if (delayMs === 0) {
             loadChapter(cleanCode, idx);
-          }, (order + 1) * 200);
+          } else {
+            setTimeout(() => {
+              loadChapter(cleanCode, idx);
+            }, delayMs);
+          }
         }
       });
     },
@@ -1555,6 +1682,36 @@ export function TabProvider({ children }) {
           } catch (_) {}
         }
 
+        // Prefetch target chapter's translations + pali_sentences in parallel with fetchBook
+        // on local offline hosts so ChapterBlock renders on frame 1 without a loading spinner.
+        const urlLang = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
+        const extraRaw = options.l || options.lang || options.db || urlLang || null;
+        const extraNorm = extraRaw ? normalizeLangCode(extraRaw) : null;
+        const openBookExtraLang = extraNorm && extraNorm !== 'pali' ? extraNorm : null;
+        const prefetchedBundleChapters = new Set();
+        if (
+          typeof isLocalDynamicHost === 'function' &&
+          isLocalDynamicHost() &&
+          typeof fetchChapterBundle === 'function' &&
+          (hasTargetChapter || (!rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')))
+        ) {
+          const prefs = resolveBundlePrefsFromSettings(
+            settingsRef.current,
+            openBookExtraLang
+          );
+          if (prefs.langs.length > 0) {
+            const preIdx = targetChapIdx ?? 0;
+            prefetchedBundleChapters.add(preIdx);
+            fetchChapterBundle(cleanCode, preIdx, {
+              includeHtml: false,
+              langs: prefs.langs,
+              sentences: prefs.sentences,
+              paliSentences: prefs.paliSentences,
+              links: false,
+            }).catch(() => {});
+          }
+        }
+
         // First resolve chapter if targetParaNum is provided and we can pre-check or load metadata
         const bookData = await fetchBook(cleanCode, {
           chapter: targetChapIdx ?? 0,
@@ -1606,6 +1763,19 @@ export function TabProvider({ children }) {
             console.warn(`[openBook] Failed to fetch initial target chapter ${targetChapIdx}:`, e);
           }
         }
+
+        // Prefetch translation + pali_sentences bundles for chapters already
+        // preloaded via fetchBook(..., { buffer: 1 }) (e.g. targetChapIdx + 1)
+        // since loadChapter will not run for them and scrolling down quickly
+        // from a short chapter 0 would otherwise hit isTransPending.
+        prefetchOpenBookAdjacentBundles({
+          bookCode: cleanCode,
+          targetChapIdx: targetChapIdx ?? 0,
+          chaptersData: bookData.chapters_data,
+          settingsObj: settingsRef.current,
+          extraLangCode: openBookExtraLang,
+          prefetchedChapters: prefetchedBundleChapters,
+        });
 
         if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
           const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx, targetSub, bookData.sub_books_para_to_chapter);
@@ -1877,6 +2047,12 @@ export function TabProvider({ children }) {
                   }
                 } catch (_) {}
               }
+              prefetchOpenBookAdjacentBundles({
+                bookCode,
+                targetChapIdx: hydrateChap,
+                chaptersData: nextChaptersData,
+                settingsObj: settingsRef.current,
+              });
               setOpenTabs((prev) =>
                 prev.map((t) =>
                   t.bookCode === bookCode
@@ -2541,6 +2717,12 @@ export function TabProvider({ children }) {
               if (chRes && chRes.html) nextChaptersData[targetChap] = chRes.html;
             } catch (_) {}
           }
+          prefetchOpenBookAdjacentBundles({
+            bookCode: cleanCode,
+            targetChapIdx: targetChap,
+            chaptersData: nextChaptersData,
+            settingsObj: settingsRef.current,
+          });
           setOpenTabs((prev) =>
             prev.map((t) =>
               t.bookCode === cleanCode

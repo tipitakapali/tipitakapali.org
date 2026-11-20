@@ -46,6 +46,57 @@ export function computeBlockCompensationDelta({
   return currentAnchorY - anchorViewportYBefore;
 }
 
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// Compensate scrollTop synchronously when a chunk strictly above the viewport
+// changes height (e.g. placeholder -> mounted HTML or async link chips) because
+// iOS WKWebView has no native scroll anchoring and main.content-area sets
+// overflow-anchor: none.
+export function computeAboveViewportScrollDelta({
+  rectTop = 0,
+  rectBottom = 0,
+  prevHeight = 0,
+  nextHeight = 0,
+  viewportTop = 0,
+}) {
+  if (!(prevHeight > 0) || !(nextHeight > 0)) return 0;
+  const delta = nextHeight - prevHeight;
+  if (Math.abs(delta) < 2) return 0;
+  const oldBottom = rectBottom - delta;
+  if (rectTop < viewportTop && oldBottom <= viewportTop + 4) {
+    return delta;
+  }
+  return 0;
+}
+
+// Batch-evaluate multiple chunk height changes (in ascending DOM order) from a
+// single commit so we perform all DOM reads before a single scrollTop write
+// without interleaved read->write layout thrashing, adjusting subsequent chunk
+// rects for cumulative height shifts across all earlier items in the commit.
+export function computeBatchedAboveViewportScrollDelta(items, viewportTop = 0) {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+  let totalDelta = 0;
+  let cumulativeShift = 0;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item) continue;
+    const itemDelta =
+      item.prevHeight > 0 && item.nextHeight > 0 ? item.nextHeight - item.prevHeight : 0;
+    const delta = computeAboveViewportScrollDelta({
+      rectTop: item.rectTop - cumulativeShift,
+      rectBottom: item.rectBottom - cumulativeShift,
+      prevHeight: item.prevHeight,
+      nextHeight: item.nextHeight,
+      viewportTop,
+    });
+    if (delta !== 0) {
+      totalDelta += delta;
+    }
+    cumulativeShift += itemDelta;
+  }
+  return totalDelta;
+}
+
 // Peak/trough scroll-direction state machine for header/footer auto-hide.
 // Tolerates mobile sub-pixel touch jitter and iOS bottom rubber-band overscroll
 // while guaranteeing reliable hide on downward scroll and reveal on upward scroll.
@@ -256,6 +307,8 @@ function resolveReaderTextNodeAndOffset(container, rawOffset, clientX, clientY) 
 export function detectLiveSectionTitleFromElements(headings, thresholdY = 120) {
   if (!headings || typeof headings[Symbol.iterator] !== 'function') return null;
   const extractCleanHeadingText = (el) => {
+    const carried = el.getAttribute?.('data-chunk-last-heading');
+    if (carried) return carried.replace(/\s+/g, ' ').trim();
     if (el.querySelector && el.cloneNode) {
       const hasNoise = el.querySelector('.note, .pb, .linked-def-row');
       if (hasNoise) {
@@ -857,11 +910,14 @@ export function injectTranslationsIntoHtml(
     const pLinks = chapterLinks ? chapterLinks[pIndex] : null;
     const makeRef = (lineKey, idx) =>
       hasLinkRefBase ? `${linkBookCode}|${linkChapterIndex}|${pIndex}|${lineKey}|${idx}` : null;
+    const makeMoreRef = (lineKey) =>
+      hasLinkRefBase ? `${linkBookCode}|${linkChapterIndex}|${pIndex}|${lineKey}|${linkScript}` : null;
     const allLinksStrip =
       pLinks && Array.isArray(pLinks.all) && pLinks.all.length > 0
         ? renderBookLinksStrip(pLinks.all, linkScript, {
             inline: false,
             getRef: hasLinkRefBase ? (_, idx) => makeRef('_all', idx) : null,
+            moreRef: makeMoreRef('_all'),
           })
         : '';
 
@@ -1279,6 +1335,7 @@ export function injectTranslationsIntoHtml(
                   ? renderBookLinksStrip(lineLinks, linkScript, {
                       inline: false,
                       getRef: hasLinkRefBase ? (_, idx) => makeRef(ln, idx) : null,
+                      moreRef: makeMoreRef(ln),
                     })
                   : '';
               const extraLeftover =
@@ -1375,57 +1432,88 @@ function escapeLinkAttr(str) {
   return escapeLinkText(str).replace(/"/g, '&quot;');
 }
 
-function renderBookLinksStrip(links, paliScript = 'roman', { inline = false, getRef = null } = {}) {
+const LINK_STRIP_MAX_INITIAL = 3;
+
+function renderLinkChipHtml(link, idx, paliScript = 'roman', getRef = null) {
+  const isSource = Boolean(link.is_source);
+  const arrow = isSource ? '←' : '→';
+  const rawWord = link.word || '';
+  const displayWord =
+    paliScript && paliScript !== 'roman'
+      ? convertPaliScript(rawWord, paliScript) || rawWord
+      : rawWord;
+  const cat = (link.target_category || '').toLowerCase();
+  const shortCat =
+    cat === 'mūla'
+      ? 'M'
+      : cat === 'aṭṭhakathā'
+      ? 'A'
+      : cat === 'ṭīkā'
+      ? 'Ṭ'
+      : '';
+  const catClass =
+    cat.includes('mūla') || cat === 'mula'
+      ? 'linked-def-chip-mula'
+      : cat.includes('aṭṭha') || cat.includes('attha')
+      ? 'linked-def-chip-attha'
+      : cat.includes('ṭīkā') || cat.includes('tika')
+      ? 'linked-def-chip-tika'
+      : '';
+  const refVal = typeof getRef === 'function' ? getRef(link, idx) : null;
+  const dataAttr = refVal
+    ? `data-link-ref="${escapeLinkAttr(refVal)}"`
+    : `data-link="${escapeLinkAttr(encodeURIComponent(JSON.stringify(link)))}"`;
+  const title = escapeLinkAttr(
+    `${isSource ? 'Source' : 'Commentary'}: ${link.target_book_title || link.target_book}${link.target_para_num ? ` (§ ${link.target_para_num})` : ''}`
+  );
+  return (
+    `<button type="button" class="linked-def-chip ${isSource ? 'linked-def-chip-source' : 'linked-def-chip-forward'}${catClass ? ` ${catClass}` : ''}" ${dataAttr} title="${title}">` +
+    `<span class="linked-def-arrow">${arrow}</span>` +
+    `<span class="linked-def-word">${escapeLinkText(displayWord)}</span>` +
+    (shortCat ? `<span class="linked-def-cat">${shortCat}</span>` : '') +
+    `</button>`
+  );
+}
+
+export function renderMoreLinkChipsFromRef(moreRef) {
+  if (!moreRef || typeof moreRef !== 'string') return '';
+  const parts = moreRef.split('|');
+  if (parts.length !== 5) return '';
+  const [bookCode, chapIdx, pIdx, lineId, paliScript] = parts;
+  const paras = _chapterLinksRegistry.get(`${bookCode}:${chapIdx}`);
+  const pLinks = paras?.[pIdx];
+  const list = pLinks
+    ? lineId !== '_all'
+      ? pLinks.by_line?.[lineId]
+      : pLinks.all
+    : null;
+  if (!Array.isArray(list) || list.length <= LINK_STRIP_MAX_INITIAL) return '';
+  const getRef = (_, idx) => `${bookCode}|${chapIdx}|${pIdx}|${lineId}|${idx}`;
+  return list
+    .slice(LINK_STRIP_MAX_INITIAL)
+    .map((lnk, i) => renderLinkChipHtml(lnk, i + LINK_STRIP_MAX_INITIAL, paliScript || 'roman', getRef))
+    .join('');
+}
+
+function renderBookLinksStrip(links, paliScript = 'roman', { inline = false, getRef = null, moreRef = null } = {}) {
   if (!Array.isArray(links) || links.length === 0) return '';
-  const MAX_INITIAL = 3;
+  const MAX_INITIAL = LINK_STRIP_MAX_INITIAL;
 
-  const renderChip = (link, idx) => {
-    const isSource = Boolean(link.is_source);
-    const arrow = isSource ? '←' : '→';
-    const rawWord = link.word || '';
-    const displayWord =
-      paliScript && paliScript !== 'roman'
-        ? convertPaliScript(rawWord, paliScript) || rawWord
-        : rawWord;
-    const cat = (link.target_category || '').toLowerCase();
-    const shortCat =
-      cat === 'mūla'
-        ? 'M'
-        : cat === 'aṭṭhakathā'
-        ? 'A'
-        : cat === 'ṭīkā'
-        ? 'Ṭ'
-        : '';
-    const catClass =
-      cat.includes('mūla') || cat === 'mula'
-        ? 'linked-def-chip-mula'
-        : cat.includes('aṭṭha') || cat.includes('attha')
-        ? 'linked-def-chip-attha'
-        : cat.includes('ṭīkā') || cat.includes('tika')
-        ? 'linked-def-chip-tika'
-        : '';
-    const refVal = typeof getRef === 'function' ? getRef(link, idx) : null;
-    const dataAttr = refVal
-      ? `data-link-ref="${escapeLinkAttr(refVal)}"`
-      : `data-link="${escapeLinkAttr(encodeURIComponent(JSON.stringify(link)))}"`;
-    const title = escapeLinkAttr(
-      `${isSource ? 'Source' : 'Commentary'}: ${link.target_book_title || link.target_book}${link.target_para_num ? ` (§ ${link.target_para_num})` : ''}`
-    );
-    return (
-      `<button type="button" class="linked-def-chip ${isSource ? 'linked-def-chip-source' : 'linked-def-chip-forward'}${catClass ? ` ${catClass}` : ''}" ${dataAttr} title="${title}">` +
-      `<span class="linked-def-arrow">${arrow}</span>` +
-      `<span class="linked-def-word">${escapeLinkText(displayWord)}</span>` +
-      (shortCat ? `<span class="linked-def-cat">${shortCat}</span>` : '') +
-      `</button>`
-    );
-  };
-
-  const primaryHtml = links.slice(0, MAX_INITIAL).map((lnk, i) => renderChip(lnk, i)).join('');
+  const primaryHtml = links
+    .slice(0, MAX_INITIAL)
+    .map((lnk, i) => renderLinkChipHtml(lnk, i, paliScript, getRef))
+    .join('');
   const extraCount = links.length - MAX_INITIAL;
   const extraHtml =
     extraCount > 0
-      ? `<span class="linked-def-more-group hidden">${links.slice(MAX_INITIAL).map((lnk, i) => renderChip(lnk, i + MAX_INITIAL)).join('')}</span>` +
-        `<button type="button" class="linked-def-more-btn" data-more-count="${extraCount}">+${extraCount} more</button>`
+      ? moreRef
+        ? `<span class="linked-def-more-group hidden" data-links-more-ref="${escapeLinkAttr(moreRef)}"></span>` +
+          `<button type="button" class="linked-def-more-btn" data-more-count="${extraCount}">+${extraCount} more</button>`
+        : `<span class="linked-def-more-group hidden">${links
+            .slice(MAX_INITIAL)
+            .map((lnk, i) => renderLinkChipHtml(lnk, i + MAX_INITIAL, paliScript, getRef))
+            .join('')}</span>` +
+          `<button type="button" class="linked-def-more-btn" data-more-count="${extraCount}">+${extraCount} more</button>`
       : '';
 
   const tag = inline ? 'span' : 'div';
@@ -1457,6 +1545,7 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
       const stripHtml = renderBookLinksStrip(pLinks.all, paliScript, {
         inline: false,
         getRef: hasRefBase ? (_, idx) => `${bookCode}|${chapterIndex}|${pIdx}|_all|${idx}` : null,
+        moreRef: hasRefBase ? `${bookCode}|${chapterIndex}|${pIdx}|_all|${paliScript}` : null,
       });
       return `${fullP}${stripHtml}`;
     });
@@ -1468,6 +1557,12 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
 
   const root = document.createElement('div');
   root.innerHTML = htmlStr;
+
+  const makeChipOpts = (pIdx, lineKey, inline) => ({
+    inline,
+    getRef: hasRefBase ? (_, idx) => `${bookCode}|${chapterIndex}|${pIdx}|${lineKey}|${idx}` : null,
+    moreRef: hasRefBase ? `${bookCode}|${chapterIndex}|${pIdx}|${lineKey}|${paliScript}` : null,
+  });
 
   const paraRows = root.querySelectorAll('.reader-para-row[data-pindex]');
   if (paraRows.length > 0) {
@@ -1484,7 +1579,7 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
           const lineLinks = ln ? pLinks.by_line?.[ln] : null;
           if (Array.isArray(lineLinks) && lineLinks.length > 0) {
             injectedLines.add(ln);
-            const stripHtml = renderBookLinksStrip(lineLinks, paliScript, { inline: false });
+            const stripHtml = renderBookLinksStrip(lineLinks, paliScript, makeChipOpts(pIdx, ln, false));
             const paliCell = pair.querySelector('.sent-pair-pali');
             if (paliCell) {
               paliCell.insertAdjacentHTML('afterend', stripHtml);
@@ -1518,7 +1613,7 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
       }
 
       if (Array.isArray(pLinks.all) && pLinks.all.length > 0) {
-        const stripHtml = renderBookLinksStrip(pLinks.all, paliScript, { inline: false });
+        const stripHtml = renderBookLinksStrip(pLinks.all, paliScript, makeChipOpts(pIdx, '_all', false));
         if (row.classList.contains('reader-trans-side-row')) {
           const paliCol = row.querySelector('.reader-pali-col');
           if (paliCol) {
@@ -1559,7 +1654,10 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
           const lineLinks = ln ? pLinks.by_line?.[ln] : null;
           if (Array.isArray(lineLinks) && lineLinks.length > 0) {
             injectedLines.add(ln);
-            sentEl.insertAdjacentHTML('afterend', renderBookLinksStrip(lineLinks, paliScript, { inline: true }));
+            sentEl.insertAdjacentHTML(
+              'afterend',
+              renderBookLinksStrip(lineLinks, paliScript, makeChipOpts(pIdx, ln, true))
+            );
           }
         });
         const leftovers = [];
@@ -1578,14 +1676,453 @@ function injectBookLinksIntoHtml(htmlStr, chapterLinks, paliScript = 'roman', se
     }
 
     if (Array.isArray(pLinks.all) && pLinks.all.length > 0) {
-      pEl.insertAdjacentHTML('afterend', renderBookLinksStrip(pLinks.all, paliScript, { inline: false }));
+      pEl.insertAdjacentHTML(
+        'afterend',
+        renderBookLinksStrip(pLinks.all, paliScript, makeChipOpts(pIdx, '_all', false))
+      );
     }
   });
 
   return root.innerHTML;
 }
 
-// Memoized Chapter Block with Pre-Buffering Intersection Observer, Lazy Translation Loading, and Scoped Highlighting
+export const CHAPTER_CHUNK_THRESHOLD = 50;
+export const CHAPTER_CHUNK_SIZE = 30;
+
+function extractChunkMeta(rawHtml, index, spans, prevParaNum) {
+  const pIndices = new Set();
+  const paraNums = new Set();
+  const paraInts = [];
+  const paraRanges = [];
+  const edPages = [];
+  const lastPbByEd = {};
+  let lastParaNum = prevParaNum || null;
+  let lastHeading = null;
+
+  const pbRe = /<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>/gi;
+  for (let i = 0; i < spans.length; i++) {
+    const pTag = spans[i].tag;
+    const gtIdx = pTag.indexOf('>');
+    const open = gtIdx !== -1 ? pTag.slice(0, gtIdx + 1) : pTag;
+
+    const pidxM = open.match(/\bdata-pindex="(\d+)"/i);
+    if (pidxM) pIndices.add(pidxM[1]);
+
+    const paraM = open.match(/\bdata-para="([^"]+)"/i);
+    if (paraM) {
+      const cleanP = paraM[1].trim();
+      if (cleanP) {
+        paraNums.add(cleanP);
+        lastParaNum = cleanP;
+        const pInt = parseInt(cleanP, 10);
+        if (!Number.isNaN(pInt)) paraInts.push(pInt);
+      }
+    }
+
+    const firstM = open.match(/\bdata-para-first="(\d+)"/i);
+    const lastM = open.match(/\bdata-para-last="(\d+)"/i);
+    if (firstM && lastM) {
+      const f = parseInt(firstM[1], 10);
+      const l = parseInt(lastM[1], 10);
+      if (!Number.isNaN(f) && !Number.isNaN(l)) {
+        paraRanges.push([f, l]);
+        paraInts.push(f, l);
+      }
+    }
+
+    const clsM = open.match(/\bclass="([^"]*)"/i);
+    if (clsM && /\b(?:book|chapter|title|subhead)\b/i.test(clsM[1])) {
+      const inner = pTag
+        .slice(gtIdx + 1, pTag.lastIndexOf('<'))
+        .replace(/<span\b[^>]*\bclass="[^"]*\b(?:note|pb)\b[^"]*"[^>]*>[\s\S]*?<\/span>/gi, '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (inner) lastHeading = inner;
+    }
+
+    if (pTag.includes('class="pb"') || pTag.includes('data-ed=')) {
+      pbRe.lastIndex = 0;
+      let pm;
+      while ((pm = pbRe.exec(pTag)) !== null) {
+        const tagStr = pm[0];
+        const edM = tagStr.match(/\bdata-ed="([^"]+)"/i);
+        const pageM = tagStr.match(/\bdata-page="([^"]+)"/i);
+        if (edM && pageM) {
+          edPages.push({ ed: edM[1], page: pageM[1] });
+          lastPbByEd[edM[1]] = pageM[1];
+        }
+      }
+    }
+  }
+
+  return {
+    index,
+    rawHtml,
+    paraCount: spans.length,
+    charLength: rawHtml.length,
+    pIndices,
+    paraNums,
+    paraInts,
+    paraRanges,
+    edPages,
+    lastPbByEd,
+    lastHeading,
+    prevParaNum: prevParaNum || null,
+    lastParaNum,
+  };
+}
+
+export function splitChapterHtmlIntoChunks(html, chunkSize = CHAPTER_CHUNK_SIZE) {
+  if (!html || typeof html !== 'string') return [];
+
+  const pRe = /<p\b[^>]*>[\s\S]*?<\/p>/gi;
+  const spans = [];
+  let m;
+  while ((m = pRe.exec(html)) !== null) {
+    spans.push({ start: m.index, end: m.index + m[0].length, tag: m[0] });
+  }
+
+  if (spans.length <= CHAPTER_CHUNK_THRESHOLD) {
+    return [extractChunkMeta(html, 0, spans, null)];
+  }
+
+  const chunks = [];
+  let cursor = 0;
+  let lastParaAcrossChunks = null;
+  const step = Math.max(1, chunkSize);
+
+  for (let i = 0; i < spans.length; i += step) {
+    const sliceEndIdx = Math.min(i + step, spans.length);
+    const isLast = sliceEndIdx >= spans.length;
+    const rawEnd = isLast ? html.length : spans[sliceEndIdx - 1].end;
+    const rawHtml = html.slice(cursor, rawEnd);
+    cursor = rawEnd;
+
+    const sliceSpans = spans.slice(i, sliceEndIdx);
+    const meta = extractChunkMeta(rawHtml, chunks.length, sliceSpans, lastParaAcrossChunks);
+    if (meta.lastParaNum) {
+      lastParaAcrossChunks = meta.lastParaNum;
+    }
+    chunks.push(meta);
+  }
+  return chunks;
+}
+
+export function findTargetChunkIndex(
+  chunks,
+  { paraIndex = null, paraNum = null, page = null, pageSystem = null, searchQuery = null, translations = null } = {}
+) {
+  if (!Array.isArray(chunks) || chunks.length <= 1) return 0;
+
+  if (paraIndex !== undefined && paraIndex !== null && paraIndex !== '') {
+    const key = String(paraIndex).trim();
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks[i].pIndices?.has(key)) return i;
+    }
+  }
+
+  if (paraNum !== undefined && paraNum !== null && String(paraNum).trim() !== '') {
+    const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks[i].paraNums?.has(cleanPara)) return i;
+    }
+    const targetInt = parseInt(cleanPara, 10);
+    if (!Number.isNaN(targetInt)) {
+      for (let i = 0; i < chunks.length; i++) {
+        const ranges = chunks[i].paraRanges;
+        if (ranges && ranges.some(([f, l]) => targetInt >= f && targetInt <= l)) {
+          return i;
+        }
+      }
+      // Nearest paragraph fallback matching scrollToTarget: closest <= targetInt, else closest > targetInt
+      let bestBeforeIdx = -1;
+      let bestBeforeDiff = Infinity;
+      let bestAfterIdx = -1;
+      let bestAfterDiff = Infinity;
+      for (let i = 0; i < chunks.length; i++) {
+        const ints = chunks[i].paraInts;
+        if (!ints || ints.length === 0) continue;
+        for (let j = 0; j < ints.length; j++) {
+          const pInt = ints[j];
+          if (pInt <= targetInt) {
+            const diff = targetInt - pInt;
+            if (diff < bestBeforeDiff) {
+              bestBeforeDiff = diff;
+              bestBeforeIdx = i;
+            }
+          } else {
+            const diff = pInt - targetInt;
+            if (diff < bestAfterDiff) {
+              bestAfterDiff = diff;
+              bestAfterIdx = i;
+            }
+          }
+        }
+      }
+      if (bestBeforeIdx >= 0) return bestBeforeIdx;
+      if (bestAfterIdx >= 0) return bestAfterIdx;
+    }
+  }
+
+  if (page !== undefined && page !== null && String(page).trim() !== '') {
+    const cleanP = String(page).trim();
+    const targetEd = pageSystem ? String(pageSystem).trim().toUpperCase() : null;
+    const hasDot = cleanP.includes('.');
+    let paddedExact = null;
+    let paddedSuffix = null;
+    if (hasDot) {
+      const parts = cleanP.split('.');
+      const vol = parseInt(parts[0], 10);
+      const num = parseInt(parts[1], 10);
+      if (!Number.isNaN(vol) && !Number.isNaN(num)) {
+        paddedExact = `${vol}.${String(num).padStart(4, '0')}`;
+      }
+    } else if (/^\d+$/.test(cleanP)) {
+      const num = parseInt(cleanP, 10);
+      if (!Number.isNaN(num)) {
+        paddedSuffix = `.${String(num).padStart(4, '0')}`;
+        paddedExact = String(num).padStart(4, '0');
+      }
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      const edPages = chunks[i].edPages;
+      if (!edPages || edPages.length === 0) continue;
+      for (let j = 0; j < edPages.length; j++) {
+        const item = edPages[j];
+        if (targetEd && String(item.ed || '').toUpperCase() !== targetEd) continue;
+        const pVal = String(item.page || '');
+        if (
+          pVal === cleanP ||
+          (paddedExact && pVal === paddedExact) ||
+          (paddedSuffix && pVal.endsWith(paddedSuffix))
+        ) {
+          return i;
+        }
+      }
+    }
+  }
+
+  if (searchQuery && String(searchQuery).trim()) {
+    const needle = String(searchQuery).trim().toLowerCase();
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks[i].rawHtml && chunks[i].rawHtml.toLowerCase().includes(needle)) {
+        return i;
+      }
+    }
+    if (translations && typeof translations === 'object') {
+      for (const langMap of Object.values(translations)) {
+        if (!langMap || typeof langMap !== 'object') continue;
+        for (const [pIdx, txt] of Object.entries(langMap)) {
+          if (typeof txt === 'string' && txt.toLowerCase().includes(needle)) {
+            for (let i = 0; i < chunks.length; i++) {
+              if (chunks[i].pIndices?.has(String(pIdx))) return i;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
+export function estimateChunkHeight(
+  chunk,
+  {
+    isPaliEnabled = true,
+    activeLangCount = 0,
+    effectiveSentenceMode = false,
+    translationDisplayMode = 'stack',
+    showBookLinks = true,
+    isMobile = false,
+  } = {}
+) {
+  if (!chunk) return 600;
+  const isSide =
+    (translationDisplayMode === 'side' || translationDisplayMode === 'side_rev') && !isMobile;
+  const charsPerLine = isMobile ? 42 : isSide ? 52 : 82;
+  const rawTextChars = Math.round((chunk.charLength || 0) * 0.62);
+  const paliLines = Math.max(chunk.paraCount || 1, Math.ceil(rawTextChars / charsPerLine));
+  const layerFactor = isSide
+    ? 1.15
+    : (isPaliEnabled ? 1 : 0) + activeLangCount * (effectiveSentenceMode ? 1.55 : 1.15);
+  const lineHeightPx = isMobile ? 27 : 29;
+  const paraGapPx = (chunk.paraCount || 1) * (effectiveSentenceMode ? 36 : 22);
+  const linkPx = showBookLinks && isPaliEnabled ? (chunk.paraCount || 1) * 14 : 0;
+  return Math.max(240, Math.round(paliLines * lineHeightPx * Math.max(0.9, layerFactor) + paraGapPx + linkPx));
+}
+
+const ChapterChunk = memo(function ChapterChunk({
+  chunk,
+  isMounted,
+  estimatedHeight,
+  measuredHeight,
+  registerChunkEl,
+  bookCode,
+  chapterIndex,
+  effectiveSentenceMode,
+  isPaliEnabled,
+  paliSentMap,
+  showSentenceNumbers,
+  paliScript,
+  highlightSearchTerms,
+  searchHighlight,
+  hasActiveTrans,
+  translations,
+  orderedLayers,
+  translationDisplayMode,
+  translationColors,
+  transSentences,
+  showBookLinks,
+  chapterLinks,
+  theme,
+}) {
+  const nodeRef = useRef(null);
+
+  const paliBaseHtml = React.useMemo(() => {
+    if (!isMounted || !chunk?.rawHtml) return null;
+    let processed = chunk.rawHtml;
+    if (effectiveSentenceMode && isPaliEnabled && paliSentMap) {
+      processed = injectPaliSentencesIntoHtml(processed, paliSentMap, {
+        showSentenceNumbers,
+      });
+    }
+    if (paliScript && paliScript !== 'roman') {
+      processed = transliterateHtml(processed, paliScript);
+    }
+    const isPali = isSearchPali(searchHighlight);
+    if (highlightSearchTerms && searchHighlight?.query && searchHighlight.query.trim() && isPali) {
+      processed = highlightHtmlText(
+        processed,
+        searchHighlight.query.trim(),
+        paliScript,
+        searchHighlight.paraIndex,
+        searchHighlight.paraNum
+      );
+    }
+    return processed;
+  }, [
+    isMounted,
+    chunk?.rawHtml,
+    effectiveSentenceMode,
+    isPaliEnabled,
+    paliSentMap,
+    showSentenceNumbers,
+    paliScript,
+    highlightSearchTerms,
+    searchHighlight,
+  ]);
+
+  const chunkDisplayHtml = React.useMemo(() => {
+    if (!isMounted || !paliBaseHtml) return null;
+    const currentPaliColors = translationColors?.pali || {};
+    const hasCustomPaliColors = Boolean(
+      formatCssColor(currentPaliColors.border) ||
+      formatCssColor(currentPaliColors.bg) ||
+      formatCssColor(currentPaliColors.text)
+    );
+    if (hasActiveTrans || !isPaliEnabled || hasCustomPaliColors) {
+      return injectTranslationsIntoHtml(
+        paliBaseHtml,
+        translations,
+        orderedLayers,
+        isPaliEnabled,
+        translationDisplayMode,
+        translationColors,
+        highlightSearchTerms ? searchHighlight : null,
+        effectiveSentenceMode,
+        transSentences,
+        theme,
+        {
+          showBookLinks,
+          chapterLinks,
+          paliScript,
+          bookCode,
+          chapterIndex,
+        }
+      );
+    }
+    if (showBookLinks && isPaliEnabled && chapterLinks) {
+      return injectBookLinksIntoHtml(paliBaseHtml, chapterLinks, paliScript, effectiveSentenceMode, {
+        bookCode,
+        chapterIndex,
+      });
+    }
+    return paliBaseHtml;
+  }, [
+    isMounted,
+    paliBaseHtml,
+    paliScript,
+    searchHighlight,
+    highlightSearchTerms,
+    hasActiveTrans,
+    translations,
+    orderedLayers,
+    isPaliEnabled,
+    translationDisplayMode,
+    translationColors,
+    effectiveSentenceMode,
+    transSentences,
+    showBookLinks,
+    chapterLinks,
+    theme,
+    bookCode,
+    chapterIndex,
+  ]);
+
+  const setNodeRef = useCallback(
+    (node) => {
+      nodeRef.current = node;
+      registerChunkEl?.(chunk.index, node);
+    },
+    [registerChunkEl, chunk.index]
+  );
+
+  if (!isMounted) {
+    const pbEntries = chunk.lastPbByEd ? Object.entries(chunk.lastPbByEd) : [];
+    const carriedHeading = chunk.lastHeading
+      ? paliScript && paliScript !== 'roman'
+        ? convertPaliScript(chunk.lastHeading, paliScript) || chunk.lastHeading
+        : chunk.lastHeading
+      : undefined;
+    return (
+      <div
+        ref={setNodeRef}
+        data-chunk-index={chunk.index}
+        data-chunk-virtualized="1"
+        data-chunk-last-heading={carriedHeading}
+        data-chunk-prev-para={chunk.prevParaNum || undefined}
+        className="chapter-chunk chapter-chunk-placeholder"
+        style={{ minHeight: measuredHeight || estimatedHeight }}
+      >
+        {pbEntries.map(([ed, page]) => (
+          <span
+            key={ed}
+            className="pb hidden"
+            data-ed={ed}
+            data-page={page}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-chunk-index={chunk.index}
+      data-chunk-prev-para={chunk.prevParaNum || undefined}
+      className="chapter-chunk"
+      dangerouslySetInnerHTML={{ __html: chunkDisplayHtml || '' }}
+    />
+  );
+});
+
+// Memoized Chapter Block with Pre-Buffering Intersection Observer, Paragraph-Chunk Windowing,
+// Lazy Translation Loading, and Non-Blocking Linked Definitions
 export const ChapterBlock = memo(function ChapterBlock({
   chapter,
   bookCode,
@@ -1593,6 +2130,12 @@ export const ChapterBlock = memo(function ChapterBlock({
   isLoading,
   onVisible,
   isCurrentOrTarget = false,
+  anchorEnd = false,
+  scrollCtxRef = null,
+  targetParaIndex = null,
+  targetParaNum = null,
+  targetPage = null,
+  targetPageSystem = null,
   paliScript = 'roman',
   searchHighlight = null,
   highlightSearchTerms = true,
@@ -1654,27 +2197,178 @@ export const ChapterBlock = memo(function ChapterBlock({
     initialCachedTrans ? activeLangsKeyWithMode : null
   );
   const [paliSentFetched, setPaliSentFetched] = React.useState(() => Boolean(initialCachedPaliSent));
-  const [linksFetched, setLinksFetched] = React.useState(() => Boolean(initialCachedLinks));
   const [isNearViewport, setIsNearViewport] = React.useState(isCurrentOrTarget);
   const [isWithinDomWindow, setIsWithinDomWindow] = React.useState(true);
   const measuredHeightRef = useRef(0);
 
-  // Preserve rendered chapter height before transitioning into trans-loading or DOM virtualization
-  useLayoutEffect(() => {
-    const el = blockRef.current;
-    if (!el) return;
-    if (
-      !isWithinDomWindow ||
-      el.getAttribute('data-trans-loading') === '1' ||
-      el.getAttribute('data-virtualized') === '1'
-    ) {
-      return;
+  const transFetchedKeyRef = useRef(transFetchedKey);
+  transFetchedKeyRef.current = transFetchedKey;
+  const paliSentFetchedRef = useRef(paliSentFetched);
+  paliSentFetchedRef.current = paliSentFetched;
+  const linksNotifiedKeyRef = useRef('');
+
+  // Synchronously resolve prefetched/cached translations & Pāḷi sentences during
+  // render when a chapter enters the viewport (or receives HTML from loadChapter)
+  // so prefetched chapters render on Frame 1 without flashing "Loading happiness...".
+  const renderSyncTrans =
+    hasActiveTrans &&
+    html &&
+    bookCode &&
+    (isNearViewport || isCurrentOrTarget) &&
+    transFetchedKey !== activeLangsKeyWithMode &&
+    typeof getCachedChapterTranslations === 'function'
+      ? getCachedChapterTranslations(bookCode, chapter.chapter_index, activeLangs, {
+          sentences: effectiveSentenceMode,
+        })
+      : null;
+
+  const renderSyncPaliSent =
+    effectiveSentenceMode &&
+    isPaliEnabled &&
+    html &&
+    bookCode &&
+    (isNearViewport || isCurrentOrTarget) &&
+    !paliSentFetched &&
+    typeof getCachedPaliSentences === 'function'
+      ? getCachedPaliSentences(bookCode, chapter.chapter_index)
+      : null;
+
+  const effectiveTranslations = renderSyncTrans
+    ? renderSyncTrans.translations || translations
+    : translations;
+  const effectiveTransSentences = renderSyncTrans
+    ? effectiveSentenceMode
+      ? renderSyncTrans.sentences || transSentences
+      : transSentences
+    : transSentences;
+  const effectivePaliSentMap = renderSyncPaliSent
+    ? extractPaliChapMap(renderSyncPaliSent, chapter.chapter_index)
+    : paliSentMap;
+
+  // Split huge chapters (>50 paragraphs) into 30-paragraph chunks so opening a
+  // giant commentary like vin01a.att only transforms & mounts nearby chunks.
+  const chunks = React.useMemo(() => splitChapterHtmlIntoChunks(html), [html]);
+  const isChunked = chunks.length > 1;
+  const isChunkedRef = useRef(isChunked);
+  isChunkedRef.current = isChunked;
+
+  const chunkElsRef = useRef(new Map());
+  const chunkHeightsRef = useRef(new Map());
+  const chunkPrevHeightsRef = useRef(new Map());
+  const chunkPrevMountedRef = useRef(new Map());
+  const chunkMountHintRef = useRef(new Map());
+  const prevChapterIdentityRef = useRef('');
+  const prevLayoutSettingsRef = useRef('');
+  const prevContentSigRef = useRef(null);
+  const [observerMountedChunks, setObserverMountedChunks] = React.useState(() => new Set());
+
+  const contentSignature = React.useMemo(
+    () => ({
+      html,
+      translations: effectiveTranslations,
+      transSentences: effectiveTransSentences,
+      paliSentMap: effectivePaliSentMap,
+      chapterLinks,
+      showBookLinks,
+      paliScript,
+      isPaliEnabled,
+      effectiveSentenceMode,
+      showSentenceNumbers,
+      translationDisplayMode,
+      orderedLayers,
+      highlightSearchTerms,
+      searchHighlight,
+    }),
+    [
+      html,
+      effectiveTranslations,
+      effectiveTransSentences,
+      effectivePaliSentMap,
+      chapterLinks,
+      showBookLinks,
+      paliScript,
+      isPaliEnabled,
+      effectiveSentenceMode,
+      showSentenceNumbers,
+      translationDisplayMode,
+      orderedLayers,
+      highlightSearchTerms,
+      searchHighlight,
+    ]
+  );
+
+  const registerChunkEl = useCallback((idx, node) => {
+    if (node) {
+      chunkElsRef.current.set(idx, node);
+    } else {
+      chunkElsRef.current.delete(idx);
     }
-    const h = el.offsetHeight || 0;
-    if (h > 0) {
-      measuredHeightRef.current = h;
+  }, []);
+
+  // Reset observer-mounted chunk set when switching chapter HTML identity
+  useEffect(() => {
+    setObserverMountedChunks(new Set());
+  }, [bookCode, chapter.chapter_index]);
+
+  const targetChunkIdx = React.useMemo(() => {
+    if (!isChunked) return 0;
+    return findTargetChunkIndex(chunks, {
+      paraIndex: targetParaIndex,
+      paraNum: targetParaNum,
+      page: targetPage,
+      pageSystem: targetPageSystem,
+      searchQuery: isCurrentOrTarget ? searchHighlight?.query : null,
+      translations: isCurrentOrTarget && searchHighlight?.query ? effectiveTranslations : null,
+    });
+  }, [
+    isChunked,
+    chunks,
+    targetParaIndex,
+    targetParaNum,
+    targetPage,
+    targetPageSystem,
+    isCurrentOrTarget,
+    searchHighlight?.query,
+    effectiveTranslations,
+  ]);
+
+  const forcedMountedChunks = React.useMemo(() => {
+    const set = new Set();
+    if (!isChunked || typeof IntersectionObserver === 'undefined') {
+      for (let i = 0; i < chunks.length; i++) set.add(i);
+      return set;
     }
-  });
+    if (isCurrentOrTarget) {
+      const hasExplicitTarget = Boolean(
+        (targetParaIndex !== undefined && targetParaIndex !== null && targetParaIndex !== '') ||
+        (targetParaNum !== undefined && targetParaNum !== null && String(targetParaNum).trim() !== '') ||
+        (targetPage !== undefined && targetPage !== null && String(targetPage).trim() !== '') ||
+        (searchHighlight?.query && String(searchHighlight.query).trim() !== '')
+      );
+      if (anchorEnd && !hasExplicitTarget) {
+        const start = Math.max(0, chunks.length - 3);
+        for (let i = start; i < chunks.length; i++) set.add(i);
+      } else {
+        const start = Math.max(0, targetChunkIdx - 1);
+        const end = Math.min(chunks.length - 1, targetChunkIdx + 3);
+        for (let i = start; i <= end; i++) set.add(i);
+      }
+    } else {
+      set.add(0);
+      if (chunks.length > 1) set.add(1);
+    }
+    return set;
+  }, [
+    isChunked,
+    chunks.length,
+    isCurrentOrTarget,
+    anchorEnd,
+    targetChunkIdx,
+    targetParaIndex,
+    targetParaNum,
+    targetPage,
+    searchHighlight?.query,
+  ]);
 
   useEffect(() => {
     if (isCurrentOrTarget) {
@@ -1683,8 +2377,9 @@ export const ChapterBlock = memo(function ChapterBlock({
     }
   }, [isCurrentOrTarget]);
 
-  // IntersectionObserver for lazy loading chapter HTML & lazy loading translations,
-  // plus a wider DOM virtualization window to shed far-off-screen chapter DOM nodes.
+  // IntersectionObserver for lazy loading chapter HTML & translations with generous
+  // margins so fast mobile scrolling never outruns chapter loading, plus a wide
+  // DOM virtualization window to shed far-off-screen chapter DOM nodes.
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') {
       setIsNearViewport(true);
@@ -1694,7 +2389,7 @@ export const ChapterBlock = memo(function ChapterBlock({
     if (!blockRef.current) return;
 
     const loadRootMargin =
-      typeof window !== 'undefined' && window.innerWidth < 768 ? '400px 0px' : '800px 0px';
+      typeof window !== 'undefined' && window.innerWidth < 768 ? '2200px 0px' : '2400px 0px';
     const loadObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -1712,15 +2407,31 @@ export const ChapterBlock = memo(function ChapterBlock({
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
+        const el = blockRef.current;
         if (entry.isIntersecting) {
+          if (
+            !isChunkedRef.current &&
+            el &&
+            el.getAttribute('data-trans-loading') !== '1' &&
+            el.getAttribute('data-virtualized') !== '1'
+          ) {
+            const h = Math.round(entry.boundingClientRect?.height || 0);
+            if (h > 0) chunkPrevHeightsRef.current.set(0, h);
+          }
           setIsWithinDomWindow(true);
         } else {
-          const h = blockRef.current?.offsetHeight || 0;
-          if (h > 0) measuredHeightRef.current = h;
+          if (
+            el &&
+            el.getAttribute('data-trans-loading') !== '1' &&
+            el.getAttribute('data-virtualized') !== '1'
+          ) {
+            const h = Math.round(entry.boundingClientRect?.height || 0) || el.offsetHeight || 0;
+            if (h > 0) measuredHeightRef.current = h;
+          }
           setIsWithinDomWindow(false);
         }
       },
-      { rootMargin: '2500px 0px' } // Keep nearby chapters mounted; collapse far-off-screen DOM
+      { rootMargin: '4500px 0px' }
     );
 
     loadObserver.observe(blockRef.current);
@@ -1731,33 +2442,33 @@ export const ChapterBlock = memo(function ChapterBlock({
     };
   }, [html, chapter.chapter_index, onVisible]);
 
-  // Fast single-roundtrip chapter bundle for local offline / VPS dynamic hosts
+  // Fast single-roundtrip chapter bundle for local offline / VPS dynamic hosts.
+  // Intentionally excludes heavy linked-definitions JSON (up to 2-3 MB on commentaries)
+  // so text + translations settle in a few ms while links load non-blockingly in parallel.
   useEffect(() => {
     if (!canUseBundle) return;
 
     const langsToFetch = activeLangsKey ? activeLangsKey.split(',').filter(Boolean) : [];
     const needTrans = Boolean(html && bookCode && activeLangsKey && langsToFetch.length > 0);
     const needPaliSent = Boolean(html && bookCode && effectiveSentenceMode && isPaliEnabled);
-    const needLinks = Boolean(html && bookCode && ((showBookLinks && isPaliEnabled) || isParallelSyncActive));
 
     if (!activeLangsKey) {
       setTranslations({});
       setTransSentences({});
       setTransFetchedKey('');
+      transFetchedKeyRef.current = '';
       setIsTransLoading(false);
     }
     if (!effectiveSentenceMode || !isPaliEnabled) {
       if (!effectiveSentenceMode) {
         setPaliSentMap(null);
         setPaliSentFetched(false);
+        paliSentFetchedRef.current = false;
       } else if (!isPaliEnabled && !paliSentMap) {
         setPaliSentFetched(false);
+        paliSentFetchedRef.current = false;
       }
       setIsPaliSentLoading(false);
-    }
-    if (!needLinks && (!showBookLinks || !isPaliEnabled)) {
-      setChapterLinks(null);
-      setLinksFetched(false);
     }
     if (!html || !bookCode) return;
 
@@ -1768,10 +2479,11 @@ export const ChapterBlock = memo(function ChapterBlock({
             sentences: effectiveSentenceMode,
           })
         : null;
-    if (syncTrans) {
+    if (syncTrans && transFetchedKeyRef.current !== activeLangsKeyWithMode) {
       setTranslations(syncTrans.translations || {});
       setTransSentences(effectiveSentenceMode ? syncTrans.sentences || {} : {});
       setTransFetchedKey(activeLangsKeyWithMode);
+      transFetchedKeyRef.current = activeLangsKeyWithMode;
       setIsTransLoading(false);
       blockRef.current?.removeAttribute('data-trans-loading');
       blockRef.current?.setAttribute('data-trans-settled', '1');
@@ -1781,28 +2493,18 @@ export const ChapterBlock = memo(function ChapterBlock({
       needPaliSent && typeof getCachedPaliSentences === 'function'
         ? getCachedPaliSentences(bookCode, chapter.chapter_index)
         : null;
-    if (syncPaliSent) {
+    if (syncPaliSent && !paliSentFetchedRef.current) {
       setPaliSentMap(extractPaliChapMap(syncPaliSent, chapter.chapter_index));
       setPaliSentFetched(true);
+      paliSentFetchedRef.current = true;
       setIsPaliSentLoading(false);
-    }
-
-    const syncLinks =
-      needLinks && near && typeof getCachedChapterLinks === 'function'
-        ? getCachedChapterLinks(bookCode, chapter.chapter_index)
-        : null;
-    if (syncLinks) {
-      setChapterLinks(syncLinks);
-      setLinksFetched(true);
-      onLinksLoaded?.(chapter.chapter_index, syncLinks);
     }
 
     if (!near) return;
 
-    const missingTrans = Boolean(needTrans && !syncTrans && transFetchedKey !== activeLangsKeyWithMode);
-    const missingPaliSent = Boolean(needPaliSent && !syncPaliSent && !paliSentFetched);
-    const missingLinks = Boolean(needLinks && !syncLinks && !linksFetched);
-    if (!missingTrans && !missingPaliSent && !missingLinks) return;
+    const missingTrans = Boolean(needTrans && !syncTrans && transFetchedKeyRef.current !== activeLangsKeyWithMode);
+    const missingPaliSent = Boolean(needPaliSent && !syncPaliSent && !paliSentFetchedRef.current);
+    if (!missingTrans && !missingPaliSent) return;
 
     let cancelled = false;
     if (missingTrans) {
@@ -1824,12 +2526,14 @@ export const ChapterBlock = memo(function ChapterBlock({
             setTranslations(data?.translations || {});
             setTransSentences(effectiveSentenceMode ? data?.sentences || {} : {});
             setTransFetchedKey(activeLangsKeyWithMode);
+            transFetchedKeyRef.current = activeLangsKeyWithMode;
             setIsTransLoading(false);
           })
           .catch((err) => {
             console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
             if (!cancelled) {
               setTransFetchedKey(activeLangsKeyWithMode);
+              transFetchedKeyRef.current = activeLangsKeyWithMode;
               setIsTransLoading(false);
             }
           });
@@ -1840,28 +2544,14 @@ export const ChapterBlock = memo(function ChapterBlock({
             if (cancelled) return;
             setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
             setPaliSentFetched(true);
+            paliSentFetchedRef.current = true;
             setIsPaliSentLoading(false);
           })
           .catch(() => {
             if (!cancelled) {
               setPaliSentFetched(true);
+              paliSentFetchedRef.current = true;
               setIsPaliSentLoading(false);
-            }
-          });
-      }
-      if (missingLinks) {
-        fetchChapterLinks(bookCode, chapter.chapter_index)
-          .then((data) => {
-            if (cancelled) return;
-            const paras = data?.paragraphs || null;
-            setChapterLinks(paras);
-            setLinksFetched(true);
-            onLinksLoaded?.(chapter.chapter_index, paras);
-          })
-          .catch(() => {
-            if (!cancelled) {
-              setChapterLinks(null);
-              setLinksFetched(true);
             }
           });
       }
@@ -1872,7 +2562,7 @@ export const ChapterBlock = memo(function ChapterBlock({
       langs: missingTrans ? langsToFetch : [],
       sentences: missingTrans && effectiveSentenceMode,
       paliSentences: missingPaliSent,
-      links: missingLinks,
+      links: false,
     })
       .then((bundle) => {
         if (cancelled) return;
@@ -1884,18 +2574,14 @@ export const ChapterBlock = memo(function ChapterBlock({
           setTranslations(bundle.translations || {});
           setTransSentences(effectiveSentenceMode ? bundle.sentences || {} : {});
           setTransFetchedKey(activeLangsKeyWithMode);
+          transFetchedKeyRef.current = activeLangsKeyWithMode;
           setIsTransLoading(false);
         }
         if (missingPaliSent) {
           setPaliSentMap(extractPaliChapMap(bundle.pali_sentences, chapter.chapter_index));
           setPaliSentFetched(true);
+          paliSentFetchedRef.current = true;
           setIsPaliSentLoading(false);
-        }
-        if (missingLinks) {
-          const paras = bundle.links || null;
-          setChapterLinks(paras);
-          setLinksFetched(true);
-          onLinksLoaded?.(chapter.chapter_index, paras);
         }
       })
       .catch(() => {
@@ -1914,14 +2600,8 @@ export const ChapterBlock = memo(function ChapterBlock({
     activeLangsKeyWithMode,
     effectiveSentenceMode,
     isPaliEnabled,
-    showBookLinks,
-    isParallelSyncActive,
     isNearViewport,
     isCurrentOrTarget,
-    transFetchedKey,
-    paliSentFetched,
-    linksFetched,
-    onLinksLoaded,
   ]);
 
   // Task 3: Lazy load translations ONLY when chapter is near viewport (or current/target) and active translation languages exist
@@ -1932,6 +2612,7 @@ export const ChapterBlock = memo(function ChapterBlock({
         setTranslations({});
         setTransSentences({});
         setTransFetchedKey('');
+        transFetchedKeyRef.current = '';
         setIsTransLoading(false);
       }
       return;
@@ -1943,6 +2624,7 @@ export const ChapterBlock = memo(function ChapterBlock({
       setTranslations({});
       setTransSentences({});
       setTransFetchedKey(activeLangsKeyWithMode);
+      transFetchedKeyRef.current = activeLangsKeyWithMode;
       setIsTransLoading(false);
       return;
     }
@@ -1957,15 +2639,13 @@ export const ChapterBlock = memo(function ChapterBlock({
       setTranslations(syncCached.translations || {});
       setTransSentences(effectiveSentenceMode ? syncCached.sentences || {} : {});
       setTransFetchedKey(activeLangsKeyWithMode);
+      transFetchedKeyRef.current = activeLangsKeyWithMode;
       setIsTransLoading(false);
       blockRef.current?.removeAttribute('data-trans-loading');
       blockRef.current?.setAttribute('data-trans-settled', '1');
       return;
     }
 
-    // Expose the translation fetch state on the chapter block so the reader's
-    // post-jump settle watcher knows whether this chapter can still grow:
-    // rows above a jump target expand when the payload lands, shifting it.
     blockRef.current?.removeAttribute('data-trans-settled');
     blockRef.current?.setAttribute('data-trans-loading', '1');
     setIsTransLoading(true);
@@ -1976,12 +2656,14 @@ export const ChapterBlock = memo(function ChapterBlock({
         setTranslations(data?.translations || {});
         setTransSentences(effectiveSentenceMode ? (data?.sentences || {}) : {});
         setTransFetchedKey(activeLangsKeyWithMode);
+        transFetchedKeyRef.current = activeLangsKeyWithMode;
         setIsTransLoading(false);
       })
       .catch((err) => {
         console.warn(`[ChapterBlock] Error loading translations for ch ${chapter.chapter_index}:`, err);
         if (isMounted) {
           setTransFetchedKey(activeLangsKeyWithMode);
+          transFetchedKeyRef.current = activeLangsKeyWithMode;
           setIsTransLoading(false);
         }
       });
@@ -1999,8 +2681,10 @@ export const ChapterBlock = memo(function ChapterBlock({
       if (!effectiveSentenceMode) {
         setPaliSentMap(null);
         setPaliSentFetched(false);
+        paliSentFetchedRef.current = false;
       } else if (!isPaliEnabled && !paliSentMap) {
         setPaliSentFetched(false);
+        paliSentFetchedRef.current = false;
       }
       setIsPaliSentLoading(false);
       return;
@@ -2012,6 +2696,7 @@ export const ChapterBlock = memo(function ChapterBlock({
     if (syncCached) {
       setPaliSentMap(extractPaliChapMap(syncCached, chapter.chapter_index));
       setPaliSentFetched(true);
+      paliSentFetchedRef.current = true;
       setIsPaliSentLoading(false);
       return;
     }
@@ -2022,11 +2707,13 @@ export const ChapterBlock = memo(function ChapterBlock({
         if (cancelled) return;
         setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
         setPaliSentFetched(true);
+        paliSentFetchedRef.current = true;
         setIsPaliSentLoading(false);
       })
       .catch(() => {
         if (!cancelled) {
           setPaliSentFetched(true);
+          paliSentFetchedRef.current = true;
           setIsPaliSentLoading(false);
         }
       });
@@ -2035,22 +2722,48 @@ export const ChapterBlock = memo(function ChapterBlock({
     };
   }, [canUseBundle, effectiveSentenceMode, isPaliEnabled, html, bookCode, chapter.chapter_index]);
 
-  // Lazy load inline Linked Definitions for this chapter when visible and enabled (or when parallel column sync is active)
+  const transFetchPending =
+    !renderSyncTrans && (isTransLoading || transFetchedKey !== activeLangsKeyWithMode);
+  const paliSentFetchPending =
+    effectiveSentenceMode &&
+    isPaliEnabled &&
+    !renderSyncPaliSent &&
+    (isPaliSentLoading || !paliSentFetched);
+  const isTransPending =
+    hasActiveTrans &&
+    (isNearViewport || isCurrentOrTarget) &&
+    (transFetchPending || paliSentFetchPending);
+  const isTransSettledNow =
+    hasActiveTrans &&
+    !isTransPending &&
+    (transFetchedKey === activeLangsKeyWithMode || Boolean(renderSyncTrans));
+
+  // Non-blocking inline Linked Definitions loader (runs independently after text +
+  // translations have settled so multi-MB commentary links never compete with initial render).
   useEffect(() => {
-    if (canUseBundle) return;
     const needLinks = (showBookLinks && isPaliEnabled) || isParallelSyncActive;
-    if (!needLinks || !html || !bookCode || (!isNearViewport && !isCurrentOrTarget)) {
+    if (
+      !needLinks ||
+      !html ||
+      !bookCode ||
+      (!isNearViewport && !isCurrentOrTarget) ||
+      (!isWithinDomWindow && !isCurrentOrTarget)
+    ) {
       if (!showBookLinks || !isPaliEnabled) setChapterLinks(null);
       return;
     }
+    if (isTransPending) return;
+    const notifyKey = `${bookCode}:${chapter.chapter_index}`;
     const syncCached =
       typeof getCachedChapterLinks === 'function'
         ? getCachedChapterLinks(bookCode, chapter.chapter_index)
         : null;
     if (syncCached) {
-      const paras = syncCached;
-      setChapterLinks(paras);
-      onLinksLoaded?.(chapter.chapter_index, paras);
+      setChapterLinks((prev) => (prev === syncCached ? prev : syncCached));
+      if (linksNotifiedKeyRef.current !== notifyKey) {
+        linksNotifiedKeyRef.current = notifyKey;
+        onLinksLoaded?.(chapter.chapter_index, syncCached);
+      }
       return;
     }
     let cancelled = false;
@@ -2059,6 +2772,7 @@ export const ChapterBlock = memo(function ChapterBlock({
         if (cancelled) return;
         const paras = data?.paragraphs || null;
         setChapterLinks(paras);
+        linksNotifiedKeyRef.current = notifyKey;
         onLinksLoaded?.(chapter.chapter_index, paras);
       })
       .catch(() => {
@@ -2067,14 +2781,19 @@ export const ChapterBlock = memo(function ChapterBlock({
     return () => {
       cancelled = true;
     };
-  }, [canUseBundle, showBookLinks, isParallelSyncActive, isPaliEnabled, html, bookCode, chapter.chapter_index, isNearViewport, isCurrentOrTarget, onLinksLoaded]);
-
-  const transFetchPending = isTransLoading || transFetchedKey !== activeLangsKeyWithMode;
-  const paliSentFetchPending = effectiveSentenceMode && isPaliEnabled && (isPaliSentLoading || !paliSentFetched);
-  const isTransPending =
-    hasActiveTrans &&
-    (isNearViewport || isCurrentOrTarget) &&
-    (transFetchPending || paliSentFetchPending);
+  }, [
+    showBookLinks,
+    isParallelSyncActive,
+    isPaliEnabled,
+    html,
+    bookCode,
+    chapter.chapter_index,
+    isNearViewport,
+    isCurrentOrTarget,
+    isWithinDomWindow,
+    isTransPending,
+    onLinksLoaded,
+  ]);
 
   // Keep data-trans-loading and data-trans-settled DOM attributes strictly in sync with isTransPending
   useEffect(() => {
@@ -2083,7 +2802,7 @@ export const ChapterBlock = memo(function ChapterBlock({
       if (isTransPending) {
         blockRef.current.setAttribute('data-trans-loading', '1');
         blockRef.current.removeAttribute('data-trans-settled');
-      } else if (transFetchedKey === activeLangsKeyWithMode) {
+      } else if (isTransSettledNow) {
         blockRef.current.removeAttribute('data-trans-loading');
         blockRef.current.setAttribute('data-trans-settled', '1');
       } else {
@@ -2094,103 +2813,318 @@ export const ChapterBlock = memo(function ChapterBlock({
       blockRef.current.removeAttribute('data-trans-loading');
       blockRef.current.removeAttribute('data-trans-settled');
     }
-  }, [isTransPending, hasActiveTrans, transFetchedKey, activeLangsKeyWithMode]);
+  }, [isTransPending, hasActiveTrans, isTransSettledNow]);
 
-  // Split expensive Pāḷi sentence injection + script transliteration from translation/link overlays
-  const paliBaseHtml = React.useMemo(() => {
-    if (!html) return null;
-    let processed = html;
-    // Sentence display mode: Pāḷi sentence lines from the precomputed map.
-    // Run BEFORE transliterateHtml so Roman sentence/page-break matching works
-    // on raw Roman HTML and the injected sentence spans get transliterated too.
-    if (effectiveSentenceMode && isPaliEnabled && paliSentMap) {
-      processed = injectPaliSentencesIntoHtml(processed, paliSentMap, {
-        showSentenceNumbers,
-      });
+  // Passively capture mounted chunk heights via ResizeObserver (runs after natural
+  // layout without forcing synchronous reflow) so chunks mounted on initial paint
+  // or strictly below the viewport during fast downward scrolling always have an
+  // accurate pre-update height for above-viewport scroll compensation when async
+  // chapterLinks arrive later.
+  useEffect(() => {
+    if (
+      !html ||
+      chunks.length === 0 ||
+      (!isCurrentOrTarget && !isWithinDomWindow) ||
+      (hasActiveTrans && isTransPending) ||
+      typeof ResizeObserver === 'undefined'
+    ) {
+      return;
     }
-    if (paliScript && paliScript !== 'roman') {
-      processed = transliterateHtml(processed, paliScript);
-    }
-    // Task 2: Only highlight Pāḷi text if search was in Root Pāḷi CST (not in translation database)
-    const isPali = isSearchPali(searchHighlight);
-    if (highlightSearchTerms && searchHighlight?.query && searchHighlight.query.trim() && isPali) {
-      processed = highlightHtmlText(
-        processed,
-        searchHighlight.query.trim(),
-        paliScript,
-        searchHighlight.paraIndex,
-        searchHighlight.paraNum
-      );
-    }
-    return processed;
-  }, [
-    html,
-    effectiveSentenceMode,
-    isPaliEnabled,
-    paliSentMap,
-    showSentenceNumbers,
-    paliScript,
-    highlightSearchTerms,
-    searchHighlight,
-  ]);
 
-  const displayHtml = React.useMemo(() => {
-    if (!paliBaseHtml) return null;
-    const currentPaliColors = translationColors?.pali || {};
-    const hasCustomPaliColors = Boolean(
-      formatCssColor(currentPaliColors.border) ||
-      formatCssColor(currentPaliColors.bg) ||
-      formatCssColor(currentPaliColors.text)
-    );
-    if (hasActiveTrans || !isPaliEnabled || hasCustomPaliColors) {
-      return injectTranslationsIntoHtml(
-        paliBaseHtml,
-        translations,
-        orderedLayers,
-        isPaliEnabled,
-        translationDisplayMode,
-        translationColors,
-        highlightSearchTerms ? searchHighlight : null,
-        effectiveSentenceMode,
-        transSentences,
-        theme,
-        {
-          showBookLinks,
-          chapterLinks,
-          paliScript,
-          bookCode,
-          chapterIndex: chapter.chapter_index,
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const el = entry.target;
+        if (!el || el.getAttribute('data-chunk-virtualized') === '1') continue;
+        const idx = Number(el.getAttribute('data-chunk-index'));
+        if (Number.isNaN(idx)) continue;
+        const borderBox = Array.isArray(entry.borderBoxSize)
+          ? entry.borderBoxSize[0]
+          : entry.borderBoxSize;
+        const h = Math.round(borderBox?.blockSize || entry.contentRect?.height || 0);
+        if (h > 0) {
+          chunkHeightsRef.current.set(idx, h);
+          chunkPrevHeightsRef.current.set(idx, h);
         }
-      );
+      }
+    });
+
+    chunkElsRef.current.forEach((node) => {
+      resizeObserver.observe(node);
+    });
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [html, chunks, isCurrentOrTarget, isWithinDomWindow, hasActiveTrans, isTransPending]);
+
+  // Shared 2-observer hysteresis window for chunked chapters (>50 paragraphs):
+  // mount chunks 3600px ahead so fast iOS momentum flicks always hit eagerly
+  // painted text, and unmount chunks >6500px away after recording height from
+  // entry.boundingClientRect (avoiding forced synchronous offsetHeight reflows).
+  useEffect(() => {
+    if (
+      !isChunked ||
+      !html ||
+      (!isCurrentOrTarget && !isWithinDomWindow) ||
+      (hasActiveTrans && isTransPending) ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
     }
-    if (showBookLinks && isPaliEnabled && chapterLinks) {
-      return injectBookLinksIntoHtml(paliBaseHtml, chapterLinks, paliScript, effectiveSentenceMode, {
-        bookCode,
-        chapterIndex: chapter.chapter_index,
-      });
+
+    const mountObserver = new IntersectionObserver(
+      (entries) => {
+        const toMount = [];
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          const el = entry.target;
+          const idx = Number(el.getAttribute('data-chunk-index'));
+          if (Number.isNaN(idx)) continue;
+          const isPlaceholder = el.getAttribute('data-chunk-virtualized') === '1';
+          if (!isPlaceholder) {
+            const h = Math.round(entry.boundingClientRect?.height || 0);
+            if (h > 0) {
+              chunkHeightsRef.current.set(idx, h);
+              chunkPrevHeightsRef.current.set(idx, h);
+            }
+          }
+          if (!entry.isIntersecting) continue;
+          if (isPlaceholder && entry.boundingClientRect) {
+            chunkMountHintRef.current.set(idx, {
+              top: entry.boundingClientRect.top,
+              bottom: entry.boundingClientRect.bottom,
+              rootTop: entry.rootBounds?.top ?? 0,
+            });
+          }
+          toMount.push(idx);
+        }
+        if (toMount.length === 0) return;
+        setObserverMountedChunks((prev) => {
+          let changed = false;
+          for (let i = 0; i < toMount.length; i++) {
+            if (!prev.has(toMount[i])) {
+              changed = true;
+              break;
+            }
+          }
+          if (!changed) return prev;
+          const next = new Set(prev);
+          for (let i = 0; i < toMount.length; i++) {
+            next.add(toMount[i]);
+          }
+          return next;
+        });
+      },
+      { rootMargin: '3600px 0px' }
+    );
+
+    const unmountObserver = new IntersectionObserver(
+      (entries) => {
+        const toUnmount = [];
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          if (entry.isIntersecting) continue;
+          const el = entry.target;
+          const idx = Number(el.getAttribute('data-chunk-index'));
+          if (Number.isNaN(idx)) continue;
+          if (el.getAttribute('data-chunk-virtualized') !== '1') {
+            const h = Math.round(entry.boundingClientRect?.height || 0) || el.offsetHeight || 0;
+            if (h > 0) chunkHeightsRef.current.set(idx, h);
+          }
+          toUnmount.push(idx);
+        }
+        if (toUnmount.length === 0) return;
+        setObserverMountedChunks((prev) => {
+          let changed = false;
+          for (let i = 0; i < toUnmount.length; i++) {
+            if (prev.has(toUnmount[i])) {
+              changed = true;
+              break;
+            }
+          }
+          if (!changed) return prev;
+          const next = new Set(prev);
+          for (let i = 0; i < toUnmount.length; i++) {
+            next.delete(toUnmount[i]);
+          }
+          return next;
+        });
+      },
+      { rootMargin: '6500px 0px' }
+    );
+
+    chunkElsRef.current.forEach((node) => {
+      mountObserver.observe(node);
+      unmountObserver.observe(node);
+    });
+
+    return () => {
+      mountObserver.disconnect();
+      unmountObserver.disconnect();
+    };
+  }, [isChunked, html, chunks, isCurrentOrTarget, isWithinDomWindow, hasActiveTrans, isTransPending]);
+
+  // Batched height measurement & above-viewport scroll compensation across all
+  // chunks in a single commit: performs all getBoundingClientRect() reads first,
+  // then applies at most ONE scroll write (preventing interleaved read->write
+  // layout thrashing across chunks). Skips forced layout on initial mount (no
+  // previous height) and on chunks mounting strictly below the viewport during
+  // fast downward scrolling.
+  useIsomorphicLayoutEffect(() => {
+    const chapterIdentityKey = `${bookCode}:${chapter.chapter_index}:${html ? html.length : 0}`;
+    const isNewChapterIdentity = prevChapterIdentityRef.current !== chapterIdentityKey;
+    if (isNewChapterIdentity) {
+      prevChapterIdentityRef.current = chapterIdentityKey;
+      chunkHeightsRef.current.clear();
+      chunkPrevHeightsRef.current.clear();
+      chunkPrevMountedRef.current.clear();
+      chunkMountHintRef.current.clear();
+      prevContentSigRef.current = contentSignature;
     }
-    return paliBaseHtml;
+
+    const layoutSettingsKey = `${activeLangsKeyWithMode}|${translationDisplayMode}|${isPaliEnabled}|${paliScript}|${showBookLinks}`;
+    if (prevLayoutSettingsRef.current !== layoutSettingsKey) {
+      prevLayoutSettingsRef.current = layoutSettingsKey;
+      chunkHeightsRef.current.clear();
+    }
+
+    const chunksRendered = Boolean(
+      html &&
+        chunks.length > 0 &&
+        (isCurrentOrTarget || isWithinDomWindow) &&
+        !(hasActiveTrans && isTransPending)
+    );
+    if (!chunksRendered) {
+      chunkPrevHeightsRef.current.clear();
+      chunkPrevMountedRef.current.clear();
+      chunkMountHintRef.current.clear();
+      prevContentSigRef.current = contentSignature;
+      return;
+    }
+
+    const contentChanged =
+      !isNewChapterIdentity &&
+      prevContentSigRef.current !== null &&
+      prevContentSigRef.current !== contentSignature;
+    prevContentSigRef.current = contentSignature;
+
+    const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
+    const candidates = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const idx = chunk.index;
+      const isMounted =
+        !isChunked || forcedMountedChunks.has(idx) || observerMountedChunks.has(idx);
+      const wasMounted = chunkPrevMountedRef.current.get(idx) === true;
+      chunkPrevMountedRef.current.set(idx, isMounted);
+
+      if (!isMounted) {
+        const knownH =
+          chunkHeightsRef.current.get(idx) ||
+          estimateChunkHeight(chunk, {
+            isPaliEnabled,
+            activeLangCount: activeLangs.length,
+            effectiveSentenceMode,
+            translationDisplayMode,
+            showBookLinks,
+            isMobile: isMobileViewport,
+          });
+        chunkPrevHeightsRef.current.set(idx, knownH);
+        chunkMountHintRef.current.delete(idx);
+        continue;
+      }
+
+      const mountHint = chunkMountHintRef.current.get(idx);
+      chunkMountHintRef.current.delete(idx);
+
+      const oldH = chunkPrevHeightsRef.current.get(idx) || 0;
+      if (!(oldH > 0)) continue;
+
+      if (!wasMounted && mountHint && mountHint.top > (mountHint.rootTop ?? 0) + 250) {
+        chunkPrevHeightsRef.current.delete(idx);
+        continue;
+      }
+
+      if (!wasMounted || contentChanged) {
+        const el = chunkElsRef.current.get(idx);
+        if (el && typeof el.getBoundingClientRect === 'function') {
+          candidates.push({ idx, el, oldH });
+        }
+      }
+    }
+
+    if (candidates.length === 0) return;
+
+    // Phase 1: Batched DOM reads (single getBoundingClientRect() per candidate; no offsetHeight)
+    const ctx = scrollCtxRef?.current;
+    const canCompensate = Boolean(ctx && !ctx.isJumping?.());
+    const scrollEl =
+      canCompensate && !ctx.useWindowScroll ? ctx.getScrollContainer?.() : null;
+    const vpTop =
+      canCompensate && scrollEl && typeof scrollEl.getBoundingClientRect === 'function'
+        ? scrollEl.getBoundingClientRect().top
+        : 0;
+
+    const measurements = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const { idx, el, oldH } = candidates[i];
+      const rect = el.getBoundingClientRect();
+      const newH = Math.round(rect.height || 0);
+      if (newH > 0) {
+        chunkHeightsRef.current.set(idx, newH);
+        chunkPrevHeightsRef.current.set(idx, newH);
+      }
+      if (canCompensate && newH > 0 && Math.abs(newH - oldH) >= 2) {
+        measurements.push({
+          rectTop: rect.top,
+          rectBottom: rect.bottom,
+          prevHeight: oldH,
+          nextHeight: newH,
+        });
+      }
+    }
+
+    if (measurements.length === 0) return;
+
+    // Phase 2: Single scroll adjustment write
+    const totalDelta = computeBatchedAboveViewportScrollDelta(measurements, vpTop);
+    if (totalDelta !== 0) {
+      if (ctx.useWindowScroll) {
+        if (typeof window !== 'undefined' && typeof window.scrollBy === 'function') {
+          window.scrollBy(0, totalDelta);
+        }
+      } else if (scrollEl) {
+        scrollEl.scrollTop += totalDelta;
+      }
+    }
   }, [
-    paliBaseHtml,
-    paliScript,
-    searchHighlight,
-    highlightSearchTerms,
-    hasActiveTrans,
-    translations,
-    orderedLayers,
-    isPaliEnabled,
-    translationDisplayMode,
-    translationColors,
-    effectiveSentenceMode,
-    transSentences,
-    showBookLinks,
-    chapterLinks,
-    theme,
     bookCode,
     chapter.chapter_index,
+    html,
+    chunks,
+    isChunked,
+    forcedMountedChunks,
+    observerMountedChunks,
+    isCurrentOrTarget,
+    isWithinDomWindow,
+    hasActiveTrans,
+    isTransPending,
+    contentSignature,
+    activeLangsKeyWithMode,
+    activeLangs.length,
+    isPaliEnabled,
+    effectiveSentenceMode,
+    translationDisplayMode,
+    paliScript,
+    showBookLinks,
+    scrollCtxRef,
   ]);
 
-  if (displayHtml) {
+  if (html && chunks.length > 0) {
+    const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
+
     if (!isCurrentOrTarget && !isWithinDomWindow) {
       return (
         <div
@@ -2205,14 +3139,31 @@ export const ChapterBlock = memo(function ChapterBlock({
     }
 
     if (hasActiveTrans && isTransPending) {
+      let estLoadingHeight = 0;
+      if (measuredHeightRef.current <= 220) {
+        for (let i = 0; i < chunks.length; i++) {
+          estLoadingHeight += estimateChunkHeight(chunks[i], {
+            isPaliEnabled,
+            activeLangCount: activeLangs.length,
+            effectiveSentenceMode,
+            translationDisplayMode,
+            showBookLinks,
+            isMobile: isMobileViewport,
+          });
+        }
+      }
+      const loadingStyle =
+        (measuredHeightRef.current > 220 ? { minHeight: measuredHeightRef.current } : undefined) ||
+        (estLoadingHeight > 480 ? { minHeight: estLoadingHeight } : undefined);
+      const isTallLoading = (loadingStyle?.minHeight || 0) > 1100;
       return (
         <div
           ref={blockRef}
           id={`chap-${chapter.chapter_index}`}
           data-chapter={chapter.chapter_index}
           data-trans-loading="1"
-          style={measuredHeightRef.current > 220 ? { minHeight: measuredHeightRef.current } : undefined}
-          className="chapter-content-block reader-chapter-trans-loading py-14 px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center justify-center gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[65vh]"
+          style={loadingStyle}
+          className={`chapter-content-block reader-chapter-trans-loading px-6 my-6 border border-dashed border-[var(--border-color)] rounded-2xl flex flex-col items-center ${isTallLoading ? 'justify-start pt-20 pb-14' : 'justify-center py-14'} gap-3 bg-[var(--bg-secondary)]/30 text-center select-none animate-in fade-in duration-300 min-h-[65vh]`}
         >
           <div className="flex items-center gap-2.5 text-sm sm:text-base font-semibold text-[var(--text-primary)]">
             <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
@@ -2237,10 +3188,51 @@ export const ChapterBlock = memo(function ChapterBlock({
         id={`chap-${chapter.chapter_index}`}
         data-chapter={chapter.chapter_index}
         data-trans-loading={hasActiveTrans && isTransPending ? '1' : undefined}
-        data-trans-settled={hasActiveTrans && !isTransPending && transFetchedKey === activeLangsKeyWithMode ? '1' : undefined}
+        data-trans-settled={isTransSettledNow ? '1' : undefined}
         className="chapter-content-block"
       >
-        <div dangerouslySetInnerHTML={{ __html: displayHtml }} />
+        {chunks.map((chunk) => {
+          const isMounted = !isChunked || forcedMountedChunks.has(chunk.index) || observerMountedChunks.has(chunk.index);
+          const measuredH = chunkHeightsRef.current.get(chunk.index) || 0;
+          const estH = isMounted
+            ? 0
+            : estimateChunkHeight(chunk, {
+                isPaliEnabled,
+                activeLangCount: activeLangs.length,
+                effectiveSentenceMode,
+                translationDisplayMode,
+                showBookLinks,
+                isMobile: isMobileViewport,
+              });
+          return (
+            <ChapterChunk
+              key={chunk.index}
+              chunk={chunk}
+              isMounted={isMounted}
+              estimatedHeight={estH}
+              measuredHeight={measuredH}
+              registerChunkEl={registerChunkEl}
+              bookCode={bookCode}
+              chapterIndex={chapter.chapter_index}
+              effectiveSentenceMode={effectiveSentenceMode}
+              isPaliEnabled={isPaliEnabled}
+              paliSentMap={effectivePaliSentMap}
+              showSentenceNumbers={showSentenceNumbers}
+              paliScript={paliScript}
+              highlightSearchTerms={highlightSearchTerms}
+              searchHighlight={searchHighlight}
+              hasActiveTrans={hasActiveTrans}
+              translations={effectiveTranslations}
+              orderedLayers={orderedLayers}
+              translationDisplayMode={translationDisplayMode}
+              translationColors={translationColors}
+              transSentences={effectiveTransSentences}
+              showBookLinks={showBookLinks}
+              chapterLinks={chapterLinks}
+              theme={theme}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -3348,8 +4340,7 @@ const ReaderPane = memo(function ReaderPane({
     (scrollTop = 0) => {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const cached = vpBoundsCacheRef.current;
-      const topDelta = Math.abs((scrollTop || 0) - cached.scrollY);
-      if (cached.height > 0 && topDelta < 120 && now - cached.ts < 300) {
+      if (cached.height > 0 && now - cached.ts < 300) {
         return cached;
       }
       const fresh = getViewportBounds();
@@ -5321,7 +6312,7 @@ const ReaderPane = memo(function ReaderPane({
       detectActiveEditionPages();
       if (containerRef.current) {
         const { top: vpTop } = getViewportBounds();
-        const headings = containerRef.current.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
+        const headings = containerRef.current.querySelectorAll('p.book, p.chapter, p.title, p.subhead, [data-chunk-last-heading]');
         const detected = detectLiveSectionTitleFromElements(headings, vpTop + getTopReadingInset());
         setPaneSectionTitle(detected);
       }
@@ -5381,7 +6372,7 @@ const ReaderPane = memo(function ReaderPane({
       const { top: vpTop } = getViewportBounds();
       const targetY = vpTop + getTopReadingInset();
 
-      const headings = container.querySelectorAll('p.book, p.chapter, p.title, p.subhead');
+      const headings = container.querySelectorAll('p.book, p.chapter, p.title, p.subhead, [data-chunk-last-heading]');
       const detectedTitle = detectLiveSectionTitleFromElements(headings, targetY);
       setPaneSectionTitle(detectedTitle);
 
@@ -5422,6 +6413,10 @@ const ReaderPane = memo(function ReaderPane({
               break;
             }
             prev = prev.previousElementSibling;
+          }
+          if (!foundParaNum) {
+            foundParaNum =
+              targetPara.closest?.('[data-chunk-prev-para]')?.getAttribute?.('data-chunk-prev-para') || null;
           }
         }
 
@@ -5533,7 +6528,7 @@ const ReaderPane = memo(function ReaderPane({
         clearTimeout(scrollTimeoutRef.current);
       }
       const fallbackMs =
-        typeof window !== 'undefined' && 'onscrollend' in window ? 220 : 180;
+        typeof window !== 'undefined' && 'onscrollend' in window ? 350 : 180;
       scrollTimeoutRef.current = setTimeout(() => {
         runPostScrollWorkRef.current(top);
       }, fallbackMs);
@@ -5626,6 +6621,15 @@ const ReaderPane = memo(function ReaderPane({
       const moreGroup = row?.querySelector('.linked-def-more-group');
       if (moreGroup) {
         const isHidden = moreGroup.classList.contains('hidden');
+        if (isHidden && moreGroup.childElementCount === 0) {
+          const moreRef = moreGroup.getAttribute('data-links-more-ref');
+          if (moreRef) {
+            const hydrated = renderMoreLinkChipsFromRef(moreRef);
+            if (hydrated) {
+              moreGroup.innerHTML = hydrated;
+            }
+          }
+        }
         moreGroup.classList.toggle('hidden', !isHidden);
         const count = moreBtn.getAttribute('data-more-count') || '';
         moreBtn.textContent = isHidden ? 'Less' : `+${count} more`;
@@ -5663,6 +6667,9 @@ const ReaderPane = memo(function ReaderPane({
             if (pNum) break;
           }
           prev = prev.previousElementSibling;
+        }
+        if (!pNum) {
+          pNum = pEl.closest?.('[data-chunk-prev-para]')?.getAttribute?.('data-chunk-prev-para') || null;
         }
       }
       if (pNum) {
@@ -5990,14 +6997,29 @@ const ReaderPane = memo(function ReaderPane({
     }
   };
 
+  const activeBookCodeForPane = activeTab?.bookCode || null;
   const handleChapterVisible = useCallback(
     (chapIdx) => {
-      if (!activeTab) return;
-      loadChapter(activeTab.bookCode, chapIdx);
-      bufferAdjacentChapters(activeTab.bookCode, chapIdx);
+      if (!activeBookCodeForPane) return;
+      loadChapter(activeBookCodeForPane, chapIdx);
+      bufferAdjacentChapters(activeBookCodeForPane, chapIdx);
     },
-    [activeTab, loadChapter, bufferAdjacentChapters]
+    [activeBookCodeForPane, loadChapter, bufferAdjacentChapters]
   );
+
+  const chunkScrollCtxRef = useRef(null);
+  chunkScrollCtxRef.current = {
+    useWindowScroll,
+    getScrollContainer: () => containerRef.current,
+    isJumping: () =>
+      Boolean(
+        isProgrammaticScrollRef.current ||
+          isTabSwitchingRef.current ||
+          paraJumpRef.current?.key ||
+          chapterJumpRef.current?.key ||
+          paneScrollIntentRef.current
+      ),
+  };
 
   const handleLinksLoaded = useCallback(
     (chapIdx, paragraphs) => {
@@ -6494,40 +7516,73 @@ const ReaderPane = memo(function ReaderPane({
               }}
             >
               {activeTab.chapters && activeTab.chapters.length > 0 ? (
-                activeTab.chapters.map((chap) => (
-                  <ChapterBlock
-                    key={`${activeTab.bookCode}_${chap.chapter_index}`}
-                    chapter={chap}
-                    bookCode={activeTab.bookCode}
-                    html={activeTab.loadedChapters?.[chap.chapter_index]}
-                    isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
-                    onVisible={handleChapterVisible}
-                    isCurrentOrTarget={
-                      activeTab.currentChapterIdx === chap.chapter_index ||
-                      paneScrollIntent?.chapterIdx === chap.chapter_index ||
-                      (hasTransLayers &&
-                        paneScrollIntent?.chapterIdx !== undefined &&
-                        paneScrollIntent?.chapterIdx !== null &&
-                        chap.chapter_index === paneScrollIntent.chapterIdx - 1) ||
-                      (chap.chapter_index === 0 &&
-                        (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) &&
-                        !paneScrollIntent?.chapterIdx)
-                    }
-                    paliScript={settings?.paliScript}
-                    searchHighlight={searchHighlight}
-                    highlightSearchTerms={settings?.highlightSearchTerms ?? true}
-                    activeLangs={activeLangs}
-                    orderedLayers={orderedLayers}
-                    isPaliEnabled={isPaliEnabled}
-                    translationDisplayMode={settings?.translationDisplayMode || 'stack'}
-                    translationColors={settings?.translationColors}
-                    sentenceMode={settings?.translationGranularity === 'sentence'}
-                    showBookLinks={settings?.showBookLinks !== false}
-                    isParallelSyncActive={isColumnsMode && isParallelSyncActive}
-                    onLinksLoaded={handleLinksLoaded}
-                    theme={settings?.theme || 'classic'}
-                  />
-                ))
+                activeTab.chapters.map((chap) => {
+                  const intentAppliesToChap = Boolean(
+                    paneScrollIntent &&
+                      (paneScrollIntent.chapterIdx === undefined ||
+                        paneScrollIntent.chapterIdx === null ||
+                        paneScrollIntent.chapterIdx === chap.chapter_index)
+                  );
+                  const isSavedCurrentChap = activeTab.currentChapterIdx === chap.chapter_index;
+                  const isPrecedingIntentChap = Boolean(
+                    hasTransLayers &&
+                      paneScrollIntent?.chapterIdx !== undefined &&
+                      paneScrollIntent?.chapterIdx !== null &&
+                      chap.chapter_index === paneScrollIntent.chapterIdx - 1
+                  );
+                  const useSavedParaForInitialRestore = Boolean(
+                    isSavedCurrentChap && !hasInitialRestoredRef.current
+                  );
+                  const targetParaIndex = intentAppliesToChap
+                    ? paneScrollIntent.paraIndex ?? null
+                    : useSavedParaForInitialRestore
+                      ? activeTab.lastParaIndex ?? null
+                      : null;
+                  const targetParaNum = intentAppliesToChap
+                    ? paneScrollIntent.paraNum ?? null
+                    : useSavedParaForInitialRestore
+                      ? activeTab.lastParaNum ?? null
+                      : null;
+                  const targetPage = intentAppliesToChap ? paneScrollIntent.page ?? null : null;
+                  const targetPageSystem = intentAppliesToChap ? paneScrollIntent.pageSystem ?? null : null;
+                  return (
+                    <ChapterBlock
+                      key={`${activeTab.bookCode}_${chap.chapter_index}`}
+                      chapter={chap}
+                      bookCode={activeTab.bookCode}
+                      html={activeTab.loadedChapters?.[chap.chapter_index]}
+                      isLoading={Boolean(activeTab.loadingChapters?.[chap.chapter_index])}
+                      onVisible={handleChapterVisible}
+                      isCurrentOrTarget={
+                        isSavedCurrentChap ||
+                        paneScrollIntent?.chapterIdx === chap.chapter_index ||
+                        isPrecedingIntentChap ||
+                        (chap.chapter_index === 0 &&
+                          (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) &&
+                          !paneScrollIntent?.chapterIdx)
+                      }
+                      anchorEnd={isPrecedingIntentChap && !isSavedCurrentChap}
+                      scrollCtxRef={chunkScrollCtxRef}
+                      targetParaIndex={targetParaIndex}
+                      targetParaNum={targetParaNum}
+                      targetPage={targetPage}
+                      targetPageSystem={targetPageSystem}
+                      paliScript={settings?.paliScript}
+                      searchHighlight={searchHighlight}
+                      highlightSearchTerms={settings?.highlightSearchTerms ?? true}
+                      activeLangs={activeLangs}
+                      orderedLayers={orderedLayers}
+                      isPaliEnabled={isPaliEnabled}
+                      translationDisplayMode={settings?.translationDisplayMode || 'stack'}
+                      translationColors={settings?.translationColors}
+                      sentenceMode={settings?.translationGranularity === 'sentence'}
+                      showBookLinks={settings?.showBookLinks !== false}
+                      isParallelSyncActive={isColumnsMode && isParallelSyncActive}
+                      onLinksLoaded={handleLinksLoaded}
+                      theme={settings?.theme || 'classic'}
+                    />
+                  );
+                })
               ) : (
                 <div
                   dangerouslySetInnerHTML={{

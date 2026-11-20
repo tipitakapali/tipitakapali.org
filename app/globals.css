@@ -5933,17 +5933,11 @@ body.window-scroll .app-footer.hidden-footer {
   }
 }
 
-/* Defer off-screen layout/paint for heavy chapter streams below the initial fold
-   while preserving exact intrinsic size memory during scrolling. */
-.chapter-content-block > div > .reader-para-row:nth-child(n + 15),
-.chapter-content-block > div > p[data-pindex]:nth-child(n + 15) {
-  content-visibility: auto;
-  contain-intrinsic-block-size: auto 7rem;
+/* Large chapters are windowed into paragraph chunks in ReaderView.jsx so
+   mounted paragraphs stay eagerly laid out and painted for instant iOS
+   momentum scrolling without WebKit content-visibility blank frames. */
+.chapter-chunk {
+  display: block;
 }
 
-@supports not (content-visibility: auto) {
-  .chapter-content-block {
-    contain: layout style paint;
-  }
-}
 

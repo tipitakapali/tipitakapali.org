@@ -938,7 +938,7 @@ export async function fetchChapterBundle(bookCode, chapterIndex, options = {}) {
             MAX_CACHE_ENTRIES
           );
         }
-        if (withLinks && data.links) {
+        if (withLinks && data.links && !data.links_warming_up) {
           setBoundedCache(
             cache,
             `chapter_links_${cleanCode}_ch${chapterIndex}`,
@@ -1169,31 +1169,53 @@ export async function fetchChapterLinks(bookCode, chapterIndex, options = {}) {
   }
 
   const cacheKey = `chapter_links_${cleanCode}_ch${chapterIndex}`;
-  const base = getApiBase();
+  const ttlMs = 30 * 60 * 1000;
+  const signal = options.signal || null;
 
-  return cachedFetch(
-    cacheKey,
-    async () => {
-      const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = timeoutCtrl ? setTimeout(() => timeoutCtrl.abort(), 15000) : null;
-      try {
-        const res = await fetch(
-          `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/links`,
-          timeoutCtrl ? { signal: timeoutCtrl.signal } : undefined
-        );
-        if (!res.ok) {
-          return { book_code: cleanCode, chapter_index: chapterIndex, paragraphs: {} };
-        }
-        return await res.json();
-      } catch (err) {
+  if (signal?.aborted) {
+    throw makeAbortError();
+  }
+
+  if (ENABLE_CLIENT_CACHE) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < ttlMs) {
+      touchBoundedCache(cache, cacheKey, cached);
+      return cached.data;
+    }
+    if (pendingRequests.has(cacheKey)) {
+      return raceWithSignal(pendingRequests.get(cacheKey), signal);
+    }
+  }
+
+  const base = getApiBase();
+  const promise = (async () => {
+    const timeoutCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = timeoutCtrl ? setTimeout(() => timeoutCtrl.abort(), 15000) : null;
+    try {
+      const res = await fetch(
+        `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/links`,
+        timeoutCtrl ? { signal: timeoutCtrl.signal } : undefined
+      );
+      if (!res.ok) {
         return { book_code: cleanCode, chapter_index: chapterIndex, paragraphs: {} };
-      } finally {
-        if (timer) clearTimeout(timer);
       }
-    },
-    30 * 60 * 1000,
-    options.signal
-  );
+      const data = await res.json();
+      if (ENABLE_CLIENT_CACHE && data && !data.warming_up) {
+        setBoundedCache(cache, cacheKey, { data, timestamp: Date.now() }, MAX_CACHE_ENTRIES);
+      }
+      return data;
+    } catch (err) {
+      return { book_code: cleanCode, chapter_index: chapterIndex, paragraphs: {} };
+    } finally {
+      if (timer) clearTimeout(timer);
+      pendingRequests.delete(cacheKey);
+    }
+  })();
+
+  if (ENABLE_CLIENT_CACHE) {
+    pendingRequests.set(cacheKey, promise);
+  }
+  return raceWithSignal(promise, signal);
 }
 
 function buildLinkedPreviewSpec({ book, chapter, paraIndex, paraNum, lineId, word, langs } = {}) {

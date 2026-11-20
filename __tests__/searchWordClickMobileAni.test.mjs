@@ -1761,3 +1761,793 @@ test("Ani (AI Nissaya) toggles header visibility on scroll while keeping chat in
   assert.match(cssSrc, /\.ai-chat-footer\s*\{[\s\S]*?opacity:\s*1\s*!important;/);
 });
 
+test("iOS/offline reader smoothness: chunked large chapters, lazy +N more link chips, non-blocking links, no paragraph content-visibility, and rAF-cached WebView scroll bridge", () => {
+  const transMod = compileModule("services/transliterate.js", {});
+  const noopComp = () => null;
+  const readerMod = compileModule("components/Reader/ReaderView.jsx", {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    "lucide-react": iconProxy,
+    "./WelcomeView": { __esModule: true, default: noopComp },
+    "./MeditationLoader": { __esModule: true, default: noopComp },
+    "./BookTocView": { __esModule: true, default: noopComp },
+    "./LinkedDefinitionModal": { __esModule: true, default: noopComp },
+    "../AiChat/AiChatView": { __esModule: true, default: noopComp },
+    "../../context/TabContext": { useTabs: () => ({}) },
+    "../../context/ThemeSettingsContext": {
+      useThemeSettings: () => ({}),
+      getDefaultTranslationColorsForTheme: () => ({
+        text: "#000",
+        border: "#000",
+        bg: "",
+      }),
+    },
+    "../../context/DictionaryContext": { useDictionary: () => ({}) },
+    "../../services/transliterate": transMod,
+    "../../services/scroll": compileModule("services/scroll.js", {}),
+    "../../services/api": {
+      fetchChapterTranslations: async () => ({}),
+      fetchChapterBundle: async () => null,
+      isLocalDynamicHost: () => false,
+      fetchPaliSentences: async () => ({}),
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      getCachedPaliSentences: () => null,
+      getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
+    },
+  });
+
+  // 1. Small chapters stay in a single chunk; empty inputs return []
+  assert.deepEqual(readerMod.splitChapterHtmlIntoChunks(""), []);
+  assert.deepEqual(readerMod.splitChapterHtmlIntoChunks(null), []);
+  const smallHtml = Array.from(
+    { length: 20 },
+    (_, i) => `<p class="bodytext" data-pindex="${i}" data-para="${i + 1}">Para ${i + 1}</p>`,
+  ).join("\n");
+  const smallChunks = readerMod.splitChapterHtmlIntoChunks(smallHtml);
+  assert.equal(smallChunks.length, 1);
+  assert.equal(smallChunks[0].rawHtml, smallHtml);
+
+  // 2. Large chapters (>50 paragraphs) split losslessly with carry-forward metadata
+  const bigParts = ['<div id="chap-1" class="chapter-anchor" data-chapter="1"></div>'];
+  for (let i = 0; i < 125; i++) {
+    if (i === 0) {
+      bigParts.push(`<p class="chapter" data-pindex="${i}">Verañjakaṇḍavaṇṇanā</p>`);
+    } else if (i === 62) {
+      bigParts.push(`<p class="subhead" data-pindex="${i}">Paṭhamapārājikaṃ</p>`);
+    } else if (i === 95) {
+      bigParts.push(
+        `<p class="bodytext" data-pindex="${i}" data-para="100-105" data-para-first="100" data-para-last="105"><span class="pb" data-ed="M" data-page="1.0042"></span>Evaṃ me sutaṃ specialterm.</p>`,
+      );
+    } else {
+      const pb =
+        i % 25 === 0
+          ? `<span class="pb" data-ed="M" data-page="1.${String(i).padStart(4, "0")}"></span>`
+          : "";
+      const paraAttr = i % 3 === 0 ? ` data-para="${i}"` : "";
+      bigParts.push(`<p class="bodytext" data-pindex="${i}"${paraAttr}>${pb}Paragraph text ${i}.</p>`);
+    }
+  }
+  const bigHtml = bigParts.join("\n");
+  const bigChunks = readerMod.splitChapterHtmlIntoChunks(bigHtml, 30);
+  assert.equal(bigChunks.length, 5);
+  assert.equal(
+    bigChunks.map((c) => c.rawHtml).join(""),
+    bigHtml,
+    "Chunk splitting must be 100% lossless byte-for-byte",
+  );
+  assert.equal(bigChunks[0].lastHeading, "Verañjakaṇḍavaṇṇanā");
+  assert.equal(bigChunks[2].lastHeading, "Paṭhamapārājikaṃ");
+  assert.ok(bigChunks[1].prevParaNum, "Subsequent chunks must carry forward previous data-para");
+  assert.equal(bigChunks[3].lastPbByEd.M, "1.0100");
+  assert.ok(bigChunks[3].edPages.some((p) => p.ed === "M" && p.page === "1.0042"));
+
+  // 3. findTargetChunkIndex resolves paraIndex, exact/ranged paraNum, edition page, and search query
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, { paraIndex: 95 }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, { paraNum: "103" }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, { page: "1.42", pageSystem: "M" }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, { page: "42", pageSystem: "M" }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, { searchQuery: "specialterm" }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(bigChunks, {}), 0);
+
+  // 4. detectLiveSectionTitleFromElements reads carry-forward heading from virtualized chunk placeholders
+  const carriedHeading = readerMod.detectLiveSectionTitleFromElements(
+    [
+      {
+        getAttribute: (k) => (k === "data-chunk-last-heading" ? "Paṭhamapārājikaṃ" : null),
+        getBoundingClientRect: () => ({ top: -400, bottom: -10, width: 320, height: 390 }),
+      },
+    ],
+    120,
+  );
+  assert.equal(carriedHeading, "Paṭhamapārājikaṃ");
+
+  // 5. estimateChunkHeight scales cleanly with active languages and sentence mode
+  const paliEst = readerMod.estimateChunkHeight(bigChunks[0], {
+    isPaliEnabled: true,
+    activeLangCount: 0,
+    effectiveSentenceMode: false,
+    isMobile: true,
+  });
+  const sentEst = readerMod.estimateChunkHeight(bigChunks[0], {
+    isPaliEnabled: true,
+    activeLangCount: 1,
+    effectiveSentenceMode: true,
+    isMobile: true,
+  });
+  assert.ok(paliEst >= 240);
+  assert.ok(sentEst > paliEst);
+
+  // 6. Lazy +N more link chip hydration: initial HTML omits hidden chips beyond 3, hydrates on demand
+  const manyLinks = Array.from({ length: 8 }, (_, idx) => ({
+    word: `dhamma${idx}`,
+    target_book: "vin01t1.tik",
+    target_book_title: "Sāratthadīpanī-Ṭīkā-1",
+    target_category: "ṭīkā",
+    target_chapter: 1,
+    target_para_index: 10 + idx,
+    target_para_num: String(idx + 1),
+    is_source: false,
+  }));
+  const injectedWithMany = readerMod.injectTranslationsIntoHtml(
+    '<p class="bodytext" data-pindex="7" data-para="1">Evaṃ me sutaṃ.</p>',
+    { en: { 7: "Thus have I heard." } },
+    [
+      { id: "pali", type: "pali" },
+      { id: "en", lang: "en", type: "trans" },
+    ],
+    true,
+    "stack",
+    {},
+    null,
+    false,
+    null,
+    "classic",
+    {
+      showBookLinks: true,
+      chapterLinks: { 7: { all: manyLinks, by_line: {} } },
+      paliScript: "roman",
+      bookCode: "vin01a.att",
+      chapterIndex: 1,
+    },
+  );
+  const initialChipCount = (injectedWithMany.match(/class="linked-def-chip /g) || []).length;
+  assert.equal(initialChipCount, 3, "Only first 3 link chips should render initially");
+  const moreRefMatch = injectedWithMany.match(/data-links-more-ref="([^"]+)"/);
+  assert.ok(moreRefMatch, "Empty more-group must carry data-links-more-ref for lazy hydration");
+  assert.match(injectedWithMany, /\+5 more/);
+
+  const hydratedMoreHtml = readerMod.renderMoreLinkChipsFromRef(moreRefMatch[1]);
+  assert.equal((hydratedMoreHtml.match(/class="linked-def-chip /g) || []).length, 5);
+  assert.match(hydratedMoreHtml, /dhamma3/);
+  assert.match(hydratedMoreHtml, /dhamma7/);
+  const hydratedRefMatch = hydratedMoreHtml.match(/data-link-ref="([^"]+)"/);
+  assert.ok(hydratedRefMatch);
+  const resolvedHydrated = readerMod.resolveChipLinkElement({
+    getAttribute: (k) => (k === "data-link-ref" ? hydratedRefMatch[1] : null),
+  });
+  assert.equal(resolvedHydrated?.word, "dhamma3");
+  assert.equal(readerMod.renderMoreLinkChipsFromRef("invalid|ref"), "");
+
+  // 7. ChapterBlock windowing when IntersectionObserver is present mounts only initial chunks
+  const prevIO = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class FakeIO {
+    observe() {}
+    disconnect() {}
+  };
+  try {
+    const renderedBig = renderToStaticMarkup(
+      React.createElement(readerMod.ChapterBlock, {
+        chapter: { chapter_index: 1, title: "verañjakaṇḍavaṇṇanā" },
+        bookCode: "vin01a.att",
+        html: bigHtml,
+        isLoading: false,
+        onVisible: () => {},
+        isCurrentOrTarget: true,
+        targetParaIndex: 95,
+      }),
+    );
+    // Target chunk is 3 -> forced window is [2, 3, 4], so chunks 0 & 1 are virtualized placeholders
+    assert.match(renderedBig, /data-chunk-index="0"[^>]*data-chunk-virtualized="1"/);
+    assert.match(renderedBig, /data-chunk-index="1"[^>]*data-chunk-virtualized="1"/);
+    assert.match(renderedBig, /specialterm/, "Target chunk 3 must be mounted immediately on frame 1");
+    assert.match(renderedBig, /class="pb hidden" data-ed="M"/, "Virtualized chunk must carry hidden pb markers");
+  } finally {
+    if (prevIO === undefined) delete globalThis.IntersectionObserver;
+    else globalThis.IntersectionObserver = prevIO;
+  }
+
+  // 8. Regression guards: no paragraph content-visibility: auto in globals.css,
+  // non-blocking links in ReaderView, and rAF/cached scroll metrics in WebView bridge
+  const cssSrc = fs.readFileSync(path.join(rootDir, "app", "globals.css"), "utf8");
+  assert.doesNotMatch(
+    cssSrc,
+    /\.reader-para-row:nth-child[\s\S]*content-visibility:\s*auto/,
+    "globals.css must not apply content-visibility: auto to reader paragraphs (causes iOS WKWebView blank fast-scroll frames & hangs)",
+  );
+  assert.doesNotMatch(
+    cssSrc,
+    /@supports\s+not\s*\(\s*content-visibility:\s*auto\s*\)[\s\S]*\.chapter-content-block/,
+  );
+
+  const readerSrc = fs.readFileSync(
+    path.join(rootDir, "components", "Reader", "ReaderView.jsx"),
+    "utf8",
+  );
+  assert.match(readerSrc, /fetchChapterBundle\([\s\S]*?links:\s*false/);
+
+  const webviewSrc = fs.readFileSync(
+    path.join(
+      rootDir,
+      "tipitakapali_org_app",
+      "lib",
+      "features",
+      "webview",
+      "tipitaka_webview_screen.dart",
+    ),
+    "utf8",
+  );
+  assert.match(webviewSrc, /getCachedMaxScroll/);
+  assert.match(webviewSrc, /getCachedBarsToggleBlocked/);
+  assert.match(webviewSrc, /scrollRafPending/);
+});
+
+test("Review fixes: above-viewport scroll anchoring, anchorEnd preceding chapter, nearest-para/translation chunk lookup, single-trip loadChapter bundle, and observer/scroll-thrash guards", () => {
+  const transMod = compileModule("services/transliterate.js", {});
+  const noopComp = () => null;
+  const readerMod = compileModule("components/Reader/ReaderView.jsx", {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    "lucide-react": iconProxy,
+    "./WelcomeView": { __esModule: true, default: noopComp },
+    "./MeditationLoader": { __esModule: true, default: noopComp },
+    "./BookTocView": { __esModule: true, default: noopComp },
+    "./LinkedDefinitionModal": { __esModule: true, default: noopComp },
+    "../AiChat/AiChatView": { __esModule: true, default: noopComp },
+    "../../context/TabContext": { useTabs: () => ({}) },
+    "../../context/ThemeSettingsContext": {
+      useThemeSettings: () => ({}),
+      getDefaultTranslationColorsForTheme: () => ({ text: "#000", border: "#000", bg: "" }),
+    },
+    "../../context/DictionaryContext": { useDictionary: () => ({}) },
+    "../../services/transliterate": transMod,
+    "../../services/scroll": compileModule("services/scroll.js", {}),
+    "../../services/api": {
+      fetchChapterTranslations: async () => ({}),
+      fetchChapterBundle: async () => null,
+      isLocalDynamicHost: () => false,
+      fetchPaliSentences: async () => ({}),
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      getCachedPaliSentences: () => null,
+      getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
+    },
+  });
+
+  // 1. computeAboveViewportScrollDelta prevents iOS WKWebView / overflow-anchor:none scroll jumps
+  assert.equal(
+    readerMod.computeAboveViewportScrollDelta({
+      rectTop: -4000,
+      rectBottom: -500,
+      prevHeight: 2000,
+      nextHeight: 3500,
+      viewportTop: 0,
+    }),
+    1500,
+    "Growing chunk strictly above viewport must return +delta",
+  );
+  assert.equal(
+    readerMod.computeAboveViewportScrollDelta({
+      rectTop: -4000,
+      rectBottom: -2000,
+      prevHeight: 3500,
+      nextHeight: 2000,
+      viewportTop: 0,
+    }),
+    -1500,
+    "Shrinking chunk strictly above viewport must return -delta",
+  );
+  assert.equal(
+    readerMod.computeAboveViewportScrollDelta({
+      rectTop: -200,
+      rectBottom: 900,
+      prevHeight: 600,
+      nextHeight: 1100,
+      viewportTop: 0,
+    }),
+    0,
+    "Partially visible chunk must not shift scrollTop",
+  );
+  assert.equal(
+    readerMod.computeAboveViewportScrollDelta({
+      rectTop: 400,
+      rectBottom: 1900,
+      prevHeight: 1000,
+      nextHeight: 1500,
+      viewportTop: 0,
+    }),
+    0,
+    "Below-viewport chunk must not shift scrollTop",
+  );
+
+  // 2. findTargetChunkIndex supports nearest-para fallback, padded vol.page, and translation search
+  const bigParts = [];
+  for (let i = 0; i < 125; i++) {
+    const paraAttr = i % 5 === 0 ? ` data-para="${i * 2}"` : "";
+    const pb = i === 95 ? `<span class="pb" data-ed="M" data-page="1.0042"></span>` : "";
+    bigParts.push(`<p class="bodytext" data-pindex="${i}"${paraAttr}>${pb}Text ${i}</p>`);
+  }
+  const bigHtml = bigParts.join("\n");
+  const chunks = readerMod.splitChapterHtmlIntoChunks(bigHtml, 30);
+  // para 191 doesn't exist exactly; nearest <= 191 is para 190 at pindex 95 (chunk 3)
+  assert.equal(readerMod.findTargetChunkIndex(chunks, { paraNum: "191" }), 3);
+  assert.equal(readerMod.findTargetChunkIndex(chunks, { page: "01.42", pageSystem: "M" }), 3);
+  assert.equal(
+    readerMod.findTargetChunkIndex(chunks, {
+      searchQuery: "enlightenment",
+      translations: { en: { 95: "The path to enlightenment." } },
+    }),
+    3,
+  );
+
+  // 3. ChapterBlock anchorEnd mounts trailing chunks for preceding chapter & reserves tall loading height
+  const prevIO = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class FakeIO {
+    observe() {}
+    disconnect() {}
+  };
+  try {
+    const renderedPrevChap = renderToStaticMarkup(
+      React.createElement(readerMod.ChapterBlock, {
+        chapter: { chapter_index: 0, title: "ganthārambhakathā" },
+        bookCode: "vin01a.att",
+        html: bigHtml,
+        isLoading: false,
+        onVisible: () => {},
+        isCurrentOrTarget: true,
+        anchorEnd: true,
+      }),
+    );
+    assert.match(renderedPrevChap, /data-chunk-index="0"[^>]*data-chunk-virtualized="1"/);
+    assert.match(renderedPrevChap, /data-chunk-index="1"[^>]*data-chunk-virtualized="1"/);
+    assert.match(renderedPrevChap, /Text 124/, "Preceding chapter with anchorEnd must mount final chunks");
+
+    const renderedLoading = renderToStaticMarkup(
+      React.createElement(readerMod.ChapterBlock, {
+        chapter: { chapter_index: 0, title: "ganthārambhakathā" },
+        bookCode: "vin01a.att",
+        html: bigHtml,
+        isLoading: false,
+        onVisible: () => {},
+        isCurrentOrTarget: true,
+        activeLangs: ["en"],
+        orderedLayers: [
+          { id: "pali", type: "pali" },
+          { id: "en", type: "trans", lang: "en" },
+        ],
+      }),
+    );
+    assert.match(renderedLoading, /data-trans-loading="1"/);
+    assert.match(renderedLoading, /justify-start/, "Tall loading block must keep spinner visible at top");
+    const minHMatch = renderedLoading.match(/min-height:(\d+)px/);
+    assert.ok(minHMatch && Number(minHMatch[1]) > 2000, "Tall chapter loading box must reserve realistic height to prevent downstream chapter fetch cascade");
+  } finally {
+    if (prevIO === undefined) delete globalThis.IntersectionObserver;
+    else globalThis.IntersectionObserver = prevIO;
+  }
+
+  // 4. Static guards for observer attachment, unmount leak, scroll thrashing, and single-roundtrip TabContext bundle
+  const readerSrc = fs.readFileSync(path.join(rootDir, "components", "Reader", "ReaderView.jsx"), "utf8");
+  assert.match(readerSrc, /\(!isCurrentOrTarget\s*&&\s*!isWithinDomWindow\)/);
+  assert.doesNotMatch(readerSrc, /forcedMountedChunksRef\.current\.has\(idx\)\)\s*continue/);
+  assert.doesNotMatch(readerSrc, /topDelta\s*<\s*120/);
+  assert.match(readerSrc, /\[activeBookCodeForPane,\s*loadChapter,\s*bufferAdjacentChapters\]/);
+
+  const tabCtxSrc = fs.readFileSync(path.join(rootDir, "context", "TabContext.jsx"), "utf8");
+  assert.match(tabCtxSrc, /fetchChapterBundle\(cleanCode,\s*chapterIdx,\s*\{[\s\S]*?includeHtml:\s*true/);
+  assert.match(tabCtxSrc, /centerIdx\s*\+\s*2/);
+
+  const dartApiSrc = fs.readFileSync(
+    path.join(rootDir, "tipitakapali_org_app", "lib", "core", "server", "tipitaka_web_api.dart"),
+    "utf8",
+  );
+  assert.match(dartApiSrc, /BoldDefinitionIndexService\.isInFlight\(dbDirectoryPath\)/);
+});
+
+test("Round 2 smoothness fixes: batched above-viewport scroll compensation, zero forced IO offsetHeight, wider IO margins, openBook adjacent bundle prefetch, and non-blocking Dart warmUpIndexes", () => {
+  const transMod = compileModule("services/transliterate.js", {});
+  const noopComp = () => null;
+  const readerMod = compileModule("components/Reader/ReaderView.jsx", {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    "lucide-react": iconProxy,
+    "./WelcomeView": { __esModule: true, default: noopComp },
+    "./MeditationLoader": { __esModule: true, default: noopComp },
+    "./BookTocView": { __esModule: true, default: noopComp },
+    "./LinkedDefinitionModal": { __esModule: true, default: noopComp },
+    "../AiChat/AiChatView": { __esModule: true, default: noopComp },
+    "../../context/TabContext": { useTabs: () => ({}) },
+    "../../context/ThemeSettingsContext": {
+      useThemeSettings: () => ({}),
+      getDefaultTranslationColorsForTheme: () => ({
+        text: "#000",
+        border: "#000",
+        bg: "",
+      }),
+    },
+    "../../context/DictionaryContext": { useDictionary: () => ({}) },
+    "../../services/transliterate": transMod,
+    "../../services/scroll": compileModule("services/scroll.js", {}),
+    "../../services/api": {
+      fetchChapterTranslations: async () => ({}),
+      fetchChapterBundle: async () => null,
+      isLocalDynamicHost: () => false,
+      fetchPaliSentences: async () => ({}),
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      getCachedPaliSentences: () => null,
+      getCachedChapterLinks: () => null,
+      prefetchLinkedPreview: () => {},
+      prefetchLinkedPreviewsBatch: () => {},
+    },
+  });
+
+  // 1. Batched above-viewport scroll compensation handles multi-chunk shifts without thrashing
+  assert.equal(readerMod.computeBatchedAboveViewportScrollDelta([], 0), 0);
+  assert.equal(readerMod.computeBatchedAboveViewportScrollDelta(null, 0), 0);
+
+  // Chunk 0 originally [-3000, -2000] grows +2000 -> [-3000, -1000]
+  // Chunk 1 originally [-1100, -100] grows +500; pushed down +2000 by chunk 0 -> [+900, +2400]
+  // Chunk 2 originally [-100, +1400] (straddling viewport) grows +500; pushed down +2500 -> [+2400, +4400]
+  // Only chunks 0 and 1 were strictly above viewport -> exact total delta +2500.
+  assert.equal(
+    readerMod.computeBatchedAboveViewportScrollDelta(
+      [
+        { rectTop: -3000, rectBottom: -1000, prevHeight: 1000, nextHeight: 3000 },
+        { rectTop: 900, rectBottom: 2400, prevHeight: 1000, nextHeight: 1500 },
+        { rectTop: 2400, rectBottom: 4400, prevHeight: 1500, nextHeight: 2000 },
+      ],
+      0,
+    ),
+    2500,
+    "Batched scroll compensation must adjust subsequent chunk rects for cumulative shifts above them",
+  );
+
+  // Two shrinking chunks strictly above viewport in one commit -> -(1000 + 400) = -1400
+  assert.equal(
+    readerMod.computeBatchedAboveViewportScrollDelta(
+      [
+        { rectTop: -3000, rectBottom: -2000, prevHeight: 2000, nextHeight: 1000 },
+        { rectTop: -2000, rectBottom: -1500, prevHeight: 900, nextHeight: 500 },
+        { rectTop: -1500, rectBottom: -400, prevHeight: 1100, nextHeight: 1100 },
+      ],
+      0,
+    ),
+    -1400,
+  );
+
+  // Chunks strictly below viewport must produce zero scroll shift
+  assert.equal(
+    readerMod.computeBatchedAboveViewportScrollDelta(
+      [
+        { rectTop: 800, rectBottom: 2300, prevHeight: 1000, nextHeight: 1500 },
+        { rectTop: 2300, rectBottom: 3900, prevHeight: 1000, nextHeight: 1600 },
+      ],
+      0,
+    ),
+    0,
+  );
+
+  // Straddling chunk shrinking dramatically must NOT misclassify a below-viewport chunk as above viewport
+  assert.equal(
+    readerMod.computeBatchedAboveViewportScrollDelta(
+      [
+        // Chunk 0 straddled [-500, +200] (prevHeight=700) and shrank to 300 -> [-500, -200]
+        { rectTop: -500, rectBottom: -200, prevHeight: 700, nextHeight: 300 },
+        // Chunk 1 was below viewport [+200, +350] (prevHeight=150), pulled up by -400 to [-200, 0] while growing to 200
+        { rectTop: -200, rectBottom: 0, prevHeight: 150, nextHeight: 200 },
+      ],
+      0,
+    ),
+    0,
+  );
+
+  // 2. openBook adjacent chapter bundle prefetch (buffer: 1) prevents chapter 1 'Loading happiness...' flash
+  const tabCtxMod = compileModule("context/TabContext.jsx", {
+    react: Object.assign({}, React, { __esModule: true, default: React }),
+    "../services/api": {
+      fetchBook: async () => ({}),
+      fetchChapter: async () => ({ html: "" }),
+      fetchChapterBundle: async () => null,
+      isLocalDynamicHost: () => true,
+      fetchMat: async () => null,
+      fetchMatJump: async () => null,
+      lookupBookInfo: async () => null,
+      fetchBookTocOnly: async () => null,
+    },
+    "../services/transliterate": transMod,
+    "./ThemeSettingsContext": {
+      useThemeSettings: () => ({ updateSetting: () => {}, settings: {} }),
+    },
+  });
+
+  const calls = [];
+  const mockFetchBundle = (code, idx, opts) => {
+    calls.push({ code, idx, opts });
+    return Promise.resolve({});
+  };
+
+  // Opening normal book at ch 0 with buffer: 1 (chapters 0 & 1 preloaded), ch 0 already prefetched
+  const launchedCh0 = tabCtxMod.prefetchOpenBookAdjacentBundles({
+    bookCode: "s0101m.mul",
+    targetChapIdx: 0,
+    chaptersData: { 0: "<p>ch0</p>", 1: "<p>ch1</p>" },
+    settingsObj: {
+      translations: { pali: true, english: true },
+      translationOrder: ["pali", "english"],
+      translationGranularity: "sentence",
+    },
+    prefetchedChapters: new Set([0]),
+    isLocalHost: () => true,
+    fetchBundle: mockFetchBundle,
+  });
+  assert.deepEqual(launchedCh0, [1]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].code, "s0101m.mul");
+  assert.equal(calls[0].idx, 1);
+  assert.deepEqual(calls[0].opts, {
+    includeHtml: false,
+    langs: ["en"],
+    sentences: true,
+    paliSentences: true,
+    links: false,
+  });
+
+  // Opening mid-book chapter 2 with chapters 1, 2, 3 preloaded (ch 2 already prefetched) -> prefetches 3 and 1
+  calls.length = 0;
+  const launchedCh2 = tabCtxMod.prefetchOpenBookAdjacentBundles({
+    bookCode: "s0101m.mul",
+    targetChapIdx: 2,
+    chaptersData: { 1: "<p>1</p>", 2: "<p>2</p>", 3: "<p>3</p>" },
+    settingsObj: {
+      translations: { pali: true, english: true },
+      translationOrder: ["pali", "english"],
+      translationGranularity: "paragraph",
+    },
+    extraLangCode: "vi",
+    prefetchedChapters: new Set([2]),
+    isLocalHost: () => true,
+    fetchBundle: mockFetchBundle,
+  });
+  assert.deepEqual(launchedCh2, [3, 1]);
+  assert.deepEqual(calls[0].opts.langs, ["en", "vi"]);
+
+  // Single-chapter book: chapter 1 absent from chaptersData -> must NOT prefetch chapter 1
+  calls.length = 0;
+  assert.deepEqual(
+    tabCtxMod.prefetchOpenBookAdjacentBundles({
+      bookCode: "s0501m.mul",
+      targetChapIdx: 0,
+      chaptersData: { 0: "<p>only</p>" },
+      settingsObj: { translations: { pali: true, english: true } },
+      prefetchedChapters: new Set([0]),
+      isLocalHost: () => true,
+      fetchBundle: mockFetchBundle,
+    }),
+    [],
+  );
+
+  // Non-local host or no active translations -> no bundle prefetch
+  assert.deepEqual(
+    tabCtxMod.prefetchOpenBookAdjacentBundles({
+      bookCode: "s0101m.mul",
+      targetChapIdx: 0,
+      chaptersData: { 0: "<p>0</p>", 1: "<p>1</p>" },
+      settingsObj: { translations: { pali: true, english: true } },
+      isLocalHost: () => false,
+      fetchBundle: mockFetchBundle,
+    }),
+    [],
+  );
+  assert.deepEqual(
+    tabCtxMod.prefetchOpenBookAdjacentBundles({
+      bookCode: "s0101m.mul",
+      targetChapIdx: 0,
+      chaptersData: { 0: "<p>0</p>", 1: "<p>1</p>" },
+      settingsObj: { translations: { pali: true } },
+      isLocalHost: () => true,
+      fetchBundle: mockFetchBundle,
+    }),
+    [],
+  );
+
+  // extraLangCode must respect settings.translationOrder so cache keys match ReaderView activeLangs
+  const orderedPrefs = tabCtxMod.resolveBundlePrefsFromSettings(
+    {
+      translations: { pali: true, english: true },
+      translationOrder: ["pali", "vietnamese", "english"],
+      translationGranularity: "sentence",
+    },
+    "vi",
+  );
+  assert.deepEqual(orderedPrefs, {
+    langs: ["vi", "en"],
+    sentences: true,
+    paliSentences: true,
+  });
+
+  // 3. Structural guards for batched layout effect, ResizeObserver passive height tracking,
+  // synchronous cache render resolution, IO boundingClientRect preference, wider margins, and Dart guards
+  const readerSrc = fs.readFileSync(path.join(rootDir, "components", "Reader", "ReaderView.jsx"), "utf8");
+  const chapterChunkMatch = readerSrc.match(/const ChapterChunk = memo\([\s\S]*?\n\}\);/);
+  assert.ok(chapterChunkMatch, "ChapterChunk component must exist");
+  assert.doesNotMatch(
+    chapterChunkMatch[0],
+    /useIsomorphicLayoutEffect|scrollBy|scrollTop\s*\+=|offsetHeight/,
+    "ChapterChunk must not run per-chunk layout effects or scroll writes",
+  );
+  assert.match(readerSrc, /computeBatchedAboveViewportScrollDelta\(measurements,\s*vpTop\)/);
+  assert.match(readerSrc, /Math\.round\(entry\.boundingClientRect\?\.height \|\| 0\) \|\| el\.offsetHeight \|\| 0/);
+  assert.match(readerSrc, /new ResizeObserver\(/);
+  assert.match(readerSrc, /const renderSyncTrans =/);
+  assert.match(readerSrc, /rootMargin:\s*'3600px 0px'/);
+  assert.match(readerSrc, /rootMargin:\s*'6500px 0px'/);
+  assert.match(readerSrc, /rootMargin:\s*'4500px 0px'/);
+
+  const tabCtxSrc = fs.readFileSync(path.join(rootDir, "context", "TabContext.jsx"), "utf8");
+  assert.match(tabCtxSrc, /prefetchOpenBookAdjacentBundles\(\{[\s\S]*?chaptersData:\s*bookData\.chapters_data/);
+
+  const dartLocalServerSrc = fs.readFileSync(
+    path.join(rootDir, "tipitakapali_org_app", "lib", "core", "server", "tipitaka_local_server.dart"),
+    "utf8",
+  );
+  assert.match(dartLocalServerSrc, /case 'warmUpIndexes':[\s\S]*?unawaited\([\s\S]*?workerApi\.warmUpIndexes\(\)/);
+});
+
+test("Review fixes: fetchChapterLinks skips caching warming_up/error responses and ChapterBlock renders cached translations without Loading happiness flash", async () => {
+  const transMod = compileModule("services/transliterate.js", {});
+  const dpdFeedbackMod = compileModule("services/dpdFeedback.js", {});
+  const apiMod = compileModule("services/api.js", {
+    "./transliterate": transMod,
+    "./dpdFeedback": dpdFeedbackMod,
+  });
+
+  const prevFetch = globalThis.fetch;
+  const prevWindow = globalThis.window;
+  let linkCalls = 0;
+  let bundleCalls = 0;
+  try {
+    globalThis.window = { location: { hostname: "127.0.0.1" } };
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("/links")) {
+        linkCalls++;
+        if (linkCalls === 1) {
+          return {
+            ok: true,
+            json: async () => ({
+              book_code: "s0101m.mul",
+              chapter_index: 0,
+              paragraphs: {},
+              warming_up: true,
+            }),
+          };
+        }
+        if (linkCalls === 2) {
+          return { ok: false, status: 503, json: async () => ({}) };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            book_code: "s0101m.mul",
+            chapter_index: 0,
+            paragraphs: { 0: { all: [{ word: "evaṃ", target_book: "s0101a.att" }] } },
+          }),
+        };
+      }
+      if (String(url).includes("/bundle")) {
+        bundleCalls++;
+        return {
+          ok: true,
+          json: async () => ({
+            book_code: "s0101m.mul",
+            chapter_index: 1,
+            translations: { en: { 0: "At one time." } },
+            sentences: { en: { 0: [{ line_id: 1, translation: "At one time." }] } },
+            pali_sentences: { 0: [{ line: 1, text: "Tena samayena." }] },
+            links: {},
+            links_warming_up: true,
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+
+    // 1. warming_up: true response must NOT be cached
+    const warmUpRes = await apiMod.fetchChapterLinks("s0101m.mul", 0);
+    assert.deepEqual(warmUpRes.paragraphs, {});
+    assert.equal(apiMod.getCachedChapterLinks("s0101m.mul", 0), null);
+
+    // 2. HTTP error fallback must NOT be cached
+    const errRes = await apiMod.fetchChapterLinks("s0101m.mul", 0);
+    assert.deepEqual(errRes.paragraphs, {});
+    assert.equal(apiMod.getCachedChapterLinks("s0101m.mul", 0), null);
+
+    // 3. Ready response IS cached and returned on subsequent calls
+    const readyRes = await apiMod.fetchChapterLinks("s0101m.mul", 0);
+    assert.equal(readyRes.paragraphs[0].all[0].word, "evaṃ");
+    assert.equal(linkCalls, 3);
+    assert.ok(apiMod.getCachedChapterLinks("s0101m.mul", 0));
+
+    const cachedRes = await apiMod.fetchChapterLinks("s0101m.mul", 0);
+    assert.equal(cachedRes.paragraphs[0].all[0].word, "evaṃ");
+    assert.equal(linkCalls, 3);
+
+    // 4. Bundle with links_warming_up: true caches translations & pali_sentences, NOT empty links
+    await apiMod.fetchChapterBundle("s0101m.mul", 1, {
+      includeHtml: false,
+      langs: ["en"],
+      sentences: true,
+      paliSentences: true,
+      links: true,
+    });
+    assert.equal(bundleCalls, 1);
+    assert.equal(apiMod.getCachedChapterLinks("s0101m.mul", 1), null);
+    assert.equal(
+      apiMod.getCachedChapterTranslations("s0101m.mul", 1, ["en"], { sentences: true })?.translations?.en?.[0],
+      "At one time.",
+    );
+
+    // 5. ChapterBlock renders cached chapter 1 translations synchronously without 'Loading happiness...'
+    const noopComp = () => null;
+    const readerMod = compileModule("components/Reader/ReaderView.jsx", {
+      react: Object.assign({}, React, { __esModule: true, default: React }),
+      "lucide-react": iconProxy,
+      "./WelcomeView": { __esModule: true, default: noopComp },
+      "./MeditationLoader": { __esModule: true, default: noopComp },
+      "./BookTocView": { __esModule: true, default: noopComp },
+      "./LinkedDefinitionModal": { __esModule: true, default: noopComp },
+      "../AiChat/AiChatView": { __esModule: true, default: noopComp },
+      "../../context/TabContext": { useTabs: () => ({}) },
+      "../../context/ThemeSettingsContext": {
+        useThemeSettings: () => ({}),
+        getDefaultTranslationColorsForTheme: () => ({ text: "#000", border: "#000", bg: "" }),
+      },
+      "../../context/DictionaryContext": { useDictionary: () => ({}) },
+      "../../services/transliterate": transMod,
+      "../../services/scroll": compileModule("services/scroll.js", {}),
+      "../../services/api": apiMod,
+    });
+
+    const markup = renderToStaticMarkup(
+      React.createElement(readerMod.ChapterBlock, {
+        chapter: { chapter_index: 1, title: "Sāmaññaphala" },
+        bookCode: "s0101m.mul",
+        html: '<p class="bodytext" data-pindex="0" data-para="1">Tena samayena.</p>',
+        isLoading: false,
+        onVisible: () => {},
+        isCurrentOrTarget: true,
+        activeLangs: ["en"],
+        orderedLayers: [
+          { id: "pali", type: "pali" },
+          { id: "english", type: "trans", lang: "en" },
+        ],
+        isPaliEnabled: true,
+        sentenceMode: true,
+        showBookLinks: false,
+      }),
+    );
+    assert.ok(markup.includes("At one time."), "Prefetched translation must render immediately on Frame 1");
+    assert.ok(!markup.includes("Loading happiness"), "Prefetched chapter must NOT flash Loading happiness...");
+  } finally {
+    globalThis.fetch = prevFetch;
+    if (prevWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = prevWindow;
+    }
+  }
+});
+
+
+

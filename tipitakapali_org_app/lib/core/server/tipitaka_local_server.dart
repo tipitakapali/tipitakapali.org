@@ -28,7 +28,8 @@ class _TipitakaHttpRouter {
   final Map<String, ({Uint8List bytes, String mime, bool isImmutable})>
       _staticCache = {};
   int _staticCacheBytes = 0;
-  static const int _maxStaticCacheTotalBytes = 16 * 1024 * 1024;
+  static final int _maxStaticCacheTotalBytes =
+      (Platform.isIOS || Platform.isAndroid) ? 8 * 1024 * 1024 : 16 * 1024 * 1024;
   static const int _maxSingleCachedFileBytes = 512 * 1024;
 
   _TipitakaHttpRouter({
@@ -785,8 +786,13 @@ void _serverIsolateMain(
         reply?.send(true);
         break;
       case 'warmUpIndexes':
-        await workerApi.warmUpIndexes();
-        reply?.send(true);
+        unawaited(
+          workerApi.warmUpIndexes().whenComplete(() {
+            try {
+              reply?.send(true);
+            } catch (_) {}
+          }),
+        );
         break;
       case 'stop':
         await httpServer.close(force: true);

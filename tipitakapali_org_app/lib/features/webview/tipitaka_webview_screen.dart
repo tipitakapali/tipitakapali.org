@@ -2199,6 +2199,35 @@ const String _languageMenuBridgeScript = r'''
     head.appendChild(style);
   }
 
+  var cachedBarsBlocked = false;
+  var cachedBarsBlockedAt = 0;
+  var cachedScrollMetricsEl = null;
+  var cachedScrollMax = 0;
+  var cachedScrollMetricsAt = 0;
+
+  function refreshBarsToggleBlocked(now) {
+    cachedBarsBlocked = isBarsToggleBlocked();
+    cachedBarsBlockedAt = now || Date.now();
+    return cachedBarsBlocked;
+  }
+
+  function getCachedBarsToggleBlocked(now) {
+    if (now - cachedBarsBlockedAt < 250) {
+      return cachedBarsBlocked;
+    }
+    return refreshBarsToggleBlocked(now);
+  }
+
+  function getCachedMaxScroll(target, now) {
+    if (cachedScrollMetricsEl === target && now - cachedScrollMetricsAt < 250) {
+      return cachedScrollMax;
+    }
+    cachedScrollMetricsEl = target;
+    cachedScrollMax = Math.max(0, target.scrollHeight - target.clientHeight);
+    cachedScrollMetricsAt = now;
+    return cachedScrollMax;
+  }
+
   function isSidebarVisible() {
     var sb = document.querySelector('aside.app-sidebar');
     if (!sb || sb.classList.contains('collapsed')) return false;
@@ -2233,6 +2262,8 @@ const String _languageMenuBridgeScript = r'''
 
   function syncAutoHideState() {
     injectAutoHideStyles();
+    cachedScrollMetricsAt = 0;
+    refreshBarsToggleBlocked(Date.now());
     if (!barsHidden) return;
     var body = document.body;
     if (!body ||
@@ -2259,12 +2290,13 @@ const String _languageMenuBridgeScript = r'''
     }
   }, { passive: true, capture: true });
 
-  document.addEventListener('scroll', function(e) {
-    var target = e.target;
-    if (!target || !target.matches) return;
-    if (!target.matches('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return;
+  var scrollRafPending = false;
+  var pendingScrollTarget = null;
 
-    var maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
+  function processBridgeScroll(target) {
+    if (!target) return;
+    var now = Date.now();
+    var maxScroll = getCachedMaxScroll(target, now);
     var rawTop = target.scrollTop;
     var top = Math.max(0, Math.min(rawTop, maxScroll));
 
@@ -2278,7 +2310,7 @@ const String _languageMenuBridgeScript = r'''
       return;
     }
 
-    if (isBarsToggleBlocked() || maxScroll <= 80) {
+    if (getCachedBarsToggleBlocked(now) || maxScroll <= 80) {
       lastScrollTop = top;
       scrollAccum = 0;
       if (barsHidden) {
@@ -2296,7 +2328,6 @@ const String _languageMenuBridgeScript = r'''
       return;
     }
 
-    var now = Date.now();
     if (now < suppressDeltaUntil) {
       lastScrollTop = top;
       scrollAccum = 0;
@@ -2333,6 +2364,26 @@ const String _languageMenuBridgeScript = r'''
       if (barsHidden) {
         setBarsHidden(false);
       }
+    }
+  }
+
+  document.addEventListener('scroll', function(e) {
+    var target = e.target;
+    if (!target || !target.matches) return;
+    if (target !== lastScrollEl && !target.matches('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return;
+    pendingScrollTarget = target;
+    if (scrollRafPending) return;
+    scrollRafPending = true;
+    var run = function() {
+      scrollRafPending = false;
+      var el = pendingScrollTarget;
+      pendingScrollTarget = null;
+      processBridgeScroll(el);
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run);
+    } else {
+      run();
     }
   }, { passive: true, capture: true });
 

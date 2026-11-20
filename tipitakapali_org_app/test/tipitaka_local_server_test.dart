@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:tipitakapali_app/core/server/dpd_family_templates.dart';
 import 'package:tipitakapali_app/core/server/tipitaka_local_server.dart';
 import 'package:tipitakapali_app/core/server/tipitaka_web_api.dart';
+import 'package:tipitakapali_app/core/services/bold_definition_index_service.dart';
 
 Future<({int statusCode, String contentType, String body})> _httpGet(
   Uri baseUri,
@@ -919,4 +921,229 @@ void main() {
       await bgServer.dispose();
     }
   });
+
+  test(
+    'getChapterLinks and bundle short-circuit when bold index is missing/stale without blocking or caching empty {}',
+    () async {
+      final isolatedDir = Directory.systemTemp.createTempSync(
+        'tipitaka_links_race_test_',
+      );
+      final buildCompleter = Completer<BoldDefinitionBuildResult>();
+      var ensureBuiltCalls = 0;
+
+      final fakeBoldService = _ControlledBoldDefinitionIndexService(
+        onEnsureBuilt: (dirPath) {
+          ensureBuiltCalls++;
+          return buildCompleter.future;
+        },
+      );
+
+      try {
+        _seedTestDatabases(isolatedDir.path);
+        // Add a commentary chapter with a bold definition for 'evaṃ' and
+        // link metadata on s0101m.mul so real links exist once
+        // bold_definitions.db is built.
+        final core = sqlite3.open(p.join(isolatedDir.path, 'tipitaka.db'));
+        try {
+          core.execute(
+            "UPDATE chapters SET html = '<p class=\"bodytext\" data-pindex=\"0\" data-para=\"1\">Evaṃ me sutaṃ.</p>' "
+            "WHERE book_code = 's0101m.mul' AND chapter_index = 0;",
+          );
+          core.execute(
+            "UPDATE canon_paragraphs SET attha_book = 's0101a.att', attha_chapter = 0, attha_para = '1' "
+            "WHERE book_code = 's0101m.mul' AND chapter_index = 0 AND para_index = 0;",
+          );
+          core.execute(
+            "INSERT INTO books (code, title, nikaya, category, xml_filename, chapter_count, meta_json) "
+            "VALUES ('s0101a.att', 'Sumaṅgalavilāsinī', 'digha', 'aṭṭhakathā', 's0101a.att.xml', 1, '{}');",
+          );
+          final attBookId = core.lastInsertRowId;
+          core.execute(
+            "INSERT INTO chapters (book_id, book_code, chapter_index, title, chunk_name, anchor_id, para_index, html) "
+            "VALUES (?, 's0101a.att', 0, 'Nidānavaṇṇanā', 'ch0', 'ch0', 0, "
+            "'<p class=\"bodytext\" data-pindex=\"0\" data-para=\"1\"><strong class=\"bld\">Eva</strong>nti ādi vuttaṃ.</p>');",
+            [attBookId],
+          );
+          core.execute(
+            "INSERT INTO canon_paragraphs (guid, book_code, chapter_index, para_index, para_num, rend, pali_text, mula_book, mula_chapter, mula_para) VALUES "
+            "('s0101a.att:c0:n0:p1', 's0101a.att', 0, 0, '1', 'bodytext', 'Evanti ādi vuttaṃ.', 's0101m.mul', 0, '1');",
+          );
+        } finally {
+          core.close();
+        }
+
+        expect(
+          BoldDefinitionIndexService.isUpToDate(isolatedDir.path),
+          isFalse,
+        );
+
+        final raceApi = TipitakaWebApi(
+          dbDirectoryPath: isolatedDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+          boldDefinitionService: fakeBoldService,
+        );
+
+        // 1. Cold startup before warmUpIndexes has been called: must return
+        // empty {} with warming_up: true immediately without blocking on
+        // ensureBuilt(), and kick off background warmUpIndexes() exactly once.
+        final sw = Stopwatch()..start();
+        final coldLinks = await raceApi.getChapterLinks('s0101m.mul', 0);
+        sw.stop();
+        expect(sw.elapsedMilliseconds, lessThan(500));
+        expect(coldLinks.statusCode, 200);
+        final coldJson = coldLinks.body as Map<String, dynamic>;
+        expect(coldJson['paragraphs'], isEmpty);
+        expect(coldJson['warming_up'], isTrue);
+        expect(ensureBuiltCalls, 1);
+
+        // 2. Subsequent bundle request with links=1 while warm-up is still in
+        // flight must also return empty {} with links_warming_up: true
+        // immediately without spawning a duplicate build.
+        final coldBundle = await raceApi.getChapterBundle('s0101m.mul', 0, {
+          'includeHtml': '0',
+          'links': '1',
+        });
+        expect(coldBundle.statusCode, 200);
+        final coldBundleJson = coldBundle.body as Map<String, dynamic>;
+        expect(coldBundleJson['links'], isEmpty);
+        expect(coldBundleJson['links_warming_up'], isTrue);
+        expect(ensureBuiltCalls, 1);
+
+        // 3. Complete the real build and finish warm-up; subsequent
+        // getChapterLinks must NOT serve a cached empty {}, must omit
+        // warming_up, and must return real links from bold_definitions.db.
+        final realBuild = BoldDefinitionIndexService.buildSync(
+          dbDirPath: isolatedDir.path,
+          force: true,
+        );
+        buildCompleter.complete(realBuild);
+        await raceApi.warmUpIndexes();
+
+        final warmLinks = await raceApi.getChapterLinks('s0101m.mul', 0);
+        expect(warmLinks.statusCode, 200);
+        final warmJson = warmLinks.body as Map<String, dynamic>;
+        expect(warmJson['warming_up'], isNull);
+        final paragraphs = warmJson['paragraphs'] as Map<String, dynamic>;
+        expect(paragraphs, isNotEmpty);
+
+        raceApi.close();
+      } finally {
+        if (isolatedDir.existsSync()) {
+          isolatedDir.deleteSync(recursive: true);
+        }
+      }
+    },
+  );
+
+  test(
+    'failed or empty bold index warm-up backs off until invalidated instead of retry-storming',
+    () async {
+      final isolatedDir = Directory.systemTemp.createTempSync(
+        'tipitaka_links_cooldown_test_',
+      );
+      var ensureBuiltCalls = 0;
+      final failingBoldService = _ControlledBoldDefinitionIndexService(
+        onEnsureBuilt: (dirPath) async {
+          ensureBuiltCalls++;
+          throw StateError('simulated disk full');
+        },
+      );
+      try {
+        _seedTestDatabases(isolatedDir.path);
+        final cooldownApi = TipitakaWebApi(
+          dbDirectoryPath: isolatedDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+          boldDefinitionService: failingBoldService,
+        );
+
+        final first = await cooldownApi.getChapterLinks('s0101m.mul', 0);
+        expect((first.body as Map<String, dynamic>)['warming_up'], isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(ensureBuiltCalls, 1);
+
+        // Second request within cooldown must NOT re-trigger ensureBuilt.
+        final second = await cooldownApi.getChapterLinks('s0101m.mul', 1);
+        expect((second.body as Map<String, dynamic>)['warming_up'], isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(ensureBuiltCalls, 1);
+
+        // After invalidateDatabases() (e.g. fresh DB download), cooldown resets
+        // and the next request retries warm-up.
+        cooldownApi.invalidateDatabases();
+        final third = await cooldownApi.getChapterLinks('s0101m.mul', 0);
+        expect((third.body as Map<String, dynamic>)['warming_up'], isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(ensureBuiltCalls, 2);
+
+        cooldownApi.close();
+      } finally {
+        if (isolatedDir.existsSync()) {
+          isolatedDir.deleteSync(recursive: true);
+        }
+      }
+    },
+  );
+
+  test(
+    'background isolate controlPort handles invalidate and links non-blockingly during warmUpIndexes',
+    () async {
+      final isolatedDir = Directory.systemTemp.createTempSync(
+        'tipitaka_isolate_warmup_test_',
+      );
+      _seedTestDatabases(isolatedDir.path);
+      final bgServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: isolatedDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      try {
+        final bgUri = await bgServer.ensureStarted();
+        final warmUpFuture = bgServer.warmUpIndexes();
+
+        // Immediately send controlPort 'invalidate' and HTTP '/links' without
+        // waiting for warmUpIndexes to finish.
+        final sw = Stopwatch()..start();
+        await bgServer.invalidateDatabases();
+        final linksResp = await _httpGet(
+          bgUri,
+          '/api/book/s0101m.mul/chapter/0/links',
+        );
+        sw.stop();
+
+        expect(linksResp.statusCode, 200);
+        expect(
+          jsonDecode(linksResp.body)['paragraphs'],
+          isA<Map<String, dynamic>>(),
+        );
+        expect(sw.elapsedMilliseconds, lessThan(4000));
+
+        await warmUpFuture;
+      } finally {
+        await bgServer.dispose();
+        if (isolatedDir.existsSync()) {
+          isolatedDir.deleteSync(recursive: true);
+        }
+      }
+    },
+  );
+}
+
+class _ControlledBoldDefinitionIndexService extends BoldDefinitionIndexService {
+  final Future<BoldDefinitionBuildResult> Function(String dbDirPath)
+      onEnsureBuilt;
+
+  _ControlledBoldDefinitionIndexService({required this.onEnsureBuilt});
+
+  @override
+  Future<BoldDefinitionBuildResult> ensureBuilt({
+    required String dbDirPath,
+    bool force = false,
+  }) {
+    return onEnsureBuilt(dbDirPath);
+  }
 }
