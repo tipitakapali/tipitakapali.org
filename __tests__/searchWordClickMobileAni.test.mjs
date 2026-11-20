@@ -1096,3 +1096,216 @@ test("Task 4: aiClientAgent handles Gemini 3.x thinking parts, 503 retry, 404 fa
   assert.ok(serverUnd.concept_groups.length >= 2);
   assert.ok(serverUnd.key_terms_for_bold_def.length >= 2);
 });
+
+// =========================================================================
+// Task 5: Markdown for Agents Content Negotiation (Accept: text/markdown)
+// =========================================================================
+
+test("Markdown for Agents: prefersMarkdownAccept, renderMarkdownForPath, route handler headers (Content-Type: text/markdown & x-markdown-tokens), and proxy negotiation", async () => {
+  const transliterateMod = compileModule("services/transliterate.js", {});
+  const seoMod = compileModule("services/seoMetadata.js", {
+    "./transliterate.js": transliterateMod,
+  });
+  const ssrCatMod = compileModule("services/ssrCatalog.js", {
+    "./transliterate.js": transliterateMod,
+    "./seoMetadata.js": seoMod,
+  });
+  const ssrContentMod = await import(
+    path.join(rootDir, "services", "ssrContent.js")
+  );
+  const ssrMd = compileModule("services/ssrMarkdown.js", {
+    "./transliterate.js": transliterateMod,
+    "./seoMetadata.js": seoMod,
+    "./ssrCatalog.js": ssrCatMod,
+    "./ssrContent.js": ssrContentMod,
+  });
+  const {
+    prefersMarkdownAccept,
+    estimateMarkdownTokens,
+    renderMarkdownForPath,
+  } = ssrMd;
+
+  // 1. Content negotiation Accept header parsing (HTML stays default for browsers)
+  assert.equal(prefersMarkdownAccept(""), false);
+  assert.equal(prefersMarkdownAccept(null), false);
+  assert.equal(
+    prefersMarkdownAccept(
+      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    ),
+    false,
+    "Standard browser Accept header must default to HTML",
+  );
+  assert.equal(
+    prefersMarkdownAccept("text/html;q=0.9, text/markdown;q=0.5"),
+    false,
+    "Lower q-weight for text/markdown than text/html must keep HTML",
+  );
+  assert.equal(prefersMarkdownAccept("text/markdown"), true);
+  assert.equal(
+    prefersMarkdownAccept("text/markdown, text/html;q=0.8, */*;q=0.5"),
+    true,
+  );
+  assert.equal(
+    prefersMarkdownAccept("text/html, text/markdown"),
+    true,
+    "Equal quality with explicit text/markdown negotiates markdown",
+  );
+  assert.equal(prefersMarkdownAccept("text/x-markdown"), true);
+  assert.equal(prefersMarkdownAccept("text/markdown;q=0"), false);
+
+  // 2. Render Markdown for /, /info, /pali-script-converter, /book/*, /translation/*
+  const homeMd = await renderMarkdownForPath("/");
+  assert.ok(homeMd && homeMd.status === 200);
+  assert.match(homeMd.markdown, /^---\ntitle:/);
+  assert.match(homeMd.markdown, /Chaṭṭha Saṅgāyana Tipiṭaka Pāḷi/);
+  assert.ok(homeMd.tokens > 500);
+
+  const infoMd = await renderMarkdownForPath("/info");
+  assert.ok(infoMd && infoMd.status === 200);
+  assert.match(infoMd.markdown, /^---\ntitle: "About & User Guide/);
+  assert.match(infoMd.markdown, /```json\n\{.*"@type":"WebPage".*\}\n```/s);
+
+  const convMd = await renderMarkdownForPath("/pali-script-converter");
+  assert.ok(convMd && convMd.status === 200);
+  assert.match(convMd.markdown, /Pāḷi Script Converter/);
+
+  const bookMd = await renderMarkdownForPath("/book/s0102m.mul/9");
+  assert.ok(bookMd && bookMd.status === 200);
+  assert.match(bookMd.markdown, /^---\ntitle: "Ch\. 9: Mahāsatipaṭṭhānasuttaṃ/);
+  assert.match(bookMd.markdown, /\[s0102m\.mul:c8:p1341\]/);
+  assert.match(bookMd.markdown, /Evaṃ me sutaṃ/);
+  assert.match(bookMd.markdown, /```json\n\{.*"@type":"Chapter"/s);
+  assert.ok(bookMd.tokens > 200);
+
+  const hiBookMd = await renderMarkdownForPath("/book/hi.s0102m.mul/9");
+  assert.ok(hiBookMd && hiBookMd.status === 200);
+  assert.match(hiBookMd.markdown, /महासतिपट्ठानसुत्तं/);
+  assert.match(hiBookMd.markdown, /एवं मे सुतं/);
+
+  const viTransMd = await renderMarkdownForPath("/translation/vi/s0102m.mul/9");
+  assert.ok(viTransMd && viTransMd.status === 200);
+  assert.match(viTransMd.markdown, /Như vầy tôi đã nghe/);
+  assert.match(viTransMd.markdown, /\*Pāḷi:\* .*Evaṃ me sutaṃ/);
+
+  const notFoundMd = await renderMarkdownForPath("/book/nonexistent_book.mul");
+  assert.equal(notFoundMd, null);
+
+  // 3. Verify Route Handler (/api/markdown/[[...path]]) sets Content-Type: text/markdown & x-markdown-tokens
+  const routeMod = compileModule("app/api/markdown/[[...path]]/route.js", {
+    "next/server": {
+      NextResponse: class MockNextResponse {
+        constructor(body, init = {}) {
+          this.body = body;
+          this.status = init.status || 200;
+          this.headers = new Map(
+            Object.entries(init.headers || {}).map(([k, v]) => [
+              k.toLowerCase(),
+              v,
+            ]),
+          );
+        }
+      },
+    },
+    "../../../../services/ssrMarkdown.js": ssrMd,
+  });
+
+  const okResp = await routeMod.GET(
+    {},
+    { params: Promise.resolve({ path: ["book", "s0101m.mul"] }) },
+  );
+  assert.equal(okResp.status, 200);
+  assert.equal(
+    okResp.headers.get("content-type"),
+    "text/markdown; charset=utf-8",
+  );
+  assert.equal(okResp.headers.get("vary"), "Accept");
+  assert.ok(Number(okResp.headers.get("x-markdown-tokens")) > 100);
+  assert.match(
+    okResp.headers.get("content-signal"),
+    /ai-train=yes, search=yes, ai-input=yes/,
+  );
+
+  const errResp = await routeMod.GET(
+    {},
+    { params: Promise.resolve({ path: ["book", "invalid.mul"] }) },
+  );
+  assert.equal(errResp.status, 404);
+  assert.equal(
+    errResp.headers.get("content-type"),
+    "text/markdown; charset=utf-8",
+  );
+  assert.ok(
+    Number(errResp.headers.get("x-markdown-tokens")) ===
+      estimateMarkdownTokens(errResp.body),
+  );
+
+  // 4. Verify proxy.js rewrites Accept: text/markdown to /api/markdown/... while leaving HTML default
+  const proxyActions = [];
+  const proxyMod = compileModule("proxy.js", {
+    "next/server": {
+      NextResponse: {
+        rewrite: (url) => {
+          const headers = new Map();
+          const resp = { type: "rewrite", url: String(url), headers };
+          proxyActions.push(resp);
+          return resp;
+        },
+        next: () => {
+          const headers = new Map();
+          const resp = { type: "next", headers };
+          proxyActions.push(resp);
+          return resp;
+        },
+        redirect: (url, status) => ({
+          type: "redirect",
+          url: String(url),
+          status,
+          headers: new Map(),
+        }),
+      },
+    },
+    "./services/ssrCatalog": compileModule("services/ssrCatalog.js", {
+      "./transliterate.js": compileModule("services/transliterate.js", {}),
+      "./seoMetadata.js": compileModule("services/seoMetadata.js", {
+        "./transliterate.js": compileModule("services/transliterate.js", {}),
+      }),
+    }),
+    "./services/ssrMarkdown": ssrMd,
+  });
+
+  const makeReq = (pathname, accept) => ({
+    url: `https://tipitakapali.org${pathname}`,
+    nextUrl: Object.assign(new URL(`https://tipitakapali.org${pathname}`), {
+      clone() {
+        return new URL(this.toString());
+      },
+    }),
+    headers: {
+      get: (k) => (k.toLowerCase() === "accept" ? accept : null),
+    },
+  });
+
+  const mdRoot = proxyMod.proxy(makeReq("/", "text/markdown"));
+  assert.equal(mdRoot.type, "rewrite");
+  assert.equal(mdRoot.url, "https://tipitakapali.org/api/markdown");
+  assert.equal(mdRoot.headers.get("Vary"), "Accept");
+
+  const mdBook = proxyMod.proxy(
+    makeReq("/book/s0101m.mul/1", "text/markdown, text/html;q=0.8"),
+  );
+  assert.equal(mdBook.type, "rewrite");
+  assert.equal(
+    mdBook.url,
+    "https://tipitakapali.org/api/markdown/book/s0101m.mul/1",
+  );
+
+  const htmlBrowser = proxyMod.proxy(
+    makeReq("/book/s0101m.mul/1", "text/html,application/xhtml+xml,*/*;q=0.8"),
+  );
+  assert.equal(
+    htmlBrowser.type,
+    "next",
+    "Browser requests without text/markdown must receive HTML default",
+  );
+  assert.equal(htmlBrowser.headers.get("Vary"), "Accept");
+});

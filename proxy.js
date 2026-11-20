@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBooksCatalog, getChaptersByBook } from './services/ssrCatalog';
+import { prefersMarkdownAccept } from './services/ssrMarkdown';
 
 const VALID_TRANSLATION_LANGS = new Set([
   'en', 'vi', 'my', 'my_nissaya', 'si', 'zh', 'th', 'km', 'lo', 'ta', 'hi',
@@ -65,7 +66,9 @@ export function proxy(request) {
   const accept = request.headers.get('accept') || '';
   const pathname = request.nextUrl.pathname;
 
-  const isStaticDoc = /\.(md|txt|json|xml|html|css|js|ico|png|svg|jpg|woff2?|ttf)$/i.test(pathname);
+  const isStaticAsset = /\.(txt|json|xml|css|js|mjs|ico|png|svg|jpe?g|webp|woff2?|ttf|zip|gz)$/i.test(pathname);
+  const isHtmlDoc = /\.html?$/i.test(pathname);
+  const isStaticDoc = isStaticAsset || isHtmlDoc || /\.md$/i.test(pathname);
 
   // 1. Canonicalize legacy /book/{code}{N} -> 301 /book/{code}/{N+1} and /book/{code}(/{ch})?l={lang} -> 301 /translation/{lang}/{code}(/{ch})
   if (pathname.startsWith('/book/') && !isStaticDoc) {
@@ -152,17 +155,20 @@ export function proxy(request) {
     }
   }
 
-  // 2. Check if client explicitly requests machine-readable markdown for HTML pages
-  if (accept.includes('text/markdown') && !pathname.startsWith('/api/') && !isStaticDoc) {
-    const targetPath = pathname === '/' ? '/llms.txt' : '/llms-full.txt';
-    const response = NextResponse.rewrite(new URL(targetPath, request.url));
-    response.headers.set('Content-Type', 'text/markdown; charset=utf-8');
+  // 2. Markdown for Agents Content Negotiation (Accept: text/markdown per llmstxt.org & Cloudflare Markdown for Agents)
+  if (prefersMarkdownAccept(accept) && !pathname.startsWith('/api/') && !isStaticAsset) {
+    const cleanPath = pathname.replace(/^\/+/, '');
+    const rewriteTarget = cleanPath ? `/api/markdown/${cleanPath}` : '/api/markdown';
+    const response = NextResponse.rewrite(new URL(rewriteTarget, request.url));
     response.headers.set('Vary', 'Accept');
-    response.headers.set('x-markdown-tokens', pathname === '/' ? '3750' : '12900');
     return response;
   }
 
-  return NextResponse.next();
+  const nextResp = NextResponse.next();
+  if (!pathname.startsWith('/api/') && !isStaticAsset) {
+    nextResp.headers.set('Vary', 'Accept');
+  }
+  return nextResp;
 }
 
 export default proxy;

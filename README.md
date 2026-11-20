@@ -202,9 +202,12 @@ npm run build
 # e.g. pm2 restart all   (or systemctl restart tipitaka-api tipitaka-web)
 ```
 
-**Cloudflare Dashboard Setup for VPS SSR:**
+**Cloudflare Dashboard Setup for VPS SSR & Markdown for Agents:**
 - Route `/book/*`, `/translation/*`, and `/sitemap*.xml` to your VPS Next.js SSR origin, with Cloudflare Cache Rules set to **Respect origin `Cache-Control`**.
 - Legacy `/book/{code}?l={lang}` and `/book/{code}{N}` links automatically `301` redirect in `proxy.js` to `/translation/{lang}/{code}` or `/book/{code}/{N+1}`.
+- **Markdown for Agents (`Accept: text/markdown`)**:
+  - When deployed via VPS Next.js SSR, `proxy.js` and `/api/markdown/[[...path]]` automatically negotiate `Accept: text/markdown`, returning structured Markdown with YAML frontmatter, JSON-LD, `Content-Type: text/markdown; charset=utf-8`, `Vary: Accept`, `x-markdown-tokens`, and `Content-Signal: ai-train=yes, search=yes, ai-input=yes` while keeping HTML as the default for browsers.
+  - On Cloudflare (or if serving static pages via Cloudflare Pages without hitting the VPS origin on `/` or `/info`), also enable **Agent Readiness → Markdown for Agents → Serve Markdown to AI agents** in the Cloudflare Dashboard (or add a Cloudflare URL Rewrite Rule when `any(http.request.headers["accept"][*] contains "text/markdown")`: rewrite `/` → `/llms.txt` and `/book/*` or `/translation/*` → `/llms-full.txt`). Both `/llms.txt` and `/llms-full.txt` are configured in `_headers` with `Content-Type: text/markdown; charset=utf-8` and `x-markdown-tokens`.
 - If migrating from static Cloudflare Pages, **disable** the legacy SPA-shell URL Rewrite Rules (Rules 1–3 below) for `/book/*` and `/chapter/*` so Cloudflare does not overwrite SSR HTML with `/`.
 
 ---

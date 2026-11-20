@@ -36,7 +36,7 @@ import zipfile
 
 out_dir, staging_dir, zip_path = sys.argv[1], sys.argv[2], sys.argv[3]
 
-skip_top = {'book', 'chapter', 'translation', '.well-known'}
+skip_top = {'book', 'chapter', 'translation', '.well-known', 'api'}
 skip_prefixes = ('sitemap', 'robots.txt', 'Google_Play_Store_badge_EN')
 indexnow_key_re = re.compile(r'^[0-9a-f]{32}\.txt$')
 skip_font_prefixes = ('Noto_Serif_SC', 'Noto_Serif_JP')

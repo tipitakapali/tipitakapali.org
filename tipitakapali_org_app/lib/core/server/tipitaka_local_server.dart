@@ -181,7 +181,112 @@ class TipitakaLocalServer {
     if (segments.isNotEmpty && segments.first == 'api') {
       return _handleApiRequest(request, segments);
     }
+    final accept = request.headers['accept'] ?? '';
+    if (_prefersMarkdownAccept(accept)) {
+      final mdResp = await _serveMarkdownForAgents(request, segments);
+      if (mdResp != null) return mdResp;
+    }
     return _serveStaticFile(segments);
+  }
+
+  static bool _prefersMarkdownAccept(String acceptHeader) {
+    final lower = acceptHeader.toLowerCase();
+    if (!lower.contains('text/markdown') && !lower.contains('text/x-markdown')) {
+      return false;
+    }
+    var mdQ = -1.0;
+    var htmlQ = -1.0;
+    for (final part in lower.split(',')) {
+      final segs = part
+          .split(';')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (segs.isEmpty) continue;
+      final mediaType = segs.first;
+      var q = 1.0;
+      for (var i = 1; i < segs.length; i++) {
+        if (segs[i].startsWith('q=')) {
+          q = double.tryParse(segs[i].substring(2).trim()) ?? 1.0;
+        }
+      }
+      if (mediaType == 'text/markdown' || mediaType == 'text/x-markdown') {
+        if (q > mdQ) mdQ = q;
+      } else if (mediaType == 'text/html' ||
+          mediaType == 'application/xhtml+xml') {
+        if (q > htmlQ) htmlQ = q;
+      }
+    }
+    if (mdQ <= 0) return false;
+    if (htmlQ < 0) return true;
+    return mdQ >= htmlQ;
+  }
+
+  Future<Response?> _serveMarkdownForAgents(
+    Request request,
+    List<String> rawSegments,
+  ) async {
+    final rootDir = _webRootDir;
+    if (rootDir == null || !rootDir.existsSync()) return null;
+    final rootCanonical = p.normalize(rootDir.path);
+    final relSegments = rawSegments.where((s) => s.isNotEmpty).toList();
+    if (relSegments.isNotEmpty) {
+      final last = relSegments.last.toLowerCase();
+      if (last.endsWith('.js') ||
+          last.endsWith('.css') ||
+          last.endsWith('.json') ||
+          last.endsWith('.xml') ||
+          last.endsWith('.png') ||
+          last.endsWith('.svg') ||
+          last.endsWith('.ico') ||
+          last.endsWith('.woff2') ||
+          last.endsWith('.ttf') ||
+          last.endsWith('.zip')) {
+        return null;
+      }
+    }
+
+    String? mdFileRel;
+    if (relSegments.isEmpty ||
+        (relSegments.length == 1 &&
+            (relSegments.first == 'index' ||
+                relSegments.first == 'index.html'))) {
+      mdFileRel = 'llms.txt';
+    } else if (relSegments.length == 1 &&
+        (relSegments.first == 'privacy_policy' ||
+            relSegments.first == 'privacy_policy.html' ||
+            relSegments.first == 'privacy_policy.md')) {
+      mdFileRel = 'privacy_policy.md';
+    } else if (relSegments.length == 1 &&
+        (relSegments.first == 'terms_of_service' ||
+            relSegments.first == 'terms_of_service.html' ||
+            relSegments.first == 'terms_of_service.md')) {
+      mdFileRel = 'terms_of_service.md';
+    } else if (relSegments.length == 1 && relSegments.first.endsWith('.md')) {
+      mdFileRel = relSegments.first;
+    } else {
+      mdFileRel = 'llms-full.txt';
+    }
+
+    final candidate = File(p.normalize(p.join(rootCanonical, mdFileRel)));
+    final fallback = File(p.normalize(p.join(rootCanonical, 'llms.txt')));
+    final target = candidate.existsSync()
+        ? candidate
+        : (fallback.existsSync() ? fallback : null);
+    if (target == null) return null;
+
+    final bytes = await target.readAsBytes();
+    final tokens = (bytes.length / 4).ceil().clamp(1, 1000000);
+    return Response.ok(
+      bytes,
+      headers: {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Vary': 'Accept',
+        'x-markdown-tokens': tokens.toString(),
+        'Content-Signal': 'ai-train=yes, search=yes, ai-input=yes',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    );
   }
 
   Future<Response> _handleApiRequest(
@@ -673,8 +778,9 @@ class TipitakaLocalServer {
       case '.ttf':
         return 'font/ttf';
       case '.txt':
-      case '.md':
         return 'text/plain; charset=utf-8';
+      case '.md':
+        return 'text/markdown; charset=utf-8';
       case '.xml':
         return 'application/xml; charset=utf-8';
       case '.zip':

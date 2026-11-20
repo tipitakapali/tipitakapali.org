@@ -89,6 +89,24 @@ const nextConfig = {
               headers: edgeCacheHeaders,
             },
             {
+              source: '/:file(llms\\.txt|llms-full\\.txt|auth\\.md|privacy_policy\\.md|terms_of_service\\.md)',
+              headers: [
+                {
+                  key: 'Content-Type',
+                  value: 'text/markdown; charset=utf-8',
+                },
+                {
+                  key: 'Vary',
+                  value: 'Accept',
+                },
+                {
+                  key: 'Content-Signal',
+                  value: 'ai-train=yes, search=yes, ai-input=yes',
+                },
+                ...edgeCacheHeaders,
+              ],
+            },
+            {
               source: '/:file(sitemap.*\\.xml)',
               headers: [
                 {
@@ -112,8 +130,8 @@ const nextConfig = {
               destination: '/pali-script-converter.html',
             },
             {
-              source: '/api/:path*',
-              destination: `${backendUrl}/api/:path*`,
+              source: '/api/:path((?!markdown(?:/|$)).*)',
+              destination: `${backendUrl}/api/:path`,
             },
           ];
         },

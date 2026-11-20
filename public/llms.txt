@@ -93,6 +93,7 @@ Always ground every claim with exact canonical coordinates so users can click st
 - Translation Sentences (static): `GET https://tipitakapali.org/api/book/{book_code}/translation/{lang}.sentences.json`
 
 ## Key Links & Machine Discovery
+- **Markdown for Agents (`Accept: text/markdown`)**: Any canonical HTML URL (`/`, `/info`, `/pali-script-converter`, `/book/{book_code}`, `/book/{script}.{book_code}/{chapter}`, `/translation/{lang}/{book_code}/{chapter}`) supports HTTP content negotiation with `Accept: text/markdown` and returns `Content-Type: text/markdown; charset=utf-8` + `x-markdown-tokens`.
 - [Home & Tipiṭaka Reader](https://tipitakapali.org/)
 - [About, Features & User Guide](https://tipitakapali.org/info)
 - [Pāḷi Script Converter (17 scripts, Velthuis)](https://tipitakapali.org/pali-script-converter)

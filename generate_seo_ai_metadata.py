@@ -525,6 +525,7 @@ Always ground every claim with exact canonical coordinates so users can click st
 - Translation Sentences (static): `GET {site_url}/api/book/{{book_code}}/translation/{{lang}}.sentences.json`
 
 ## Key Links & Machine Discovery
+- **Markdown for Agents (`Accept: text/markdown`)**: Any canonical HTML URL (`/`, `/info`, `/pali-script-converter`, `/book/{{book_code}}`, `/book/{{script}}.{{book_code}}/{{chapter}}`, `/translation/{{lang}}/{{book_code}}/{{chapter}}`) supports HTTP content negotiation with `Accept: text/markdown` and returns `Content-Type: text/markdown; charset=utf-8` + `x-markdown-tokens`.
 - [Home & Tipiṭaka Reader]({site_url}/)
 - [About, Features & User Guide]({site_url}/info)
 - [Pāḷi Script Converter (17 scripts, Velthuis)]({site_url}/pali-script-converter)
