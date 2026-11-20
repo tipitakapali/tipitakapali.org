@@ -174,3 +174,47 @@ export function smartScrollIntoView(targetEl, container, options = {}) {
   const targetTop = rect.top - containerTop + currentScroll - topPadding;
   smartScrollTo(container, targetTop, options);
 }
+
+export function computeNextHeaderVisibility({
+  top = 0,
+  isHeaderVisible = true,
+  upPeakY = 0,
+  downPeakY = 0,
+  viewportHeight = 0,
+  scrollHeight = 0,
+  isJumping = false,
+}) {
+  const safeTop = Number.isFinite(top) ? top : 0;
+  const hasRange = scrollHeight > viewportHeight && viewportHeight > 0;
+  const maxScroll = hasRange ? Math.max(0, scrollHeight - viewportHeight) : Math.max(0, safeTop);
+  const clampedTop = Math.max(0, Math.min(safeTop, maxScroll));
+  const isBottomOverscroll = hasRange && safeTop > maxScroll + 1;
+
+  if (isJumping) {
+    const nextVisible = clampedTop <= 24 ? true : isHeaderVisible;
+    return { nextVisible, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+
+  if (clampedTop <= 24) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+
+  if (isHeaderVisible) {
+    const baseUp = Number.isFinite(upPeakY) ? Math.min(upPeakY, clampedTop) : clampedTop;
+    if (clampedTop > 64 && clampedTop - baseUp >= 36) {
+      return { nextVisible: false, upPeakY: clampedTop, downPeakY: clampedTop };
+    }
+    return { nextVisible: true, upPeakY: baseUp, downPeakY: clampedTop };
+  }
+
+  if (isBottomOverscroll) {
+    const baseDown = Number.isFinite(downPeakY) ? Math.max(downPeakY, maxScroll) : maxScroll;
+    return { nextVisible: false, upPeakY: clampedTop, downPeakY: baseDown };
+  }
+
+  const baseDown = Number.isFinite(downPeakY) ? Math.max(downPeakY, clampedTop) : clampedTop;
+  if (baseDown - clampedTop >= 24) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+  return { nextVisible: false, upPeakY: clampedTop, downPeakY: baseDown };
+}

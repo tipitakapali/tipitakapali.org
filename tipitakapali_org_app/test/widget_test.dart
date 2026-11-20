@@ -519,8 +519,12 @@ void main() {
     expect(tipitakaWebBridgeScript, contains('.app-header'));
     expect(tipitakaWebBridgeScript, contains('.book-tabs-bar'));
     expect(tipitakaWebBridgeScript, contains('.content-header'));
+    expect(tipitakaWebBridgeScript, contains('.ai-chat-header'));
+    expect(tipitakaWebBridgeScript, contains('.ai-chat-view .ai-chat-messages'));
     expect(tipitakaWebBridgeScript, contains('footer.app-footer'));
+    expect(tipitakaWebBridgeScript, isNot(contains('.ai-chat-footer')));
     expect(tipitakaWebBridgeScript, contains('AUTO_HIDE_THRESHOLD'));
+    expect(tipitakaWebBridgeScript, contains('AUTO_SHOW_THRESHOLD'));
     expect(tipitakaWebBridgeScript, contains('syncAutoHideState'));
   });
 

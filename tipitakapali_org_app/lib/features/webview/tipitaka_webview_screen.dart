@@ -2118,6 +2118,7 @@ const String _languageMenuBridgeScript = r'''
   // Auto-toggle top & bottom reading bars on scroll (mirrors epitaka_app's
   // pixel-accumulator threshold logic).
   var AUTO_HIDE_THRESHOLD = 42;
+  var AUTO_SHOW_THRESHOLD = 24;
   var barsHidden = false;
   var lastScrollEl = null;
   var lastScrollTop = 0;
@@ -2134,7 +2135,7 @@ const String _languageMenuBridgeScript = r'''
     style.textContent = [
       '@keyframes tpo-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }',
       'a[href*="play.google.com"], img[src*="Google_Play_Store_badge"] { display: none !important; }',
-      '.app-header, .book-tabs-bar, .content-header, footer.app-footer {',
+      '.app-header, .book-tabs-bar, .content-header, .ai-chat-header, footer.app-footer {',
       '  transition: height 0.24s cubic-bezier(0.4, 0, 0.2, 1),',
       '              min-height 0.24s cubic-bezier(0.4, 0, 0.2, 1),',
       '              max-height 0.24s cubic-bezier(0.4, 0, 0.2, 1),',
@@ -2167,7 +2168,8 @@ const String _languageMenuBridgeScript = r'''
       '  opacity: 0 !important;',
       '  pointer-events: none !important;',
       '}',
-      'body.tpo-bars-hidden .content-header {',
+      'body.tpo-bars-hidden .content-header,',
+      'body.tpo-bars-hidden .ai-chat-header {',
       '  height: 0 !important;',
       '  min-height: 0 !important;',
       '  max-height: 0 !important;',
@@ -2209,8 +2211,9 @@ const String _languageMenuBridgeScript = r'''
     if (!body) return true;
     if (body.classList.contains('zen-mode')) return true;
     if (document.querySelector('.modal-overlay, .dict-overlay')) return true;
+    if (document.querySelector('.ai-chat-header [aria-expanded="true"]')) return true;
     if (isSidebarVisible()) return true;
-    if (!document.querySelector('.reader-view-panel main.content-area')) return true;
+    if (!document.querySelector('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return true;
     return false;
   }
 
@@ -2235,7 +2238,7 @@ const String _languageMenuBridgeScript = r'''
     if (!body ||
         body.classList.contains('zen-mode') ||
         isSidebarVisible() ||
-        !document.querySelector('.reader-view-panel main.content-area')) {
+        !document.querySelector('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) {
       scrollAccum = 0;
       setBarsHidden(false);
     }
@@ -2259,7 +2262,7 @@ const String _languageMenuBridgeScript = r'''
   document.addEventListener('scroll', function(e) {
     var target = e.target;
     if (!target || !target.matches) return;
-    if (!target.matches('.reader-view-panel main.content-area')) return;
+    if (!target.matches('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return;
 
     var maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
     var rawTop = target.scrollTop;
@@ -2325,7 +2328,7 @@ const String _languageMenuBridgeScript = r'''
       if (!barsHidden) {
         setBarsHidden(true);
       }
-    } else if (scrollAccum < -AUTO_HIDE_THRESHOLD) {
+    } else if (scrollAccum < -AUTO_SHOW_THRESHOLD) {
       scrollAccum = 0;
       if (barsHidden) {
         setBarsHidden(false);

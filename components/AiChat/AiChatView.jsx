@@ -35,6 +35,7 @@ import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
 import { convertPaliScript } from '../../services/transliterate';
 import { getApiBase } from '../../services/api';
+import { computeNextHeaderVisibility } from '../../services/scroll';
 
 const THREADS_STORAGE_KEY = 'tipitaka_ai_threads_v2';
 const MESSAGES_STORAGE_KEY = 'tipitaka_ai_messages_v2';
@@ -456,7 +457,7 @@ function QueryUnderstandingCard({ understanding, isStreaming }) {
 }
 
 export default function AiChatView({ initialQuery = null }) {
-  const { openBook } = useTabs();
+  const { openBook, isHeaderVisible = true, setIsHeaderVisible, isSidebarOpen = false } = useTabs();
   const { settings: themeSettings } = useThemeSettings();
 
   const [threads, setThreads] = useState([]);
@@ -481,6 +482,11 @@ export default function AiChatView({ initialQuery = null }) {
   const threadScrollMapRef = useRef({});
   const isAutoScrollingRef = useRef(false);
   const pendingQueryRef = useRef(null);
+  const isHeaderVisibleRef = useRef(isHeaderVisible !== false);
+  isHeaderVisibleRef.current = isHeaderVisible !== false;
+  const scrollUpPeakYRef = useRef(0);
+  const scrollDownPeakYRef = useRef(0);
+  const suppressHeaderToggleUntilRef = useRef(0);
 
   // Prefill initialQuery if provided
   useEffect(() => {
@@ -562,22 +568,107 @@ export default function AiChatView({ initialQuery = null }) {
   const handleMessagesScroll = useCallback((e) => {
     const el = e.target;
     if (!el) return;
-    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const top = Math.max(0, el.scrollTop || 0);
+    const viewportHeight = el.clientHeight || 0;
+    const scrollHeight = el.scrollHeight || 0;
+    const distanceToBottom = scrollHeight - top - viewportHeight;
     isNearBottomRef.current = distanceToBottom <= 120;
     if (activeThreadId && !isAutoScrollingRef.current) {
-      threadScrollMapRef.current[activeThreadId] = el.scrollTop;
+      threadScrollMapRef.current[activeThreadId] = top;
     }
-  }, [activeThreadId]);
+
+    if (typeof setIsHeaderVisible !== 'function') return;
+
+    if (scrollHeight - viewportHeight <= 80) {
+      scrollUpPeakYRef.current = top;
+      scrollDownPeakYRef.current = top;
+      if (!isHeaderVisibleRef.current) {
+        isHeaderVisibleRef.current = true;
+        setIsHeaderVisible(true);
+      }
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      isAutoScrollingRef.current ||
+      now < suppressHeaderToggleUntilRef.current ||
+      isThreadMenuOpen
+    ) {
+      scrollUpPeakYRef.current = top;
+      scrollDownPeakYRef.current = top;
+      if (isThreadMenuOpen && !isHeaderVisibleRef.current) {
+        isHeaderVisibleRef.current = true;
+        setIsHeaderVisible(true);
+      }
+      return;
+    }
+
+    const { nextVisible, upPeakY, downPeakY } = computeNextHeaderVisibility({
+      top,
+      isHeaderVisible: isHeaderVisibleRef.current,
+      upPeakY: scrollUpPeakYRef.current,
+      downPeakY: scrollDownPeakYRef.current,
+      viewportHeight,
+      scrollHeight,
+      isJumping: false,
+    });
+    scrollUpPeakYRef.current = upPeakY;
+    scrollDownPeakYRef.current = downPeakY;
+    if (nextVisible !== isHeaderVisibleRef.current) {
+      isHeaderVisibleRef.current = nextVisible;
+      suppressHeaderToggleUntilRef.current = now + 320;
+      setIsHeaderVisible(nextVisible);
+    }
+  }, [activeThreadId, isThreadMenuOpen, setIsHeaderVisible]);
+
+  // Keep scroll peak anchors synchronized when header visibility or active thread changes externally
+  useEffect(() => {
+    const curTop = Math.max(0, messagesContainerRef.current?.scrollTop || 0);
+    scrollUpPeakYRef.current = curTop;
+    scrollDownPeakYRef.current = curTop;
+  }, [isHeaderVisible, activeThreadId]);
+
+  // Reveal headers when thread menu opens or conversation is short / near top
+  useEffect(() => {
+    if (typeof setIsHeaderVisible !== 'function') return;
+    const el = messagesContainerRef.current;
+    const isShort = !el || el.scrollHeight <= el.clientHeight + 80 || (el.scrollTop || 0) <= 24;
+    if ((isThreadMenuOpen || isShort) && !isHeaderVisibleRef.current) {
+      isHeaderVisibleRef.current = true;
+      setIsHeaderVisible(true);
+    }
+  }, [activeThreadId, messages.length, isThreadMenuOpen, setIsHeaderVisible]);
 
   // Restore thread scroll position synchronously before paint without page scrolling
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
     if (!el || !activeThreadId) return;
     const savedPos = threadScrollMapRef.current[activeThreadId];
+    let nextTop = el.scrollTop || 0;
+    let didProgrammaticAdjust = false;
     if (savedPos !== undefined) {
-      el.scrollTop = savedPos;
+      nextTop = savedPos;
+      didProgrammaticAdjust = true;
     } else if (messages.length > 0) {
-      el.scrollTop = el.scrollHeight;
+      nextTop = el.scrollHeight;
+      didProgrammaticAdjust = true;
+    }
+    if (didProgrammaticAdjust) {
+      isAutoScrollingRef.current = true;
+      suppressHeaderToggleUntilRef.current = Date.now() + 120;
+      el.scrollTop = nextTop;
+      const actualTop = Math.max(0, el.scrollTop || 0);
+      scrollUpPeakYRef.current = actualTop;
+      scrollDownPeakYRef.current = actualTop;
+      const clearAuto = () => {
+        isAutoScrollingRef.current = false;
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(clearAuto);
+      } else {
+        setTimeout(clearAuto, 16);
+      }
     }
   }, [activeThreadId, messages]);
 
@@ -892,11 +983,12 @@ export default function AiChatView({ initialQuery = null }) {
   };
 
   const activeThread = threads.find((t) => t.id === activeThreadId);
+  const isChatHeaderHidden = isHeaderVisible === false && !isSidebarOpen && !isThreadMenuOpen;
 
   return (
     <div className="ai-chat-view flex flex-col h-full w-full bg-[var(--bg-primary)] overflow-hidden">
       {/* ── Chat Header Toolbar ────────────────────────────────────────── */}
-      <header className="px-3 sm:px-5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0 select-none z-10">
+      <header className={`ai-chat-header px-3 sm:px-5 py-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0 select-none z-10 ${isChatHeaderHidden ? 'hidden-scroll' : ''}`}>
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center shrink-0 overflow-hidden">
             <img src="/ani-tipitakapali-org.svg" alt="Ani" className="w-7 h-7 object-contain" />
@@ -1042,7 +1134,7 @@ export default function AiChatView({ initialQuery = null }) {
       <div
         ref={messagesContainerRef}
         onScroll={handleMessagesScroll}
-        className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-6"
+        className="ai-chat-messages flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-4 space-y-6"
       >
         {/* Welcome Empty State */}
         {messages.length === 0 && (
@@ -1319,7 +1411,7 @@ export default function AiChatView({ initialQuery = null }) {
       </div>
 
       {/* ── Input Box & Controls Footer ────────────────────────────────── */}
-      <footer className="p-3 sm:p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] shrink-0">
+      <footer className="ai-chat-footer p-3 sm:p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] shrink-0">
         <div className="max-w-3xl mx-auto">
           {/* No-API-key notice at bottom of answer screen */}
           {!aiSettings.apiKey && messages.length > 0 && (

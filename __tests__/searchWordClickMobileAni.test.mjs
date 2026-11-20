@@ -1671,3 +1671,93 @@ test("Offline performance optimizations: transliterate caching, single-pass data
   }
 });
 
+test("Ani (AI Nissaya) toggles header visibility on scroll while keeping chat input footer permanently visible", () => {
+  const scrollMod = compileModule("services/scroll.js", {});
+  assert.equal(typeof scrollMod.computeNextHeaderVisibility, "function");
+
+  // Scroll down >36px past top (>64px) hides header; scroll up >=24px reveals it
+  const hiddenStep = scrollMod.computeNextHeaderVisibility({
+    top: 120,
+    isHeaderVisible: true,
+    upPeakY: 80,
+    downPeakY: 120,
+    viewportHeight: 700,
+    scrollHeight: 2000,
+  });
+  assert.equal(hiddenStep.nextVisible, false);
+
+  const revealedStep = scrollMod.computeNextHeaderVisibility({
+    top: 90,
+    isHeaderVisible: false,
+    upPeakY: 120,
+    downPeakY: 120,
+    viewportHeight: 700,
+    scrollHeight: 2000,
+  });
+  assert.equal(revealedStep.nextVisible, true);
+
+  const nearTopStep = scrollMod.computeNextHeaderVisibility({
+    top: 12,
+    isHeaderVisible: false,
+    upPeakY: 200,
+    downPeakY: 200,
+    viewportHeight: 700,
+    scrollHeight: 2000,
+  });
+  assert.equal(nearTopStep.nextVisible, true);
+
+  const noop = () => {};
+  const noopComp = () => null;
+  const renderAniWithHeader = (isHeaderVisible) => {
+    const mod = compileModule("components/AiChat/AiChatView.jsx", {
+      react: Object.assign({}, React, { __esModule: true, default: React }),
+      "lucide-react": iconProxy,
+      "./AiMarkdown": { __esModule: true, default: noopComp },
+      "./AiSettingsModal": {
+        __esModule: true,
+        default: noopComp,
+        getStoredAiSettings: () => ({ answerModel: "gemini-2.5-flash" }),
+        DEFAULT_AI_SETTINGS: { answerModel: "gemini-2.5-flash" },
+      },
+      "./CitationQuickviewModal": { __esModule: true, default: noopComp },
+      "../../services/aiClientAgent": { runClientAiAgent: async () => {} },
+      "../../context/TabContext": {
+        useTabs: () => ({
+          openBook: noop,
+          isHeaderVisible,
+          setIsHeaderVisible: noop,
+          isSidebarOpen: false,
+        }),
+      },
+      "../../context/ThemeSettingsContext": {
+        useThemeSettings: () => ({ settings: { paliScript: "roman" } }),
+      },
+      "../../services/transliterate": compileModule("services/transliterate.js", {}),
+      "../../services/api": { getApiBase: () => "" },
+      "../../services/scroll": scrollMod,
+    });
+    return renderToStaticMarkup(React.createElement(mod.default, {}));
+  };
+
+  const visibleHtml = renderAniWithHeader(true);
+  assert.match(visibleHtml, /<header[^>]*class="[^"]*ai-chat-header[^"]*"/);
+  assert.doesNotMatch(visibleHtml, /<header[^>]*hidden-scroll/);
+
+  const hiddenHtml = renderAniWithHeader(false);
+  assert.match(hiddenHtml, /<header[^>]*class="[^"]*ai-chat-header[^"]*hidden-scroll[^"]*"/);
+  assert.match(hiddenHtml, /<div[^>]*class="[^"]*ai-chat-messages[^"]*min-h-0[^"]*"/);
+  assert.match(hiddenHtml, /<footer[^>]*class="[^"]*ai-chat-footer[^"]*"/);
+  assert.doesNotMatch(hiddenHtml, /<footer[^>]*hidden-(?:footer|scroll)/);
+  assert.match(hiddenHtml, /<textarea[^>]*Ask Ani about Pāḷi grammar/);
+
+  const aniSrc = fs.readFileSync(
+    path.join(rootDir, "components", "AiChat", "AiChatView.jsx"),
+    "utf8",
+  );
+  assert.match(aniSrc, /handleMessagesScroll[\s\S]*computeNextHeaderVisibility[\s\S]*setIsHeaderVisible\(nextVisible\)/);
+
+  const cssSrc = fs.readFileSync(path.join(rootDir, "app", "globals.css"), "utf8");
+  assert.match(cssSrc, /\.ai-chat-header\.hidden-scroll\s*\{/);
+  assert.match(cssSrc, /\.ai-chat-footer\s*\{[\s\S]*?opacity:\s*1\s*!important;/);
+});
+

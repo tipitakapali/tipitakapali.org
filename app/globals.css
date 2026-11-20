@@ -2673,6 +2673,38 @@ main.content-area {
   overflow: hidden !important;
 }
 
+.ai-chat-header {
+  transition: margin-top 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, max-height 0.25s ease, padding-top 0.25s ease, padding-bottom 0.25s ease;
+  max-height: 72px;
+}
+
+.ai-chat-header.hidden-scroll {
+  margin-top: 0 !important;
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.ai-chat-header.hidden-scroll:has(:focus-visible) {
+  margin-top: 0 !important;
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  max-height: 72px !important;
+  overflow: visible !important;
+}
+
+.ai-chat-footer {
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
 .breadcrumbs {
   display: flex;
   align-items: center;
