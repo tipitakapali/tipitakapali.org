@@ -471,7 +471,8 @@ export function DictionaryProvider({ children }) {
     // Re-run if active translation languages or bold_def enabled state changed.
     if (
       lookupDataRef.current?.word === cleanWord &&
-      lookupDataRef.current?._boldContextKey === boldContextKey
+      lookupDataRef.current?._boldContextKey === boldContextKey &&
+      !lookupDataRef.current?._hadError
     ) {
       setQueryWord(cleanWord);
       setDisplayWord(rawDisplay);
@@ -534,6 +535,7 @@ export function DictionaryProvider({ children }) {
       const mergedData = {
         word: cleanWord,
         _boldContextKey: boldContextKey,
+        _hadError: false,
         hasResults: false,
         synonyms: [],
         bold_def_prefix: '',
@@ -628,6 +630,7 @@ export function DictionaryProvider({ children }) {
         })
         .catch((err) => {
           if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          mergedData._hadError = true;
           dpdDone = true;
           handleUpdate();
         });
@@ -658,6 +661,7 @@ export function DictionaryProvider({ children }) {
         })
         .catch((err) => {
           if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          mergedData._hadError = true;
           othersDone = true;
           handleUpdate();
         });
@@ -674,6 +678,7 @@ export function DictionaryProvider({ children }) {
         })
         .catch((err) => {
           if (err.name === 'AbortError' || signal.aborted || currentSeq !== lookupSeqRef.current) return;
+          mergedData._hadError = true;
           boldDone = true;
           handleUpdate();
         });
@@ -681,7 +686,11 @@ export function DictionaryProvider({ children }) {
       const [dpdRes, othersRes, boldRes] = await Promise.allSettled([dpdPromise, othersPromise, boldPromise]);
       if (currentSeq !== lookupSeqRef.current || signal.aborted) return;
 
-      if (dpdRes.status === 'rejected' && othersRes.status === 'rejected' && boldRes.status === 'rejected') {
+      if (
+        dpdRes.status === 'rejected' &&
+        othersRes.status === 'rejected' &&
+        (!boldEnabled || boldRes.status === 'rejected')
+      ) {
         const err = dpdRes.reason || othersRes.reason || boldRes.reason;
         console.warn('Dictionary lookup error:', err);
         setError(err?.message || 'Dictionary lookup failed');

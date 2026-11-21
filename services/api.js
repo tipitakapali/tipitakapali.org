@@ -273,7 +273,11 @@ export async function fetchBook(bookCode, options = {}) {
 
   return cachedFetch(cacheKey, async () => {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}${qs}`);
-    if (!res.ok) throw new Error(`Failed to load book: ${cleanCode}`);
+    if (!res.ok) {
+      const err = new Error(`Failed to load book: ${cleanCode}`);
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }, 60 * 60 * 1000);
 }
@@ -290,7 +294,11 @@ export async function fetchChapter(bookCode, chapterIndex) {
 
   return cachedFetch(cacheKey, async () => {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}`);
-    if (!res.ok) throw new Error(`Failed to load chapter ${chapterIndex} for book: ${cleanCode}`);
+    if (!res.ok) {
+      const err = new Error(`Failed to load chapter ${chapterIndex} for book: ${cleanCode}`);
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }, 60 * 60 * 1000);
 }
@@ -302,7 +310,11 @@ export async function fetchToc(bookCode) {
 
   return cachedFetch(cacheKey, async () => {
     const res = await fetch(`/api/book/${encodeURIComponent(cleanCode)}/toc`);
-    if (!res.ok) throw new Error(`Failed to load TOC for book: ${cleanCode}`);
+    if (!res.ok) {
+      const err = new Error(`Failed to load TOC for book: ${cleanCode}`);
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }, 24 * 60 * 60 * 1000);
 }
@@ -654,7 +666,11 @@ export async function fetchDictionaryLookup(word, dictType = 'all', options = {}
       const res = await fetch(`${base}/api/dict/lookup?${qs}`, {
         signal: options.signal,
       });
-      if (!res.ok) throw new Error(`Dictionary lookup failed for ${cleanWord}`);
+      if (!res.ok) {
+        const err = new Error(`Dictionary lookup failed for ${cleanWord}`);
+        err.status = res.status;
+        throw err;
+      }
       return res.json();
     },
     24 * 60 * 60 * 1000,
@@ -706,7 +722,11 @@ export async function fetchDictionaryInflection(query) {
     cacheKey,
     async () => {
       const res = await fetch(`${base}/api/dict/inf?w=${encodeURIComponent(cleanQuery)}`);
-      if (!res.ok) throw new Error(`Inflection lookup failed for ${cleanQuery}`);
+      if (!res.ok) {
+        const err = new Error(`Inflection lookup failed for ${cleanQuery}`);
+        err.status = res.status;
+        throw err;
+      }
       return res.json();
     },
     7 * 24 * 60 * 60 * 1000

@@ -368,7 +368,7 @@ function convertDictionaryEntryHtml(rawHtml, dictType, targetScript) {
   // DPD: Hide button-box by default and inject toggle play button at end of definition
   if (dictType === 'dpd' && !restored.includes('dpd-toggle-play-btn')) {
     const toggleBtnHtml =
-      '<button type="button" class="dpd-toggle-play-btn" title="Toggle buttons" aria-label="Toggle buttons"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>';
+      '<button type="button" class="dpd-toggle-play-btn" title="Toggle buttons" aria-label="Toggle buttons" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></button>';
     if (/<\/div>\s*<div\s+class=["']?(?:button[-_]box)/i.test(restored)) {
       restored = restored.replace(
         /(<\/div>\s*<div\s+class=["']?(button[-_]box)([^"'>]*)["']?>)/gi,
@@ -1315,7 +1315,7 @@ export default function DictionaryModal() {
             buttonBox.classList.remove('dpd-collapsed');
             toggleBtn.classList.add('active');
             toggleBtn.setAttribute('title', 'Hide buttons');
-            toggleBtn.setAttribute('aria-label', 'Hide buttons');
+            toggleBtn.setAttribute('aria-expanded', 'true');
 
             // Task 1: Auto-show "grammar" content (or root_info if root entry)
             if (container) {
@@ -1335,7 +1335,7 @@ export default function DictionaryModal() {
             buttonBox.classList.add('dpd-collapsed');
             toggleBtn.classList.remove('active');
             toggleBtn.setAttribute('title', 'Toggle buttons');
-            toggleBtn.setAttribute('aria-label', 'Toggle buttons');
+            toggleBtn.setAttribute('aria-expanded', 'false');
 
             // Collapse any open drawers/tables in this entry
             if (container) {

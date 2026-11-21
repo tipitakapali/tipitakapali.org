@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,29 @@ final tipitakaWebViewBuilderProvider = Provider<TipitakaWebViewBuilder?>((ref) {
   return null;
 });
 
+/// Controls whether [TipitakaWebViewScreen] proactively closes the loopback
+/// listening socket on `AppLifecycleState.paused` and forces a fresh same-port
+/// rebind on `AppLifecycleState.resumed` (enabled on iOS per Apple TN2277).
+final tipitakaSuspendSocketOnPauseProvider = Provider<bool>((ref) {
+  return !kIsWeb && Platform.isIOS;
+});
+
+/// Preserves the WebView's current path, query, and fragment when the loopback
+/// server has to rebind onto a different port after an OS lifecycle resume.
+@visibleForTesting
+Uri rebaseLoopbackUri(Uri? currentUri, Uri newServerBaseUri) {
+  if (currentUri == null) return newServerBaseUri;
+  final host = currentUri.host.toLowerCase();
+  if (host != '127.0.0.1' && host != 'localhost') {
+    return newServerBaseUri;
+  }
+  return currentUri.replace(
+    scheme: newServerBaseUri.scheme,
+    host: newServerBaseUri.host,
+    port: newServerBaseUri.port,
+  );
+}
+
 /// Hosts the offline `tipitakapali.org` web application served from
 /// [TipitakaLocalServer] inside an [InAppWebView], matching `tpo_flutter`'s
 /// full-screen reader architecture while keeping onboarding & database management
@@ -45,6 +69,8 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     with WidgetsBindingObserver {
   InAppWebViewController? _webViewController;
   Uri? _serverUri;
+  Uri? _initialWebViewUri;
+  int _webViewEpoch = 0;
   String? _error;
   bool _starting = true;
   bool _canGoBack = false;
@@ -52,6 +78,12 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
   Color? _topBarColor;
   Color? _bottomBarColor;
   bool _updateDialogShown = false;
+  bool _wasPaused = false;
+  int _pauseEpoch = 0;
+  Future<({bool ok, bool restarted, bool portChanged, Uri? uri})>?
+      _recoveryFuture;
+  bool _recoveryForced = false;
+  DateTime? _lastMainFrameErrorRecoveryAt;
 
   @override
   void initState() {
@@ -87,12 +119,35 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final suspendOnPause = ref.read(tipitakaSuspendSocketOnPauseProvider);
     if (state == AppLifecycleState.resumed) {
-      _ensureServerAlive();
-    } else if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
+      final wasPaused = _wasPaused;
+      _wasPaused = false;
+      unawaited(
+        _ensureServerAlive(forceRebind: suspendOnPause && wasPaused),
+      );
+    } else if (state == AppLifecycleState.paused) {
+      _wasPaused = true;
+      _pauseEpoch++;
       _flushWebSession();
+      if (suspendOnPause) {
+        final server = ref.read(tipitakaLocalServerProvider);
+        unawaited(server.suspendSocket());
+      }
+    } else if (state == AppLifecycleState.inactive) {
+      if (_wasPaused) {
+        // Returning from screen-off/background (paused -> hidden -> inactive ->
+        // resumed): start rebinding immediately during unlock transition so the
+        // loopback server is already listening before the first tap.
+        _wasPaused = false;
+        unawaited(_ensureServerAlive(forceRebind: suspendOnPause));
+      } else {
+        _flushWebSession();
+      }
+    } else if (state == AppLifecycleState.hidden) {
+      if (!_wasPaused) {
+        _flushWebSession();
+      }
     }
   }
 
@@ -109,14 +164,176 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
     );
   }
 
-  Future<void> _ensureServerAlive() async {
-    final server = ref.read(tipitakaLocalServerProvider);
-    if (server.isRunning && _serverUri != null) return;
-    await _startServer();
-    if (mounted && _serverUri != null && _webViewController != null) {
-      await _webViewController!.loadUrl(
-        urlRequest: URLRequest(url: WebUri(_serverUri!.toString())),
+  Future<({bool ok, bool restarted, bool portChanged, Uri? uri})>
+      _ensureServerAlive({
+    bool forceRebind = false,
+    bool reloadIfSamePort = false,
+  }) async {
+    final existing = _recoveryFuture;
+    if (existing != null) {
+      if (!forceRebind || _recoveryForced) {
+        final res = await existing;
+        if (reloadIfSamePort && res.ok && !res.portChanged && mounted) {
+          await _reloadOrNavigateCurrentWebView(res.uri);
+        }
+        return res;
+      }
+      final res = await existing;
+      // If the in-flight recovery already rebound/restarted the server, reuse
+      // it instead of tearing down and rebinding a second time.
+      if (res.ok && res.restarted) {
+        if (reloadIfSamePort && !res.portChanged && mounted) {
+          await _reloadOrNavigateCurrentWebView(res.uri);
+        }
+        return res;
+      }
+    }
+
+    final future = _ensureServerAliveInternal(
+      forceRebind: forceRebind,
+      reloadIfSamePort: reloadIfSamePort,
+    );
+    _recoveryFuture = future;
+    _recoveryForced = forceRebind;
+    try {
+      return await future;
+    } finally {
+      if (identical(_recoveryFuture, future)) {
+        _recoveryFuture = null;
+        _recoveryForced = false;
+      }
+    }
+  }
+
+  Future<void> _reloadOrNavigateCurrentWebView(Uri? fallbackUri) async {
+    final controller = _webViewController;
+    if (controller == null || !mounted) return;
+    try {
+      final current = await controller.getUrl();
+      final currentStr = current?.toString() ?? '';
+      if (currentStr.isEmpty || currentStr == 'about:blank') {
+        final target = fallbackUri ?? _serverUri;
+        if (target != null) {
+          await controller.loadUrl(
+            urlRequest: URLRequest(
+              url: WebUri(target.toString()),
+              cachePolicy:
+                  URLRequestCachePolicy.RELOAD_IGNORING_LOCAL_CACHE_DATA,
+            ),
+          );
+        }
+      } else {
+        await controller.reload();
+      }
+    } catch (_) {}
+  }
+
+  Future<({bool ok, bool restarted, bool portChanged, Uri? uri})>
+      _ensureServerAliveInternal({
+    required bool forceRebind,
+    required bool reloadIfSamePort,
+  }) async {
+    try {
+      final server = ref.read(tipitakaLocalServerProvider);
+      final prevUri = _serverUri;
+      final pauseEpochAtStart = _pauseEpoch;
+      final result = await server.ensureHealthy(forceRebind: forceRebind);
+      if (result.restarted && _pauseEpoch == pauseEpochAtStart) {
+        // Post-pause recovery already rebound the socket; prevent a delayed
+        // lifecycle resume event from tearing down the freshly bound server.
+        _wasPaused = false;
+      }
+      if (!mounted) {
+        return (
+          ok: true,
+          restarted: result.restarted,
+          portChanged: result.portChanged,
+          uri: result.uri,
+        );
+      }
+
+      final portChanged = result.portChanged ||
+          (prevUri != null && prevUri.port != result.uri.port);
+
+      if (portChanged) {
+        final oldController = _webViewController;
+        if (oldController != null) {
+          try {
+            await oldController
+                .evaluateJavascript(
+                  source:
+                      'if (typeof window.__tpoFlushSession === "function") { window.__tpoFlushSession(); } '
+                      'if (typeof window.__tpoSyncLocalStorageBridge === "function") { window.__tpoSyncLocalStorageBridge(); }',
+                )
+                .timeout(const Duration(milliseconds: 250));
+          } catch (_) {}
+        }
+        Uri? currentUri;
+        try {
+          final raw = await oldController
+              ?.getUrl()
+              .timeout(const Duration(milliseconds: 250));
+          if (raw != null && raw.toString().isNotEmpty) {
+            currentUri = Uri.tryParse(raw.toString());
+          }
+        } catch (_) {}
+        final targetUri = rebaseLoopbackUri(currentUri, result.uri);
+        if (!mounted) {
+          return (
+            ok: true,
+            restarted: result.restarted,
+            portChanged: true,
+            uri: result.uri,
+          );
+        }
+        setState(() {
+          _webViewController = null;
+          _serverUri = result.uri;
+          _initialWebViewUri = targetUri;
+          _error = null;
+          _starting = false;
+          _webViewEpoch++;
+        });
+      } else if (_serverUri == null || _error != null || _starting) {
+        setState(() {
+          _serverUri = result.uri;
+          _initialWebViewUri = result.uri;
+          _error = null;
+          _starting = false;
+        });
+      } else if (reloadIfSamePort) {
+        await _reloadOrNavigateCurrentWebView(result.uri);
+      } else if (_webViewController != null) {
+        // If WebView ended up blank while backgrounded, restore it cleanly.
+        try {
+          final current = await _webViewController!.getUrl();
+          final currentStr = current?.toString() ?? '';
+          if (currentStr.isEmpty || currentStr == 'about:blank') {
+            await _webViewController!.loadUrl(
+              urlRequest: URLRequest(
+                url: WebUri(result.uri.toString()),
+                cachePolicy:
+                    URLRequestCachePolicy.RELOAD_IGNORING_LOCAL_CACHE_DATA,
+              ),
+            );
+          }
+        } catch (_) {}
+      }
+
+      return (
+        ok: true,
+        restarted: result.restarted,
+        portChanged: portChanged,
+        uri: result.uri,
       );
+    } catch (e) {
+      if (mounted && _serverUri == null) {
+        setState(() {
+          _error = e.toString();
+          _starting = false;
+        });
+      }
+      return (ok: false, restarted: false, portChanged: false, uri: _serverUri);
     }
   }
 
@@ -131,6 +348,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       if (!mounted) return;
       setState(() {
         _serverUri = uri;
+        _initialWebViewUri = uri;
         _starting = false;
       });
       unawaited(
@@ -514,6 +732,7 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
       localStorageStore.entries,
       bootToken: localStorageStore.bootToken,
     );
+    final serverRecoveryScript = buildLocalServerRecoveryScript();
     final seedScript = buildOnboardingTranslationSeedScript(
       onboardingLang ??
           (downloadState.selectedLanguageCode ==
@@ -522,14 +741,20 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
               : null),
       paliScript: downloadState.selectedPaliScript,
     );
+    final targetInitialUri = _initialWebViewUri ?? serverUri;
     return InAppWebView(
+      key: ValueKey<int>(_webViewEpoch),
       initialUrlRequest: URLRequest(
-        url: WebUri(serverUri.toString()),
+        url: WebUri(targetInitialUri.toString()),
         cachePolicy: URLRequestCachePolicy.RELOAD_IGNORING_LOCAL_CACHE_DATA,
       ),
       initialUserScripts: UnmodifiableListView<UserScript>([
         UserScript(
           source: lsPersistenceScript,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+        UserScript(
+          source: serverRecoveryScript,
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
         ),
         if (seedScript.isNotEmpty)
@@ -682,10 +907,51 @@ class _TipitakaWebViewScreenState extends ConsumerState<TipitakaWebViewScreen>
             return {'ok': true};
           },
         );
+        controller.addJavaScriptHandler(
+          handlerName: 'ensureLocalServerAlive',
+          callback: (args) async {
+            final forceRebind = args.isNotEmpty &&
+                args.first is Map &&
+                (args.first as Map)['forceRebind'] == true;
+            final res = await _ensureServerAlive(forceRebind: forceRebind);
+            return {
+              'ok': res.ok,
+              'restarted': res.restarted,
+              'portChanged': res.portChanged,
+              'baseUrl': res.uri?.toString(),
+            };
+          },
+        );
       },
       onLoadStop: (controller, _) async {
         await _updateBackState();
         await controller.evaluateJavascript(source: _languageMenuBridgeScript);
+      },
+      onWebContentProcessDidTerminate: (controller) async {
+        final suspendOnPause = ref.read(tipitakaSuspendSocketOnPauseProvider);
+        final needsForceRebind = suspendOnPause && _wasPaused;
+        _wasPaused = false;
+        await _ensureServerAlive(
+          forceRebind: needsForceRebind,
+          reloadIfSamePort: true,
+        );
+      },
+      onRenderProcessGone: (controller, _) async {
+        await _ensureServerAlive(reloadIfSamePort: true);
+      },
+      onReceivedError: (controller, request, error) async {
+        if (request.isForMainFrame != true) return;
+        if (error.type == WebResourceErrorType.CANCELLED) return;
+        final host = request.url.host.toLowerCase();
+        if (host != '127.0.0.1' && host != 'localhost') return;
+        final now = DateTime.now();
+        if (_lastMainFrameErrorRecoveryAt != null &&
+            now.difference(_lastMainFrameErrorRecoveryAt!) <
+                const Duration(seconds: 3)) {
+          return;
+        }
+        _lastMainFrameErrorRecoveryAt = now;
+        await _ensureServerAlive(forceRebind: true, reloadIfSamePort: true);
       },
       onUpdateVisitedHistory: (controller, _, _) async {
         await _updateBackState();
@@ -1343,7 +1609,8 @@ String buildLocalStoragePersistenceScript(
   return '''
 (function() {
   try {
-    var BOOT_MARKER = $encodedBootMarker;
+    var BASE_BOOT_MARKER = $encodedBootMarker;
+    var BOOT_MARKER = BASE_BOOT_MARKER + '|' + ((window.location && window.location.origin) || '');
     var snapshot = $encodedEntries;
     var proto = window.Storage && window.Storage.prototype;
     if (!proto) return;
@@ -1525,6 +1792,240 @@ String buildLocalStoragePersistenceScript(
         });
       } catch (_) {}
     };
+  } catch (_) {}
+})();
+''';
+}
+
+/// Builds an `AT_DOCUMENT_START` script that protects loopback `fetch()` calls
+/// against transient iOS/WKWebView socket drops after screen-off/resume by
+/// asking Flutter (`ensureLocalServerAlive`) to verify/rebind the local server
+/// and retrying the failed same-origin loopback fetch automatically.
+@visibleForTesting
+String buildLocalServerRecoveryScript() {
+  return r'''
+(function() {
+  try {
+    if (window.__tpoFetchRecoveryHooked) return;
+    window.__tpoFetchRecoveryHooked = true;
+    if (typeof window.fetch !== 'function') return;
+
+    var origFetch = window.fetch.bind(window);
+    var activeRecovery = null;
+
+    function isLocalLoopbackRequest(input) {
+      try {
+        var rawUrl = '';
+        if (typeof input === 'string') {
+          rawUrl = input;
+        } else if (input && typeof input.url === 'string') {
+          rawUrl = input.url;
+        } else if (input && typeof input.toString === 'function') {
+          rawUrl = String(input);
+        }
+        if (!rawUrl) return false;
+        var resolved = new URL(rawUrl, window.location.href);
+        var host = resolved.hostname;
+        return (host === '127.0.0.1' || host === 'localhost') &&
+            resolved.origin === window.location.origin;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function isAbortError(err, init, input) {
+      if (err && (err.name === 'AbortError' || err.code === 20)) return true;
+      if (init && init.signal && init.signal.aborted) return true;
+      if (input && typeof input === 'object' && input.signal && input.signal.aborted) return true;
+      return false;
+    }
+
+    function cloneIfRequest(input) {
+      if (typeof Request !== 'undefined' && input instanceof Request) {
+        try {
+          if (!input.bodyUsed) {
+            return input.clone();
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    function hasNativeBridge() {
+      return !!(window.flutter_inappwebview &&
+          typeof window.flutter_inappwebview.callHandler === 'function');
+    }
+
+    function waitForNativeBridge(timeoutMs) {
+      if (hasNativeBridge()) return Promise.resolve(true);
+      if (typeof window.addEventListener !== 'function') {
+        return Promise.resolve(false);
+      }
+      return new Promise(function(resolve) {
+        var settled = false;
+        var timer = null;
+        var done = function() {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          if (typeof window.removeEventListener === 'function') {
+            window.removeEventListener('flutterInAppWebViewPlatformReady', onReady);
+          }
+          resolve(hasNativeBridge());
+        };
+        var onReady = function() { done(); };
+        window.addEventListener('flutterInAppWebViewPlatformReady', onReady);
+        timer = setTimeout(done, timeoutMs);
+      });
+    }
+
+    function holdDuringPortRemount(err, init, input) {
+      var holdMs = typeof window.__tpoPortRemountHoldMs === 'number'
+          ? window.__tpoPortRemountHoldMs
+          : 5000;
+      var signal = (init && init.signal) ||
+          (input && typeof input === 'object' ? input.signal : null);
+      return new Promise(function(_, reject) {
+        if (signal && signal.aborted) {
+          reject(err);
+          return;
+        }
+        var timer = setTimeout(function() {
+          if (signal && typeof signal.removeEventListener === 'function') {
+            signal.removeEventListener('abort', onAbort);
+          }
+          reject(err);
+        }, holdMs);
+        var onAbort = function() {
+          clearTimeout(timer);
+          reject(err);
+        };
+        if (signal && typeof signal.addEventListener === 'function') {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      });
+    }
+
+    function requestNativeServerRecovery(reason, forceRebind) {
+      if (activeRecovery && !forceRebind) {
+        return activeRecovery;
+      }
+      var run = function() {
+        var bridgeWaitMs = typeof window.__tpoBridgeWaitMs === 'number'
+            ? window.__tpoBridgeWaitMs
+            : 1500;
+        var timeoutMs = typeof window.__tpoRecoveryTimeoutMs === 'number'
+            ? window.__tpoRecoveryTimeoutMs
+            : 6000;
+        var p = waitForNativeBridge(bridgeWaitMs)
+          .then(function(ready) {
+            if (!ready || !hasNativeBridge()) {
+              return { ok: false };
+            }
+            return new Promise(function(resolve) {
+              var settled = false;
+              var timer = setTimeout(function() {
+                if (settled) return;
+                settled = true;
+                resolve({ ok: false, timedOut: true });
+              }, timeoutMs);
+              Promise.resolve()
+                .then(function() {
+                  return window.flutter_inappwebview.callHandler('ensureLocalServerAlive', {
+                    reason: reason || 'fetch_error',
+                    forceRebind: !!forceRebind
+                  });
+                })
+                .then(
+                  function(val) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(val || { ok: false });
+                  },
+                  function() {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve({ ok: false });
+                  }
+                );
+            });
+          })
+          .catch(function() {
+            return { ok: false };
+          })
+          .finally(function() {
+            if (activeRecovery === p) {
+              activeRecovery = null;
+            }
+          });
+        activeRecovery = p;
+        return p;
+      };
+      if (activeRecovery && forceRebind) {
+        return activeRecovery.then(run, run);
+      }
+      return run();
+    }
+
+    window.__tpoEnsureLocalServerAlive = requestNativeServerRecovery;
+
+    window.fetch = function(input, init) {
+      if (!isLocalLoopbackRequest(input)) {
+        return origFetch(input, init);
+      }
+      var retry1 = cloneIfRequest(input);
+      var retry2 = cloneIfRequest(retry1 || input);
+      return origFetch(input, init).catch(function(err) {
+        if (isAbortError(err, init, input)) {
+          throw err;
+        }
+        return requestNativeServerRecovery('fetch_error', false).then(function(res) {
+          if (isAbortError(null, init, input)) {
+            throw err;
+          }
+          if (res && res.ok && res.portChanged) {
+            return holdDuringPortRemount(err, init, input);
+          }
+          if (!res || !res.ok) {
+            throw err;
+          }
+          return origFetch(retry1 || input, init).catch(function(err2) {
+            if (isAbortError(err2, init, input)) {
+              throw err2;
+            }
+            return requestNativeServerRecovery('fetch_retry_error', true).then(function(res2) {
+              if (isAbortError(null, init, input)) {
+                throw err2;
+              }
+              if (res2 && res2.ok && res2.portChanged) {
+                return holdDuringPortRemount(err2, init, input);
+              }
+              if (!res2 || !res2.ok) {
+                throw err2;
+              }
+              return origFetch(retry2 || input, init);
+            });
+          });
+        });
+      });
+    };
+
+    var wasHidden = document.visibilityState === 'hidden';
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+      } else if (document.visibilityState === 'visible' && wasHidden) {
+        wasHidden = false;
+        requestNativeServerRecovery('visibility_resume', false);
+      }
+    });
+    window.addEventListener('pageshow', function(e) {
+      if (e && e.persisted) {
+        requestNativeServerRecovery('pageshow', false);
+      }
+    });
   } catch (_) {}
 })();
 ''';

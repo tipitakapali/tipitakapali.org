@@ -37,6 +37,16 @@ export function readStoredTreePinned() {
   }
 }
 
+export function shouldTreatBookLoadErrorAsNotFound(err, bookInfo) {
+  const status = err?.status;
+  if (status === 404 || status === 400) return true;
+  if (typeof status === 'number' && status >= 500) return false;
+  // Transport/network failures (no HTTP status) on a known tree book are
+  // transient connectivity/server-resume errors rather than a missing 404 book.
+  if (status == null && bookInfo) return false;
+  return true;
+}
+
 const MAX_TABS = 12;
 
 export function parseSavedTabsSnapshot(rawTabs, savedActiveCode = null) {
@@ -1596,15 +1606,17 @@ export function TabProvider({ children }) {
           setOpenTabs(cleanedTabs);
           setActiveBookCode(nextActive);
           persistTabs(cleanedTabs, nextActive);
-          // Clean from recent history if ever present
-          setRecentHistory((prev) => {
-            const filtered = prev.filter((h) => h.bookCode !== cleanCode);
-            try {
-              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
-            } catch (e) {}
-            return filtered;
-          });
-          setIsNotFound(true);
+          if (shouldTreatBookLoadErrorAsNotFound(err, bookInfo)) {
+            // Clean from recent history if ever present
+            setRecentHistory((prev) => {
+              const filtered = prev.filter((h) => h.bookCode !== cleanCode);
+              try {
+                localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
+              } catch (e) {}
+              return filtered;
+            });
+            setIsNotFound(true);
+          }
           return;
         } finally {
           setLoadingBook(false);
@@ -1935,15 +1947,17 @@ export function TabProvider({ children }) {
         setOpenTabs(cleanedTabs);
         setActiveBookCode(nextActive);
         persistTabs(cleanedTabs, nextActive);
-        // Clean from recent history if ever present
-        setRecentHistory((prev) => {
-          const filtered = prev.filter((h) => h.bookCode !== cleanCode);
-          try {
-            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
-          } catch (e) {}
-          return filtered;
-        });
-        setIsNotFound(true);
+        if (shouldTreatBookLoadErrorAsNotFound(err, bookInfo)) {
+          // Clean from recent history if ever present
+          setRecentHistory((prev) => {
+            const filtered = prev.filter((h) => h.bookCode !== cleanCode);
+            try {
+              localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(filtered));
+            } catch (e) {}
+            return filtered;
+          });
+          setIsNotFound(true);
+        }
       } finally {
         setLoadingBook(false);
       }

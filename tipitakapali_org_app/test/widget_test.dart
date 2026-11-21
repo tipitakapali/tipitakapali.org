@@ -1642,6 +1642,193 @@ void main() {
       expect(find.textContaining('WebView ready:'), findsNothing);
     },
   );
+
+  test('rebaseLoopbackUri preserves path, query, and fragment across loopback port changes', () {
+    final newBase = Uri.parse('http://127.0.0.1:54321/');
+    expect(
+      rebaseLoopbackUri(
+        Uri.parse('http://127.0.0.1:8899/book/s0101m.mul?chapter=2#para10'),
+        newBase,
+      ).toString(),
+      'http://127.0.0.1:54321/book/s0101m.mul?chapter=2#para10',
+    );
+    expect(
+      rebaseLoopbackUri(Uri.parse('http://localhost:8899/'), newBase).toString(),
+      'http://127.0.0.1:54321/',
+    );
+    expect(rebaseLoopbackUri(null, newBase), newBase);
+    expect(
+      rebaseLoopbackUri(Uri.parse('about:blank'), newBase),
+      newBase,
+    );
+  });
+
+  test('buildLocalServerRecoveryScript configures loopback fetch retry and visibility recovery', () {
+    final script = buildLocalServerRecoveryScript();
+    expect(script, contains('ensureLocalServerAlive'));
+    expect(script, contains('visibilitychange'));
+    expect(script, contains('pageshow'));
+    expect(script, contains('flutterInAppWebViewPlatformReady'));
+    expect(script, contains('timedOut'));
+    expect(script, contains('AbortError'));
+    expect(script, contains('127.0.0.1'));
+    expect(script, isNot(contains('window.location.reload')));
+  });
+
+  testWidgets(
+    'TipitakaWebViewScreen suspends socket on iOS pause, rebinds on resume, and updates URI on port change',
+    (tester) async {
+      final previousHttpOverrides = HttpOverrides.current;
+      HttpOverrides.global = null;
+      addTearDown(() => HttpOverrides.global = previousHttpOverrides);
+
+      SharedPreferences.setMockInitialValues({});
+      final tmp = Directory.systemTemp.createTempSync('tp_ios_resume_test_');
+      final webRoot = Directory(p.join(tmp.path, 'web_root'))..createSync();
+      File(p.join(webRoot.path, 'index.html'))
+          .writeAsStringSync('<html><body>OK</body></html>');
+      _createSampleTipitakaDb(p.join(tmp.path, 'tipitaka.db'));
+      final dpd = sqlite3.open(p.join(tmp.path, 'dpd_tipitakapali.db'));
+      try {
+        dpd.execute(
+          'CREATE TABLE bhz (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, defi TEXT NOT NULL);',
+        );
+        dpd.execute(
+          'INSERT INTO bhz (word, defi) VALUES (?, ?)',
+          ['bhagavant', '<section class=dp9><p>Blessed One</p></section>'],
+        );
+      } finally {
+        dpd.close();
+      }
+
+      final realServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmp.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      HttpServer? portBlocker;
+      addTearDown(() async {
+        await portBlocker?.close(force: true);
+        await realServer.dispose();
+        if (tmp.existsSync()) {
+          tmp.deleteSync(recursive: true);
+        }
+      });
+
+      final observedUris = <Uri>[];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dbStorageServiceProvider.overrideWithValue(
+              DbStorageService(overrideDirectory: tmp),
+            ),
+            downloadControllerProvider.overrideWith(
+              () => _StaticDownloadController(
+                DownloadCenterState(
+                  isInitializing: false,
+                  dbDirectoryPath: tmp.path,
+                ),
+              ),
+            ),
+            tipitakaLocalServerProvider.overrideWithValue(realServer),
+            tipitakaSuspendSocketOnPauseProvider.overrideWithValue(true),
+            tipitakaWebViewBuilderProvider.overrideWithValue((context, uri) {
+              observedUris.add(uri);
+              return Center(child: Text('WV:$uri'));
+            }),
+          ],
+          child: const MaterialApp(home: TipitakaWebViewScreen()),
+        ),
+      );
+
+      await tester.runAsync(() async {
+        for (var i = 0; i < 40 && observedUris.isEmpty; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump();
+        }
+      });
+      await tester.pump();
+      expect(observedUris, isNotEmpty);
+      final initialUri = observedUris.last;
+
+      // 1. Screen off (paused) -> socket closes cleanly; screen on (resumed) -> same port restored
+      await tester.runAsync(() async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        for (var i = 0; i < 30 && realServer.isRunning; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        expect(await realServer.checkHealth(), isFalse);
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        // Server must start rebinding immediately during iOS unlock (inactive),
+        // before resumed even fires, so the first tap never races a closed socket.
+        for (var i = 0; i < 50 && !(await realServer.checkHealth()); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+        }
+        expect(await realServer.checkHealth(), isTrue);
+        expect(realServer.port, initialUri.port);
+        final rebindsAfterInactive = realServer.rebindCount;
+        expect(rebindsAfterInactive, 1);
+
+        // Delivering resumed afterwards must NOT tear down and double-rebind.
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(realServer.rebindCount, rebindsAfterInactive);
+        expect(await realServer.checkHealth(), isTrue);
+        expect(realServer.port, initialUri.port);
+
+        // Verify book & dictionary APIs both serve 200 OK on the same port.
+        final client = HttpClient();
+        try {
+          final bookReq = await client.getUrl(
+            initialUri.resolve('api/book/s0101m.mul?tocOnly=true'),
+          );
+          final bookResp = await bookReq.close();
+          expect(bookResp.statusCode, 200);
+          await bookResp.drain<void>();
+
+          final dictReq = await client.getUrl(
+            initialUri.resolve('api/dict/lookup?w=bhagavant'),
+          );
+          final dictResp = await dictReq.close();
+          expect(dictResp.statusCode, 200);
+          await dictResp.drain<void>();
+        } finally {
+          client.close(force: true);
+        }
+      });
+      await tester.pump();
+
+      // 2. If the previous port is occupied while paused, resuming updates the WebView URI to the new port.
+      await tester.runAsync(() async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        for (var i = 0; i < 30 && realServer.isRunning; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        portBlocker = await HttpServer.bind(
+          InternetAddress.loopbackIPv4,
+          initialUri.port,
+        );
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        for (var i = 0; i < 60 && !(await realServer.checkHealth()); i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+        }
+        expect(await realServer.checkHealth(), isTrue);
+        expect(realServer.port, isNot(initialUri.port));
+      });
+      await tester.pump();
+      expect(observedUris.last.port, equals(realServer.port));
+      expect(observedUris.last.port, isNot(initialUri.port));
+    },
+  );
 }
 
 class _StaticDownloadController extends DownloadController {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -633,4 +634,266 @@ test('isPointInsideRangeRects distinguishes actual word glyphs from empty margin
 
   // Mock range with no layout geometry falls back safely to true
   assert.equal(isPointInsideRangeRects({ getClientRects: () => [] }, 0, 0, 4), true);
+});
+
+test('dpd-toggle-play-btn is enlarged, longer, and meets mobile 44px touch target requirements', () => {
+  const css = fs.readFileSync(path.join(rootDir, 'app/globals.css'), 'utf8');
+  const dictModalSrc = fs.readFileSync(path.join(rootDir, 'components/DictionaryModal.jsx'), 'utf8');
+
+  const baseRuleMatch = css.match(/\.dp9\s+\.dpd-toggle-play-btn\s*\{([\s\S]*?)\}/);
+  assert.ok(baseRuleMatch, 'Base .dp9 .dpd-toggle-play-btn rule must exist');
+  const baseRule = baseRuleMatch[1];
+
+  const baseInline = baseRule.match(/min-inline-size:\s*(\d+)px/);
+  const baseBlock = baseRule.match(/min-block-size:\s*(\d+)px/);
+  assert.ok(baseInline && Number(baseInline[1]) >= 64, 'Base button must be noticeably longer (>=64px)');
+  assert.ok(baseBlock && Number(baseBlock[1]) >= 28, 'Base button must be taller (>=28px)');
+  assert.match(baseRule, /touch-action:\s*manipulation/);
+  assert.match(baseRule, /max-inline-size:\s*100%/);
+
+  const mobileMediaMatch = css.match(
+    /@media\s*\(pointer:\s*coarse\),\s*\(hover:\s*none\),\s*\(max-width:\s*767px\)\s*\{\s*\.dp9\s+\.dpd-toggle-play-btn\s*\{([\s\S]*?)\}/
+  );
+  assert.ok(mobileMediaMatch, 'Mobile/coarse-pointer media query for .dp9 .dpd-toggle-play-btn must exist');
+  const mobileRule = mobileMediaMatch[1];
+  const mobileInline = mobileRule.match(/min-inline-size:\s*(\d+)px/);
+  const mobileBlock = mobileRule.match(/min-block-size:\s*(\d+)px/);
+  assert.ok(mobileInline && Number(mobileInline[1]) >= 96, 'Mobile button must be long (>=96px)');
+  assert.ok(mobileBlock && Number(mobileBlock[1]) >= 44, 'Mobile button must meet 44px WCAG 2.5.5 touch height');
+
+  // Guard :hover for hover-capable pointers so iOS touch does not leave sticky hover,
+  // provide keyboard :focus-visible outline, and prevent SVG compression.
+  assert.match(
+    css,
+    /@media\s*\(hover:\s*hover\)\s*\{\s*\.dp9\s+\.dpd-toggle-play-btn:hover\s*\{/
+  );
+  assert.match(css, /\.dp9\s+\.dpd-toggle-play-btn:focus-visible\s*\{[\s\S]*?outline:/);
+  assert.match(css, /\.dp9\s+\.dpd-toggle-play-btn\s+svg\s*\{[\s\S]*?flex-shrink:\s*0/);
+
+  // Verify accessible button markup and scaled SVG icon in DictionaryModal
+  assert.match(
+    dictModalSrc,
+    /class="dpd-toggle-play-btn"[^>]*aria-label="Toggle buttons"[^>]*aria-expanded="false"/
+  );
+  assert.match(
+    dictModalSrc,
+    /dpd-toggle-play-btn[\s\S]*?<svg[^>]*width="16"[^>]*height="16"[^>]*aria-hidden="true"/
+  );
+  assert.match(dictModalSrc, /toggleBtn\.setAttribute\('aria-expanded',\s*'true'\)/);
+  assert.match(dictModalSrc, /toggleBtn\.setAttribute\('aria-expanded',\s*'false'\)/);
+  // Keep aria-label steady so aria-expanded alone conveys state without redundancy
+  assert.doesNotMatch(dictModalSrc, /toggleBtn\.setAttribute\('aria-label',/);
+});
+
+test('WebView buildLocalServerRecoveryScript recovers failed loopback fetches and ignores external/aborted fetches', async () => {
+  const webviewDart = fs.readFileSync(
+    path.join(rootDir, 'tipitakapali_org_app/lib/features/webview/tipitaka_webview_screen.dart'),
+    'utf8'
+  );
+  const scriptMatch = webviewDart.match(
+    /String buildLocalServerRecoveryScript\(\)\s*\{\s*return r'''([\s\S]*?)''';\s*\}/
+  );
+  assert.ok(scriptMatch, 'buildLocalServerRecoveryScript() must be present in tipitaka_webview_screen.dart');
+  const recoveryJs = scriptMatch[1];
+
+  const listeners = { document: {}, window: {} };
+  const recoveryCalls = [];
+  let serverAlive = false;
+  let forceRebindNeeded = false;
+  let nextPortChanged = false;
+  let fetchAttempts = [];
+
+  const mockDocument = {
+    visibilityState: 'visible',
+    addEventListener(type, fn) {
+      listeners.document[type] = listeners.document[type] || [];
+      listeners.document[type].push(fn);
+    },
+  };
+
+  const sandbox = {
+    URL,
+    Promise,
+    Error,
+    TypeError,
+    setTimeout,
+    clearTimeout,
+    document: mockDocument,
+    window: null,
+  };
+  let hangNextCallHandler = false;
+  const mockWindow = {
+    __tpoRecoveryTimeoutMs: 60,
+    __tpoBridgeWaitMs: 60,
+    __tpoPortRemountHoldMs: 500,
+    location: { href: 'http://127.0.0.1:8899/book/s0101m.mul', origin: 'http://127.0.0.1:8899', hostname: '127.0.0.1' },
+    addEventListener(type, fn) {
+      listeners.window[type] = listeners.window[type] || [];
+      listeners.window[type].push(fn);
+    },
+    removeEventListener(type, fn) {
+      if (!listeners.window[type]) return;
+      listeners.window[type] = listeners.window[type].filter((f) => f !== fn);
+    },
+    flutter_inappwebview: {
+      callHandler(name, payload) {
+        recoveryCalls.push({ name, payload });
+        if (hangNextCallHandler) {
+          hangNextCallHandler = false;
+          return new Promise(() => {}); // Never resolves: must hit timeout & clear activeRecovery
+        }
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (nextPortChanged) {
+              resolve({ ok: true, restarted: true, portChanged: true });
+              return;
+            }
+            if (forceRebindNeeded && !payload?.forceRebind) {
+              resolve({ ok: true, restarted: false, portChanged: false });
+              return;
+            }
+            serverAlive = true;
+            forceRebindNeeded = false;
+            resolve({ ok: true, restarted: true, portChanged: false });
+          }, 10);
+        });
+      },
+    },
+    fetch: async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      fetchAttempts.push(url);
+      if (url.startsWith('https://')) {
+        throw new TypeError('Load failed');
+      }
+      if (!serverAlive) {
+        throw new TypeError('Load failed');
+      }
+      return { ok: true, status: 200, url };
+    },
+  };
+  sandbox.window = mockWindow;
+  vm.runInNewContext(recoveryJs, sandbox);
+
+  // 1. Parallel dictionary lookups while server socket is dead deduplicate into 1 recovery call & all succeed
+  const [r1, r2, r3] = await Promise.all([
+    mockWindow.fetch('/api/dict/lookup?w=dhamma&dict=dpd'),
+    mockWindow.fetch('/api/dict/lookup?w=dhamma&dict=others'),
+    mockWindow.fetch('/api/dict/lookup?w=dhamma&dict=bold_def'),
+  ]);
+  assert.equal(r1.status, 200);
+  assert.equal(r2.status, 200);
+  assert.equal(r3.status, 200);
+  assert.equal(recoveryCalls.length, 1, 'Parallel failed loopback fetches must share one recovery call');
+  assert.equal(recoveryCalls[0].name, 'ensureLocalServerAlive');
+
+  // 2. When first retry still hits a stale keep-alive socket, second recovery escalates with forceRebind=true
+  serverAlive = false;
+  forceRebindNeeded = true;
+  recoveryCalls.length = 0;
+  const bookRes = await mockWindow.fetch('/api/book/s0101m.mul?tocOnly=true');
+  assert.equal(bookRes.status, 200);
+  assert.equal(recoveryCalls.length, 2);
+  assert.equal(recoveryCalls[0].payload.forceRebind, false);
+  assert.equal(recoveryCalls[1].payload.forceRebind, true);
+
+  // 3. External HTTPS URL failures must NOT trigger local server recovery
+  recoveryCalls.length = 0;
+  await assert.rejects(
+    () => mockWindow.fetch('https://api.tipitakapali.org/api/ai/tools'),
+    /Load failed/
+  );
+  assert.equal(recoveryCalls.length, 0);
+
+  // 4. Aborted local fetch must NOT trigger local server recovery
+  serverAlive = false;
+  recoveryCalls.length = 0;
+  const ac = new AbortController();
+  ac.abort();
+  await assert.rejects(
+    () => mockWindow.fetch('/api/dict/lookup?w=nibbana', { signal: ac.signal }),
+    /Load failed/
+  );
+  assert.equal(recoveryCalls.length, 0);
+
+  // 5. visibilitychange hidden -> visible proactively calls ensureLocalServerAlive
+  mockDocument.visibilityState = 'hidden';
+  for (const fn of listeners.document.visibilitychange || []) fn();
+  mockDocument.visibilityState = 'visible';
+  for (const fn of listeners.document.visibilitychange || []) fn();
+  await new Promise((r) => setTimeout(r, 25));
+  assert.equal(recoveryCalls.length, 1);
+  assert.equal(recoveryCalls[0].payload.reason, 'visibility_resume');
+
+  // 6. Hung native callHandler times out cleanly without deadlocking subsequent recoveries
+  serverAlive = false;
+  hangNextCallHandler = true;
+  recoveryCalls.length = 0;
+  await assert.rejects(() => mockWindow.fetch('/api/dict/lookup?w=metta&dict=dpd'), /Load failed/);
+  assert.equal(recoveryCalls.length, 1);
+  // Immediately subsequent fetch recovers normally because activeRecovery was cleared
+  const afterTimeout = await mockWindow.fetch('/api/dict/lookup?w=metta&dict=dpd');
+  assert.equal(afterTimeout.status, 200);
+  assert.equal(recoveryCalls.length, 2);
+
+  // 7. Early fetch before native bridge attaches waits for flutterInAppWebViewPlatformReady
+  serverAlive = false;
+  recoveryCalls.length = 0;
+  const savedBridge = mockWindow.flutter_inappwebview;
+  mockWindow.flutter_inappwebview = null;
+  setTimeout(() => {
+    mockWindow.flutter_inappwebview = savedBridge;
+    for (const fn of [...(listeners.window.flutterInAppWebViewPlatformReady || [])]) fn();
+  }, 15);
+  const lateBridgeRes = await mockWindow.fetch('/api/book/s0101m.mul?tocOnly=true');
+  assert.equal(lateBridgeRes.status, 200);
+  assert.equal(recoveryCalls.length, 1);
+
+  // 8. portChanged hold honors caller AbortSignal immediately without waiting out the remount timer
+  serverAlive = false;
+  nextPortChanged = true;
+  const acRemount = new AbortController();
+  const remountStart = Date.now();
+  const remountPromise = mockWindow.fetch('/api/book/s0101m.mul?tocOnly=true', { signal: acRemount.signal });
+  setTimeout(() => acRemount.abort(), 30);
+  await assert.rejects(() => remountPromise, /Load failed/);
+  assert.ok(Date.now() - remountStart < 300, 'portChanged hold must reject promptly when caller aborts');
+  nextPortChanged = false;
+});
+
+test('TabContext avoids false 404 on transient network errors for known books and DictionaryContext retries after error', () => {
+  const tabCtxMod = compileModule('../context/TabContext.jsx', {
+    react: React,
+    '../services/api': {
+      fetchBook: async () => ({}),
+      fetchChapter: async () => ({}),
+      fetchChapterBundle: async () => ({}),
+      isLocalDynamicHost: () => false,
+      fetchMat: async () => null,
+      fetchMatJump: async () => null,
+      lookupBookInfo: () => null,
+      fetchBookTocOnly: async () => ({}),
+    },
+    '../services/transliterate': { splitScriptCode: (c) => ({ bookCode: c, prefix: null }) },
+    './ThemeSettingsContext': { useThemeSettings: () => ({ settings: {}, updateSetting: () => {} }) },
+  });
+
+  const { shouldTreatBookLoadErrorAsNotFound } = tabCtxMod;
+  const knownBook = { title: 'Dīghanikāya', nikaya: 'Sutta' };
+
+  // Transient network error (TypeError: Load failed, no HTTP status) on a known tree book is NOT a 404
+  assert.equal(shouldTreatBookLoadErrorAsNotFound(new TypeError('Load failed'), knownBook), false);
+  // HTTP 500/503 server restart errors are NOT a 404
+  assert.equal(shouldTreatBookLoadErrorAsNotFound(Object.assign(new Error('503'), { status: 503 }), knownBook), false);
+  // Real HTTP 404 / 400 IS a 404 even if bookInfo existed
+  assert.equal(shouldTreatBookLoadErrorAsNotFound(Object.assign(new Error('404'), { status: 404 }), knownBook), true);
+  assert.equal(shouldTreatBookLoadErrorAsNotFound(Object.assign(new Error('400'), { status: 400 }), knownBook), true);
+  // Unknown book code (not in tree) still shows 404
+  assert.equal(shouldTreatBookLoadErrorAsNotFound(new Error('Failed'), null), true);
+
+  // Verify services/api.js attaches HTTP status and DictionaryContext does not cache failed lookups on repeat tap
+  const apiSrc = fs.readFileSync(path.join(rootDir, 'services/api.js'), 'utf8');
+  assert.match(apiSrc, /err\.status\s*=\s*res\.status/);
+  const dictCtxSrc = fs.readFileSync(path.join(rootDir, 'context/DictionaryContext.jsx'), 'utf8');
+  assert.match(dictCtxSrc, /!lookupDataRef\.current\?\._hadError/);
+  assert.match(dictCtxSrc, /mergedData\._hadError\s*=\s*true/);
 });

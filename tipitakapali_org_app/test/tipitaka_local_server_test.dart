@@ -1141,6 +1141,310 @@ void main() {
       }
     },
   );
+
+  test(
+    'suspendSocket + ensureHealthy preserves exact port and restores dictionary and book APIs (iOS screen-off/on)',
+    () async {
+      final bgServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      try {
+        final initialUri = await bgServer.ensureStarted();
+        expect(await bgServer.checkHealth(), isTrue);
+
+        // Simulate iOS screen-off (AppLifecycleState.paused): close socket cleanly.
+        await bgServer.suspendSocket();
+        expect(bgServer.isRunning, isFalse);
+        expect(await bgServer.checkHealth(), isFalse);
+        await expectLater(
+          _httpGet(initialUri, '/api/health'),
+          throwsA(isA<SocketException>()),
+        );
+
+        // Simulate iOS screen-on (AppLifecycleState.resumed): rebind on same port.
+        final recovered = await bgServer.ensureHealthy(forceRebind: true);
+        expect(recovered.restarted, isTrue);
+        expect(recovered.portChanged, isFalse);
+        expect(recovered.uri, initialUri);
+        expect(bgServer.isRunning, isTrue);
+        expect(await bgServer.checkHealth(), isTrue);
+
+        // Both dictionary lookup and clicking a book in the tree must succeed.
+        final dictRes = await _httpGet(
+          recovered.uri,
+          '/api/dict/lookup?w=${Uri.encodeQueryComponent('bhagavā')}',
+        );
+        expect(dictRes.statusCode, 200);
+        expect(jsonDecode(dictRes.body)['hasResults'], isTrue);
+
+        final bookRes = await _httpGet(
+          recovered.uri,
+          '/api/book/s0101m.mul?tocOnly=true',
+        );
+        expect(bookRes.statusCode, 200);
+        expect(jsonDecode(bookRes.body)['code'], 's0101m.mul');
+      } finally {
+        await bgServer.dispose();
+      }
+    },
+  );
+
+  test(
+    'ensureHealthy detects silently reclaimed OS sockets in both in-process and background isolate modes',
+    () async {
+      for (final useIsolate in [false, true]) {
+        final testServer = TipitakaLocalServer(
+          preferredPort: 0,
+          explicitWebRootDir: webRoot,
+          useBackgroundIsolate: useIsolate,
+          aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+          api: TipitakaWebApi(
+            dbDirectoryPath: tmpDir.path,
+            dpdFamilyTemplates: DpdFamilyTemplates(),
+          ),
+        );
+        try {
+          final initialUri = await testServer.ensureStarted();
+          expect(await testServer.checkHealth(), isTrue);
+
+          // Simulate iOS silently marking the listening socket defunct while
+          // leaving Dart's cached port / isRunning stale.
+          await testServer.simulateOsSocketReclaimForTesting(notifyDone: false);
+          expect(await testServer.checkHealth(), isFalse);
+
+          final recovered = await testServer.ensureHealthy();
+          expect(recovered.restarted, isTrue);
+          expect(recovered.portChanged, isFalse);
+          expect(recovered.uri, initialUri);
+          expect(await testServer.checkHealth(), isTrue);
+
+          final dictRes = await _httpGet(
+            recovered.uri,
+            '/api/dict/lookup?w=${Uri.encodeQueryComponent('bhagavā')}',
+          );
+          expect(dictRes.statusCode, 200);
+          expect(jsonDecode(dictRes.body)['hasResults'], isTrue);
+
+          final bookRes = await _httpGet(
+            recovered.uri,
+            '/api/book/s0101m.mul?chapter=0&buffer=0',
+          );
+          expect(bookRes.statusCode, 200);
+          expect(
+            jsonDecode(bookRes.body)['chapters_data']['0'],
+            contains('Evaṃ me sutaṃ'),
+          );
+        } finally {
+          await testServer.dispose();
+        }
+      }
+    },
+  );
+
+  test(
+    'ensureHealthy recovers from worker isolate crash and falls back cleanly if previous port is occupied',
+    () async {
+      // 1. Worker isolate crash fallback
+      final crashedServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      try {
+        final uri1 = await crashedServer.ensureStarted();
+        crashedServer.simulateWorkerIsolateCrashForTesting();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(await crashedServer.checkHealth(), isFalse);
+
+        final crashSw = Stopwatch()..start();
+        final recovered = await crashedServer.ensureHealthy();
+        crashSw.stop();
+        expect(recovered.restarted, isTrue);
+        // Isolate onExit detection must avoid the 3-second dead-SendPort timeout.
+        expect(crashSw.elapsedMilliseconds, lessThan(1500));
+        expect(await crashedServer.checkHealth(), isTrue);
+        final bookRes = await _httpGet(recovered.uri, '/api/book/s0101m.mul?tocOnly=true');
+        expect(bookRes.statusCode, 200);
+        expect(uri1.port, greaterThan(0));
+      } finally {
+        await crashedServer.dispose();
+      }
+
+      // 2. Port stolen while suspended -> binds new port and sets portChanged=true
+      final stolenPortServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      HttpServer? blocker;
+      try {
+        final originalUri = await stolenPortServer.ensureStarted();
+        await stolenPortServer.suspendSocket();
+
+        blocker = await HttpServer.bind(
+          InternetAddress.loopbackIPv4,
+          originalUri.port,
+        );
+        final recovered = await stolenPortServer.ensureHealthy(forceRebind: true);
+        expect(recovered.restarted, isTrue);
+        expect(recovered.portChanged, isTrue);
+        expect(recovered.uri.port, isNot(originalUri.port));
+        expect(await stolenPortServer.checkHealth(), isTrue);
+
+        final dictRes = await _httpGet(
+          recovered.uri,
+          '/api/dict/lookup?w=${Uri.encodeQueryComponent('bhagavā')}',
+        );
+        expect(dictRes.statusCode, 200);
+        expect(jsonDecode(dictRes.body)['hasResults'], isTrue);
+      } finally {
+        await blocker?.close(force: true);
+        await stolenPortServer.dispose();
+      }
+    },
+  );
+
+  test(
+    'rapid suspendSocket followed immediately by concurrent ensureHealthy calls stays alive without racing',
+    () async {
+      final raceServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      try {
+        final initialUri = await raceServer.ensureStarted();
+        final suspendFuture = raceServer.suspendSocket();
+        // suspendSocket() must mark the socket suspended synchronously (no stale
+        // _startFuture microtask yield) so iOS pause immediately queues suspend.
+        expect(raceServer.isRunning, isFalse);
+        final recoverFutures = Future.wait([
+          raceServer.ensureHealthy(forceRebind: false),
+          raceServer.ensureHealthy(forceRebind: true),
+          raceServer.ensureHealthy(forceRebind: true),
+        ]);
+        await suspendFuture;
+        final results = await recoverFutures;
+        for (final r in results) {
+          expect(r.uri, initialUri);
+        }
+        // Concurrent forceRebind=false and forceRebind=true must coalesce onto
+        // ONE socket rebind rather than tearing down the freshly bound socket.
+        expect(raceServer.rebindCount, 1);
+        expect(await raceServer.checkHealth(), isTrue);
+        final res = await _httpGet(initialUri, '/api/book/s0101m.mul?tocOnly=true');
+        expect(res.statusCode, 200);
+      } finally {
+        await raceServer.dispose();
+      }
+    },
+  );
+
+  test(
+    'closeDynamicConnections disables keep-alive on /api/* and HTML while keeping /_next/static/ persistent (iOS WKWebView)',
+    () async {
+      final staticDir = Directory(p.join(webRoot.path, '_next', 'static'))
+        ..createSync(recursive: true);
+      File(p.join(staticDir.path, 'chunk.js')).writeAsStringSync('console.log(1);');
+
+      final iosServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        closeDynamicConnections: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      final client = HttpClient();
+      try {
+        final uri = await iosServer.ensureStarted();
+
+        Future<HttpClientResponse> fetchPath(String path) async {
+          final req = await client.getUrl(uri.resolve(path));
+          req.persistentConnection = true;
+          final resp = await req.close();
+          await resp.drain<void>();
+          return resp;
+        }
+
+        final healthResp = await fetchPath('/api/health');
+        expect(healthResp.statusCode, 200);
+        expect(healthResp.persistentConnection, isFalse);
+
+        final bookResp = await fetchPath('/api/book/s0101m.mul?tocOnly=true');
+        expect(bookResp.statusCode, 200);
+        expect(bookResp.persistentConnection, isFalse);
+
+        final dictResp = await fetchPath(
+          '/api/dict/lookup?w=${Uri.encodeQueryComponent('bhagavā')}',
+        );
+        expect(dictResp.statusCode, 200);
+        expect(dictResp.persistentConnection, isFalse);
+
+        final staticResp = await fetchPath('/_next/static/chunk.js');
+        expect(staticResp.statusCode, 200);
+        expect(staticResp.persistentConnection, isTrue);
+      } finally {
+        client.close(force: true);
+        await iosServer.dispose();
+      }
+    },
+  );
+
+  test(
+    'dispose during in-flight ensureHealthy aborts cleanly without resurrecting a zombie server',
+    () async {
+      final tempServer = TipitakaLocalServer(
+        preferredPort: 0,
+        explicitWebRootDir: webRoot,
+        useBackgroundIsolate: true,
+        aiUpstreamBaseUri: Uri.parse('http://127.0.0.1:1'),
+        api: TipitakaWebApi(
+          dbDirectoryPath: tmpDir.path,
+          dpdFamilyTemplates: DpdFamilyTemplates(),
+        ),
+      );
+      final initialUri = await tempServer.ensureStarted();
+      await tempServer.suspendSocket();
+
+      final recoveryFuture = tempServer.ensureHealthy(forceRebind: true);
+      final disposeFuture = tempServer.dispose();
+
+      await expectLater(recoveryFuture, throwsA(isA<StateError>()));
+      await disposeFuture;
+      expect(tempServer.isRunning, isFalse);
+      expect(await tempServer.checkHealth(), isFalse);
+      await expectLater(
+        _httpGet(initialUri, '/api/health'),
+        throwsA(isA<SocketException>()),
+      );
+    },
+  );
 }
 
 class _ControlledBoldDefinitionIndexService extends BoldDefinitionIndexService {

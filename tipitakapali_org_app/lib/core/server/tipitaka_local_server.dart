@@ -713,6 +713,99 @@ class _TipitakaHttpRouter {
   }
 }
 
+/// Outcome of [TipitakaLocalServer.ensureHealthy], indicating the active
+/// loopback [uri], whether the listening socket/isolate had to be rebound or
+/// restarted, and whether the loopback port changed.
+class ServerHealthResult {
+  final Uri uri;
+  final bool restarted;
+  final bool portChanged;
+
+  const ServerHealthResult({
+    required this.uri,
+    required this.restarted,
+    required this.portChanged,
+  });
+}
+
+Future<void> _closeHttpServerSafely(HttpServer? server) async {
+  if (server == null) return;
+  try {
+    await server.close(force: true).timeout(const Duration(seconds: 1));
+  } catch (_) {}
+}
+
+Future<HttpServer> _bindAndServeHttpServer({
+  required Handler handler,
+  required int targetPort,
+  int fallbackPreferredPort = 0,
+  bool closeDynamicConnections = false,
+  void Function(HttpServer closedServer)? onSocketClosed,
+}) async {
+  Future<HttpServer?> tryBind(int port, {int retries = 1}) async {
+    for (var attempt = 0; attempt < retries; attempt++) {
+      try {
+        return await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+      } on SocketException {
+        if (attempt + 1 < retries) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 50 * (attempt + 1)),
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  HttpServer? server;
+  if (targetPort > 0) {
+    server = await tryBind(targetPort, retries: 3);
+  }
+  if (server == null &&
+      fallbackPreferredPort > 0 &&
+      fallbackPreferredPort != targetPort) {
+    server = await tryBind(fallbackPreferredPort, retries: 2);
+  }
+  server ??= await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+
+  // Keep idle keep-alive sockets short on mobile so iOS/Android background
+  // suspension does not leave stale pooled connections in WKWebView.
+  server.idleTimeout = (Platform.isIOS || Platform.isAndroid)
+      ? const Duration(seconds: 5)
+      : const Duration(seconds: 15);
+
+  final boundServer = server;
+  boundServer.listen(
+    (request) {
+      // On iOS, WKWebView's out-of-process NSURLSession pools HTTP/1.1
+      // keep-alive sockets independently of Dart; closing dynamic/API
+      // connections cleanly prevents stale pooled connections after screen-off
+      // while keeping keep-alive fast for immutable /_next/static/ bursts.
+      if (closeDynamicConnections &&
+          !request.uri.path.startsWith('/_next/static/')) {
+        request.response.persistentConnection = false;
+      }
+      unawaited(
+        shelf_io.handleRequest(request, handler).catchError((
+          Object _,
+          StackTrace _,
+        ) {
+          // Ignore broken-pipe / client-abort socket errors so a cancelled
+          // WebView fetch never terminates the local server isolate.
+        }),
+      );
+    },
+    onError: (Object _, StackTrace _) {
+      // Transient client handshake errors must not bring down the listener.
+    },
+    onDone: () {
+      onSocketClosed?.call(boundServer);
+    },
+    cancelOnError: false,
+  );
+  return boundServer;
+}
+
 void _serverIsolateMain(
   ({
     SendPort readyPort,
@@ -721,13 +814,46 @@ void _serverIsolateMain(
     String dbDirectoryPath,
     String? webRootPath,
     String aiUpstreamBaseUri,
+    bool closeDynamicConnections,
     TransferableTypedData? dpdCompressedBytes,
   })
   args,
 ) async {
   late final TipitakaWebApi workerApi;
-  late final HttpServer httpServer;
+  late final _TipitakaHttpRouter router;
+  HttpServer? httpServer;
+  var activePort = args.preferredPort;
+  var intentionallyClosing = false;
   final controlPort = ReceivePort();
+
+  Future<void> closeCurrentServer() async {
+    final existing = httpServer;
+    intentionallyClosing = true;
+    httpServer = null;
+    await _closeHttpServerSafely(existing);
+  }
+
+  Future<int> bindServer(int desiredPort) async {
+    await closeCurrentServer();
+    intentionallyClosing = false;
+    final bound = await _bindAndServeHttpServer(
+      handler: router.handler,
+      targetPort: desiredPort,
+      fallbackPreferredPort: args.preferredPort,
+      closeDynamicConnections: args.closeDynamicConnections,
+      onSocketClosed: (closedServer) {
+        if (!intentionallyClosing && identical(httpServer, closedServer)) {
+          httpServer = null;
+          try {
+            args.statusPort.send({'socketClosed': true});
+          } catch (_) {}
+        }
+      },
+    );
+    httpServer = bound;
+    activePort = bound.port;
+    return activePort;
+  }
 
   try {
     Uint8List? compressedBytes;
@@ -739,30 +865,18 @@ void _serverIsolateMain(
       dbDirectoryPath: args.dbDirectoryPath,
       dpdFamilyTemplates: templates,
     );
-    final router = _TipitakaHttpRouter(
+    router = _TipitakaHttpRouter(
       api: workerApi,
       webRootDir:
           args.webRootPath != null ? Directory(args.webRootPath!) : null,
       aiUpstreamBaseUri: Uri.parse(args.aiUpstreamBaseUri),
     );
 
-    try {
-      httpServer = await shelf_io.serve(
-        router.handler,
-        InternetAddress.loopbackIPv4,
-        args.preferredPort,
-      );
-    } on SocketException {
-      httpServer = await shelf_io.serve(
-        router.handler,
-        InternetAddress.loopbackIPv4,
-        0,
-      );
-    }
+    final boundPort = await bindServer(args.preferredPort);
 
     final hasPaliSentences = workerApi.hasPaliSentencesSupport();
     args.readyPort.send({
-      'port': httpServer.port,
+      'port': boundPort,
       'control': controlPort.sendPort,
       'hasPaliSentences': hasPaliSentences,
     });
@@ -809,8 +923,35 @@ void _serverIsolateMain(
           }),
         );
         break;
+      case 'suspend':
+        await closeCurrentServer();
+        reply?.send({'ok': true});
+        break;
+      case 'rebind':
+        final reqPort = msg['preferredPort'] is int
+            ? msg['preferredPort'] as int
+            : activePort;
+        try {
+          final reboundPort = await bindServer(reqPort);
+          reply?.send({'ok': true, 'port': reboundPort});
+        } catch (e) {
+          reply?.send({'ok': false, 'error': e.toString()});
+        }
+        break;
+      case 'simulateSocketKill':
+        final notify = msg['notify'] == true;
+        final existing = httpServer;
+        if (!notify) {
+          intentionallyClosing = true;
+        }
+        await _closeHttpServerSafely(existing);
+        if (!notify) {
+          httpServer = null;
+        }
+        reply?.send({'ok': true});
+        break;
       case 'stop':
-        await httpServer.close(force: true);
+        await closeCurrentServer();
         workerApi.close();
         controlPort.close();
         reply?.send(true);
@@ -832,15 +973,30 @@ class TipitakaLocalServer {
   final Future<String> Function()? resolveDbDirectoryPath;
   final Uri aiUpstreamBaseUri;
   final bool useBackgroundIsolate;
+  final bool closeDynamicConnections;
 
   HttpServer? _server;
+  _TipitakaHttpRouter? _inProcessRouter;
+  bool _inProcessIntentionallyClosing = false;
   Directory? _webRootDir;
   bool _starting = false;
   Future<Uri>? _startFuture;
   Isolate? _workerIsolate;
   int? _isolatePort;
+  int? _lastBoundPort;
+  bool _socketSuspended = false;
+  bool _socketDied = false;
+  bool _intentionallyStopping = false;
+  bool _disposed = false;
+  int _lifecycleEpoch = 0;
+  int _stopEpoch = 0;
+  int _rebindCount = 0;
+  Future<void>? _pendingSuspend;
+  Future<ServerHealthResult>? _ensureHealthyFuture;
+  bool _ensureHealthyForced = false;
   SendPort? _isolateControlPort;
   ReceivePort? _isolateStatusPort;
+  ReceivePort? _isolateExitPort;
   bool? _isolateHasPaliSentences;
 
   TipitakaLocalServer({
@@ -850,7 +1006,9 @@ class TipitakaLocalServer {
     this.resolveDbDirectoryPath,
     Uri? aiUpstreamBaseUri,
     this.useBackgroundIsolate = false,
-  }) : aiUpstreamBaseUri = aiUpstreamBaseUri ?? defaultAiUpstreamBaseUri {
+    bool? closeDynamicConnections,
+  }) : aiUpstreamBaseUri = aiUpstreamBaseUri ?? defaultAiUpstreamBaseUri,
+       closeDynamicConnections = closeDynamicConnections ?? Platform.isIOS {
     if (useBackgroundIsolate) {
       api.onInvalidate = () {
         _isolateControlPort?.send({'cmd': 'invalidate'});
@@ -861,10 +1019,26 @@ class TipitakaLocalServer {
     }
   }
 
-  bool get isRunning => _server != null || _isolatePort != null;
-  int? get port => _server?.port ?? _isolatePort;
+  bool get isRunning =>
+      !_disposed && !_socketSuspended && !_socketDied && port != null;
+
+  @visibleForTesting
+  int get rebindCount => _rebindCount;
+
+  int? get port {
+    final s = _server;
+    if (s != null) {
+      try {
+        return s.port;
+      } catch (_) {
+        return null;
+      }
+    }
+    return _isolatePort;
+  }
+
   Uri? get baseUri =>
-      port != null ? Uri.parse('http://127.0.0.1:$port/') : null;
+      isRunning && port != null ? Uri.parse('http://127.0.0.1:$port/') : null;
 
   /// Returns `true` when sentence-level Pāḷi data is available, using the
   /// background worker isolate's cached status when [useBackgroundIsolate] is
@@ -881,53 +1055,82 @@ class TipitakaLocalServer {
   }
 
   Future<Uri> ensureStarted() {
+    if (_disposed) {
+      return Future.error(StateError('TipitakaLocalServer has been disposed'));
+    }
+    if (_socketSuspended || _socketDied) {
+      return ensureHealthy().then((result) => result.uri);
+    }
     final existing = baseUri;
     if (existing != null) return Future.value(existing);
     if (_starting && _startFuture != null) return _startFuture!;
     _starting = true;
-    _startFuture = _startInternal().whenComplete(() {
-      _starting = false;
+    late final Future<Uri> future;
+    future = _startInternal().whenComplete(() {
+      if (identical(_startFuture, future)) {
+        _starting = false;
+        _startFuture = null;
+      }
     });
-    return _startFuture!;
+    _startFuture = future;
+    return future;
   }
 
-  Future<Uri> _startInternal() async {
+  Future<Uri> _startInternal({int? portOverride}) async {
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
     if (api.dbDirectoryPath.isEmpty && resolveDbDirectoryPath != null) {
       final resolved = await resolveDbDirectoryPath!();
+      if (_disposed) {
+        throw StateError('TipitakaLocalServer has been disposed');
+      }
       if (resolved.isNotEmpty) {
         api.updateDbDirectory(resolved);
       }
     }
     _webRootDir ??= await _prepareWebRoot();
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
+    final targetPort = portOverride ?? _lastBoundPort ?? preferredPort;
 
     if (useBackgroundIsolate) {
-      return _startWorkerIsolate();
+      return _startWorkerIsolate(portOverride: targetPort);
     }
 
-    final router = _TipitakaHttpRouter(
+    _inProcessRouter ??= _TipitakaHttpRouter(
       api: api,
       webRootDir: _webRootDir,
       aiUpstreamBaseUri: aiUpstreamBaseUri,
     );
 
-    try {
-      _server = await shelf_io.serve(
-        router.handler,
-        InternetAddress.loopbackIPv4,
-        preferredPort,
-      );
-    } on SocketException {
-      // Fallback to an ephemeral port if preferredPort is occupied.
-      _server = await shelf_io.serve(
-        router.handler,
-        InternetAddress.loopbackIPv4,
-        0,
-      );
+    _inProcessIntentionallyClosing = false;
+    final bound = await _bindAndServeHttpServer(
+      handler: _inProcessRouter!.handler,
+      targetPort: targetPort,
+      fallbackPreferredPort: preferredPort,
+      closeDynamicConnections: closeDynamicConnections,
+      onSocketClosed: (closedServer) {
+        if (!_inProcessIntentionallyClosing &&
+            identical(_server, closedServer)) {
+          _server = null;
+          _socketDied = true;
+        }
+      },
+    );
+    if (_disposed) {
+      await _closeHttpServerSafely(bound);
+      throw StateError('TipitakaLocalServer has been disposed');
     }
+    _server = bound;
+    _lastBoundPort = bound.port;
+    _socketSuspended = false;
+    _socketDied = false;
     return baseUri!;
   }
 
-  Future<Uri> _startWorkerIsolate() async {
+  Future<Uri> _startWorkerIsolate({int? portOverride}) async {
     TransferableTypedData? transferableDpd;
     try {
       final data = await rootBundle.load('assets/dpd_family_data.json.gz');
@@ -938,35 +1141,68 @@ class TipitakaLocalServer {
       transferableDpd = TransferableTypedData.fromList([bytes]);
     } catch (_) {}
 
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
+
     final readyPort = ReceivePort();
     final statusPort = ReceivePort();
+    final exitPort = ReceivePort();
     _isolateStatusPort?.close();
     _isolateStatusPort = statusPort;
+    _isolateExitPort?.close();
+    _isolateExitPort = exitPort;
     statusPort.listen((msg) {
-      if (msg is Map && msg['hasPaliSentences'] is bool) {
+      if (msg is! Map) return;
+      if (msg['hasPaliSentences'] is bool) {
         _isolateHasPaliSentences = msg['hasPaliSentences'] as bool;
+      }
+      if (msg['socketClosed'] == true && !_socketSuspended) {
+        _socketDied = true;
+      }
+    });
+    exitPort.listen((_) {
+      if (identical(_isolateExitPort, exitPort)) {
+        _workerIsolate = null;
+        _isolateControlPort = null;
+        _isolatePort = null;
+        if (!_disposed && !_intentionallyStopping) {
+          _socketDied = true;
+        }
+        exitPort.close();
+        _isolateExitPort = null;
       }
     });
     try {
-      _workerIsolate = await Isolate.spawn(
+      final spawned = await Isolate.spawn(
         _serverIsolateMain,
         (
           readyPort: readyPort.sendPort,
           statusPort: statusPort.sendPort,
-          preferredPort: preferredPort,
+          preferredPort: portOverride ?? preferredPort,
           dbDirectoryPath: api.dbDirectoryPath,
           webRootPath: _webRootDir?.path,
           aiUpstreamBaseUri: aiUpstreamBaseUri.toString(),
+          closeDynamicConnections: closeDynamicConnections,
           dpdCompressedBytes: transferableDpd,
         ),
+        onExit: exitPort.sendPort,
         debugName: 'TipitakaLocalServerWorker',
       );
+      _workerIsolate = spawned;
       final readyMsg = await readyPort.first as Map;
+      if (_disposed || !identical(_workerIsolate, spawned)) {
+        spawned.kill(priority: Isolate.immediate);
+        throw StateError('TipitakaLocalServer stopped during startup');
+      }
       if (readyMsg['error'] != null) {
         throw StateError('Local server isolate failed: ${readyMsg['error']}');
       }
       _isolatePort = readyMsg['port'] as int;
+      _lastBoundPort = _isolatePort;
       _isolateControlPort = readyMsg['control'] as SendPort;
+      _socketSuspended = false;
+      _socketDied = false;
       if (readyMsg['hasPaliSentences'] is bool) {
         _isolateHasPaliSentences = readyMsg['hasPaliSentences'] as bool;
       }
@@ -980,10 +1216,350 @@ class TipitakaLocalServer {
       if (identical(_isolateStatusPort, statusPort)) {
         _isolateStatusPort = null;
       }
+      exitPort.close();
+      if (identical(_isolateExitPort, exitPort)) {
+        _isolateExitPort = null;
+      }
       rethrow;
     } finally {
       readyPort.close();
     }
+  }
+
+  /// Sends an actual loopback `GET /api/health` request to verify that the
+  /// listening socket is still alive and serving HTTP responses.
+  Future<bool> checkHealth({
+    Duration timeout = const Duration(milliseconds: 1200),
+  }) async {
+    final activePort = port;
+    if (activePort == null ||
+        activePort <= 0 ||
+        _socketSuspended ||
+        _socketDied) {
+      return false;
+    }
+    final client = HttpClient()..connectionTimeout = timeout;
+    try {
+      final req = await client
+          .getUrl(Uri.parse('http://127.0.0.1:$activePort/api/health'))
+          .timeout(timeout);
+      req.persistentConnection = false;
+      req.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      final resp = await req.close().timeout(timeout);
+      await resp.drain<void>().timeout(timeout);
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Cleanly closes the listening TCP socket before iOS suspends the process
+  /// (per Apple TN2277) while keeping the worker isolate and SQLite/DPD caches
+  /// warm so [ensureHealthy] can rapidly rebind on the exact same port.
+  Future<void> suspendSocket() async {
+    if (_disposed) return;
+    final epoch = ++_lifecycleEpoch;
+    final inFlightStart = _startFuture;
+    if (_starting && inFlightStart != null) {
+      try {
+        await inFlightStart;
+      } catch (_) {}
+    }
+    final inFlightHealth = _ensureHealthyFuture;
+    if (inFlightHealth != null) {
+      try {
+        await inFlightHealth;
+      } catch (_) {}
+    }
+    if (_disposed || _lifecycleEpoch != epoch) return;
+    if (_socketSuspended) return;
+
+    final currentPort = port;
+    if (currentPort == null) return;
+    _lastBoundPort = currentPort;
+    _socketSuspended = true;
+
+    final op = _suspendSocketInternal();
+    _pendingSuspend = op;
+    try {
+      await op;
+    } finally {
+      if (identical(_pendingSuspend, op)) {
+        _pendingSuspend = null;
+      }
+    }
+  }
+
+  Future<void> _suspendSocketInternal() async {
+    final ctrl = _isolateControlPort;
+    if (ctrl != null) {
+      final replyPort = ReceivePort();
+      try {
+        ctrl.send({'cmd': 'suspend', 'reply': replyPort.sendPort});
+        await replyPort.first.timeout(const Duration(seconds: 1));
+      } catch (_) {
+      } finally {
+        replyPort.close();
+      }
+      return;
+    }
+    final s = _server;
+    _inProcessIntentionallyClosing = true;
+    _server = null;
+    await _closeHttpServerSafely(s);
+  }
+
+  /// Verifies that the local HTTP server actively responds on loopback,
+  /// rebinding the listening socket on the same port (or restarting the worker
+  /// isolate if needed) when suspended, reclaimed by iOS, or unresponsive.
+  Future<ServerHealthResult> ensureHealthy({bool forceRebind = false}) async {
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
+    final existing = _ensureHealthyFuture;
+    if (existing != null) {
+      if (!forceRebind || _ensureHealthyForced) {
+        return existing;
+      }
+      try {
+        final existingResult = await existing;
+        if (_disposed) {
+          throw StateError('TipitakaLocalServer has been disposed');
+        }
+        // If the concurrent call already bound a fresh socket and it passes a
+        // loopback probe, reuse it instead of tearing it down a second time.
+        if (existingResult.restarted && await checkHealth()) {
+          return existingResult;
+        }
+      } catch (e) {
+        if (_disposed) rethrow;
+      }
+    }
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
+    final future = _ensureHealthyInternal(forceRebind: forceRebind);
+    _ensureHealthyFuture = future;
+    _ensureHealthyForced = forceRebind;
+    try {
+      return await future;
+    } finally {
+      if (identical(_ensureHealthyFuture, future)) {
+        _ensureHealthyFuture = null;
+        _ensureHealthyForced = false;
+      }
+    }
+  }
+
+  Future<ServerHealthResult> _ensureHealthyInternal({
+    required bool forceRebind,
+  }) async {
+    if (_disposed) {
+      throw StateError('TipitakaLocalServer has been disposed');
+    }
+    _lifecycleEpoch++;
+    final stopEpochAtStart = _stopEpoch;
+    final pendingSuspend = _pendingSuspend;
+    if (pendingSuspend != null) {
+      try {
+        await pendingSuspend;
+      } catch (_) {}
+    }
+    final inFlightStart = _startFuture;
+    if (_starting && inFlightStart != null) {
+      try {
+        await inFlightStart;
+      } catch (_) {}
+    }
+    if (_disposed || _stopEpoch != stopEpochAtStart) {
+      throw StateError('TipitakaLocalServer stopped during health recovery');
+    }
+
+    final previousPort = port ?? _lastBoundPort;
+
+    final hasLiveBackend = useBackgroundIsolate
+        ? (_workerIsolate != null && _isolateControlPort != null)
+        : (_server != null || _socketSuspended || _socketDied);
+
+    if (hasLiveBackend && !forceRebind && !_socketSuspended && !_socketDied) {
+      final alive = await checkHealth();
+      if (_disposed || _stopEpoch != stopEpochAtStart) {
+        throw StateError('TipitakaLocalServer stopped during health check');
+      }
+      final currentUri = baseUri;
+      if (alive && currentUri != null) {
+        return ServerHealthResult(
+          uri: currentUri,
+          restarted: false,
+          portChanged: false,
+        );
+      }
+    }
+
+    final desiredPort = previousPort ?? preferredPort;
+
+    if (hasLiveBackend) {
+      final reboundUri = await _tryRebindSocket(desiredPort);
+      if (_disposed || _stopEpoch != stopEpochAtStart) {
+        throw StateError('TipitakaLocalServer stopped during socket rebind');
+      }
+      if (reboundUri != null && await checkHealth()) {
+        if (_disposed || _stopEpoch != stopEpochAtStart) {
+          throw StateError('TipitakaLocalServer stopped after socket rebind');
+        }
+        _rebindCount++;
+        return ServerHealthResult(
+          uri: reboundUri,
+          restarted: true,
+          portChanged: previousPort != null && reboundUri.port != previousPort,
+        );
+      }
+    }
+
+    // No live backend (e.g. isolate exited) or fast rebind failed: perform a
+    // full clean restart preferring the same port.
+    await _stopInternal(bumpStopEpoch: false);
+    if (_disposed || _stopEpoch != stopEpochAtStart) {
+      throw StateError('TipitakaLocalServer stopped before restart');
+    }
+    final freshUri = await _startWithOverride(desiredPort);
+    if (_disposed || _stopEpoch != stopEpochAtStart) {
+      await _stopInternal(bumpStopEpoch: false);
+      throw StateError('TipitakaLocalServer stopped during restart');
+    }
+    if (!await checkHealth()) {
+      throw StateError(
+        'Local Tipitaka server failed health check after restart on $freshUri',
+      );
+    }
+    _rebindCount++;
+    return ServerHealthResult(
+      uri: freshUri,
+      restarted: true,
+      portChanged: previousPort != null && freshUri.port != previousPort,
+    );
+  }
+
+  Future<Uri> _startWithOverride(int desiredPort) {
+    if (_disposed) {
+      return Future.error(StateError('TipitakaLocalServer has been disposed'));
+    }
+    if (_starting && _startFuture != null) return _startFuture!;
+    _starting = true;
+    late final Future<Uri> future;
+    future = _startInternal(portOverride: desiredPort).whenComplete(() {
+      if (identical(_startFuture, future)) {
+        _starting = false;
+        _startFuture = null;
+      }
+    });
+    _startFuture = future;
+    return future;
+  }
+
+  Future<Uri?> _tryRebindSocket(int desiredPort) async {
+    if (useBackgroundIsolate) {
+      final ctrl = _isolateControlPort;
+      if (ctrl == null) return null;
+      final replyPort = ReceivePort();
+      try {
+        ctrl.send({
+          'cmd': 'rebind',
+          'preferredPort': desiredPort,
+          'reply': replyPort.sendPort,
+        });
+        final res = await replyPort.first.timeout(const Duration(seconds: 3));
+        if (_disposed) return null;
+        if (res is Map && res['ok'] == true && res['port'] is int) {
+          _isolatePort = res['port'] as int;
+          _lastBoundPort = _isolatePort;
+          _socketSuspended = false;
+          _socketDied = false;
+          return baseUri;
+        }
+      } catch (_) {
+        return null;
+      } finally {
+        replyPort.close();
+      }
+      return null;
+    }
+
+    try {
+      final oldServer = _server;
+      _inProcessIntentionallyClosing = true;
+      _server = null;
+      await _closeHttpServerSafely(oldServer);
+      if (_disposed) return null;
+
+      _webRootDir ??= await _prepareWebRoot();
+      if (_disposed) return null;
+      _inProcessRouter ??= _TipitakaHttpRouter(
+        api: api,
+        webRootDir: _webRootDir,
+        aiUpstreamBaseUri: aiUpstreamBaseUri,
+      );
+      _inProcessIntentionallyClosing = false;
+      final bound = await _bindAndServeHttpServer(
+        handler: _inProcessRouter!.handler,
+        targetPort: desiredPort,
+        fallbackPreferredPort: preferredPort,
+        closeDynamicConnections: closeDynamicConnections,
+        onSocketClosed: (closedServer) {
+          if (!_inProcessIntentionallyClosing &&
+              identical(_server, closedServer)) {
+            _server = null;
+            _socketDied = true;
+          }
+        },
+      );
+      if (_disposed) {
+        await _closeHttpServerSafely(bound);
+        return null;
+      }
+      _server = bound;
+      _lastBoundPort = bound.port;
+      _socketSuspended = false;
+      _socketDied = false;
+      return baseUri;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Test helper simulating iOS silently reclaiming/killing the underlying
+  /// listening socket while keeping the server's Dart state stale.
+  @visibleForTesting
+  Future<void> simulateOsSocketReclaimForTesting({bool notifyDone = false}) async {
+    if (useBackgroundIsolate) {
+      final ctrl = _isolateControlPort;
+      if (ctrl == null) return;
+      final replyPort = ReceivePort();
+      try {
+        ctrl.send({
+          'cmd': 'simulateSocketKill',
+          'notify': notifyDone,
+          'reply': replyPort.sendPort,
+        });
+        await replyPort.first.timeout(const Duration(seconds: 2));
+      } finally {
+        replyPort.close();
+      }
+      return;
+    }
+    final existing = _server;
+    if (!notifyDone) {
+      _inProcessIntentionallyClosing = true;
+    }
+    await _closeHttpServerSafely(existing);
+  }
+
+  /// Test helper simulating an unexpected crash of the worker isolate.
+  @visibleForTesting
+  void simulateWorkerIsolateCrashForTesting() {
+    _workerIsolate?.kill(priority: Isolate.immediate);
   }
 
   Future<void> warmUpIndexes() async {
@@ -1025,39 +1601,56 @@ class TipitakaLocalServer {
     await ensureStarted();
   }
 
-  Future<void> stop() async {
-    final s = _server;
-    _server = null;
-    _startFuture = null;
+  Future<void> stop() => _stopInternal(bumpStopEpoch: true);
 
-    final ctrl = _isolateControlPort;
-    final isolate = _workerIsolate;
-    final statusPort = _isolateStatusPort;
-    _isolateControlPort = null;
-    _workerIsolate = null;
-    _isolatePort = null;
-    _isolateStatusPort = null;
-    _isolateHasPaliSentences = null;
-    statusPort?.close();
-
-    if (ctrl != null) {
-      final ackPort = ReceivePort();
-      try {
-        ctrl.send({'cmd': 'stop', 'reply': ackPort.sendPort});
-        await ackPort.first.timeout(const Duration(seconds: 2));
-      } catch (_) {
-      } finally {
-        ackPort.close();
-      }
+  Future<void> _stopInternal({required bool bumpStopEpoch}) async {
+    _lifecycleEpoch++;
+    if (bumpStopEpoch) {
+      _stopEpoch++;
     }
-    isolate?.kill(priority: Isolate.immediate);
+    _intentionallyStopping = true;
+    try {
+      final s = _server;
+      _inProcessIntentionallyClosing = true;
+      _server = null;
+      _starting = false;
+      _startFuture = null;
+      _socketSuspended = false;
+      _socketDied = false;
 
-    if (s != null) {
-      await s.close(force: true);
+      final ctrl = _isolateControlPort;
+      final isolate = _workerIsolate;
+      final statusPort = _isolateStatusPort;
+      final exitPort = _isolateExitPort;
+      _isolateControlPort = null;
+      _workerIsolate = null;
+      _isolatePort = null;
+      _isolateStatusPort = null;
+      _isolateExitPort = null;
+      _isolateHasPaliSentences = null;
+      statusPort?.close();
+      exitPort?.close();
+
+      if (ctrl != null) {
+        final ackPort = ReceivePort();
+        try {
+          ctrl.send({'cmd': 'stop', 'reply': ackPort.sendPort});
+          await ackPort.first.timeout(const Duration(seconds: 2));
+        } catch (_) {
+        } finally {
+          ackPort.close();
+        }
+      }
+      isolate?.kill(priority: Isolate.immediate);
+
+      await _closeHttpServerSafely(s);
+    } finally {
+      _intentionallyStopping = false;
     }
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     await stop();
     api.close();
   }
