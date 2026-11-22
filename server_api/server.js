@@ -1848,6 +1848,21 @@ function buildSearchSql({ ftsQuery, isContains = false, containsTerms = [], mat,
     return res;
   });
 
+  fastify.get('/api/dict/suggest', async (req, reply) => {
+    const rawQ = req.query.q || req.query.w || req.query.prefix || '';
+    const limit = parseInt(req.query.limit || '15', 10) || 15;
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    return dictEngine.suggestWords(rawQ, limit);
+  });
+
+  fastify.post('/api/dict/suggest', async (req, reply) => {
+    const body = req.body || {};
+    const rawQ = body.q || body.w || body.prefix || '';
+    const limit = parseInt(body.limit || '15', 10) || 15;
+    applyCacheHeader(reply, 'public, max-age=86400, stale-while-revalidate=604800');
+    return dictEngine.suggestWords(rawQ, limit);
+  });
+
   // Legacy fastify endpoints for compatibility with external references
   fastify.post('/api/dpd', async (req, reply) => {
     const word = req.body?.w || req.query?.w || '';

@@ -594,13 +594,13 @@ class LinkedDefinitionService {
       if (!TipitakaCoreReader.tableAndViewNames(boldDb).contains('chapter_links')) {
         return null;
       }
-      final cachedRows = boldDb.select(
-        'SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1',
-        [bookCode, chapterIndex],
-      );
-      if (cachedRows.isEmpty) return '{}';
-      final raw = cachedRows.first['paragraphs_json']?.toString().trim();
-      if (raw != null && raw.startsWith('{') && raw.endsWith('}')) {
+      final raw = TipitakaCoreReader.readChapterLinksJson(
+        boldDb,
+        bookCode,
+        chapterIndex,
+      )?.trim();
+      if (raw == null || raw.isEmpty) return '{}';
+      if (raw.startsWith('{') && raw.endsWith('}')) {
         return raw;
       }
       return '{}';
@@ -660,18 +660,19 @@ class LinkedDefinitionService {
 
     try {
       if (TipitakaCoreReader.tableAndViewNames(boldDb).contains('chapter_links')) {
-        final cachedRows = boldDb.select(
-          'SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1',
-          [bookCode, chapterIndex],
-        );
-        if (cachedRows.isEmpty) {
+        final raw = TipitakaCoreReader.readChapterLinksJson(
+          boldDb,
+          bookCode,
+          chapterIndex,
+        )?.trim();
+        if (raw == null || raw.isEmpty) {
           return {
             'book_code': bookCode,
             'chapter_index': chapterIndex,
             'paragraphs': const <String, dynamic>{},
           };
         }
-        final decoded = jsonDecode(cachedRows.first['paragraphs_json'].toString());
+        final decoded = jsonDecode(raw);
         return {
           'book_code': bookCode,
           'chapter_index': chapterIndex,
@@ -1727,60 +1728,81 @@ class LinkedDefinitionService {
           }
           if (tdb == null) continue;
           try {
-            final pRows = tdb.select(
-              'SELECT para_index, translation, sentences_json '
-              'FROM paragraph_translations '
-              'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? '
-              'ORDER BY para_index',
-              [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
-            );
             final pMap = <int, String>{};
             final sMap = <int, Map<int, String>>{};
-            for (final pr in pRows) {
-              final pidx = (pr['para_index'] as num).toInt();
-              final txt = (pr['translation'] ?? '').toString().trim();
-              if (txt.isNotEmpty) pMap[pidx] = txt;
-              final rawJson = pr['sentences_json']?.toString();
-              if (rawJson != null && rawJson.isNotEmpty) {
-                try {
-                  final decoded = jsonDecode(rawJson);
-                  if (decoded is List) {
-                    for (var idx = 0; idx < decoded.length; idx++) {
-                      final item = decoded[idx];
-                      if (item is String) {
-                        final t = item.trim();
-                        if (t.isNotEmpty) {
-                          sMap.putIfAbsent(pidx, () => {})[idx + 1] = t;
-                        }
-                      } else if (item is Map) {
-                        final lid = (item['line_id'] as num?)?.toInt();
-                        final t = item['translation']?.toString().trim() ?? '';
-                        if (lid != null && t.isNotEmpty) {
-                          sMap.putIfAbsent(pidx, () => {})[lid] = t;
+            final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+              tdb,
+              bookCode,
+              targetChapIdx,
+            );
+            if (v2Pack != null) {
+              for (final entry in v2Pack) {
+                if (entry.paraIndex < minParaIdx || entry.paraIndex > maxParaIdx) {
+                  continue;
+                }
+                final txt = (entry.translation ?? '').trim();
+                if (txt.isNotEmpty) pMap[entry.paraIndex] = txt;
+                for (final s in entry.sentences) {
+                  final st = s.text.trim();
+                  if (st.isNotEmpty) {
+                    sMap.putIfAbsent(entry.paraIndex, () => {})[s.lineId] = st;
+                  }
+                }
+              }
+            } else {
+              final pRows = tdb.select(
+                'SELECT para_index, translation, sentences_json '
+                'FROM paragraph_translations '
+                'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? '
+                'ORDER BY para_index',
+                [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
+              );
+              for (final pr in pRows) {
+                final pidx = (pr['para_index'] as num).toInt();
+                final txt = (pr['translation'] ?? '').toString().trim();
+                if (txt.isNotEmpty) pMap[pidx] = txt;
+                final rawJson = pr['sentences_json']?.toString();
+                if (rawJson != null && rawJson.isNotEmpty) {
+                  try {
+                    final decoded = jsonDecode(rawJson);
+                    if (decoded is List) {
+                      for (var idx = 0; idx < decoded.length; idx++) {
+                        final item = decoded[idx];
+                        if (item is String) {
+                          final t = item.trim();
+                          if (t.isNotEmpty) {
+                            sMap.putIfAbsent(pidx, () => {})[idx + 1] = t;
+                          }
+                        } else if (item is Map) {
+                          final lid = (item['line_id'] as num?)?.toInt();
+                          final t = item['translation']?.toString().trim() ?? '';
+                          if (lid != null && t.isNotEmpty) {
+                            sMap.putIfAbsent(pidx, () => {})[lid] = t;
+                          }
                         }
                       }
+                    }
+                  } catch (_) {}
+                }
+              }
+              if (sMap.isEmpty) {
+                try {
+                  final stRows = tdb.select(
+                    'SELECT para_index, line_id, translation FROM sentence_translations '
+                    'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? '
+                    'ORDER BY para_index, line_id',
+                    [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
+                  );
+                  for (final sr in stRows) {
+                    final pidx = (sr['para_index'] as num).toInt();
+                    final lid = (sr['line_id'] as num).toInt();
+                    final t = (sr['translation'] ?? '').toString().trim();
+                    if (t.isNotEmpty) {
+                      sMap.putIfAbsent(pidx, () => {})[lid] = t;
                     }
                   }
                 } catch (_) {}
               }
-            }
-            if (sMap.isEmpty) {
-              try {
-                final stRows = tdb.select(
-                  'SELECT para_index, line_id, translation FROM sentence_translations '
-                  'WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? '
-                  'ORDER BY para_index, line_id',
-                  [bookCode, targetChapIdx, minParaIdx, maxParaIdx],
-                );
-                for (final sr in stRows) {
-                  final pidx = (sr['para_index'] as num).toInt();
-                  final lid = (sr['line_id'] as num).toInt();
-                  final t = (sr['translation'] ?? '').toString().trim();
-                  if (t.isNotEmpty) {
-                    sMap.putIfAbsent(pidx, () => {})[lid] = t;
-                  }
-                }
-              } catch (_) {}
             }
             if (pMap.isNotEmpty || sMap.isNotEmpty) {
               loadedLangs.add(lang);

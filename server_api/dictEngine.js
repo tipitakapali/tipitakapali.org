@@ -2,7 +2,9 @@
 
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 const Database = require('better-sqlite3');
+const { convertAnyToRoman, normalizePaliForSearch } = require('./transliterate');
 
 function getDbCandidates(filename) {
   const candidates = [];
@@ -87,24 +89,97 @@ function getTableCharsFromDb(db) {
   }
 }
 
+const DICT_SOURCE_IDS = {
+  DPD: 0,
+  SPLI: 1,
+  PTS: 2,
+  ABD: 3,
+  PSD: 4,
+  SANS: 5,
+};
+
+function decodeZlibOrText(val) {
+  if (val === undefined || val === null) return '';
+  if (Buffer.isBuffer(val)) return zlib.inflateSync(val).toString('utf8');
+  if (val instanceof Uint8Array) return zlib.inflateSync(Buffer.from(val)).toString('utf8');
+  return String(val);
+}
+
+function prefixUpperBound(prefix) {
+  if (!prefix) return '\uFFFF';
+  const last = prefix.charCodeAt(prefix.length - 1);
+  return prefix.slice(0, -1) + String.fromCharCode(last + 1);
+}
+
+function extractShortPreview(rawDefi) {
+  let html = String(rawDefi || '');
+  if (!html) return null;
+  if (html.startsWith('@')) {
+    const secondAt = html.indexOf('@', 1);
+    if (secondAt > 0) html = html.slice(secondAt + 1);
+  }
+  const summaryMatch = html.match(/<div[^>]*class=["']?dpd["']?[^>]*>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+  const raw = summaryMatch ? summaryMatch[1] : html;
+  const plain = raw
+    .replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return null;
+  return plain.length > 96 ? `${plain.slice(0, 96)}…` : plain;
+}
+
 function initDictDatabases() {
   try {
-    for (const [key, filename] of Object.entries(DB_FILES)) {
-      const fullPath = resolveDbPath(filename);
-      if (fullPath) {
-        const db = new Database(fullPath, { readonly: true });
-        db.exec(`
+    const unifiedPath = resolveDbPath('dictionaries.db');
+    if (unifiedPath) {
+      try {
+        const udb = new Database(unifiedPath, { readonly: true });
+        udb.exec(`
           PRAGMA synchronous = NORMAL;
           PRAGMA temp_store = MEMORY;
           PRAGMA query_only = 1;
-          PRAGMA cache_size = -16000;
+          PRAGMA cache_size = -32000;
           PRAGMA mmap_size = 268435456;
         `);
-        dbs[key] = db;
-        tableChars[key] = getTableCharsFromDb(db);
-        console.log(`[DictEngine] Connected ${key} (${tableChars[key].length} partition tables) from: ${fullPath}`);
-      } else {
-        console.warn(`[DictEngine] Database file missing for ${key}: ${filename}`);
+        const hasEntries = udb
+          .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='dict_entries' LIMIT 1")
+          .get();
+        if (hasEntries) {
+          dbs.UNIFIED = udb;
+          console.log(`[DictEngine] Connected UNIFIED V2 dictionary database from: ${unifiedPath}`);
+        } else {
+          udb.close();
+        }
+      } catch (e) {
+        console.warn('[DictEngine] Failed to open dictionaries.db, falling back to legacy DBs:', e.message);
+      }
+    }
+
+    if (!dbs.UNIFIED) {
+      for (const [key, filename] of Object.entries(DB_FILES)) {
+        const fullPath = resolveDbPath(filename);
+        if (fullPath) {
+          const db = new Database(fullPath, { readonly: true });
+          db.exec(`
+            PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA query_only = 1;
+            PRAGMA cache_size = -16000;
+            PRAGMA mmap_size = 268435456;
+          `);
+          dbs[key] = db;
+          tableChars[key] = getTableCharsFromDb(db);
+          console.log(`[DictEngine] Connected ${key} (${tableChars[key].length} partition tables) from: ${fullPath}`);
+        } else {
+          console.warn(`[DictEngine] Database file missing for ${key}: ${filename}`);
+        }
       }
     }
 
@@ -210,7 +285,7 @@ function restoreDpdDefi(df) {
 const SYN_CACHE_MAX = 3000;
 const synCache = new Map();
 function getSynonyms(word) {
-  if (!dbs.SYN) return [];
+  if (!dbs.UNIFIED && !dbs.SYN) return [];
   if (synCache.has(word)) {
     const cached = synCache.get(word);
     synCache.delete(word);
@@ -218,9 +293,15 @@ function getSynonyms(word) {
     return cached;
   }
   try {
-    const fchar = getFChar(word, 'SYN', false);
-    const rows = prepareCached('SYN', `SELECT word FROM "${fchar}" WHERE synonym = ?`).all(word);
-    const result = rows.map((r) => r.word);
+    let result = [];
+    if (dbs.UNIFIED) {
+      const rows = prepareCached('UNIFIED', 'SELECT word FROM dict_synonyms WHERE synonym = ? LIMIT 64').all(word);
+      result = rows.map((r) => r.word);
+    } else {
+      const fchar = getFChar(word, 'SYN', false);
+      const rows = prepareCached('SYN', `SELECT word FROM "${fchar}" WHERE synonym = ?`).all(word);
+      result = rows.map((r) => r.word);
+    }
     if (synCache.size >= SYN_CACHE_MAX) {
       const firstKey = synCache.keys().next().value;
       synCache.delete(firstKey);
@@ -232,10 +313,39 @@ function getSynonyms(word) {
   }
 }
 
+function queryUnifiedEntries(wordsToQuery, sourceId) {
+  const unique = wordsToQuery.filter(Boolean);
+  if (!dbs.UNIFIED || unique.length === 0) return [];
+  const out = [];
+  const chunkSize = 400;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => '?').join(',');
+    const rows = prepareCached(
+      'UNIFIED',
+      `SELECT word, defi_z FROM dict_entries WHERE source_id = ? AND word IN (${placeholders})`
+    ).all(sourceId, ...chunk);
+    for (const r of rows) {
+      out.push({ word: r.word, defi: decodeZlibOrText(r.defi_z) });
+    }
+  }
+  return out;
+}
+
 // Single-word DPD Query — accepts cachedSyns to avoid duplicate SYN query (see lookupDPDFast/lookupOthers)
 function lookupSingleDPD(word, cachedSyns = null) {
   if (word.startsWith('##')) {
     try {
+      if (dbs.UNIFIED) {
+        const row = prepareCached(
+          'UNIFIED',
+          'SELECT word, defi_z FROM dict_entries WHERE source_id = ? AND word = ? LIMIT 1'
+        ).get(DICT_SOURCE_IDS.DPD, word);
+        if (row) {
+          return [{ word: row.word, isExact: true, html: restoreMinifiedLinksAndFeedback(decodeZlibOrText(row.defi_z)) }];
+        }
+        return [];
+      }
       const row = prepareCached('DPD', 'SELECT word, defi FROM misc WHERE word = ? LIMIT 1').get(word);
       if (row) {
         return [{ word: row.word, isExact: true, html: restoreMinifiedLinksAndFeedback(row.defi) }];
@@ -251,6 +361,25 @@ function lookupSingleDPD(word, cachedSyns = null) {
 
   const exactMatches = [];
   const relatedMatches = [];
+
+  if (dbs.UNIFIED) {
+    try {
+      const rows = queryUnifiedEntries(wordsToQuery, DICT_SOURCE_IDS.DPD);
+      for (const r of rows) {
+        let df = restoreDpdDefi(r.defi);
+        const isExact = r.word.toLowerCase() === word;
+        if (isExact) {
+          df = df.replaceAll('class=p1w', 'class=p2w');
+          exactMatches.push({ word: r.word, isExact: true, html: df });
+        } else {
+          relatedMatches.push({ word: r.word, isExact: false, html: df });
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] DPD V2 lookup error for', word, e.message);
+    }
+    return [...exactMatches, ...relatedMatches];
+  }
 
   for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'DPD', false)) {
     try {
@@ -297,7 +426,7 @@ function normalizeDictWord(rawWord) {
 
 // Query DPD Dictionary (supports multi-word phrases) — cachedSyns reused from caller to avoid duplicate SYN hit
 function lookupDPD(rawWord, cachedSyns = null) {
-  if (!dbs.DPD) return [];
+  if (!dbs.UNIFIED && !dbs.DPD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -323,6 +452,23 @@ function lookupSinglePTS(word, cachedSyns = null) {
 
   const exactMatches = [];
   const relatedMatches = [];
+
+  if (dbs.UNIFIED) {
+    try {
+      for (const r of queryUnifiedEntries(wordsToQuery, DICT_SOURCE_IDS.PTS)) {
+        const isExact = r.word.toLowerCase() === word;
+        const html = `<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">${r.word}</span><br>${r.defi}</div>`;
+        if (isExact) {
+          exactMatches.push({ word: r.word, isExact: true, html });
+        } else {
+          relatedMatches.push({ word: r.word, isExact: false, html });
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] PTS V2 lookup error:', e.message);
+    }
+    return [...exactMatches, ...relatedMatches];
+  }
 
   for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'PTS', false)) {
     try {
@@ -350,7 +496,7 @@ function lookupSinglePTS(word, cachedSyns = null) {
 
 // Query PTS PED Dictionary (supports multi-word phrases) — cachedSyns shared
 function lookupPTS(rawWord, cachedSyns = null) {
-  if (!dbs.PTS) return [];
+  if (!dbs.UNIFIED && !dbs.PTS) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -376,6 +522,23 @@ function lookupSingleABD(word, cachedSyns = null) {
 
   const exactMatches = [];
   const relatedMatches = [];
+
+  if (dbs.UNIFIED) {
+    try {
+      for (const r of queryUnifiedEntries(wordsToQuery, DICT_SOURCE_IDS.ABD)) {
+        const isExact = r.word.toLowerCase() === word;
+        const html = `<div class="tmmAbhidhan"><span class="${isExact ? 'pm2w' : 'pm1w'}">${r.word}</span><br>${r.defi}</div>`;
+        if (isExact) {
+          exactMatches.push({ word: r.word, isExact: true, html });
+        } else {
+          relatedMatches.push({ word: r.word, isExact: false, html });
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] ABD V2 lookup error:', e.message);
+    }
+    return [...exactMatches, ...relatedMatches];
+  }
 
   for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'ABD', false)) {
     try {
@@ -403,7 +566,7 @@ function lookupSingleABD(word, cachedSyns = null) {
 
 // Query Abhidhānappadīpikā (supports multi-word phrases) — cachedSyns shared
 function lookupABD(rawWord, cachedSyns = null) {
-  if (!dbs.ABD) return [];
+  if (!dbs.UNIFIED && !dbs.ABD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -429,6 +592,27 @@ function lookupSinglePSD(word, cachedSyns = null) {
 
   const exactMatches = [];
   const relatedMatches = [];
+
+  if (dbs.UNIFIED) {
+    try {
+      for (const r of queryUnifiedEntries(wordsToQuery, DICT_SOURCE_IDS.PSD)) {
+        const isExact = r.word.toLowerCase() === word;
+        let df = r.defi;
+        if (isExact) {
+          df = df.replaceAll('class=psdW', 'class=p2w');
+        }
+        const html = `<div class="psinh26">${df}</div>`;
+        if (isExact) {
+          exactMatches.push({ word: r.word, isExact: true, source: '', html });
+        } else {
+          relatedMatches.push({ word: r.word, isExact: false, source: '', html });
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] PSD V2 lookup error:', e.message);
+    }
+    return [...exactMatches, ...relatedMatches];
+  }
 
   for (const [fchar, groupWords] of groupWordsByPartition(wordsToQuery, 'PSD', false)) {
     try {
@@ -460,7 +644,7 @@ function lookupSinglePSD(word, cachedSyns = null) {
 
 // Query Pāli-Sinhala Dictionary (supports multi-word phrases) — cachedSyns shared
 function lookupPSD(rawWord, cachedSyns = null) {
-  if (!dbs.PSD) return [];
+  if (!dbs.UNIFIED && !dbs.PSD) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -481,9 +665,30 @@ function lookupPSD(rawWord, cachedSyns = null) {
 
 // Single-word Sanskrit Query
 function lookupSingleSANS(word) {
-  const fchar = getFChar(word, 'SANS', false);
   const matches = [];
 
+  if (dbs.UNIFIED) {
+    try {
+      const rows = prepareCached(
+        'UNIFIED',
+        'SELECT word, defi_z FROM dict_entries WHERE source_id = ? AND word = ?'
+      ).all(DICT_SOURCE_IDS.SANS, word);
+      for (const r of rows) {
+        const isExact = r.word.toLowerCase() === word;
+        let df = decodeZlibOrText(r.defi_z);
+        if (isExact) {
+          df = df.replaceAll('class=p1w', 'class=p3w');
+        }
+        const html = `<div class="sanskritSection">${df}</div>`;
+        matches.push({ word: r.word, isExact, html });
+      }
+    } catch (e) {
+      console.error('[DictEngine] SANS V2 lookup error:', e.message);
+    }
+    return matches;
+  }
+
+  const fchar = getFChar(word, 'SANS', false);
   try {
     const rows = prepareCached('SANS', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(word);
     for (const r of rows) {
@@ -504,7 +709,7 @@ function lookupSingleSANS(word) {
 
 // Query Sanskrit (supports multi-word phrases)
 function lookupSANS(rawWord) {
-  if (!dbs.SANS) return [];
+  if (!dbs.UNIFIED && !dbs.SANS) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -523,23 +728,18 @@ function lookupSANS(rawWord) {
   return lookupSingleSANS(word);
 }
 
-// Single-word Splitter Query
-function lookupSingleSplitter(word) {
-  const fchar = getFChar(word, 'SPLI', true);
+function formatSplitterRows(rows) {
   const results = [];
+  for (const r of rows) {
+    const elements = (r.defi || '').split('@').filter((x) => x && x.trim().length > 0);
+    const decHtml = elements
+      .map((el) => `<p class="dec">${el.replaceAll('+', ' <span class="dec-plus">+</span> ')}</p>`)
+      .join('');
 
-  try {
-    const rows = prepareCached('SPLI', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(word);
-    for (const r of rows) {
-      const elements = (r.defi || '').split('@').filter((x) => x && x.trim().length > 0);
-      const decHtml = elements
-        .map((el) => `<p class="dec">${el.replaceAll('+', ' <span class="dec-plus">+</span> ')}</p>`)
-        .join('');
+    const encodedWord = encodeURIComponent(r.word);
+    const improveLink = `https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=${encodedWord}&entry.326955045=Deconstructor&entry.1433863141=Tipitakapali.org%209999-12-12`;
 
-      const encodedWord = encodeURIComponent(r.word);
-      const improveLink = `https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=${encodedWord}&entry.326955045=Deconstructor&entry.1433863141=Tipitakapali.org%209999-12-12`;
-
-      const html = `
+    const html = `
         <div class="dpd-splitter-section">
           <div class="splitter-headword">
             <span class="p2w font-bold text-indigo-600 dark:text-indigo-400 text-sm sm:text-base">${r.word}</span>
@@ -550,24 +750,47 @@ function lookupSingleSplitter(word) {
           <p class="dpd-footer">These DPD word breakups are code-generated. <a href="${improveLink}" class="link" target="_blank">Improve it</a>.</p>
         </div>
       `;
-      results.push({
-        word: r.word,
-        isExact: true,
-        isSplitter: true,
-        breakups: elements,
-        html,
-      });
+    results.push({
+      word: r.word,
+      isExact: true,
+      isSplitter: true,
+      breakups: elements,
+      html,
+    });
+  }
+  return results;
+}
+
+// Single-word Splitter Query
+function lookupSingleSplitter(word) {
+  if (dbs.UNIFIED) {
+    try {
+      const rows = prepareCached(
+        'UNIFIED',
+        'SELECT word, defi_z FROM dict_entries WHERE source_id = ? AND word = ?'
+      ).all(DICT_SOURCE_IDS.SPLI, word);
+      return formatSplitterRows(
+        rows.map((r) => ({ word: r.word, defi: decodeZlibOrText(r.defi_z) }))
+      );
+    } catch (e) {
+      console.error('[DictEngine] Splitter V2 lookup error:', e.message);
+      return [];
     }
-  } catch (e) {
-    console.error('[DictEngine] Splitter lookup error:', e.message);
   }
 
-  return results;
+  const fchar = getFChar(word, 'SPLI', true);
+  try {
+    const rows = prepareCached('SPLI', `SELECT word, defi FROM "${fchar}" WHERE word = ?`).all(word);
+    return formatSplitterRows(rows);
+  } catch (e) {
+    console.error('[DictEngine] Splitter lookup error:', e.message);
+    return [];
+  }
 }
 
 // Query Splitter / Deconstructor (supports multi-word phrases)
 function lookupSplitter(rawWord) {
-  if (!dbs.SPLI) return [];
+  if (!dbs.UNIFIED && !dbs.SPLI) return [];
   const word = normalizeDictWord(rawWord);
   if (!word) return [];
 
@@ -588,10 +811,36 @@ function lookupSplitter(rawWord) {
 
 // Query Inflection table (declension & conjugation)
 function lookupINF(rawQuery) {
-  if (!dbs.INF) return null;
+  if (!dbs.UNIFIED && !dbs.INF) return null;
   if (!rawQuery) return null;
 
   let clean = rawQuery.replace(/^(declension_|conjugation_)/, '').trim();
+
+  if (dbs.UNIFIED) {
+    try {
+      const row = prepareCached(
+        'UNIFIED',
+        'SELECT word, html_z FROM dict_inflections WHERE key = ? LIMIT 1'
+      ).get(clean);
+      if (row && row.html_z) {
+        return { word: row.word, query: rawQuery, html: decodeZlibOrText(row.html_z) };
+      }
+      if (clean.includes('_')) {
+        const baseWord = clean.split('_')[0];
+        const baseRow = prepareCached(
+          'UNIFIED',
+          'SELECT word, html_z FROM dict_inflections WHERE key = ? LIMIT 1'
+        ).get(baseWord);
+        if (baseRow && baseRow.html_z) {
+          return { word: baseRow.word, query: rawQuery, html: decodeZlibOrText(baseRow.html_z) };
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] INF V2 lookup error for', rawQuery, e.message);
+    }
+    return null;
+  }
+
   const fchar = getFChar(clean, 'DPD', false);
 
   try {
@@ -621,9 +870,210 @@ const ENABLE_DICT_CACHE = true;
 
 // Bounded in-memory LRU caches for dictionary queries (< 0.01ms response time)
 const DICT_CACHE_MAX = 3000;
+const SUGGEST_CACHE_MAX = 1500;
 const dictCache = new Map();
 const dpdCache = new Map();
 const othersCache = new Map();
+const suggestCache = new Map();
+
+function diacriticCharVariants(ch) {
+  switch (ch) {
+    case 'a': case 'ā': return ['a', 'ā'];
+    case 'i': case 'ī': return ['i', 'ī'];
+    case 'u': case 'ū': return ['u', 'ū'];
+    case 't': case 'ṭ': return ['t', 'ṭ'];
+    case 'd': case 'ḍ': return ['d', 'ḍ'];
+    case 'n': case 'ṇ': case 'ñ': case 'ṅ': return ['n', 'ṇ', 'ñ', 'ṅ'];
+    case 'm': case 'ṃ': case 'ṁ': return ['m', 'ṃ', 'ṁ'];
+    case 'l': case 'ḷ': return ['l', 'ḷ'];
+    default: return [ch];
+  }
+}
+
+function buildDiacriticGlob(foldedQuery) {
+  let out = '';
+  for (let i = 0; i < foldedQuery.length; i++) {
+    const ch = foldedQuery[i];
+    const vars = diacriticCharVariants(ch);
+    if (vars.length > 1) {
+      out += `[${vars.join('')}]`;
+    } else if (ch === '[' || ch === '*' || ch === '?') {
+      out += `[${ch}]`;
+    } else {
+      out += ch;
+    }
+  }
+  return `${out}*`;
+}
+
+function expandDiacriticPrefixTables(foldedQuery, tables) {
+  if (foldedQuery.length < 2) return [];
+  const firstVars = diacriticCharVariants(foldedQuery[0]);
+  const secondVars = diacriticCharVariants(foldedQuery[1]);
+  const out = [];
+  for (const c1 of firstVars) {
+    for (const c2 of secondVars) {
+      const cand = `${c1}${c2}z`;
+      if (tables.includes(cand)) out.push(cand);
+    }
+  }
+  return out;
+}
+
+function suggestWords(rawPrefix, rawLimit = 15) {
+  const parsedLimit = Number.isFinite(Number(rawLimit)) ? Math.floor(Number(rawLimit)) : 15;
+  const limit = Math.min(Math.max(parsedLimit, 1), 30);
+  const romanized = convertAnyToRoman(rawPrefix || '');
+  const clean = normalizeDictWord(romanized);
+  if (clean.length < 2 || clean.startsWith('##')) {
+    return { query: clean, suggestions: [] };
+  }
+
+  const cacheKey = `${clean}|${limit}`;
+  if (ENABLE_DICT_CACHE) {
+    const cached = suggestCache.get(cacheKey);
+    if (cached) {
+      suggestCache.delete(cacheKey);
+      suggestCache.set(cacheKey, cached);
+      return cached;
+    }
+  }
+
+  const foldedQuery = normalizePaliForSearch(clean);
+  const results = [];
+  const seen = new Set();
+
+  const addCandidate = (word, rawDefi) => {
+    const w = String(word || '').trim();
+    if (!w) return;
+    const key = w.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    const isExact =
+      key === clean ||
+      (foldedQuery.length > 0 && normalizePaliForSearch(key) === foldedQuery);
+    results.push({
+      word: w,
+      preview: rawDefi ? extractShortPreview(rawDefi) : null,
+      isExact,
+    });
+  };
+
+  if (dbs.UNIFIED) {
+    try {
+      const cleanUpper = prefixUpperBound(clean);
+      const exactRows = prepareCached(
+        'UNIFIED',
+        'WITH top_words AS (' +
+          '  SELECT word, MIN(source_id * 1000000000 + id) AS best_key ' +
+          '  FROM dict_entries ' +
+          '  WHERE source_id IN (0, 2) AND word >= ? AND word < ? ' +
+          '  GROUP BY word ' +
+          '  ORDER BY CASE WHEN word = ? THEN 0 ELSE 1 END, length(word), word ' +
+          '  LIMIT ?' +
+          ') ' +
+          'SELECT d.word, d.defi_z ' +
+          'FROM top_words t ' +
+          'JOIN dict_entries d ON d.id = (t.best_key % 1000000000) ' +
+          'ORDER BY CASE WHEN d.word = ? THEN 0 ELSE 1 END, length(d.word), d.word'
+      ).all(clean, cleanUpper, clean, limit, clean);
+      for (const r of exactRows) {
+        addCandidate(r.word, decodeZlibOrText(r.defi_z));
+        if (results.length >= limit) break;
+      }
+
+      if (foldedQuery.length >= 2 && (clean === foldedQuery || results.length < limit)) {
+        const foldedUpper = prefixUpperBound(foldedQuery);
+        const foldedRows = prepareCached(
+          'UNIFIED',
+          'WITH top_words AS (' +
+            '  SELECT word, MIN(source_id * 1000000000 + id) AS best_key ' +
+            '  FROM dict_entries ' +
+            '  WHERE source_id IN (0, 2) AND folded >= ? AND folded < ? ' +
+            '  GROUP BY word ' +
+            '  ORDER BY length(word), word ' +
+            '  LIMIT ?' +
+            ') ' +
+            'SELECT d.word, d.defi_z ' +
+            'FROM top_words t ' +
+            'JOIN dict_entries d ON d.id = (t.best_key % 1000000000) ' +
+            'ORDER BY length(d.word), d.word'
+        ).all(foldedQuery, foldedUpper, limit * 2);
+        for (const r of foldedRows) {
+          addCandidate(r.word, decodeZlibOrText(r.defi_z));
+        }
+      }
+    } catch (e) {
+      console.error('[DictEngine] suggest V2 error:', e.message);
+    }
+  } else {
+    const queryLegacy = (dbKey) => {
+      if (!dbs[dbKey]) return;
+      const chars = tableChars[dbKey] || [];
+      const escGlob = clean.replace(/\[/g, '[[]').replace(/\*/g, '[*]').replace(/\?/g, '[?]');
+      const primaryTable = getFChar(clean, dbKey, false);
+      if (chars.includes(primaryTable) || primaryTable === 'misc') {
+        try {
+          const rows = prepareCached(
+            dbKey,
+            `SELECT word, MIN(defi) AS defi FROM "${primaryTable}" ` +
+              'WHERE word GLOB ? GROUP BY word ' +
+              'ORDER BY CASE WHEN word = ? THEN 0 ELSE 1 END, length(word), word LIMIT ?'
+          ).all(`${escGlob}*`, clean, limit);
+          for (const r of rows) {
+            addCandidate(r.word, r.defi);
+            if (results.length >= limit) break;
+          }
+        } catch (_) {}
+      }
+      if (foldedQuery.length >= 2 && (clean === foldedQuery || results.length < limit)) {
+        const diacriticGlob = buildDiacriticGlob(foldedQuery);
+        const candidateTables = expandDiacriticPrefixTables(foldedQuery, chars);
+        const perTableLimit = candidateTables.length > 1 ? Math.min(limit, 8) : limit;
+        for (const t of candidateTables) {
+          try {
+            const rows = prepareCached(
+              dbKey,
+              `SELECT word, MIN(defi) AS defi FROM "${t}" ` +
+                'WHERE word GLOB ? GROUP BY word ' +
+                'ORDER BY length(word), word LIMIT ?'
+            ).all(diacriticGlob, perTableLimit);
+            for (const r of rows) {
+              addCandidate(r.word, r.defi);
+            }
+          } catch (_) {}
+        }
+      }
+    };
+    queryLegacy('DPD');
+    if (results.length < limit) {
+      queryLegacy('PTS');
+    }
+  }
+
+  results.sort((a, b) => {
+    if (a.isExact !== b.isExact) return a.isExact ? -1 : 1;
+    const aPrefix = a.word.toLowerCase().startsWith(clean);
+    const bPrefix = b.word.toLowerCase().startsWith(clean);
+    if (aPrefix !== bPrefix) return aPrefix ? -1 : 1;
+    if (a.word.length !== b.word.length) return a.word.length - b.word.length;
+    return a.word.localeCompare(b.word);
+  });
+
+  const payload = {
+    query: clean,
+    suggestions: results.slice(0, limit),
+  };
+
+  if (ENABLE_DICT_CACHE) {
+    if (suggestCache.size >= SUGGEST_CACHE_MAX) {
+      const firstKey = suggestCache.keys().next().value;
+      suggestCache.delete(firstKey);
+    }
+    suggestCache.set(cacheKey, payload);
+  }
+  return payload;
+}
 
 // Priority 1: Fast DPD lookup (Digital Pāḷi Dictionary + Synonyms)
 function lookupDPDFast(rawWord, useSplitter = false) {
@@ -810,12 +1260,19 @@ function lookupAll(rawWord) {
 
 function closeDatabases() {
   stmtCache.clear();
+  synCache.clear();
+  dictCache.clear();
+  dpdCache.clear();
+  othersCache.clear();
+  suggestCache.clear();
   for (const [key, dbInstance] of Object.entries(dbs)) {
     try {
       if (dbInstance && typeof dbInstance.close === 'function') {
         dbInstance.close();
       }
     } catch (e) {}
+    delete dbs[key];
+    delete tableChars[key];
   }
 }
 
@@ -834,6 +1291,7 @@ module.exports = {
   lookupSANS,
   lookupINF,
   lookupSplitter,
+  suggestWords,
   getSynonyms,
   closeDatabases,
 };

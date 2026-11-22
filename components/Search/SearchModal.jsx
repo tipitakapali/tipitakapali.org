@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
 import { Search, X, Loader2, Filter, SlidersHorizontal, ArrowUpDown, ChevronDown, Languages } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
-import { searchTipitaka, fetchSearchDatabases, invalidateSearchDatabasesCache } from '../../services/api';
+import { searchTipitaka, fetchSearchDatabases, invalidateSearchDatabasesCache, fetchDictionarySuggestions } from '../../services/api';
 import { useTabs } from '../../context/TabContext';
 import { useThemeSettings } from '../../context/ThemeSettingsContext';
-import { typeVelthuis, convertAnyToRoman } from '../../services/transliterate';
+import { typeVelthuis, convertAnyToRoman, convertPaliScript } from '../../services/transliterate';
 
 export const LANG_KEY_TO_CODE = {
   english: 'en',
@@ -405,6 +405,16 @@ export default function SearchModal() {
   const handledInitialQueryRef = useRef(null);
   const performSearchRef = useRef(null);
 
+  const searchSuggestListboxId = useId();
+  const [suggestItems, setSuggestItems] = useState([]);
+  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
+  const [activeSuggestIdx, setActiveSuggestIdx] = useState(-1);
+  const suggestContainerRef = useRef(null);
+  const suggestTimerRef = useRef(null);
+  const suggestAbortRef = useRef(null);
+  const isTypingSuggestRef = useRef(false);
+  const currentScript = settings?.paliScript || 'roman';
+
   const refreshSearchDatabases = useCallback((bustCache = false) => {
     if (bustCache && typeof invalidateSearchDatabasesCache === 'function') {
       invalidateSearchDatabasesCache();
@@ -607,12 +617,98 @@ export default function SearchModal() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isSearchOpen) {
+        if (isSuggestOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsSuggestOpen(false);
+          setActiveSuggestIdx(-1);
+          return;
+        }
         closeSearchModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSearchOpen, closeSearchModal]);
+  }, [isSearchOpen, isSuggestOpen, closeSearchModal]);
+
+  useEffect(() => {
+    if (!isSuggestOpen) return;
+    const handleClickOutside = (e) => {
+      if (suggestContainerRef.current && !suggestContainerRef.current.contains(e.target)) {
+        setIsSuggestOpen(false);
+        setActiveSuggestIdx(-1);
+      }
+    };
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    return () => document.removeEventListener('pointerdown', handleClickOutside, true);
+  }, [isSuggestOpen]);
+
+  useEffect(() => {
+    if (!isSearchOpen || !isPaliDb) {
+      setIsSuggestOpen(false);
+      setActiveSuggestIdx(-1);
+      isTypingSuggestRef.current = false;
+    }
+  }, [isSearchOpen, isPaliDb]);
+
+  useEffect(() => {
+    if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+    if (suggestAbortRef.current) {
+      suggestAbortRef.current.abort();
+      suggestAbortRef.current = null;
+    }
+
+    if (!isSearchOpen || !isPaliDb || !isTypingSuggestRef.current) {
+      return undefined;
+    }
+
+    const tokenMatch = (query || '').match(/([^\s]+)$/);
+    const lastToken = tokenMatch ? tokenMatch[1].trim() : '';
+    if (lastToken.length < 2 || /[*"():~]/.test(lastToken)) {
+      setSuggestItems([]);
+      setIsSuggestOpen(false);
+      setActiveSuggestIdx(-1);
+      return undefined;
+    }
+
+    suggestTimerRef.current = setTimeout(() => {
+      const controller = new AbortController();
+      suggestAbortRef.current = controller;
+      fetchDictionarySuggestions(lastToken, { limit: 10, signal: controller.signal })
+        .then((data) => {
+          if (controller.signal.aborted || !isTypingSuggestRef.current) return;
+          const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+          setSuggestItems(list);
+          setIsSuggestOpen(list.length > 0);
+          setActiveSuggestIdx(-1);
+        })
+        .catch(() => {});
+    }, 120);
+
+    return () => {
+      if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+      if (suggestAbortRef.current) {
+        suggestAbortRef.current.abort();
+        suggestAbortRef.current = null;
+      }
+    };
+  }, [query, isSearchOpen, isPaliDb]);
+
+  const handleSelectSuggestion = useCallback((word) => {
+    if (!word) return;
+    isTypingSuggestRef.current = false;
+    setIsSuggestOpen(false);
+    setActiveSuggestIdx(-1);
+    const updated = (query || '').replace(/[^\s]*$/, word);
+    setQuery(updated);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const searchQuery = isPaliDb ? convertAnyToRoman(updated).trim() : updated.trim();
+    const minLen = getMinSearchLength(searchQuery);
+    if (searchQuery.length >= minLen) {
+      performSearch(searchQuery, 0, selectedDb);
+    }
+    inputRef.current?.focus({ preventScroll: true });
+  }, [query, isPaliDb, performSearch, selectedDb]);
 
   const handleInputChange = (e) => {
     const raw = e.target.value;
@@ -622,6 +718,7 @@ export default function SearchModal() {
       const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
       displayedVal = hasNonLatin ? raw : typeVelthuis(raw);
     }
+    isTypingSuggestRef.current = isPali;
     setQuery(displayedVal);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -693,6 +790,9 @@ export default function SearchModal() {
   };
 
   const handleSelectExample = (exampleQuery) => {
+    isTypingSuggestRef.current = false;
+    setIsSuggestOpen(false);
+    setActiveSuggestIdx(-1);
     setQuery(exampleQuery);
     const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
     const searchQuery = isPali ? convertAnyToRoman(exampleQuery).trim() : exampleQuery.trim();
@@ -771,9 +871,13 @@ export default function SearchModal() {
         <search className="shrink-0">
           {/* Search Header Row — full-width search field with Close button */}
           <div className="p-2 sm:p-2.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center gap-1.5 sm:gap-2 shrink-0 select-none">
+          <div ref={suggestContainerRef} className="relative flex-1 min-w-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              isTypingSuggestRef.current = false;
+              setIsSuggestOpen(false);
+              setActiveSuggestIdx(-1);
               const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
               const searchQuery = isPali ? convertAnyToRoman(query).trim() : query.trim();
               const minLen = getMinSearchLength(searchQuery);
@@ -788,15 +892,26 @@ export default function SearchModal() {
               <label htmlFor="fts-search-input" className="sr-only">
                 Full text search query
               </label>
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" aria-hidden="true" />
               <input
                 id="fts-search-input"
+                name="q"
                 ref={inputRef}
                 type="search"
+                inputMode="search"
                 enterKeyHint="search"
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
+                role={isPaliDb ? 'combobox' : undefined}
+                aria-autocomplete={isPaliDb ? 'list' : undefined}
+                aria-expanded={isPaliDb ? (isSuggestOpen && suggestItems.length > 0) : undefined}
+                aria-controls={isPaliDb ? searchSuggestListboxId : undefined}
+                aria-activedescendant={
+                  isPaliDb && isSuggestOpen && activeSuggestIdx >= 0 && suggestItems[activeSuggestIdx]
+                    ? `${searchSuggestListboxId}-opt-${activeSuggestIdx}`
+                    : undefined
+                }
                 placeholder={
                   isPaliDb
                     ? 'Search Pāḷi CST (Velthuis or 17 Pāḷi scripts)…'
@@ -805,8 +920,36 @@ export default function SearchModal() {
                 value={query}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) {
+                    return;
+                  }
+                  const suggestVisible = isPaliDb && isSuggestOpen && suggestItems.length > 0;
+                  if (e.key === 'ArrowDown' && suggestVisible) {
+                    e.preventDefault();
+                    setActiveSuggestIdx((prev) => (prev + 1) % suggestItems.length);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp' && suggestVisible) {
+                    e.preventDefault();
+                    setActiveSuggestIdx((prev) => (prev <= 0 ? suggestItems.length - 1 : prev - 1));
+                    return;
+                  }
+                  if (e.key === 'Escape' && suggestVisible) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsSuggestOpen(false);
+                    setActiveSuggestIdx(-1);
+                    return;
+                  }
                   if (e.key === 'Enter') {
                     e.preventDefault();
+                    if (suggestVisible && activeSuggestIdx >= 0 && suggestItems[activeSuggestIdx]) {
+                      handleSelectSuggestion(suggestItems[activeSuggestIdx].word);
+                      return;
+                    }
+                    isTypingSuggestRef.current = false;
+                    setIsSuggestOpen(false);
+                    setActiveSuggestIdx(-1);
                     e.target?.blur();
                     const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
                     const searchQuery = isPali ? convertAnyToRoman(query).trim() : query.trim();
@@ -828,11 +971,19 @@ export default function SearchModal() {
                   }}
                   onPointerDown={(e) => {
                     e.preventDefault();
+                    isTypingSuggestRef.current = false;
+                    setIsSuggestOpen(false);
+                    setSuggestItems([]);
+                    setActiveSuggestIdx(-1);
                     setQuery('');
                     setResults([]);
                     setTotal(0);
                   }}
                   onClick={() => {
+                    isTypingSuggestRef.current = false;
+                    setIsSuggestOpen(false);
+                    setSuggestItems([]);
+                    setActiveSuggestIdx(-1);
                     setQuery('');
                     setResults([]);
                     setTotal(0);
@@ -848,6 +999,63 @@ export default function SearchModal() {
               )}
             </div>
           </form>
+
+          {isPaliDb && isSuggestOpen && suggestItems.length > 0 && (
+            <ul
+              id={searchSuggestListboxId}
+              role="listbox"
+              aria-label="Pāḷi headword suggestions"
+              className="absolute left-0 right-0 top-full mt-1.5 max-h-64 overflow-y-auto overscroll-contain bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 divide-y divide-[var(--border-color)]/40"
+            >
+              {suggestItems.map((item, idx) => {
+                const isActive = idx === activeSuggestIdx;
+                const scriptWord =
+                  currentScript && currentScript !== 'roman'
+                    ? convertPaliScript(item.word, currentScript) || item.word
+                    : item.word;
+                return (
+                  <li
+                    key={`${item.word}-${idx}`}
+                    id={`${searchSuggestListboxId}-opt-${idx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActiveSuggestIdx(idx)}
+                    onClick={() => handleSelectSuggestion(item.word)}
+                    className={`min-h-[40px] px-3 py-2 cursor-pointer transition select-none flex flex-col justify-center gap-0.5 ${
+                      isActive
+                        ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                        : 'hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 truncate">
+                        <span className="font-semibold text-xs sm:text-sm truncate">
+                          {scriptWord}
+                        </span>
+                        {currentScript && currentScript !== 'roman' && scriptWord !== item.word && (
+                          <span className="text-[11px] text-[var(--text-muted)] truncate shrink-0">
+                            ({item.word})
+                          </span>
+                        )}
+                      </div>
+                      {item.isExact && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent)] font-bold shrink-0">
+                          Exact
+                        </span>
+                      )}
+                    </div>
+                    {item.preview && (
+                      <div className="text-[11px] text-[var(--text-muted)] truncate">
+                        {item.preview}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          </div>
           <button
             type="button"
             onClick={closeSearchModal}

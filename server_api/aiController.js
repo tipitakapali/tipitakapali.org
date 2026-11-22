@@ -10,6 +10,8 @@ const {
   readChapterSentences,
   readChapterPack,
   hydrateCanonRows,
+  hasChapterTransPack,
+  readChapterTranslationPack,
 } = require('./tipitakaCoreHelper');
 const {
   understandUserQuery,
@@ -95,6 +97,86 @@ function getTranslationDb(lang) {
     }
   }
   return null;
+}
+
+function readAiParaTranslation(tdb, bookCode, chapterIndex, paraIndex) {
+  if (!tdb || !bookCode) return null;
+  if (hasChapterTransPack(tdb)) {
+    const pack = readChapterTranslationPack(tdb, bookCode, Number(chapterIndex));
+    const entry = pack.get(Number(paraIndex));
+    return entry?.translation || null;
+  }
+  try {
+    const r = tdb
+      .prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?')
+      .get(bookCode, chapterIndex, paraIndex);
+    return r?.translation || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function readAiSentenceTranslations(tdb, bookCode, chapterIndex, paraIndex, lineId) {
+  if (!tdb || !bookCode) return [];
+  if (hasChapterTransPack(tdb)) {
+    const pack = readChapterTranslationPack(tdb, bookCode, Number(chapterIndex));
+    if (paraIndex !== null && paraIndex !== undefined) {
+      const entry = pack.get(Number(paraIndex));
+      if (!entry) return [];
+      const sents = Array.isArray(entry.sentences) ? entry.sentences : [];
+      if (lineId !== null && lineId !== undefined) {
+        const hit = sents.find((s) => Number(s.line_id) === Number(lineId));
+        if (hit && hit.translation) return [{ line_id: Number(lineId), translation: hit.translation }];
+      } else if (sents.length > 0) {
+        return sents.map((s) => ({ line_id: s.line_id, translation: s.translation }));
+      }
+      if (entry.translation) {
+        return [{ line_id: lineId || 1, translation: entry.translation }];
+      }
+      return [];
+    }
+    const out = [];
+    const pKeys = Array.from(pack.keys()).sort((a, b) => a - b);
+    for (const pk of pKeys) {
+      const entry = pack.get(pk);
+      const sents = Array.isArray(entry?.sentences) ? entry.sentences : [];
+      for (const s of sents) {
+        out.push({ para_index: pk, line_id: s.line_id, translation: s.translation });
+        if (out.length >= 80) return out;
+      }
+    }
+    return out;
+  }
+
+  let rows = [];
+  try {
+    if (paraIndex !== null && paraIndex !== undefined && lineId !== null && lineId !== undefined) {
+      const r = tdb
+        .prepare('SELECT translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ?')
+        .get(bookCode, chapterIndex, paraIndex, lineId);
+      rows = r ? [{ line_id: lineId, translation: r.translation }] : [];
+    } else if (paraIndex !== null && paraIndex !== undefined) {
+      rows = tdb
+        .prepare('SELECT line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? ORDER BY line_id')
+        .all(bookCode, chapterIndex, paraIndex);
+    } else {
+      rows = tdb
+        .prepare('SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? ORDER BY para_index, line_id LIMIT 80')
+        .all(bookCode, chapterIndex);
+    }
+  } catch (_) {}
+
+  if (rows.length === 0 && paraIndex !== null && paraIndex !== undefined) {
+    try {
+      const ptr = tdb
+        .prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?')
+        .get(bookCode, chapterIndex, paraIndex);
+      if (ptr && ptr.translation) {
+        rows = [{ line_id: lineId || 1, translation: ptr.translation }];
+      }
+    } catch (_) {}
+  }
+  return rows;
 }
 
 function getTranslationFtsDb(lang) {
@@ -1729,28 +1811,7 @@ function aiGetSentences({ book_code, chapter_index, para_index, para_num, line_i
   for (const lang of tLangs) {
     const tdb = getTranslationDb(lang);
     if (!tdb) continue;
-    try {
-      if (pIdx !== null && lid !== null) {
-        const r = tdb.prepare('SELECT translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? AND line_id = ?').get(targetCode, cIdx, pIdx, lid);
-        translations[lang] = r ? [{ line_id: lid, translation: r.translation }] : [];
-      } else if (pIdx !== null) {
-        const rows = tdb.prepare('SELECT line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ? ORDER BY line_id').all(targetCode, cIdx, pIdx);
-        translations[lang] = rows;
-      } else {
-        const rows = tdb.prepare('SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? ORDER BY para_index, line_id LIMIT 80').all(targetCode, cIdx);
-        translations[lang] = rows;
-      }
-    } catch {}
-
-    // Fallback: if sentence translations are sparse/missing, pull from paragraph_translations
-    if ((!translations[lang] || translations[lang].length === 0) && pIdx !== null) {
-      try {
-        const ptr = tdb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(targetCode, cIdx, pIdx);
-        if (ptr && ptr.translation) {
-          translations[lang] = [{ line_id: lid || 1, translation: ptr.translation }];
-        }
-      } catch {}
-    }
+    translations[lang] = readAiSentenceTranslations(tdb, targetCode, cIdx, pIdx, lid);
   }
   return {
     success: true,
@@ -1883,12 +1944,10 @@ function aiGetParagraphContent({
       for (const lang of langs) {
         const tdb = getTranslationDb(lang);
         if (tdb) {
-          try {
-            const tRow = tdb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(p.book_code, p.chapter_index, p.para_index);
-            if (tRow && tRow.translation) {
-              translations[lang] = tRow.translation;
-            }
-          } catch (e) {}
+          const trText = readAiParaTranslation(tdb, p.book_code, p.chapter_index, p.para_index);
+          if (trText) {
+            translations[lang] = trText;
+          }
         }
       }
 
@@ -2050,10 +2109,8 @@ function aiGetCommentaries({ book_code, chapter_index, para_num, para_index }) {
         atthaEntries = rows.map((r) => {
           let enTrans = null;
           if (enDb) {
-            try {
-              const tRow = enDb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(r.book_code, r.chapter_index, r.para_index);
-              if (tRow?.translation) enTrans = tRow.translation.substring(0, 500);
-            } catch (_) {}
+            const trText = readAiParaTranslation(enDb, r.book_code, r.chapter_index, r.para_index);
+            if (trText) enTrans = trText.substring(0, 500);
           }
           return {
             book_code: r.book_code,
@@ -2117,10 +2174,8 @@ function aiGetCommentaries({ book_code, chapter_index, para_num, para_index }) {
         tikaEntries = rows.map((r) => {
           let enTrans = null;
           if (enDb) {
-            try {
-              const tRow = enDb.prepare('SELECT translation FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index = ?').get(r.book_code, r.chapter_index, r.para_index);
-              if (tRow?.translation) enTrans = tRow.translation.substring(0, 500);
-            } catch (_) {}
+            const trText = readAiParaTranslation(enDb, r.book_code, r.chapter_index, r.para_index);
+            if (trText) enTrans = trText.substring(0, 500);
           }
           return {
             book_code: r.book_code,

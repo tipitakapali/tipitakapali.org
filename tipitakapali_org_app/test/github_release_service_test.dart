@@ -13,18 +13,18 @@ void main() {
       GitHubReleaseService.defaultRepo,
       'tipitakapali/tipitakapali.org',
     );
-    expect(GitHubReleaseService.defaultTag, 'db');
+    expect(GitHubReleaseService.defaultTag, 'db-v2');
   });
 
   test('fetchFromGitHubApiBase merges live zip URLs, sizes, and digests', () async {
     final bundledRaw =
-        await File('assets/databases_manifest.json').readAsString();
+        await File('assets/databases_manifest_v2.json').readAsString();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
 
     server.listen((request) {
       if (request.uri.path ==
-          '/repos/tipitakapali/tipitakapali.org/releases/tags/db') {
+          '/repos/tipitakapali/tipitakapali.org/releases/tags/db-v2') {
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.json
@@ -83,14 +83,14 @@ void main() {
 
   test('decodes UTF-8 manifest and API responses without charset header', () async {
     final bundledBytes =
-        await File('assets/databases_manifest.json').readAsBytes();
+        await File('assets/databases_manifest_v2.json').readAsBytes();
     final bundledRaw = utf8.decode(bundledBytes);
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
 
     server.listen((request) {
       if (request.uri.path ==
-          '/repos/tipitakapali/tipitakapali.org/releases/tags/db') {
+          '/repos/tipitakapali/tipitakapali.org/releases/tags/db-v2') {
         final releasePayload = utf8.encode(
           jsonEncode({
             'tag_name': 'v2026.11',
@@ -142,7 +142,7 @@ void main() {
 
   test('preserves compulsory flags on core and dictionaries even when remote manifest sets false', () async {
     final bundledRaw =
-        await File('assets/databases_manifest.json').readAsString();
+        await File('assets/databases_manifest_v2.json').readAsString();
     final remoteMap = jsonDecode(bundledRaw) as Map<String, dynamic>;
     final coreMap = remoteMap['core'] as Map<String, dynamic>;
     (coreMap['tipitaka'] as Map<String, dynamic>)['compulsory'] = false;
@@ -157,7 +157,7 @@ void main() {
 
     server.listen((request) {
       if (request.uri.path ==
-          '/repos/tipitakapali/tipitakapali.org/releases/tags/db') {
+          '/repos/tipitakapali/tipitakapali.org/releases/tags/db-v2') {
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.json
@@ -211,7 +211,7 @@ void main() {
     'fetchOfficialRelease checks raw repo databases_manifest.json and falls back to bundled offline',
     () async {
       final bundledRaw =
-          await File('assets/databases_manifest.json').readAsString();
+          await File('assets/databases_manifest_v2.json').readAsString();
       final remoteMap = jsonDecode(bundledRaw) as Map<String, dynamic>;
       final coreMap = remoteMap['core'] as Map<String, dynamic>;
       final tipitakaMap = coreMap['tipitaka'] as Map<String, dynamic>;

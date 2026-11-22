@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../utils/pali_script_converter.dart';
+import 'tipitaka_core_reader.dart';
 
 enum DictSource {
   dpd('dpd', 'DPD'),
@@ -96,6 +97,7 @@ class DictionaryLookupResult {
 }
 
 class DictionaryDbPaths {
+  final String? unifiedDictDbPath;
   final String? dpdDbPath;
   final String? synonymsDbPath;
   final String? splitterDbPath;
@@ -106,6 +108,7 @@ class DictionaryDbPaths {
   final String? sanskritDbPath;
 
   const DictionaryDbPaths({
+    this.unifiedDictDbPath,
     this.dpdDbPath,
     this.synonymsDbPath,
     this.splitterDbPath,
@@ -117,6 +120,7 @@ class DictionaryDbPaths {
   });
 
   bool get hasAnyInstalled => [
+    unifiedDictDbPath,
     dpdDbPath,
     splitterDbPath,
     ptspedDbPath,
@@ -163,8 +167,47 @@ class DictionaryRepository {
     return null;
   }
 
-  List<String> _lookupSynonyms(String? synonymsDbPath, String word) {
-    final db = _tryOpenReadOnly(synonymsDbPath);
+  static String _decodeZlibOrText(Object? raw) {
+    if (raw == null) return '';
+    if (raw is List<int>) {
+      if (raw.isEmpty) return '';
+      return utf8.decode(zlib.decode(raw));
+    }
+    return raw.toString();
+  }
+
+  static int _sourceIdFor(DictSource source) => switch (source) {
+    DictSource.dpd => 0,
+    DictSource.splitter => 1,
+    DictSource.pts => 2,
+    DictSource.abd => 3,
+    DictSource.psd => 4,
+    DictSource.sans => 5,
+  };
+
+  List<String> _lookupSynonyms(DictionaryDbPaths paths, String word) {
+    final unified = _tryOpenReadOnly(paths.unifiedDictDbPath);
+    if (unified != null) {
+      try {
+        if (TipitakaCoreReader.tableAndViewNames(unified).contains('dict_synonyms')) {
+          final rows = unified.select(
+            'SELECT word FROM dict_synonyms WHERE synonym = ? LIMIT 16',
+            [word],
+          );
+          return rows
+              .map((r) => (r['word'] ?? '').toString())
+              .where((w) => w.isNotEmpty)
+              .toSet()
+              .toList(growable: false);
+        }
+      } catch (_) {
+        return const [];
+      } finally {
+        unified.close();
+      }
+    }
+
+    final db = _tryOpenReadOnly(paths.synonymsDbPath);
     if (db == null) return const [];
     try {
       final tables = _readPrefixTables(db);
@@ -238,14 +281,14 @@ class DictionaryRepository {
     final allEntries = <DictionaryEntry>[];
 
     // If multi-word phrase matches verbatim, prefer verbatim; else iterate tokens.
-    var syns = _lookupSynonyms(paths.synonymsDbPath, normalized);
+    var syns = _lookupSynonyms(paths, normalized);
     allSynonyms.addAll(syns);
     allEntries.addAll(_queryAllSourcesForWord(normalized, syns, paths));
 
     if (allEntries.isEmpty && tokens.length > 1) {
       final queriedWords = tokens.where((t) => t != normalized).toList();
       for (final tok in queriedWords) {
-        final tokSyns = _lookupSynonyms(paths.synonymsDbPath, tok);
+        final tokSyns = _lookupSynonyms(paths, tok);
         for (final s in tokSyns) {
           if (!allSynonyms.contains(s)) allSynonyms.add(s);
         }
@@ -267,6 +310,54 @@ class DictionaryRepository {
     DictionaryDbPaths paths,
   ) {
     final wordsToQuery = <String>{word, ...syns}.toList(growable: false);
+    final unified = _tryOpenReadOnly(paths.unifiedDictDbPath);
+    if (unified != null) {
+      try {
+        if (TipitakaCoreReader.tableAndViewNames(unified).contains('dict_entries')) {
+          return [
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: wordsToQuery,
+              source: DictSource.dpd,
+            ),
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: [word],
+              source: DictSource.splitter,
+            ),
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: wordsToQuery,
+              source: DictSource.pts,
+            ),
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: wordsToQuery,
+              source: DictSource.abd,
+            ),
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: wordsToQuery,
+              source: DictSource.psd,
+            ),
+            ..._queryUnifiedDb(
+              db: unified,
+              baseWord: word,
+              wordsToQuery: [word],
+              source: DictSource.sans,
+            ),
+          ];
+        }
+      } finally {
+        unified.close();
+      }
+    }
+
     final out = <DictionaryEntry>[];
 
     out.addAll(
@@ -331,6 +422,43 @@ class DictionaryRepository {
     );
 
     return out;
+  }
+
+  List<DictionaryEntry> _queryUnifiedDb({
+    required Database db,
+    required String baseWord,
+    required List<String> wordsToQuery,
+    required DictSource source,
+  }) {
+    if (wordsToQuery.isEmpty) return const [];
+    final exact = <DictionaryEntry>[];
+    final related = <DictionaryEntry>[];
+    final sourceId = _sourceIdFor(source);
+    final placeholders = List.filled(wordsToQuery.length, '?').join(',');
+    try {
+      final rows = db.select(
+        'SELECT word, defi_z FROM dict_entries '
+        'WHERE source_id = ? AND word IN ($placeholders)',
+        [sourceId, ...wordsToQuery],
+      );
+      for (final r in rows) {
+        final hw = (r['word'] ?? '').toString();
+        final rawDefi = _decodeZlibOrText(r['defi_z']);
+        final isExact = hw.toLowerCase() == baseWord.toLowerCase();
+        final entry = _buildEntry(
+          source: source,
+          headword: hw,
+          rawDefi: rawDefi,
+          isExactMatch: isExact,
+        );
+        if (isExact) {
+          exact.add(entry);
+        } else {
+          related.add(entry);
+        }
+      }
+    } catch (_) {}
+    return [...exact, ...related];
   }
 
   List<DictionaryEntry> _queryDb({
@@ -542,20 +670,50 @@ class DictionaryRepository {
     );
   }
 
-  /// Queries `dpd_inflection_tipitakapali.db` for a lemma/key like
+  /// Queries `dictionaries.db` (`dict_inflections`) or legacy
+  /// `dpd_inflection_tipitakapali.db` for a lemma/key like
   /// `declension_dhamma_1` or `dhamma` and parses the HTML inflection table.
   InflectionTableData? lookupInflection(
     String? inflectionDbPath,
-    String rawKey,
-  ) {
+    String rawKey, {
+    String? unifiedDictDbPath,
+  }) {
+    if (rawKey.trim().isEmpty) return null;
+    final clean = rawKey
+        .replaceFirst(RegExp(r'^(declension_|conjugation_)'), '')
+        .trim();
+
+    final unified = _tryOpenReadOnly(unifiedDictDbPath);
+    if (unified != null) {
+      try {
+        if (TipitakaCoreReader.tableAndViewNames(unified).contains('dict_inflections')) {
+          for (final candidate in <String>[
+            clean,
+            if (clean.contains('_')) clean.split('_').first,
+          ]) {
+            final rows = unified.select(
+              'SELECT word, html_z FROM dict_inflections WHERE key = ? LIMIT 1',
+              [candidate],
+            );
+            if (rows.isNotEmpty && rows.first['html_z'] != null) {
+              final wordFound = rows.first['word']?.toString() ?? candidate;
+              final defiHtml = _decodeZlibOrText(rows.first['html_z']);
+              return _parseInflectionHtml(wordFound, defiHtml);
+            }
+          }
+          return null;
+        }
+      } catch (_) {
+        return null;
+      } finally {
+        unified.close();
+      }
+    }
+
     final db = _tryOpenReadOnly(inflectionDbPath);
-    if (db == null || rawKey.trim().isEmpty) return null;
+    if (db == null) return null;
     try {
       final tables = _readPrefixTables(db);
-      final clean = rawKey
-          .replaceFirst(RegExp(r'^(declension_|conjugation_)'), '')
-          .trim();
-
       String? wordFound;
       String? defiHtml;
 

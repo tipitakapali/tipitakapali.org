@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useId } from 'react';
 import {
   BookSearch,
   X,
@@ -32,7 +32,7 @@ import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { useTabs } from '../context/TabContext';
 import BoldDefinitionSection from './BoldDefinitionSection';
 import { typeVelthuis, convertAnyToRoman, convertPaliScript, cleanDictionaryQuery } from '../services/transliterate';
-import { fetchDictionaryInflection } from '../services/api';
+import { fetchDictionaryInflection, fetchDictionarySuggestions } from '../services/api';
 import { restoreMinifiedLinks } from '../services/dpdFeedback';
 
 // Helper to highlight exact matching inflections in table cells (CC BY-NC-SA 4.0 DPD)
@@ -809,37 +809,92 @@ export default function DictionaryModal() {
   const historyBtnRef = useRef(null);
   const historyDropdownRef = useRef(null);
 
-  // Close history dropdown on click outside or Escape
+  // Dictionary Autocomplete Suggest State & Refs
+  const dictInputId = useId();
+  const dictListboxId = useId();
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
+  const [activeSuggestIdx, setActiveSuggestIdx] = useState(-1);
+  const suggestContainerRef = useRef(null);
+  const suggestAbortRef = useRef(null);
+  const suggestTimerRef = useRef(null);
+  const isUserTypingRef = useRef(false);
+
+  // Close suggestions on click outside or Escape (capture phase so Escape only dismisses dropdown)
   useEffect(() => {
-    if (!isHistoryOpen) return;
+    if (!isSuggestOpen) return;
     const handleClickOutside = (e) => {
-      if (
-        historyDropdownRef.current &&
-        !historyDropdownRef.current.contains(e.target) &&
-        historyBtnRef.current &&
-        !historyBtnRef.current.contains(e.target)
-      ) {
-        setIsHistoryOpen(false);
+      if (suggestContainerRef.current && !suggestContainerRef.current.contains(e.target)) {
+        setIsSuggestOpen(false);
+        setActiveSuggestIdx(-1);
       }
     };
-    const handleKeyDown = (e) => {
+    const handleEscape = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         e.stopPropagation();
-        setIsHistoryOpen(false);
+        setIsSuggestOpen(false);
+        setActiveSuggestIdx(-1);
       }
     };
     document.addEventListener('pointerdown', handleClickOutside, true);
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleEscape, true);
     return () => {
       document.removeEventListener('pointerdown', handleClickOutside, true);
-      document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keydown', handleEscape, true);
     };
-  }, [isHistoryOpen]);
+  }, [isSuggestOpen]);
 
-  // Close history dropdown whenever the dictionary is closed
+  // Debounced Pāḷi word suggestions only while actively typing in the search field
+  useEffect(() => {
+    if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+    if (suggestAbortRef.current) {
+      suggestAbortRef.current.abort();
+      suggestAbortRef.current = null;
+    }
+
+    if (!isOpen || !isUserTypingRef.current) {
+      return undefined;
+    }
+
+    const trimmed = (localInput || '').trim();
+    if (trimmed.length < 2 || trimmed.includes(' ') || trimmed.startsWith('##')) {
+      setSuggestions([]);
+      setIsSuggestOpen(false);
+      setActiveSuggestIdx(-1);
+      return undefined;
+    }
+
+    suggestTimerRef.current = setTimeout(() => {
+      const controller = new AbortController();
+      suggestAbortRef.current = controller;
+      fetchDictionarySuggestions(trimmed, { limit: 14, signal: controller.signal })
+        .then((data) => {
+          if (controller.signal.aborted || !isUserTypingRef.current) return;
+          const list = Array.isArray(data?.suggestions) ? data.suggestions : [];
+          setSuggestions(list);
+          setIsSuggestOpen(list.length > 0);
+          setActiveSuggestIdx(-1);
+        })
+        .catch(() => {});
+    }, 100);
+
+    return () => {
+      if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+      if (suggestAbortRef.current) {
+        suggestAbortRef.current.abort();
+        suggestAbortRef.current = null;
+      }
+    };
+  }, [localInput, isOpen]);
+
+  // Close history & suggest dropdowns whenever the dictionary is closed
   useEffect(() => {
     if (!isOpen) {
       setIsHistoryOpen(false);
+      setIsSuggestOpen(false);
+      setActiveSuggestIdx(-1);
+      isUserTypingRef.current = false;
     }
   }, [isOpen]);
 
@@ -1044,6 +1099,9 @@ export default function DictionaryModal() {
   // Synchronize local input with context display word ONLY when an external lookup occurs
   useEffect(() => {
     if (displayWord || queryWord) {
+      isUserTypingRef.current = false;
+      setIsSuggestOpen(false);
+      setActiveSuggestIdx(-1);
       setLocalInput(displayWord || queryWord || '');
     }
   }, [queryWord, displayWord]);
@@ -1054,6 +1112,10 @@ export default function DictionaryModal() {
       e.preventDefault();
       e.stopPropagation();
     }
+    isUserTypingRef.current = false;
+    setSuggestions([]);
+    setIsSuggestOpen(false);
+    setActiveSuggestIdx(-1);
     setLocalInput('');
     if (clearDictionaryInput) {
       clearDictionaryInput();
@@ -1274,9 +1336,25 @@ export default function DictionaryModal() {
     }
   }, [activeDictTab, handleTabSelect, visibleTabs]);
 
+  const handleSelectSuggestion = useCallback((word) => {
+    if (!word) return;
+    isUserTypingRef.current = false;
+    setIsSuggestOpen(false);
+    setActiveSuggestIdx(-1);
+    setLocalInput(word);
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    inputRef.current?.blur();
+    performLookup(word, true);
+  }, [performLookup]);
+
   // Handle word search submission
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
+    isUserTypingRef.current = false;
+    setIsSuggestOpen(false);
+    setActiveSuggestIdx(-1);
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
@@ -1724,7 +1802,11 @@ export default function DictionaryModal() {
           <button
             ref={historyBtnRef}
             type="button"
-            onClick={() => setIsHistoryOpen((prev) => !prev)}
+            onClick={() => {
+              setIsSuggestOpen(false);
+              setActiveSuggestIdx(-1);
+              setIsHistoryOpen((prev) => !prev);
+            }}
             className={`p-1.5 rounded-lg transition cursor-pointer ${
               isHistoryOpen
                 ? 'text-[var(--accent)] bg-[var(--accent-light)]'
@@ -1835,47 +1917,152 @@ export default function DictionaryModal() {
           )}
         </div>
 
-        {/* Input Field with Dictionary Icon */}
-        <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-0">
-          <BookSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={localInput}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const isDeleting = raw.length < localInput.length;
-              let finalVal = raw;
-              if (!isDeleting) {
-                const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
-                finalVal = hasNonLatin ? raw : typeVelthuis(raw);
+        {/* Input Field with Dictionary Icon & Autocomplete Suggestions */}
+        <search ref={suggestContainerRef} className="relative flex-1 min-w-0">
+          <form onSubmit={handleSearchSubmit} className="relative">
+            <label htmlFor={dictInputId} className="sr-only">
+              Search Pāḷi dictionary
+            </label>
+            <BookSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] pointer-events-none" aria-hidden="true" />
+            <input
+              id={dictInputId}
+              name="w"
+              ref={inputRef}
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={isSuggestOpen && suggestions.length > 0}
+              aria-controls={dictListboxId}
+              aria-activedescendant={
+                isSuggestOpen && activeSuggestIdx >= 0 && suggestions[activeSuggestIdx]
+                  ? `${dictListboxId}-opt-${activeSuggestIdx}`
+                  : undefined
               }
-              setLocalInput(finalVal);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSearchSubmit(e);
-              }
-            }}
-            placeholder="Dictionary - multi words & 17 pāḷi scripts input accepted"
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-base sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
-          />
-          {localInput && (
-            <button
-              type="button"
-              onMouseDown={handleClearInput}
-              onTouchStart={handleClearInput}
-              onPointerDown={handleClearInput}
-              onClick={handleClearInput}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
-              title="Clear input"
-              aria-label="Clear input"
+              value={localInput}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const isDeleting = raw.length < localInput.length;
+                let finalVal = raw;
+                if (!isDeleting) {
+                  const hasNonLatin = /[^\u0000-\u024F\u1E00-\u1EFF\s\d\p{P}]/u.test(raw);
+                  finalVal = hasNonLatin ? raw : typeVelthuis(raw);
+                }
+                isUserTypingRef.current = true;
+                setIsHistoryOpen(false);
+                setLocalInput(finalVal);
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) {
+                  return;
+                }
+                const suggestVisible = isSuggestOpen && suggestions.length > 0;
+                if (e.key === 'ArrowDown' && suggestVisible) {
+                  e.preventDefault();
+                  setActiveSuggestIdx((prev) => (prev + 1) % suggestions.length);
+                  return;
+                }
+                if (e.key === 'ArrowUp' && suggestVisible) {
+                  e.preventDefault();
+                  setActiveSuggestIdx((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+                  return;
+                }
+                if (e.key === 'Escape' && suggestVisible) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsSuggestOpen(false);
+                  setActiveSuggestIdx(-1);
+                  return;
+                }
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (suggestVisible && activeSuggestIdx >= 0 && suggestions[activeSuggestIdx]) {
+                    handleSelectSuggestion(suggestions[activeSuggestIdx].word);
+                  } else {
+                    handleSearchSubmit(e);
+                  }
+                }
+              }}
+              placeholder="Dictionary - multi words & 17 pāḷi scripts input accepted"
+              className="dict-search-input w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl py-1.5 sm:py-2 pl-9 pr-8 text-base sm:text-sm outline-none focus:border-[var(--accent)] text-[var(--text-primary)] shadow-2xs transition"
+            />
+            {localInput && (
+              <button
+                type="button"
+                onMouseDown={handleClearInput}
+                onTouchStart={handleClearInput}
+                onPointerDown={handleClearInput}
+                onClick={handleClearInput}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] active:bg-[var(--bg-secondary)] cursor-pointer touch-manipulation z-20"
+                title="Clear input"
+                aria-label="Clear input"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </form>
+
+          {isSuggestOpen && suggestions.length > 0 && (
+            <ul
+              id={dictListboxId}
+              role="listbox"
+              aria-label="Dictionary word suggestions"
+              className="absolute left-0 right-0 top-full mt-1.5 max-h-72 overflow-y-auto overscroll-contain bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 divide-y divide-[var(--border-color)]/40"
             >
-              <X size={14} />
-            </button>
+              {suggestions.map((item, idx) => {
+                const isActive = idx === activeSuggestIdx;
+                const scriptWord =
+                  currentScript && currentScript !== 'roman'
+                    ? convertPaliScript(item.word, currentScript) || item.word
+                    : item.word;
+                return (
+                  <li
+                    key={`${item.word}-${idx}`}
+                    id={`${dictListboxId}-opt-${idx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActiveSuggestIdx(idx)}
+                    onClick={() => handleSelectSuggestion(item.word)}
+                    className={`min-h-[40px] px-3 py-2 cursor-pointer transition select-none flex flex-col justify-center gap-0.5 ${
+                      isActive
+                        ? 'bg-[var(--accent-light)] text-[var(--accent)]'
+                        : 'hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0 truncate">
+                        <span className="font-semibold text-xs sm:text-sm truncate">
+                          {scriptWord}
+                        </span>
+                        {currentScript && currentScript !== 'roman' && scriptWord !== item.word && (
+                          <span className="text-[11px] text-[var(--text-muted)] truncate shrink-0">
+                            ({item.word})
+                          </span>
+                        )}
+                      </div>
+                      {item.isExact && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-light)] text-[var(--accent)] font-bold shrink-0">
+                          Exact
+                        </span>
+                      )}
+                    </div>
+                    {item.preview && (
+                      <div className="text-[11px] text-[var(--text-muted)] truncate">
+                        {item.preview}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </form>
+        </search>
 
         {/* Pin / Unpin Side Panel Toggle (Desktop Left/Right Dock only) */}
         {dockMode !== 'modal' && typeof togglePinned === 'function' && (

@@ -226,8 +226,19 @@ def _load_translation_coverage(db_dir: Path, lang_code: str):
     coverage = {}
     conn = sqlite3.connect(str(db_file))
     try:
+        tables = {
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        tbl = (
+            "chapter_trans_pack"
+            if "chapter_trans_pack" in tables
+            else ("paragraph_translations" if "paragraph_translations" in tables else None)
+        )
+        if tbl is None:
+            return coverage
         for bcode, ch_idx in conn.execute(
-            "SELECT DISTINCT book_code, chapter_index FROM paragraph_translations "
+            f"SELECT DISTINCT book_code, chapter_index FROM {tbl} "
             "ORDER BY book_code, chapter_index"
         ):
             coverage.setdefault(bcode, set()).add(int(ch_idx))

@@ -418,4 +418,119 @@ class TipitakaCoreReader {
     if (c == null || pIdx == null) return null;
     return (bookCode: m.group(1)!, chapterIndex: c, paraIndex: pIdx);
   }
+
+  /// Decodes a V2 `chapter_trans_pack.data_z` BLOB into per-paragraph and
+  /// per-sentence translations.
+  ///
+  /// Wire format: zlib-compressed UTF-8 JSON array of entries:
+  /// `[para_index, para_num, para_translation, [[line_id, sent_translation], ...]]`
+  static List<
+    ({
+      int paraIndex,
+      String? paraNum,
+      String? translation,
+      List<({int lineId, String text})> sentences,
+    })
+  >
+  decodeChapterTransPack(List<int> dataZ) {
+    final raw = utf8.decode(zlib.decode(dataZ));
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+
+    final out =
+        <
+          ({
+            int paraIndex,
+            String? paraNum,
+            String? translation,
+            List<({int lineId, String text})> sentences,
+          })
+        >[];
+    for (final item in decoded) {
+      if (item is! List || item.length < 3) continue;
+      final pIdx = (item[0] as num?)?.toInt();
+      if (pIdx == null) continue;
+      final pNum = item[1]?.toString();
+      final paraText = item[2]?.toString();
+      final sents = <({int lineId, String text})>[];
+      if (item.length >= 4 && item[3] is List) {
+        for (final s in (item[3] as List)) {
+          if (s is! List || s.length < 2) continue;
+          final lid = (s[0] as num?)?.toInt();
+          final txt = s[1]?.toString();
+          if (lid != null && txt != null && txt.isNotEmpty) {
+            sents.add((lineId: lid, text: txt));
+          }
+        }
+      }
+      out.add((
+        paraIndex: pIdx,
+        paraNum: pNum,
+        translation: paraText,
+        sentences: sents,
+      ));
+    }
+    return out;
+  }
+
+  /// Reads and decodes a single chapter's V2 `chapter_trans_pack` row from
+  /// [transDb], returning `null` if the table does not exist.
+  static List<
+    ({
+      int paraIndex,
+      String? paraNum,
+      String? translation,
+      List<({int lineId, String text})> sentences,
+    })
+  >?
+  readChapterTranslationPack(
+    Database transDb,
+    String bookCode,
+    int chapterIndex,
+  ) {
+    if (!tableAndViewNames(transDb).contains('chapter_trans_pack')) {
+      return null;
+    }
+    try {
+      final rows = transDb.select(
+        'SELECT data_z FROM chapter_trans_pack '
+        'WHERE book_code = ? AND chapter_index = ? LIMIT 1',
+        [bookCode, chapterIndex],
+      );
+      if (rows.isEmpty || rows.first['data_z'] is! List<int>) {
+        return const [];
+      }
+      return decodeChapterTransPack(rows.first['data_z'] as List<int>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Transparently reads `chapter_links` JSON from `bold_definitions.db`,
+  /// supporting both V2 zlib-compressed `paragraphs_z` BLOB and V1
+  /// `paragraphs_json` TEXT.
+  static String? readChapterLinksJson(
+    Database boldDb,
+    String bookCode,
+    int chapterIndex,
+  ) {
+    final cols = tableColumns(boldDb, 'chapter_links');
+    final hasZ = cols.contains('paragraphs_z');
+    final hasJson = cols.contains('paragraphs_json');
+    if (!hasZ && !hasJson) return null;
+    final selectCols = hasZ && hasJson
+        ? 'paragraphs_json, paragraphs_z'
+        : (hasZ ? 'paragraphs_z' : 'paragraphs_json');
+    final rows = boldDb.select(
+      'SELECT $selectCols FROM chapter_links '
+      'WHERE book_code = ? AND chapter_index = ? LIMIT 1',
+      [bookCode, chapterIndex],
+    );
+    if (rows.isEmpty) return '';
+    final r = rows.first;
+    return decodeTextOrZlib(
+      hasJson ? r['paragraphs_json'] : null,
+      hasZ ? r['paragraphs_z'] : null,
+    );
+  }
 }

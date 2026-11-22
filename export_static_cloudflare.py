@@ -24,6 +24,7 @@ import os
 import sys
 import json
 import time
+import zlib
 import shutil
 import sqlite3
 import argparse
@@ -1219,9 +1220,20 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
 
-    books = [r[0] for r in cur.execute(
-        "SELECT DISTINCT book_code FROM paragraph_translations ORDER BY book_code"
-    ).fetchall()]
+    tables = {r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    use_v2_pack = 'chapter_trans_pack' in tables
+
+    if use_v2_pack:
+        books = [r[0] for r in cur.execute(
+            "SELECT DISTINCT book_code FROM chapter_trans_pack ORDER BY book_code"
+        ).fetchall()]
+    elif 'paragraph_translations' in tables:
+        books = [r[0] for r in cur.execute(
+            "SELECT DISTINCT book_code FROM paragraph_translations ORDER BY book_code"
+        ).fetchall()]
+    else:
+        conn.close()
+        return 0, 0, 0
 
     n_books = 0
     n_chapters = 0
@@ -1231,22 +1243,57 @@ def export_lang(db_path: Path, lang: str, target_api_dir: Path):
         chapters = {}
         sent_chapters = {}
         has_sentences = False
-        for ch_idx, para_idx, translation, sentences_json in cur.execute(
-            "SELECT chapter_index, para_index, translation, sentences_json FROM paragraph_translations "
-            "WHERE book_code = ? ORDER BY chapter_index, para_index",
-            (book_code,)
-        ):
-            ch = chapters.setdefault(str(ch_idx), {})
-            ch[str(para_idx)] = translation
-            if sentences_json:
+        if use_v2_pack:
+            for ch_idx, raw_pack in cur.execute(
+                "SELECT chapter_index, data_z FROM chapter_trans_pack "
+                "WHERE book_code = ? ORDER BY chapter_index",
+                (book_code,)
+            ):
+                raw_json = (
+                    zlib.decompress(raw_pack).decode('utf-8')
+                    if isinstance(raw_pack, (bytes, bytearray))
+                    else raw_pack
+                )
                 try:
-                    sents = json.loads(sentences_json)
+                    items = json.loads(raw_json)
                 except Exception:
-                    sents = None
-                if isinstance(sents, list) and len(sents) > 0:
-                    sch = sent_chapters.setdefault(str(ch_idx), {})
-                    sch[str(para_idx)] = sents
-                    has_sentences = True
+                    continue
+                if not isinstance(items, list):
+                    continue
+                ch = chapters.setdefault(str(ch_idx), {})
+                for entry in items:
+                    if not isinstance(entry, list) or len(entry) < 3:
+                        continue
+                    para_idx = entry[0]
+                    translation = entry[2]
+                    ch[str(para_idx)] = translation
+                    if len(entry) >= 4 and isinstance(entry[3], list) and len(entry[3]) > 0:
+                        sents = [
+                            {'line_id': s[0], 'translation': s[1]}
+                            for s in entry[3]
+                            if isinstance(s, list) and len(s) >= 2 and s[1]
+                        ]
+                        if sents:
+                            sch = sent_chapters.setdefault(str(ch_idx), {})
+                            sch[str(para_idx)] = sents
+                            has_sentences = True
+        else:
+            for ch_idx, para_idx, translation, sentences_json in cur.execute(
+                "SELECT chapter_index, para_index, translation, sentences_json FROM paragraph_translations "
+                "WHERE book_code = ? ORDER BY chapter_index, para_index",
+                (book_code,)
+            ):
+                ch = chapters.setdefault(str(ch_idx), {})
+                ch[str(para_idx)] = translation
+                if sentences_json:
+                    try:
+                        sents = json.loads(sentences_json)
+                    except Exception:
+                        sents = None
+                    if isinstance(sents, list) and len(sents) > 0:
+                        sch = sent_chapters.setdefault(str(ch_idx), {})
+                        sch[str(para_idx)] = sents
+                        has_sentences = True
 
         if not chapters:
             continue
@@ -1609,8 +1656,10 @@ def export_translations(args, paths):
         total_bytes += n_bytes
 
         conn = sqlite3.connect(str(db_path))
+        t_tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        t_tbl = "chapter_trans_pack" if "chapter_trans_pack" in t_tables else "paragraph_translations"
         valid_per_lang[lang] = {r[0] for r in conn.execute(
-            "SELECT DISTINCT book_code FROM paragraph_translations").fetchall()}
+            f"SELECT DISTINCT book_code FROM {t_tbl}").fetchall()}
         conn.close()
         log_success(f"  {lang}: {n_books} books, {n_chapters} chapters, {n_bytes / 1048576:.1f} MB")
 

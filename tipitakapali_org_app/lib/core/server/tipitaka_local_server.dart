@@ -253,6 +253,14 @@ class _TipitakaHttpRouter {
         final q = params['w'] ?? params['id'] ?? params['word'] ?? '';
         return _toShelfResponse(api.lookupInflection(q), noCache: true);
       }
+      if (segments[2] == 'suggest') {
+        final q = params['q'] ?? params['w'] ?? params['prefix'] ?? '';
+        final limit = int.tryParse(params['limit'] ?? '15') ?? 15;
+        return _toShelfResponse(
+          api.suggestDict(q, limit: limit),
+          noCache: true,
+        );
+      }
     }
 
     // Linked definitions contextual preview: /api/links/preview & /api/links/previews

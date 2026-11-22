@@ -1148,6 +1148,43 @@ class BoldDefinitionIndexService {
               ));
             }
             final tTables = TipitakaCoreReader.tableAndViewNames(tdb);
+            if (tTables.contains('chapter_trans_pack')) {
+              final byBookChap =
+                  <String, ({String book, int chap, Set<int> paras})>{};
+              for (final loc in uniqueLocations.values) {
+                final key = '${loc.book}|${loc.chap}';
+                byBookChap
+                    .putIfAbsent(
+                      key,
+                      () => (book: loc.book, chap: loc.chap, paras: <int>{}),
+                    )
+                    .paras
+                    .add(loc.para);
+              }
+              for (final grp in byBookChap.values) {
+                final pack = TipitakaCoreReader.readChapterTranslationPack(
+                  tdb,
+                  grp.book,
+                  grp.chap,
+                );
+                if (pack == null) continue;
+                for (final entry in pack) {
+                  if (!grp.paras.contains(entry.paraIndex)) continue;
+                  final pKey = '$lang|${grp.book}:${grp.chap}:${entry.paraIndex}';
+                  for (final s in entry.sentences) {
+                    final st = s.text.trim();
+                    if (st.isEmpty) continue;
+                    parasWithSentTrans.add(pKey);
+                    sentTransByLine['$pKey:${s.lineId}'] = st;
+                  }
+                  final pText = (entry.translation ?? '').trim();
+                  if (pText.isNotEmpty) {
+                    paraFallbackByLoc[pKey] = pText;
+                  }
+                }
+              }
+              continue;
+            }
             final hasSentTable = tTables.contains('sentence_translations');
             final hasParaTable = tTables.contains('paragraph_translations');
             final paraCols = hasParaTable

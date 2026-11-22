@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const Database = require('better-sqlite3');
 const { convertAnyToRoman } = require('./transliterate');
 const {
@@ -11,6 +12,8 @@ const {
   decodeChapterPackBlob,
   readChapterPack,
   readChapterSentences,
+  hasChapterTransPack,
+  readChapterTranslationPack,
 } = require('./tipitakaCoreHelper');
 
 const BOLD_DB_FILENAME = 'bold_definitions.db';
@@ -477,11 +480,12 @@ class BoldLinkedEngine {
       checkDb = new Database(dstPath, { readonly: true });
       const rows = checkDb.prepare('SELECT key, value FROM meta').all();
       const meta = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-      if (
-        meta.schema_version !== SCHEMA_VERSION ||
-        meta.source_size !== String(srcStat.size) ||
-        meta.source_mtime !== String(Math.floor(srcStat.mtimeMs))
-      ) {
+      if (meta.schema_version !== SCHEMA_VERSION || meta.source_size !== String(srcStat.size)) {
+        return false;
+      }
+      // Prebuilt V2 bold_definitions.db assets preserve schema_version + source_size
+      // across machines/deploys; avoid rebuilding solely due to file copy mtime shifts.
+      if (meta.chapter_links_compressed !== '1' && meta.source_mtime !== String(Math.floor(srcStat.mtimeMs))) {
         return false;
       }
       const cnt = checkDb.prepare('SELECT COUNT(*) AS c FROM bold_definitions').get()?.c || 0;
@@ -820,8 +824,14 @@ class BoldLinkedEngine {
     const paraFallbackByLoc = new Map();
     const parasWithSentTrans = new Set();
     if (this.translationEngine && Array.isArray(enabledLangs) && enabledLangs.length > 0 && uniqueLocs.size > 0) {
+      const byBookChap = new Map();
       const byBook = new Map();
       for (const loc of uniqueLocs.values()) {
+        const bcKey = `${loc.book}|${loc.chap}`;
+        if (!byBookChap.has(bcKey)) {
+          byBookChap.set(bcKey, { book: loc.book, chap: loc.chap, paras: new Set() });
+        }
+        byBookChap.get(bcKey).paras.add(loc.para);
         if (!byBook.has(loc.book)) byBook.set(loc.book, new Set());
         byBook.get(loc.book).add(loc.para);
       }
@@ -830,6 +840,27 @@ class BoldLinkedEngine {
         if (!code) continue;
         const entry = this.translationEngine.databases.get(code);
         if (!entry) continue;
+        if (entry.isV2 || hasChapterTransPack(entry.db)) {
+          for (const grp of byBookChap.values()) {
+            const pack = readChapterTranslationPack(entry.db, grp.book, grp.chap);
+            for (const paraIdx of grp.paras) {
+              const pEntry = pack.get(paraIdx);
+              if (!pEntry) continue;
+              const pKey = `${code}|${grp.book}:${grp.chap}:${paraIdx}`;
+              if (Array.isArray(pEntry.sentences)) {
+                for (const sr of pEntry.sentences) {
+                  const txt = String(sr.translation || '').trim();
+                  if (!txt) continue;
+                  parasWithSentTrans.add(pKey);
+                  sentTransByLine.set(`${pKey}:${Number(sr.line_id)}`, txt);
+                }
+              }
+              const pTxt = String(pEntry.translation || '').trim();
+              if (pTxt) paraFallbackByLoc.set(pKey, pTxt);
+            }
+          }
+          continue;
+        }
         for (const [bookCode, paraSet] of byBook.entries()) {
           const params = Array.from(paraSet);
           const ph = params.map(() => '?').join(',');
@@ -1039,15 +1070,27 @@ class BoldLinkedEngine {
     if (!this.dbTipitaka || !bdb) return empty;
 
     if (getTableSet(bdb).has('chapter_links')) {
-      const row = bdb
-        .prepare('SELECT paragraphs_json FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1')
-        .get(bookCode, chapterIndex);
-      const res = row
-        ? { book_code: bookCode, chapter_index: chapterIndex, paragraphs: JSON.parse(row.paragraphs_json) }
-        : empty;
-      if (this.chapterLinksCache.size > 150) this.chapterLinksCache.clear();
-      this.chapterLinksCache.set(cacheKey, res);
-      return res;
+      const linkCols = getColumnSet(bdb, 'chapter_links');
+      const hasZ = linkCols.has('paragraphs_z');
+      const hasJson = linkCols.has('paragraphs_json');
+      if (hasZ || hasJson) {
+        const selectCols = hasZ && hasJson ? 'paragraphs_json, paragraphs_z' : (hasZ ? 'paragraphs_z' : 'paragraphs_json');
+        const row = bdb
+          .prepare(`SELECT ${selectCols} FROM chapter_links WHERE book_code = ? AND chapter_index = ? LIMIT 1`)
+          .get(bookCode, chapterIndex);
+        let res = empty;
+        if (row) {
+          try {
+            const rawJson = decodeTextOrZlib(hasJson ? row.paragraphs_json : null, hasZ ? row.paragraphs_z : null);
+            if (rawJson) {
+              res = { book_code: bookCode, chapter_index: chapterIndex, paragraphs: JSON.parse(rawJson) };
+            }
+          } catch (_) {}
+        }
+        if (this.chapterLinksCache.size > 150) this.chapterLinksCache.clear();
+        this.chapterLinksCache.set(cacheKey, res);
+        return res;
+      }
     }
 
     const payload = this._computeLinksForChapter(bdb, bookCode, chapterIndex, null);
@@ -1552,42 +1595,60 @@ class BoldLinkedEngine {
         const entry = this.translationEngine.databases.get(code);
         if (!entry) continue;
         try {
-          const pRows = this._prep(entry.db, 'SELECT para_index, translation, sentences_json FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index').all(book, targetChapIdx, minParaIdx, maxParaIdx);
           const pMap = new Map();
           const sMap = new Map();
-          for (const pr of pRows) {
-            if (pr.translation && String(pr.translation).trim()) pMap.set(pr.para_index, String(pr.translation).trim());
-            if (pr.sentences_json) {
-              try {
-                const dec = JSON.parse(pr.sentences_json);
-                if (Array.isArray(dec)) {
-                  for (let idx = 0; idx < dec.length; idx++) {
-                    const item = dec[idx];
-                    if (typeof item === 'string') {
-                      const txt = item.trim();
-                      if (txt) {
+          if (entry.isV2 || hasChapterTransPack(entry.db)) {
+            const pack = readChapterTranslationPack(entry.db, book, targetChapIdx);
+            for (const [paraIdx, pEntry] of pack.entries()) {
+              if (paraIdx < minParaIdx || paraIdx > maxParaIdx) continue;
+              if (pEntry.translation && String(pEntry.translation).trim()) {
+                pMap.set(paraIdx, String(pEntry.translation).trim());
+              }
+              if (Array.isArray(pEntry.sentences)) {
+                for (const sr of pEntry.sentences) {
+                  const txt = String(sr.translation || '').trim();
+                  if (!txt) continue;
+                  if (!sMap.has(paraIdx)) sMap.set(paraIdx, new Map());
+                  sMap.get(paraIdx).set(Number(sr.line_id), txt);
+                }
+              }
+            }
+          } else {
+            const pRows = this._prep(entry.db, 'SELECT para_index, translation, sentences_json FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index').all(book, targetChapIdx, minParaIdx, maxParaIdx);
+            for (const pr of pRows) {
+              if (pr.translation && String(pr.translation).trim()) pMap.set(pr.para_index, String(pr.translation).trim());
+              if (pr.sentences_json) {
+                try {
+                  const dec = JSON.parse(pr.sentences_json);
+                  if (Array.isArray(dec)) {
+                    for (let idx = 0; idx < dec.length; idx++) {
+                      const item = dec[idx];
+                      if (typeof item === 'string') {
+                        const txt = item.trim();
+                        if (txt) {
+                          if (!sMap.has(pr.para_index)) sMap.set(pr.para_index, new Map());
+                          sMap.get(pr.para_index).set(idx + 1, txt);
+                        }
+                      } else if (item && item.line_id !== undefined && item.translation && String(item.translation).trim()) {
                         if (!sMap.has(pr.para_index)) sMap.set(pr.para_index, new Map());
-                        sMap.get(pr.para_index).set(idx + 1, txt);
+                        sMap.get(pr.para_index).set(Number(item.line_id), String(item.translation).trim());
                       }
-                    } else if (item && item.line_id !== undefined && item.translation && String(item.translation).trim()) {
-                      if (!sMap.has(pr.para_index)) sMap.set(pr.para_index, new Map());
-                      sMap.get(pr.para_index).set(Number(item.line_id), String(item.translation).trim());
                     }
                   }
+                } catch (_) {}
+              }
+            }
+            if (sMap.size === 0) {
+              try {
+                const stRows = this._prep(entry.db, 'SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index, line_id').all(book, targetChapIdx, minParaIdx, maxParaIdx);
+                for (const sr of stRows) {
+                  const txt = String(sr.translation || '').trim();
+                  if (!txt) continue;
+                  if (!sMap.has(sr.para_index)) sMap.set(sr.para_index, new Map());
+                  sMap.get(sr.para_index).set(Number(sr.line_id), txt);
                 }
               } catch (_) {}
             }
-          }
-          if (sMap.size === 0) {
-            try {
-              const stRows = this._prep(entry.db, 'SELECT para_index, line_id, translation FROM sentence_translations WHERE book_code = ? AND chapter_index = ? AND para_index BETWEEN ? AND ? ORDER BY para_index, line_id').all(book, targetChapIdx, minParaIdx, maxParaIdx);
-              for (const sr of stRows) {
-                const txt = String(sr.translation || '').trim();
-                if (!txt) continue;
-                if (!sMap.has(sr.para_index)) sMap.set(sr.para_index, new Map());
-                sMap.get(sr.para_index).set(Number(sr.line_id), txt);
-              }
-            } catch (_) {}
           }
           if (pMap.size > 0 || sMap.size > 0) {
             loadedLangs.push(code);

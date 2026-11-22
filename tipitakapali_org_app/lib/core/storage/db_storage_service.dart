@@ -268,10 +268,16 @@ class DbStorageService {
           invalid.add(name);
         }
       } else if (transRegex.hasMatch(name)) {
-        if (!_hasValidSqliteSchemaSync(
+        final hasV2 = _hasValidSqliteSchemaSync(
           entry.path,
-          requiredTables: const ['paragraph_translations'],
-        )) {
+          requiredTables: const ['chapter_trans_pack'],
+        );
+        final hasV1 = !hasV2 &&
+            _hasValidSqliteSchemaSync(
+              entry.path,
+              requiredTables: const ['paragraph_translations'],
+            );
+        if (!hasV2 && !hasV1) {
           invalid.add(name);
         }
       }

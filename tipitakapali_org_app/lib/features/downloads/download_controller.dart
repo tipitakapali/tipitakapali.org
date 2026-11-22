@@ -63,14 +63,6 @@ class DownloadCenterState {
 
   static const _defaultOptionalIds = {
     'translation_en',
-    'dpd_tipitakapali',
-    'dpd_splitter',
-    'dpd_inflection',
-    'dpd_synonyms',
-    'ptsped2015ed',
-    'abhidhan',
-    'ap_bh_mw_sanskrit',
-    'palisinh',
   };
 
   const DownloadCenterState({
@@ -103,7 +95,13 @@ class DownloadCenterState {
     if (m == null) return false;
     final required = m.compulsoryAssets;
     if (required.isEmpty) return installedDbs.containsKey('tipitaka.db');
-    return required.every((a) => installedDbs.containsKey(a.filename));
+    final hasLegacyDicts =
+        DownloadController.hasLegacyDictionariesInstalled(installedDbs);
+    return required.every(
+      (a) =>
+          installedDbs.containsKey(a.filename) ||
+          (a.filename == 'dictionaries.db' && hasLegacyDicts),
+    );
   }
 
   bool get hasCoreFts => installedDbs.containsKey('fts_tipitaka.db');
@@ -221,6 +219,22 @@ class DownloadController extends Notifier<DownloadCenterState> {
   static const _prefOnboardingCompleted = 'onboarding_completed_v1';
   static const _prefOnboardingInProgress = 'onboarding_in_progress_v1';
 
+  static const List<String> legacyDictionaryFilenames = [
+    'dpd_tipitakapali.db',
+    'dpd_synonyms_tipitakapali.db',
+    'dpd_splitter_tipitakapali.db',
+    'dpd_inflection_tipitakapali.db',
+    'ptsped2015ed_tipitakapali.db',
+    'legacy_ptsped2015ed_tipitakapali.db',
+    'abhidhan_tipitakapali.db',
+    'palisinh.db',
+    'ap_bh_mw_sanskrit.db',
+  ];
+
+  static bool hasLegacyDictionariesInstalled(
+    Map<String, InstalledDbInfo> installed,
+  ) => legacyDictionaryFilenames.any(installed.containsKey);
+
   final Map<String, DownloadCancellationToken> _tokens = {};
   bool _initialized = false;
   bool _disposed = false;
@@ -262,6 +276,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
       var installed = await _storage.listInstalledDatabases();
       if (_disposed) return;
 
+      if (installed.containsKey('dictionaries.db') &&
+          hasLegacyDictionariesInstalled(installed)) {
+        await _cleanupObsoleteLegacyDictionaries(prefs: prefs);
+        if (_disposed) return;
+        installed = await _storage.listInstalledDatabases();
+        if (_disposed) return;
+      }
+
       // Load bundled manifest immediately so onboarding/offline launches render in <10ms,
       // then check the online repository manifest in the background.
       final bundled = await _releaseService.loadBundledManifest();
@@ -293,9 +315,14 @@ class DownloadController extends Notifier<DownloadCenterState> {
       if (_disposed) return;
 
       final requiredCompulsory = bundled.compulsoryAssets;
+      final hasLegacyDicts = hasLegacyDictionariesInstalled(installed);
       final hasAllCompulsory = requiredCompulsory.isEmpty
           ? installed.containsKey('tipitaka.db')
-          : requiredCompulsory.every((a) => installed.containsKey(a.filename));
+          : requiredCompulsory.every(
+              (a) =>
+                  installed.containsKey(a.filename) ||
+                  (a.filename == 'dictionaries.db' && hasLegacyDicts),
+            );
       final hasCoreFts = installed.containsKey('fts_tipitaka.db');
       final hasMissingTransFts = _findMissingTranslationFtsLangs(installed)
           .isNotEmpty;
@@ -525,6 +552,18 @@ class DownloadController extends Notifier<DownloadCenterState> {
         );
       }
     }
+    final dictV2Asset = manifest.findAsset(filename: 'dictionaries.db');
+    if (dictV2Asset != null &&
+        !installed.containsKey('dictionaries.db') &&
+        hasLegacyDictionariesInstalled(installed)) {
+      updates.add(
+        DatabaseUpdateItem(
+          asset: dictV2Asset,
+          installedVersion: 1,
+          installedUpdated: 'Legacy V1 dictionaries',
+        ),
+      );
+    }
     updates.sort(
       (a, b) => _downloadPriority(a.asset).compareTo(_downloadPriority(b.asset)),
     );
@@ -647,11 +686,13 @@ class DownloadController extends Notifier<DownloadCenterState> {
   bool _hasPendingSelectedDownloads([DatabaseManifest? overrideManifest]) {
     final m = overrideManifest ?? state.manifest;
     if (m == null) return false;
+    final hasLegacyDicts = hasLegacyDictionariesInstalled(state.installedDbs);
     return m.allCatalogAssets.any(
       (a) =>
           a.category != DbCategory.fts &&
           (a.compulsory || state.selectedOptionalIds.contains(a.id)) &&
-          !state.installedDbs.containsKey(a.filename),
+          !state.installedDbs.containsKey(a.filename) &&
+          !(a.filename == 'dictionaries.db' && hasLegacyDicts),
     );
   }
 
@@ -944,6 +985,10 @@ class DownloadController extends Notifier<DownloadCenterState> {
           );
         }
         await refreshInstalled();
+        if (targetAsset.filename == 'dictionaries.db') {
+          await _cleanupObsoleteLegacyDictionaries();
+          await refreshInstalled();
+        }
         var ftsOk = true;
         if (shouldIndexNow) {
           ftsOk = await _indexAfterInstall(targetAsset.filename);
@@ -1406,6 +1451,10 @@ class DownloadController extends Notifier<DownloadCenterState> {
           );
         }
         await refreshInstalled();
+        if (targetAsset.filename == 'dictionaries.db') {
+          await _cleanupObsoleteLegacyDictionaries();
+          await refreshInstalled();
+        }
         var ftsOk = true;
         if (shouldIndexNow) {
           ftsOk = await _indexAfterInstall(targetAsset.filename);
@@ -1449,6 +1498,20 @@ class DownloadController extends Notifier<DownloadCenterState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_prefInstalledMetaPrefix$filename');
     await refreshInstalled();
+  }
+
+  Future<void> _cleanupObsoleteLegacyDictionaries({
+    SharedPreferences? prefs,
+  }) async {
+    final sp = prefs ?? await SharedPreferences.getInstance();
+    for (final filename in legacyDictionaryFilenames) {
+      try {
+        await _storage.deleteDatabase(filename);
+      } catch (_) {
+        // Best-effort cleanup; ignore transient OS file locks.
+      }
+      await sp.remove('$_prefInstalledMetaPrefix$filename');
+    }
   }
 
   void _updateTransfer(DownloadProgress progress) {

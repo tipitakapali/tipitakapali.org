@@ -111,6 +111,7 @@ class _DictionaryPopupPanelState extends ConsumerState<DictionaryPopupPanel> {
   DictionaryDbPaths _resolveDbPaths() {
     final installed = ref.read(downloadControllerProvider).installedDbs;
     return DictionaryDbPaths(
+      unifiedDictDbPath: installed['dictionaries.db']?.path,
       dpdDbPath: installed['dpd_tipitakapali.db']?.path,
       synonymsDbPath: installed['dpd_synonyms_tipitakapali.db']?.path,
       splitterDbPath: installed['dpd_splitter_tipitakapali.db']?.path,
@@ -177,7 +178,11 @@ class _DictionaryPopupPanelState extends ConsumerState<DictionaryPopupPanel> {
     final paths = _resolveDbPaths();
     final table = ref
         .read(dictionaryRepositoryProvider)
-        .lookupInflection(paths.inflectionDbPath, key);
+        .lookupInflection(
+          paths.inflectionDbPath,
+          key,
+          unifiedDictDbPath: paths.unifiedDictDbPath,
+        );
     setState(() {
       _expandedInflectionKey = key;
       _inflectionData = table;

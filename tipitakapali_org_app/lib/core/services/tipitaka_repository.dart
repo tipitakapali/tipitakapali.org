@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'dictionary_repository.dart';
+import 'tipitaka_core_reader.dart';
 
 export 'dictionary_repository.dart';
 
@@ -882,6 +883,18 @@ class TipitakaRepository {
     }
     final db = _openReadOnly(translationDbPath);
     try {
+      final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+        db,
+        bookCode,
+        chapterIndex,
+      );
+      if (v2Pack != null) {
+        return {
+          for (final item in v2Pack)
+            if (item.translation != null)
+              item.paraIndex: stripSimpleHtml(item.translation!),
+        };
+      }
       final rows = db.select(
         'SELECT para_index, translation FROM paragraph_translations '
         'WHERE book_code = ? AND chapter_index = ? ORDER BY para_index ASC',
@@ -910,6 +923,23 @@ class TipitakaRepository {
     }
     final db = _openReadOnly(translationDbPath);
     try {
+      final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+        db,
+        bookCode,
+        chapterIndex,
+      );
+      if (v2Pack != null) {
+        final out = <int, Map<int, String>>{};
+        for (final item in v2Pack) {
+          for (final s in item.sentences) {
+            if (s.text.trim().isNotEmpty) {
+              out.putIfAbsent(item.paraIndex, () => <int, String>{})[s.lineId] =
+                  stripSimpleHtml(s.text);
+            }
+          }
+        }
+        return out;
+      }
       final rows = db.select(
         'SELECT para_index, line_id, translation FROM sentence_translations '
         'WHERE book_code = ? AND chapter_index = ? ORDER BY para_index ASC, line_id ASC',
@@ -1161,6 +1191,7 @@ class TipitakaRepository {
   /// Preserved flat lookup API; delegates to [DictionaryRepository].
   List<DictionaryEntry> lookupWord({
     required String rawWord,
+    String? unifiedDictDbPath,
     String? dpdDbPath,
     String? synonymsDbPath,
     String? splitterDbPath,
@@ -1174,6 +1205,7 @@ class TipitakaRepository {
         .lookup(
           rawWord,
           DictionaryDbPaths(
+            unifiedDictDbPath: unifiedDictDbPath,
             dpdDbPath: dpdDbPath,
             synonymsDbPath: synonymsDbPath,
             splitterDbPath: splitterDbPath,

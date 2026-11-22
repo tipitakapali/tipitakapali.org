@@ -690,6 +690,45 @@ export async function fetchBoldDefinitionLookup(word, options = {}) {
   return fetchDictionaryLookup(word, 'bold_def', options);
 }
 
+export async function fetchDictionarySuggestions(prefix, options = {}) {
+  const cleanPrefix = cleanDictionaryQuery(prefix || '').trim();
+  if (cleanPrefix.length < 2 || cleanPrefix.startsWith('##')) {
+    return { query: cleanPrefix, suggestions: [] };
+  }
+
+  const parsedLimit = Number.isFinite(Number(options.limit))
+    ? Math.floor(Number(options.limit))
+    : 15;
+  const limit = Math.min(Math.max(parsedLimit, 1), 30);
+
+  const params = new URLSearchParams();
+  params.set('q', cleanPrefix);
+  params.set('limit', String(limit));
+
+  const qs = params.toString();
+  const cacheKey = `dict_suggest_${qs}`;
+  const base = getDictApiBase();
+
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const res = await fetch(`${base}/api/dict/suggest?${qs}`, {
+        signal: options.signal,
+      });
+      if (!res.ok) {
+        return { query: cleanPrefix, suggestions: [] };
+      }
+      const data = await res.json();
+      return {
+        query: data?.query || cleanPrefix,
+        suggestions: Array.isArray(data?.suggestions) ? data.suggestions : [],
+      };
+    },
+    24 * 60 * 60 * 1000,
+    options.signal
+  );
+}
+
 /**
  * Fetches the dynamic DPD feedback template from database (payload ##tipitakapalidpdfeedback)
  * Adapted from ref/tipitakapali.org/web/handleClick_dev.js (getFeedbackTemplateFromDb)

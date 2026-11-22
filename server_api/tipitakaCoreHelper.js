@@ -3,6 +3,7 @@
 const zlib = require('zlib');
 
 const _packCacheByDb = new WeakMap();
+const _transPackCacheByDb = new WeakMap();
 const MAX_PACK_CACHE = 40;
 
 const GUID_RE = /^(.+?):c(\d+):n[^:]*:p(\d+)$/;
@@ -13,6 +14,80 @@ function getTableSet(db) {
     .prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'")
     .all();
   return new Set(rows.map((r) => r.name));
+}
+
+function hasChapterTransPack(db) {
+  return getTableSet(db).has('chapter_trans_pack');
+}
+
+function decodeChapterTransPackBlob(buf) {
+  const map = new Map();
+  if (!buf) return map;
+  const raw = Buffer.isBuffer(buf) ? zlib.inflateSync(buf).toString('utf8') : String(buf);
+  const rows = JSON.parse(raw);
+  if (!Array.isArray(rows)) return map;
+
+  for (const item of rows) {
+    if (!Array.isArray(item) || item.length < 3) continue;
+    const paraIndex = Number(item[0]);
+    if (!Number.isFinite(paraIndex)) continue;
+    const paraNum = item[1] !== undefined && item[1] !== null ? String(item[1]) : null;
+    const translation = item[2] !== undefined && item[2] !== null ? String(item[2]) : null;
+    const sents = [];
+    if (Array.isArray(item[3])) {
+      for (const s of item[3]) {
+        if (!Array.isArray(s) || s.length < 2) continue;
+        const lineId = Number(s[0]);
+        const txt = s[1] !== undefined && s[1] !== null ? String(s[1]) : '';
+        if (Number.isFinite(lineId) && txt) {
+          sents.push({ line_id: lineId, translation: txt });
+        }
+      }
+    }
+    map.set(paraIndex, {
+      paraIndex,
+      paraNum,
+      translation,
+      sentences: sents,
+    });
+  }
+  return map;
+}
+
+function readChapterTranslationPack(db, bookCode, chapterIndex) {
+  const empty = new Map();
+  if (!db || !bookCode) return empty;
+
+  let packCache = _transPackCacheByDb.get(db);
+  if (!packCache) {
+    packCache = new Map();
+    _transPackCacheByDb.set(db, packCache);
+  }
+  const key = `${bookCode}#${chapterIndex}`;
+  const cached = packCache.get(key);
+  if (cached) {
+    packCache.delete(key);
+    packCache.set(key, cached);
+    return cached;
+  }
+
+  let res = empty;
+  try {
+    if (hasChapterTransPack(db)) {
+      const row = db
+        .prepare('SELECT data_z FROM chapter_trans_pack WHERE book_code = ? AND chapter_index = ? LIMIT 1')
+        .get(bookCode, chapterIndex);
+      if (row && row.data_z) {
+        res = decodeChapterTransPackBlob(row.data_z);
+      }
+    }
+  } catch (_) {}
+
+  if (packCache.size >= MAX_PACK_CACHE) {
+    packCache.delete(packCache.keys().next().value);
+  }
+  packCache.set(key, res);
+  return res;
 }
 
 function getColumnSet(db, tableName) {
@@ -242,6 +317,9 @@ module.exports = {
   decodeTextOrZlib,
   decodeChapterPackBlob,
   readChapterPack,
+  hasChapterTransPack,
+  decodeChapterTransPackBlob,
+  readChapterTranslationPack,
   hasPaliSentencesSupport,
   readBookSentences,
   readChapterSentences,

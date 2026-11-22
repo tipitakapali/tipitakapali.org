@@ -45,12 +45,14 @@ Usage:
 import argparse
 import glob
 import html
+import json
 import os
 import re
 import sqlite3
 import sys
 import time
 import unicodedata
+import zlib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(SCRIPT_DIR, "db")
@@ -202,12 +204,34 @@ def build_fts_for_lang(lang_code: str, db_dir: str, books_meta: dict, rend_map: 
     except Exception:
         pass
 
-    rows = src_cur.execute("""
-        SELECT book_code, para_index, para_num, translation 
-        FROM paragraph_translations 
-        WHERE translation IS NOT NULL AND length(trim(translation)) > 0
-        ORDER BY book_code, para_index;
-    """).fetchall()
+    src_tables = {
+        r[0]
+        for r in src_cur.execute(
+            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+        ).fetchall()
+    }
+    if "chapter_trans_pack" in src_tables and "paragraph_translations" not in src_tables:
+        rows = []
+        for bcode, _cidx, data_z in src_cur.execute(
+            "SELECT book_code, chapter_index, data_z FROM chapter_trans_pack ORDER BY book_code, chapter_index;"
+        ):
+            if not data_z:
+                continue
+            raw_json = zlib.decompress(data_z).decode("utf-8") if isinstance(data_z, (bytes, bytearray)) else str(data_z)
+            for item in json.loads(raw_json):
+                if not isinstance(item, list) or len(item) < 3:
+                    continue
+                p_idx, p_num, trans = item[0], item[1], item[2]
+                if trans and str(trans).strip():
+                    rows.append((bcode, p_idx, p_num, str(trans)))
+        rows.sort(key=lambda r: (r[0], r[1]))
+    else:
+        rows = src_cur.execute("""
+            SELECT book_code, para_index, para_num, translation 
+            FROM paragraph_translations 
+            WHERE translation IS NOT NULL AND length(trim(translation)) > 0
+            ORDER BY book_code, para_index;
+        """).fetchall()
     src_conn.close()
 
     total_rows = len(rows)
@@ -366,7 +390,29 @@ def show_status(db_dir: str):
         t_mtime = os.path.getmtime(p)
         try:
             c_t = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
-            t_paras = c_t.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
+            t_tbls = {
+                r[0]
+                for r in c_t.execute(
+                    "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                ).fetchall()
+            }
+            if "chapter_trans_pack" in t_tbls and "paragraph_translations" not in t_tbls:
+                tp_row = c_t.execute(
+                    "SELECT value FROM translation_meta WHERE key = 'total_paragraphs' LIMIT 1"
+                ).fetchone()
+                if tp_row and tp_row[0] is not None:
+                    t_paras = int(tp_row[0])
+                else:
+                    t_paras = 0
+                    for (data_z,) in c_t.execute("SELECT data_z FROM chapter_trans_pack"):
+                        if not data_z:
+                            continue
+                        raw_json = zlib.decompress(data_z).decode("utf-8") if isinstance(data_z, (bytes, bytearray)) else str(data_z)
+                        for item in json.loads(raw_json):
+                            if isinstance(item, list) and len(item) >= 3 and item[2] and str(item[2]).strip():
+                                t_paras += 1
+            else:
+                t_paras = c_t.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
             c_t.close()
         except Exception:
             t_paras = -1
@@ -445,7 +491,29 @@ def main():
                 # Also check row count difference
                 try:
                     c_src = sqlite3.connect(f"file:{src_db}?mode=ro", uri=True)
-                    src_cnt = c_src.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
+                    src_tbls = {
+                        r[0]
+                        for r in c_src.execute(
+                            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+                        ).fetchall()
+                    }
+                    if "chapter_trans_pack" in src_tbls and "paragraph_translations" not in src_tbls:
+                        tp_row = c_src.execute(
+                            "SELECT value FROM translation_meta WHERE key = 'total_paragraphs' LIMIT 1"
+                        ).fetchone()
+                        if tp_row and tp_row[0] is not None:
+                            src_cnt = int(tp_row[0])
+                        else:
+                            src_cnt = 0
+                            for (data_z,) in c_src.execute("SELECT data_z FROM chapter_trans_pack"):
+                                if not data_z:
+                                    continue
+                                raw_json = zlib.decompress(data_z).decode("utf-8") if isinstance(data_z, (bytes, bytearray)) else str(data_z)
+                                for item in json.loads(raw_json):
+                                    if isinstance(item, list) and len(item) >= 3 and item[2] and str(item[2]).strip():
+                                        src_cnt += 1
+                    else:
+                        src_cnt = c_src.execute("SELECT count(*) FROM paragraph_translations WHERE translation IS NOT NULL AND length(trim(translation)) > 0").fetchone()[0]
                     c_src.close()
                     c_dst = sqlite3.connect(f"file:{dst_db}?mode=ro", uri=True)
                     dst_cnt = c_dst.execute("SELECT count(*) FROM paragraphs_fts").fetchone()[0]

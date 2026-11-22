@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: "none"
 
-version: 26.11.25+95
+version: 26.11.27+99
 
 environment:
   sdk: ^3.13.7
@@ -53,6 +53,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/databases_manifest.json
+    - assets/databases_manifest_v2.json
     - assets/web.zip
     - assets/web_bundle_stamp.txt
     - assets/dpd_family_data.json.gz

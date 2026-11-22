@@ -627,6 +627,23 @@ extension TipitakaWebAiApi on TipitakaWebApi {
           final tdb = _openDb('translation_$code.db');
           if (tdb == null) continue;
           try {
+            final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+              tdb,
+              rowBook,
+              rowChap,
+            );
+            if (v2Pack != null) {
+              for (final item in v2Pack) {
+                if (item.paraIndex == rowParaIdx) {
+                  final txt = item.translation?.trim();
+                  if (txt != null && txt.isNotEmpty) {
+                    translations[lang] = txt;
+                  }
+                  break;
+                }
+              }
+              continue;
+            }
             var tRows = tdb.select(
               'SELECT translation FROM paragraph_translations '
               'WHERE book_code = ? AND chapter_index = ? AND para_index = ? LIMIT 1',
@@ -777,6 +794,53 @@ extension TipitakaWebAiApi on TipitakaWebApi {
       if (tdb == null) continue;
 
       var langRows = <Map<String, dynamic>>[];
+      final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+        tdb,
+        targetCode,
+        activeChap,
+      );
+      if (v2Pack != null) {
+        if (pIdx != null) {
+          for (final item in v2Pack) {
+            if (item.paraIndex != pIdx) continue;
+            if (lid != null) {
+              for (final s in item.sentences) {
+                if (s.lineId == lid) {
+                  langRows.add({'line_id': lid, 'translation': s.text});
+                  break;
+                }
+              }
+            } else {
+              for (final s in item.sentences) {
+                langRows.add({'line_id': s.lineId, 'translation': s.text});
+              }
+            }
+            if (langRows.isEmpty &&
+                item.translation != null &&
+                item.translation!.isNotEmpty) {
+              langRows = [
+                {'line_id': lid ?? 1, 'translation': item.translation},
+              ];
+            }
+            break;
+          }
+        } else {
+          for (final item in v2Pack) {
+            for (final s in item.sentences) {
+              langRows.add({
+                'para_index': item.paraIndex,
+                'line_id': s.lineId,
+                'translation': s.text,
+              });
+              if (langRows.length >= 80) break;
+            }
+            if (langRows.length >= 80) break;
+          }
+        }
+        translations[lang] = langRows;
+        continue;
+      }
+
       try {
         if (pIdx != null && lid != null) {
           final rows = tdb.select(

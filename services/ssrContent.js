@@ -14,6 +14,21 @@ let _sqliteDriver = undefined; // { type: 'better-sqlite3' | 'node-sqlite', Ctor
 const _dbHandles = new Map(); // filename -> db handle | null
 const _availLangsCache = new Map(); // `${bookCode}|${chapterIndex ?? 'book'}` -> Set<string> | null
 const _transChapsCache = new Map(); // `${langCode}|${bookCode}` -> Set<number> | null
+const _transV2Cache = new WeakMap();
+
+function isV2TransDb(db) {
+  if (!db) return false;
+  if (_transV2Cache.has(db)) return _transV2Cache.get(db);
+  let v2 = false;
+  try {
+    const row = db
+      .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='chapter_trans_pack' LIMIT 1")
+      .get();
+    v2 = Boolean(row);
+  } catch (_) {}
+  _transV2Cache.set(db, v2);
+  return v2;
+}
 
 /**
  * Load Node runtime modules via webpackIgnore/turbopackIgnore so Next.js/Turbopack
@@ -253,12 +268,16 @@ export async function getTranslatedChapterIndices(bookCode, langCode) {
     return null;
   }
   try {
-    const rows = db
-      .prepare(
-        'SELECT DISTINCT chapter_index FROM paragraph_translations ' +
-          'WHERE book_code = ? ORDER BY chapter_index ASC'
-      )
-      .all(bookCode);
+    const rows = isV2TransDb(db)
+      ? db
+          .prepare('SELECT chapter_index FROM chapter_trans_pack WHERE book_code = ? ORDER BY chapter_index ASC')
+          .all(bookCode)
+      : db
+          .prepare(
+            'SELECT DISTINCT chapter_index FROM paragraph_translations ' +
+              'WHERE book_code = ? ORDER BY chapter_index ASC'
+          )
+          .all(bookCode);
     const set = new Set(rows.map((r) => Number(r.chapter_index)));
     _transChapsCache.set(cacheKey, set);
     return set;
@@ -291,16 +310,18 @@ export async function getAvailableTranslationLangs(bookCode, chapterIndex = null
     if (!db) continue;
     openedAnyDb = true;
     try {
+      const useV2 = isV2TransDb(db);
+      const tbl = useV2 ? 'chapter_trans_pack' : 'paragraph_translations';
       const row =
         safeChap !== null
           ? db
               .prepare(
-                'SELECT 1 AS ok FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? LIMIT 1'
+                `SELECT 1 AS ok FROM ${tbl} WHERE book_code = ? AND chapter_index = ? LIMIT 1`
               )
               .get(bookCode, safeChap)
           : db
               .prepare(
-                'SELECT 1 AS ok FROM paragraph_translations WHERE book_code = ? LIMIT 1'
+                `SELECT 1 AS ok FROM ${tbl} WHERE book_code = ? LIMIT 1`
               )
               .get(bookCode);
       if (row) {
@@ -322,6 +343,29 @@ async function readTranslationChapterFromDb(bookCode, chapterIndex, langCode) {
   if (!db) return null;
 
   try {
+    if (isV2TransDb(db)) {
+      const row = db
+        .prepare('SELECT data_z FROM chapter_trans_pack WHERE book_code = ? AND chapter_index = ? LIMIT 1')
+        .get(bookCode, chapterIndex);
+      const map = new Map();
+      if (row && row.data_z) {
+        const buf = Buffer.isBuffer(row.data_z) ? row.data_z : Buffer.from(row.data_z);
+        const packed = JSON.parse(zlib.inflateSync(buf).toString('utf8'));
+        if (Array.isArray(packed)) {
+          for (const item of packed) {
+            if (!Array.isArray(item) || item.length < 3) continue;
+            const paraIndex = Number(item[0]);
+            const paraNum = item[1] !== null && item[1] !== undefined ? String(item[1]) : null;
+            const text = item[2] !== null && item[2] !== undefined ? String(item[2]).trim() : '';
+            if (Number.isFinite(paraIndex) && text) {
+              map.set(paraIndex, { paraNum, text });
+            }
+          }
+        }
+      }
+      return map;
+    }
+
     const rows = db
       .prepare(
         'SELECT para_index, para_num, translation FROM paragraph_translations ' +

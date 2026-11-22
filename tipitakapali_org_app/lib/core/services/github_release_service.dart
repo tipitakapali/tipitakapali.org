@@ -19,10 +19,10 @@ class ManifestFetchResult {
 
 class GitHubReleaseService {
   static const String defaultRepo = 'tipitakapali/tipitakapali.org';
-  static const String defaultTag = 'db';
+  static const String defaultTag = 'db-v2';
   static const String defaultRawManifestUrl =
-      'https://raw.githubusercontent.com/$defaultRepo/refs/heads/main/tipitakapali_org_app/assets/databases_manifest.json';
-  static const String bundledAssetPath = 'assets/databases_manifest.json';
+      'https://github.com/$defaultRepo/releases/download/$defaultTag/databases_manifest.json';
+  static const String bundledAssetPath = 'assets/databases_manifest_v2.json';
   static const Duration requestTimeout = Duration(seconds: 15);
 
   final http.Client _client;

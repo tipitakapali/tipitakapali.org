@@ -704,11 +704,15 @@ class FtsIndexService {
       var scanned = 0;
       const batchSize = 5000;
       var inTx = 0;
-      final totalRows = _countQuery(
-        srcDb,
-        'SELECT count(*) AS c FROM paragraph_translations '
-        'WHERE translation IS NOT NULL AND length(trim(translation)) > 0',
-      );
+      final useV2Pack = _tableExists(srcDb, 'chapter_trans_pack') &&
+          !_tableExists(srcDb, 'paragraph_translations');
+      final totalRows = useV2Pack
+          ? _countQuery(srcDb, 'SELECT count(*) AS c FROM chapter_trans_pack')
+          : _countQuery(
+              srcDb,
+              'SELECT count(*) AS c FROM paragraph_translations '
+              'WHERE translation IS NOT NULL AND length(trim(translation)) > 0',
+            );
       final emitter = _FtsProgressEmitter(
         filename: dstName,
         totalRows: totalRows,
@@ -721,58 +725,113 @@ class FtsIndexService {
           book_code, book_title, nikaya, para_num, para_index, para_rend, content
         ) VALUES (?, ?, ?, ?, ?, ?, ?);
       ''');
-      final selectStmt = srcDb.prepare(
-        'SELECT book_code, para_index, para_num, translation '
-        'FROM paragraph_translations '
-        'WHERE translation IS NOT NULL AND length(trim(translation)) > 0 '
-        'ORDER BY book_code, para_index',
-      );
 
-      try {
-        final cursor = selectStmt.selectCursor();
-        dstDb.execute('BEGIN;');
+      if (useV2Pack) {
+        final packStmt = srcDb.prepare(
+          'SELECT book_code, data_z FROM chapter_trans_pack '
+          'ORDER BY book_code, chapter_index',
+        );
         try {
-          while (cursor.moveNext()) {
-            scanned++;
-            final r = cursor.current;
-            final code = (r['book_code'] ?? '').toString();
-            final pIdx = (r['para_index'] as num?)?.toInt() ?? 0;
-            final pNum = (r['para_num'] ?? '').toString();
-            final clean = cleanTranslationText(
-              (r['translation'] ?? '').toString(),
-            );
-            if (clean.isEmpty) {
+          final cursor = packStmt.selectCursor();
+          dstDb.execute('BEGIN;');
+          try {
+            while (cursor.moveNext()) {
+              scanned++;
+              final r = cursor.current;
+              final code = (r['book_code'] ?? '').toString();
+              final blob = r['data_z'];
+              if (blob is! List<int>) {
+                emitter.maybeEmit(scanned);
+                continue;
+              }
+              final meta = booksMeta[code];
+              final entries = TipitakaCoreReader.decodeChapterTransPack(blob);
+              for (final entry in entries) {
+                final clean = cleanTranslationText(entry.translation ?? '');
+                if (clean.isEmpty) continue;
+                final rend = rendMap['$code:${entry.paraIndex}'] ?? 'bodytext';
+                insertStmt.execute([
+                  code,
+                  meta?.title ?? code,
+                  meta?.nikaya ?? '',
+                  entry.paraNum ?? '',
+                  entry.paraIndex,
+                  rend,
+                  clean,
+                ]);
+                inserted++;
+                inTx++;
+                if (inTx >= batchSize) {
+                  dstDb.execute('COMMIT;');
+                  dstDb.execute('BEGIN;');
+                  inTx = 0;
+                }
+              }
               emitter.maybeEmit(scanned);
-              continue;
             }
-            final meta = booksMeta[code];
-            final rend = rendMap['$code:$pIdx'] ?? 'bodytext';
-            insertStmt.execute([
-              code,
-              meta?.title ?? code,
-              meta?.nikaya ?? '',
-              pNum,
-              pIdx,
-              rend,
-              clean,
-            ]);
-            inserted++;
-            inTx++;
-            emitter.maybeEmit(scanned);
-            if (inTx >= batchSize) {
-              dstDb.execute('COMMIT;');
-              dstDb.execute('BEGIN;');
-              inTx = 0;
-            }
+            dstDb.execute('COMMIT;');
+          } catch (_) {
+            dstDb.execute('ROLLBACK;');
+            rethrow;
           }
-          dstDb.execute('COMMIT;');
-        } catch (_) {
-          dstDb.execute('ROLLBACK;');
-          rethrow;
+        } finally {
+          packStmt.close();
+          insertStmt.close();
         }
-      } finally {
-        selectStmt.close();
-        insertStmt.close();
+      } else {
+        final selectStmt = srcDb.prepare(
+          'SELECT book_code, para_index, para_num, translation '
+          'FROM paragraph_translations '
+          'WHERE translation IS NOT NULL AND length(trim(translation)) > 0 '
+          'ORDER BY book_code, para_index',
+        );
+
+        try {
+          final cursor = selectStmt.selectCursor();
+          dstDb.execute('BEGIN;');
+          try {
+            while (cursor.moveNext()) {
+              scanned++;
+              final r = cursor.current;
+              final code = (r['book_code'] ?? '').toString();
+              final pIdx = (r['para_index'] as num?)?.toInt() ?? 0;
+              final pNum = (r['para_num'] ?? '').toString();
+              final clean = cleanTranslationText(
+                (r['translation'] ?? '').toString(),
+              );
+              if (clean.isEmpty) {
+                emitter.maybeEmit(scanned);
+                continue;
+              }
+              final meta = booksMeta[code];
+              final rend = rendMap['$code:$pIdx'] ?? 'bodytext';
+              insertStmt.execute([
+                code,
+                meta?.title ?? code,
+                meta?.nikaya ?? '',
+                pNum,
+                pIdx,
+                rend,
+                clean,
+              ]);
+              inserted++;
+              inTx++;
+              emitter.maybeEmit(scanned);
+              if (inTx >= batchSize) {
+                dstDb.execute('COMMIT;');
+                dstDb.execute('BEGIN;');
+                inTx = 0;
+              }
+            }
+            dstDb.execute('COMMIT;');
+          } catch (_) {
+            dstDb.execute('ROLLBACK;');
+            rethrow;
+          }
+        } finally {
+          selectStmt.close();
+          insertStmt.close();
+        }
       }
 
       dstDb.execute(

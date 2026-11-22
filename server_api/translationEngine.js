@@ -3,6 +3,11 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const {
+  hasChapterTransPack,
+  readChapterTranslationPack,
+  tryParseGuid,
+} = require('./tipitakaCoreHelper');
 
 const LANG_MAP = {
   english: 'en',
@@ -104,26 +109,40 @@ class TranslationEngine {
         PRAGMA query_only = 1;
       `);
 
-      const stmtChapter = db.prepare(`
-        SELECT para_index, guid, para_num, translation, sentence_count, sentences_json
-        FROM paragraph_translations
-        WHERE book_code = ? AND chapter_index = ?
-        ORDER BY para_index ASC
-      `);
+      const isV2 = hasChapterTransPack(db);
 
-      const stmtPara = db.prepare(`
-        SELECT para_index, guid, para_num, translation, sentence_count, sentences_json
-        FROM paragraph_translations
-        WHERE book_code = ? AND para_index = ?
-        LIMIT 1
-      `);
+      const stmtChapter = !isV2
+        ? db.prepare(`
+            SELECT para_index, guid, para_num, translation, sentence_count, sentences_json
+            FROM paragraph_translations
+            WHERE book_code = ? AND chapter_index = ?
+            ORDER BY para_index ASC
+          `)
+        : null;
 
-      const stmtGuid = db.prepare(`
-        SELECT book_code, chapter_index, para_index, guid, para_num, translation, sentence_count, sentences_json
-        FROM paragraph_translations
-        WHERE guid = ?
-        LIMIT 1
-      `);
+      const stmtPara = !isV2
+        ? db.prepare(`
+            SELECT para_index, guid, para_num, translation, sentence_count, sentences_json
+            FROM paragraph_translations
+            WHERE book_code = ? AND para_index = ?
+            LIMIT 1
+          `)
+        : null;
+
+      const stmtGuid = !isV2
+        ? db.prepare(`
+            SELECT book_code, chapter_index, para_index, guid, para_num, translation, sentence_count, sentences_json
+            FROM paragraph_translations
+            WHERE guid = ?
+            LIMIT 1
+          `)
+        : null;
+
+      const stmtMinChap = db.prepare(
+        isV2
+          ? 'SELECT MIN(chapter_index) AS min_ch FROM chapter_trans_pack WHERE book_code = ?'
+          : 'SELECT MIN(chapter_index) AS min_ch FROM paragraph_translations WHERE book_code = ?'
+      );
 
       let meta = {};
       try {
@@ -135,9 +154,11 @@ class TranslationEngine {
 
       this.databases.set(langCode, {
         db,
+        isV2,
         stmtChapter,
         stmtPara,
         stmtGuid,
+        stmtMinChap,
         meta,
         path: fullPath,
       });
@@ -182,6 +203,58 @@ class TranslationEngine {
     return list;
   }
 
+  getFirstTranslatedChapter(langCode, bookCode) {
+    const entry = this.databases.get(langCode);
+    if (!entry || !entry.stmtMinChap || !bookCode) return null;
+    try {
+      const row = entry.stmtMinChap.get(bookCode);
+      if (row && row.min_ch !== null && row.min_ch !== undefined) {
+        return Number(row.min_ch);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  getChapterRows(langCode, cleanCode, cIdx) {
+    const entry = this.databases.get(langCode);
+    if (!entry) return [];
+    if (entry.isV2) {
+      const pack = readChapterTranslationPack(entry.db, cleanCode, cIdx);
+      if (!pack || pack.size === 0) return [];
+      const keys = Array.from(pack.keys()).sort((a, b) => a - b);
+      return keys.map((pi) => {
+        const item = pack.get(pi);
+        const sents = Array.isArray(item.sentences) ? item.sentences : [];
+        return {
+          para_index: pi,
+          guid: `${cleanCode}:c${cIdx}:n${item.paraNum ?? ''}:p${pi}`,
+          para_num: item.paraNum,
+          translation: item.translation,
+          sentence_count: sents.length,
+          sentences: sents,
+        };
+      });
+    }
+
+    const rows = entry.stmtChapter.all(cleanCode, cIdx);
+    return rows.map((r) => {
+      let parsedSents = null;
+      if (r.sentences_json) {
+        try {
+          parsedSents = JSON.parse(r.sentences_json);
+        } catch (_) {}
+      }
+      return {
+        para_index: r.para_index,
+        guid: r.guid,
+        para_num: r.para_num,
+        translation: r.translation,
+        sentence_count: r.sentence_count,
+        sentences: parsedSents,
+      };
+    });
+  }
+
   getChapterTranslations(bookCode, chapterIndex, requestedLangs = [], includeSentences = false) {
     let cleanCode = (bookCode || '').replace('.xml', '');
     const chapSuffixMatch = cleanCode.match(/^(.*?\.(?:mul|att|tik|nrf))(\d+)$/i);
@@ -207,16 +280,15 @@ class TranslationEngine {
       if (!entry) continue;
 
       try {
-        const rows = entry.stmtChapter.all(cleanCode, cIdx);
+        const rows = this.getChapterRows(code, cleanCode, cIdx);
         const paraMap = {};
         const sentMap = {};
         for (const r of rows) {
-          paraMap[r.para_index] = r.translation;
-          if (includeSentences && r.sentences_json) {
-            try {
-              const parsed = JSON.parse(r.sentences_json);
-              if (Array.isArray(parsed) && parsed.length > 0) sentMap[r.para_index] = parsed;
-            } catch (_) {}
+          if (r.translation !== null && r.translation !== undefined) {
+            paraMap[r.para_index] = r.translation;
+          }
+          if (includeSentences && Array.isArray(r.sentences) && r.sentences.length > 0) {
+            sentMap[r.para_index] = r.sentences;
           }
         }
         result.translations[code] = paraMap;
@@ -253,7 +325,7 @@ class TranslationEngine {
       if (!entry) continue;
 
       try {
-        const rows = entry.stmtChapter.all(cleanCode, cIdx);
+        const rows = this.getChapterRows(code, cleanCode, cIdx);
         for (const r of rows) {
           if (!result.paragraphs[r.para_index]) {
             result.paragraphs[r.para_index] = {
@@ -266,7 +338,7 @@ class TranslationEngine {
           result.paragraphs[r.para_index].translations[code] = {
             text: r.translation,
             sentence_count: r.sentence_count,
-            sentences: r.sentences_json ? JSON.parse(r.sentences_json) : null,
+            sentences: Array.isArray(r.sentences) && r.sentences.length > 0 ? r.sentences : null,
           };
         }
       } catch (err) {
@@ -287,10 +359,29 @@ class TranslationEngine {
       translations: {},
     };
 
+    const parsedGuid = tryParseGuid(guid);
+
     for (const code of langCodes) {
       const entry = this.databases.get(code);
       if (!entry) continue;
       try {
+        if (entry.isV2) {
+          if (!parsedGuid) continue;
+          const pack = readChapterTranslationPack(entry.db, parsedGuid.bookCode, parsedGuid.chapterIndex);
+          const item = pack.get(parsedGuid.paraIndex);
+          if (item && (item.translation || (item.sentences && item.sentences.length > 0))) {
+            result.translations[code] = {
+              text: item.translation,
+              book_code: parsedGuid.bookCode,
+              chapter_index: parsedGuid.chapterIndex,
+              para_index: parsedGuid.paraIndex,
+              para_num: item.paraNum,
+              sentences: item.sentences && item.sentences.length > 0 ? item.sentences : null,
+            };
+          }
+          continue;
+        }
+
         const row = entry.stmtGuid.get(guid);
         if (row) {
           result.translations[code] = {

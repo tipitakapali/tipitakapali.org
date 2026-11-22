@@ -78,6 +78,7 @@ class TipitakaWebApi {
   final Map<String, Database> _dbs = {};
   final Map<String, Set<String>> _tableNamesCache = {};
   final Map<String, List<String>> _synCache = {};
+  final Map<String, Map<String, dynamic>> _suggestCache = {};
 
   List<dynamic>? _treeCache;
   Uint8List? _treeBytesCache;
@@ -169,6 +170,7 @@ class TipitakaWebApi {
     _dbs.clear();
     _tableNamesCache.clear();
     _synCache.clear();
+    _suggestCache.clear();
     _treeCache = null;
     _treeBytesCache = null;
     _booksListCache = null;
@@ -299,6 +301,135 @@ class TipitakaWebApi {
   Database? _openPtsDb() {
     return _openDb('ptsped2015ed_tipitakapali.db') ??
         _openDb('legacy_ptsped2015ed_tipitakapali.db');
+  }
+
+  Database? _openUnifiedDictDb() {
+    final db = _openDb('dictionaries.db');
+    if (db == null) return null;
+    return TipitakaCoreReader.tableAndViewNames(db).contains('dict_entries')
+        ? db
+        : null;
+  }
+
+  static String _decodeDictValue(Object? raw) {
+    if (raw == null) return '';
+    if (raw is List<int>) {
+      if (raw.isEmpty) return '';
+      return utf8.decode(zlib.decode(raw));
+    }
+    return raw.toString();
+  }
+
+  static String _prefixUpperBound(String prefix) {
+    if (prefix.isEmpty) return '\uffff';
+    final units = prefix.codeUnits.toList(growable: true);
+    units[units.length - 1] = units[units.length - 1] + 1;
+    return String.fromCharCodes(units);
+  }
+
+  static String _extractShortPreview(String htmlOrText) {
+    if (htmlOrText.isEmpty) return '';
+    var s = htmlOrText
+        .replaceAll(
+          RegExp(r'<style\b[^>]*>[\s\S]*?</style>', caseSensitive: false),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(r'<script\b[^>]*>[\s\S]*?</script>', caseSensitive: false),
+          ' ',
+        );
+    final dpdMatch = RegExp(
+      r"<(?:p|div)[^>]*class=['\x22]?dpd['\x22]?[^>]*>([\s\S]*?)</(?:p|div)>",
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (dpdMatch != null) {
+      s = dpdMatch.group(1) ?? s;
+    }
+    s = s
+        .replaceAll(RegExp(r'<[^>]+>'), ' ')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return s.length > 90 ? '${s.substring(0, 87)}...' : s;
+  }
+
+  static List<String> _diacriticCharVariants(String ch) {
+    switch (ch) {
+      case 'a':
+      case 'ā':
+        return const ['a', 'ā'];
+      case 'i':
+      case 'ī':
+        return const ['i', 'ī'];
+      case 'u':
+      case 'ū':
+        return const ['u', 'ū'];
+      case 't':
+      case 'ṭ':
+        return const ['t', 'ṭ'];
+      case 'd':
+      case 'ḍ':
+        return const ['d', 'ḍ'];
+      case 'n':
+      case 'ṇ':
+      case 'ñ':
+      case 'ṅ':
+        return const ['n', 'ṇ', 'ñ', 'ṅ'];
+      case 'm':
+      case 'ṃ':
+      case 'ṁ':
+        return const ['m', 'ṃ', 'ṁ'];
+      case 'l':
+      case 'ḷ':
+        return const ['l', 'ḷ'];
+      default:
+        return [ch];
+    }
+  }
+
+  static String _buildDiacriticGlob(String foldedQuery) {
+    final buf = StringBuffer();
+    for (var i = 0; i < foldedQuery.length; i++) {
+      final ch = foldedQuery[i];
+      final variants = _diacriticCharVariants(ch);
+      if (variants.length > 1) {
+        buf
+          ..write('[')
+          ..write(variants.join())
+          ..write(']');
+      } else if (ch == '[' || ch == '*' || ch == '?') {
+        buf
+          ..write('[')
+          ..write(ch)
+          ..write(']');
+      } else {
+        buf.write(ch);
+      }
+    }
+    buf.write('*');
+    return buf.toString();
+  }
+
+  static List<String> _expandDiacriticPrefixTables(
+    String foldedQuery,
+    Set<String> tables,
+  ) {
+    if (foldedQuery.length < 2) return const [];
+    final firstVars = _diacriticCharVariants(foldedQuery[0]);
+    final secondVars = _diacriticCharVariants(foldedQuery[1]);
+    final out = <String>[];
+    for (final c1 in firstVars) {
+      for (final c2 in secondVars) {
+        final cand = '$c1${c2}z';
+        if (tables.contains(cand)) out.add(cand);
+      }
+    }
+    return out;
   }
 
   Set<String> _getTableNames(String dbKey, Database db) {
@@ -1298,28 +1429,57 @@ class TipitakaWebApi {
         if (db == null) continue;
         installedCodes.add(code);
         try {
-          final rows = db.select(
-            'SELECT para_index, guid, para_num, translation, sentence_count, sentences_json '
-            'FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? '
-            'ORDER BY para_index ASC',
-            [cleanCode, chapterIndex],
+          final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+            db,
+            cleanCode,
+            chapterIndex,
           );
-          for (final r in rows) {
-            final pKey = r['para_index'].toString();
-            final entry = detailedParagraphs.putIfAbsent(
-              pKey,
-              () => {
-                'para_index': r['para_index'],
-                'guid': r['guid'],
-                'para_num': r['para_num'],
-                'translations': <String, dynamic>{},
-              },
+          if (v2Pack != null) {
+            for (final item in v2Pack) {
+              final pKey = item.paraIndex.toString();
+              final entry = detailedParagraphs.putIfAbsent(
+                pKey,
+                () => {
+                  'para_index': item.paraIndex,
+                  'guid': '$cleanCode:c$chapterIndex:n:p${item.paraIndex}',
+                  'para_num': item.paraNum,
+                  'translations': <String, dynamic>{},
+                },
+              );
+              final sents = [
+                for (final s in item.sentences)
+                  {'line_id': s.lineId, 'translation': s.text},
+              ];
+              (entry['translations'] as Map<String, dynamic>)[code] = {
+                'text': item.translation,
+                'sentence_count': sents.length,
+                'sentences': sents,
+              };
+            }
+          } else {
+            final rows = db.select(
+              'SELECT para_index, guid, para_num, translation, sentence_count, sentences_json '
+              'FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? '
+              'ORDER BY para_index ASC',
+              [cleanCode, chapterIndex],
             );
-            (entry['translations'] as Map<String, dynamic>)[code] = {
-              'text': r['translation'],
-              'sentence_count': r['sentence_count'],
-              'sentences': _tryDecodeJson(r['sentences_json']),
-            };
+            for (final r in rows) {
+              final pKey = r['para_index'].toString();
+              final entry = detailedParagraphs.putIfAbsent(
+                pKey,
+                () => {
+                  'para_index': r['para_index'],
+                  'guid': r['guid'],
+                  'para_num': r['para_num'],
+                  'translations': <String, dynamic>{},
+                },
+              );
+              (entry['translations'] as Map<String, dynamic>)[code] = {
+                'text': r['translation'],
+                'sentence_count': r['sentence_count'],
+                'sentences': _tryDecodeJson(r['sentences_json']),
+              };
+            }
           }
         } catch (_) {}
       }
@@ -1387,64 +1547,95 @@ class TipitakaWebApi {
       var hasSentRows = false;
 
       try {
-        final rows = db.select(
-          'SELECT para_index, translation, sentences_json '
-          'FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? '
-          'ORDER BY para_index ASC',
-          [cleanCode, chapterIndex],
+        final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+          db,
+          cleanCode,
+          chapterIndex,
         );
-        for (final r in rows) {
-          final pKey = r['para_index'].toString();
-          if (!firstPara) paraBuf.write(',');
-          firstPara = false;
-          paraBuf
-            ..write(jsonEncode(pKey))
-            ..write(':')
-            ..write(jsonEncode(r['translation']));
+        if (v2Pack != null) {
+          for (final item in v2Pack) {
+            final pKey = item.paraIndex.toString();
+            if (!firstPara) paraBuf.write(',');
+            firstPara = false;
+            paraBuf
+              ..write(jsonEncode(pKey))
+              ..write(':')
+              ..write(jsonEncode(item.translation));
 
-          if (withSentences && r['sentences_json'] != null) {
-            final rawSent = r['sentences_json'].toString().trim();
-            if (rawSent.length > 2 &&
-                rawSent.startsWith('[') &&
-                rawSent.endsWith(']')) {
+            if (withSentences && item.sentences.isNotEmpty) {
               hasSentRows = true;
               if (!firstSent) sentBuf.write(',');
               firstSent = false;
+              final sentsJson = jsonEncode([
+                for (final s in item.sentences)
+                  {'line_id': s.lineId, 'translation': s.text},
+              ]);
               sentBuf
                 ..write(jsonEncode(pKey))
                 ..write(':')
-                ..write(rawSent);
+                ..write(sentsJson);
             }
           }
-        }
+        } else {
+          final rows = db.select(
+            'SELECT para_index, translation, sentences_json '
+            'FROM paragraph_translations WHERE book_code = ? AND chapter_index = ? '
+            'ORDER BY para_index ASC',
+            [cleanCode, chapterIndex],
+          );
+          for (final r in rows) {
+            final pKey = r['para_index'].toString();
+            if (!firstPara) paraBuf.write(',');
+            firstPara = false;
+            paraBuf
+              ..write(jsonEncode(pKey))
+              ..write(':')
+              ..write(jsonEncode(r['translation']));
 
-        if (withSentences && !hasSentRows) {
-          try {
-            final stRows = db.select(
-              'SELECT para_index, line_id, translation '
-              'FROM sentence_translations WHERE book_code = ? AND chapter_index = ? '
-              'ORDER BY para_index ASC, line_id ASC',
-              [cleanCode, chapterIndex],
-            );
-            final fallbackMap = <String, List<Map<String, dynamic>>>{};
-            for (final sr in stRows) {
-              final pKey = sr['para_index'].toString();
-              fallbackMap
-                  .putIfAbsent(pKey, () => <Map<String, dynamic>>[])
-                  .add({
-                    'line_id': sr['line_id'],
-                    'translation': sr['translation'],
-                  });
+            if (withSentences && r['sentences_json'] != null) {
+              final rawSent = r['sentences_json'].toString().trim();
+              if (rawSent.length > 2 &&
+                  rawSent.startsWith('[') &&
+                  rawSent.endsWith(']')) {
+                hasSentRows = true;
+                if (!firstSent) sentBuf.write(',');
+                firstSent = false;
+                sentBuf
+                  ..write(jsonEncode(pKey))
+                  ..write(':')
+                  ..write(rawSent);
+              }
             }
-            for (final entry in fallbackMap.entries) {
-              if (!firstSent) sentBuf.write(',');
-              firstSent = false;
-              sentBuf
-                ..write(jsonEncode(entry.key))
-                ..write(':')
-                ..write(jsonEncode(entry.value));
-            }
-          } catch (_) {}
+          }
+
+          if (withSentences && !hasSentRows) {
+            try {
+              final stRows = db.select(
+                'SELECT para_index, line_id, translation '
+                'FROM sentence_translations WHERE book_code = ? AND chapter_index = ? '
+                'ORDER BY para_index ASC, line_id ASC',
+                [cleanCode, chapterIndex],
+              );
+              final fallbackMap = <String, List<Map<String, dynamic>>>{};
+              for (final sr in stRows) {
+                final pKey = sr['para_index'].toString();
+                fallbackMap
+                    .putIfAbsent(pKey, () => <Map<String, dynamic>>[])
+                    .add({
+                      'line_id': sr['line_id'],
+                      'translation': sr['translation'],
+                    });
+              }
+              for (final entry in fallbackMap.entries) {
+                if (!firstSent) sentBuf.write(',');
+                firstSent = false;
+                sentBuf
+                  ..write(jsonEncode(entry.key))
+                  ..write(':')
+                  ..write(jsonEncode(entry.value));
+              }
+            } catch (_) {}
+          }
         }
       } catch (_) {}
 
@@ -1484,11 +1675,38 @@ class TipitakaWebApi {
             .where((s) => s.isNotEmpty)
             .toList();
 
+    final parsedGuid = TipitakaCoreReader.tryParseGuid(guid);
     final translations = <String, dynamic>{};
     for (final code in requested) {
       final db = _openDb('translation_$code.db');
       if (db == null) continue;
       try {
+        if (parsedGuid != null) {
+          final v2Pack = TipitakaCoreReader.readChapterTranslationPack(
+            db,
+            parsedGuid.bookCode,
+            parsedGuid.chapterIndex,
+          );
+          if (v2Pack != null) {
+            for (final item in v2Pack) {
+              if (item.paraIndex == parsedGuid.paraIndex) {
+                translations[code] = {
+                  'text': item.translation,
+                  'book_code': parsedGuid.bookCode,
+                  'chapter_index': parsedGuid.chapterIndex,
+                  'para_index': item.paraIndex,
+                  'para_num': item.paraNum,
+                  'sentences': [
+                    for (final s in item.sentences)
+                      {'line_id': s.lineId, 'translation': s.text},
+                  ],
+                };
+                break;
+              }
+            }
+            continue;
+          }
+        }
         final rows = db.select(
           'SELECT book_code, chapter_index, para_index, guid, para_num, translation, sentences_json '
           'FROM paragraph_translations WHERE guid = ? LIMIT 1',
@@ -1934,6 +2152,25 @@ class TipitakaWebApi {
   List<String> _getSynonyms(String word) {
     final cached = _synCache[word];
     if (cached != null) return cached;
+
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      try {
+        final rows = unified.select(
+          'SELECT word FROM dict_synonyms WHERE synonym = ?',
+          [word],
+        );
+        final result = rows
+            .map((r) => (r['word'] ?? '').toString())
+            .where((w) => w.isNotEmpty)
+            .toList(growable: false);
+        _putBoundedLru(_synCache, word, result, 3000);
+        return result;
+      } catch (_) {
+        return const [];
+      }
+    }
+
     final db = _openDb('dpd_synonyms_tipitakapali.db');
     if (db == null) return const [];
     try {
@@ -1944,20 +2181,146 @@ class TipitakaWebApi {
           .map((r) => (r['word'] ?? '').toString())
           .where((w) => w.isNotEmpty)
           .toList(growable: false);
-      if (_synCache.length >= 3000) {
-        _synCache.remove(_synCache.keys.first);
-      }
-      _synCache[word] = result;
+      _putBoundedLru(_synCache, word, result, 3000);
       return result;
     } catch (_) {
       return const [];
     }
   }
 
+  List<Map<String, dynamic>> _queryUnifiedEntries({
+    required Database db,
+    required int sourceId,
+    required String baseWord,
+    required List<String> wordsToQuery,
+    required Map<String, dynamic> Function(
+      String headword,
+      String rawDefi,
+      bool isExact,
+    )
+    formatter,
+  }) {
+    if (wordsToQuery.isEmpty) return const [];
+    final exact = <Map<String, dynamic>>[];
+    final related = <Map<String, dynamic>>[];
+    final placeholders = List.filled(wordsToQuery.length, '?').join(',');
+    try {
+      final rows = db.select(
+        'SELECT word, defi_z FROM dict_entries '
+        'WHERE source_id = ? AND word IN ($placeholders)',
+        [sourceId, ...wordsToQuery],
+      );
+      for (final r in rows) {
+        final hw = (r['word'] ?? '').toString();
+        final rawDefi = _decodeDictValue(r['defi_z']);
+        final isExact = hw.toLowerCase() == baseWord;
+        final item = formatter(hw, rawDefi, isExact);
+        if (isExact) {
+          exact.add(item);
+        } else {
+          related.add(item);
+        }
+      }
+    } catch (_) {}
+    return [...exact, ...related];
+  }
+
+  List<Map<String, dynamic>> _lookupMultiWord(
+    String cleanWord,
+    List<String> sharedSyns,
+    List<Map<String, dynamic>> Function(String word, List<String> syns)
+    singleLookup, {
+    bool useSynonymsForTokens = true,
+  }) {
+    if (!cleanWord.contains(' ')) return singleLookup(cleanWord, sharedSyns);
+    final full = singleLookup(cleanWord, sharedSyns);
+    if (full.isNotEmpty) return full;
+    final out = <Map<String, dynamic>>[];
+    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
+      if (tok.isNotEmpty) {
+        out.addAll(
+          singleLookup(tok, useSynonymsForTokens ? _getSynonyms(tok) : const []),
+        );
+      }
+    }
+    return out;
+  }
+
+  Map<String, dynamic> _buildSplitterEntry(String hw, String rawDefi) {
+    final elements = rawDefi
+        .split('@')
+        .where((x) => x.trim().isNotEmpty)
+        .toList(growable: false);
+    final decHtml = elements
+        .map(
+          (el) =>
+              '<p class="dec">${el.replaceAll('+', ' <span class="dec-plus">+</span> ')}</p>',
+        )
+        .join();
+    final encodedWord = Uri.encodeComponent(hw);
+    final improveLink =
+        'https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=$encodedWord&entry.326955045=Deconstructor&entry.1433863141=Tipitakapali.org%209999-12-12';
+    final html = '''
+      <div class="dpd-splitter-section">
+        <div class="splitter-headword">
+          <span class="p2w font-bold text-indigo-600 dark:text-indigo-400 text-sm sm:text-base">$hw</span>
+        </div>
+        <div class="splitter-body mt-2 space-y-1.5">
+          $decHtml
+        </div>
+        <p class="dpd-footer">These DPD word breakups are code-generated. <a href="$improveLink" class="link" target="_blank">Improve it</a>.</p>
+      </div>
+    ''';
+    return {
+      'word': hw,
+      'isExact': true,
+      'isSplitter': true,
+      'breakups': elements,
+      'html': html,
+    };
+  }
+
   List<Map<String, dynamic>> _lookupSingleDpd(
     String word,
     List<String> cachedSyns,
   ) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      if (word.startsWith('##')) {
+        try {
+          final rows = unified.select(
+            'SELECT word, defi_z FROM dict_entries '
+            'WHERE source_id = 0 AND word = ? LIMIT 1',
+            [word],
+          );
+          if (rows.isNotEmpty) {
+            return [
+              {
+                'word': rows.first['word'],
+                'isExact': true,
+                'html': dpdFamilyTemplates.restoreMinifiedLinksAndFooter(
+                  _decodeDictValue(rows.first['defi_z']),
+                ),
+              },
+            ];
+          }
+        } catch (_) {}
+        return const [];
+      }
+      final wordsToQuery = <String>{word, ...cachedSyns}.toList(growable: false);
+      return _queryUnifiedEntries(
+        db: unified,
+        sourceId: 0,
+        baseWord: word,
+        wordsToQuery: wordsToQuery,
+        formatter: (hw, rawDefi, isExact) {
+          var df = dpdFamilyTemplates.restoreDpdDefi(rawDefi);
+          if (isExact) df = df.replaceAll('class=p1w', 'class=p2w');
+          return {'word': hw, 'isExact': isExact, 'html': df};
+        },
+      );
+    }
+
     final db = _openDb('dpd_tipitakapali.db');
     if (db == null) return const [];
     if (word.startsWith('##')) {
@@ -2059,27 +2422,38 @@ class TipitakaWebApi {
   List<Map<String, dynamic>> _lookupDpdList(
     String cleanWord,
     List<String> sharedSyns,
-  ) {
-    if (!cleanWord.contains(' ')) {
-      return _lookupSingleDpd(cleanWord, sharedSyns);
-    }
-    final full = _lookupSingleDpd(cleanWord, sharedSyns);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(_lookupSingleDpd(tok, _getSynonyms(tok)));
-    }
-    return out;
-  }
+  ) =>
+      _lookupMultiWord(cleanWord, sharedSyns, _lookupSingleDpd);
 
   List<Map<String, dynamic>> _lookupPts(
     String cleanWord,
     List<String> sharedSyns,
   ) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      return _lookupMultiWord(
+        cleanWord,
+        sharedSyns,
+        (w, syns) => _queryUnifiedEntries(
+          db: unified,
+          sourceId: 2,
+          baseWord: w,
+          wordsToQuery: <String>{w, ...syns}.toList(growable: false),
+          formatter: (hw, rawDefi, isExact) => {
+            'word': hw,
+            'isExact': isExact,
+            'html':
+                '<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">$hw</span><br>$rawDefi</div>',
+          },
+        ),
+      );
+    }
     final db = _openPtsDb();
     if (db == null) return const [];
-    List<Map<String, dynamic>> runSingle(String w, List<String> syns) {
-      return _lookupSimpleDict(
+    return _lookupMultiWord(
+      cleanWord,
+      sharedSyns,
+      (w, syns) => _lookupSimpleDict(
         db: db,
         dbKey: 'PTS',
         word: w,
@@ -2090,27 +2464,39 @@ class TipitakaWebApi {
           'html':
               '<div class="pts15"><span class="${isExact ? 'pp2w' : 'pp1w'}">${r['word']}</span><br>${r['defi']}</div>',
         },
-      );
-    }
-
-    if (!cleanWord.contains(' ')) return runSingle(cleanWord, sharedSyns);
-    final full = runSingle(cleanWord, sharedSyns);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(runSingle(tok, _getSynonyms(tok)));
-    }
-    return out;
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _lookupAbd(
     String cleanWord,
     List<String> sharedSyns,
   ) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      return _lookupMultiWord(
+        cleanWord,
+        sharedSyns,
+        (w, syns) => _queryUnifiedEntries(
+          db: unified,
+          sourceId: 3,
+          baseWord: w,
+          wordsToQuery: <String>{w, ...syns}.toList(growable: false),
+          formatter: (hw, rawDefi, isExact) => {
+            'word': hw,
+            'isExact': isExact,
+            'html':
+                '<div class="tmmAbhidhan"><span class="${isExact ? 'pm2w' : 'pm1w'}">$hw</span><br>$rawDefi</div>',
+          },
+        ),
+      );
+    }
     final db = _openDb('abhidhan_tipitakapali.db');
     if (db == null) return const [];
-    List<Map<String, dynamic>> runSingle(String w, List<String> syns) {
-      return _lookupSimpleDict(
+    return _lookupMultiWord(
+      cleanWord,
+      sharedSyns,
+      (w, syns) => _lookupSimpleDict(
         db: db,
         dbKey: 'ABD',
         word: w,
@@ -2121,27 +2507,43 @@ class TipitakaWebApi {
           'html':
               '<div class="tmmAbhidhan"><span class="${isExact ? 'pm2w' : 'pm1w'}">${r['word']}</span><br>${r['defi']}</div>',
         },
-      );
-    }
-
-    if (!cleanWord.contains(' ')) return runSingle(cleanWord, sharedSyns);
-    final full = runSingle(cleanWord, sharedSyns);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(runSingle(tok, _getSynonyms(tok)));
-    }
-    return out;
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _lookupPsd(
     String cleanWord,
     List<String> sharedSyns,
   ) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      return _lookupMultiWord(
+        cleanWord,
+        sharedSyns,
+        (w, syns) => _queryUnifiedEntries(
+          db: unified,
+          sourceId: 4,
+          baseWord: w,
+          wordsToQuery: <String>{w, ...syns}.toList(growable: false),
+          formatter: (hw, rawDefi, isExact) {
+            var df = rawDefi;
+            if (isExact) df = df.replaceAll('class=psdW', 'class=p2w');
+            return {
+              'word': hw,
+              'isExact': isExact,
+              'source': '',
+              'html': '<div class="psinh26">$df</div>',
+            };
+          },
+        ),
+      );
+    }
     final db = _openDb('palisinh.db');
     if (db == null) return const [];
-    List<Map<String, dynamic>> runSingle(String w, List<String> syns) {
-      return _lookupSimpleDict(
+    return _lookupMultiWord(
+      cleanWord,
+      sharedSyns,
+      (w, syns) => _lookupSimpleDict(
         db: db,
         dbKey: 'PSD',
         word: w,
@@ -2156,24 +2558,40 @@ class TipitakaWebApi {
             'html': '<div class="psinh26">$df</div>',
           };
         },
-      );
-    }
-
-    if (!cleanWord.contains(' ')) return runSingle(cleanWord, sharedSyns);
-    final full = runSingle(cleanWord, sharedSyns);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(runSingle(tok, _getSynonyms(tok)));
-    }
-    return out;
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _lookupSans(String cleanWord) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      return _lookupMultiWord(
+        cleanWord,
+        const [],
+        (w, _) => _queryUnifiedEntries(
+          db: unified,
+          sourceId: 5,
+          baseWord: w,
+          wordsToQuery: [w],
+          formatter: (hw, rawDefi, isExact) {
+            var df = rawDefi;
+            if (isExact) df = df.replaceAll('class=p1w', 'class=p3w');
+            return {
+              'word': hw,
+              'isExact': isExact,
+              'html': '<div class="sanskritSection">$df</div>',
+            };
+          },
+        ),
+        useSynonymsForTokens: false,
+      );
+    }
     final db = _openDb('ap_bh_mw_sanskrit.db');
     if (db == null) return const [];
-    List<Map<String, dynamic>> runSingle(String w) {
-      return _lookupSimpleDict(
+    return _lookupMultiWord(
+      cleanWord,
+      const [],
+      (w, _) => _lookupSimpleDict(
         db: db,
         dbKey: 'SANS',
         word: w,
@@ -2187,75 +2605,57 @@ class TipitakaWebApi {
             'html': '<div class="sanskritSection">$df</div>',
           };
         },
-      );
-    }
-
-    if (!cleanWord.contains(' ')) return runSingle(cleanWord);
-    final full = runSingle(cleanWord);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(runSingle(tok));
-    }
-    return out;
+      ),
+      useSynonymsForTokens: false,
+    );
   }
 
   List<Map<String, dynamic>> _lookupSplitter(String cleanWord) {
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      return _lookupMultiWord(
+        cleanWord,
+        const [],
+        (w, _) {
+          final results = <Map<String, dynamic>>[];
+          try {
+            final rows = unified.select(
+              'SELECT word, defi_z FROM dict_entries '
+              'WHERE source_id = 1 AND word = ?',
+              [w],
+            );
+            for (final r in rows) {
+              final hw = (r['word'] ?? w).toString();
+              final rawDefi = _decodeDictValue(r['defi_z']);
+              results.add(_buildSplitterEntry(hw, rawDefi));
+            }
+          } catch (_) {}
+          return results;
+        },
+        useSynonymsForTokens: false,
+      );
+    }
     final db = _openDb('dpd_splitter_tipitakapali.db');
     if (db == null) return const [];
-    List<Map<String, dynamic>> runSingle(String w) {
-      final fchar = _getFChar(w, 'SPLI', db, useSplitter: true);
-      final safe = '"${fchar.replaceAll('"', '""')}"';
-      final results = <Map<String, dynamic>>[];
-      try {
-        final rows = db.select('SELECT word, defi FROM $safe WHERE word = ?', [w]);
-        for (final r in rows) {
-          final hw = (r['word'] ?? w).toString();
-          final elements = (r['defi'] ?? '')
-              .toString()
-              .split('@')
-              .where((x) => x.trim().isNotEmpty)
-              .toList(growable: false);
-          final decHtml = elements
-              .map(
-                (el) =>
-                    '<p class="dec">${el.replaceAll('+', ' <span class="dec-plus">+</span> ')}</p>',
-              )
-              .join();
-          final encodedWord = Uri.encodeComponent(hw);
-          final improveLink =
-              'https://docs.google.com/forms/d/e/1FAIpQLSf9boBe7k5tCwq7LdWgBHHGIPVc4ROO5yjVDo1X5LDAxkmGWQ/viewform?usp=pp_url&entry.438735500=$encodedWord&entry.326955045=Deconstructor&entry.1433863141=Tipitakapali.org%209999-12-12';
-          final html = '''
-            <div class="dpd-splitter-section">
-              <div class="splitter-headword">
-                <span class="p2w font-bold text-indigo-600 dark:text-indigo-400 text-sm sm:text-base">$hw</span>
-              </div>
-              <div class="splitter-body mt-2 space-y-1.5">
-                $decHtml
-              </div>
-              <p class="dpd-footer">These DPD word breakups are code-generated. <a href="$improveLink" class="link" target="_blank">Improve it</a>.</p>
-            </div>
-          ''';
-          results.add({
-            'word': hw,
-            'isExact': true,
-            'isSplitter': true,
-            'breakups': elements,
-            'html': html,
-          });
-        }
-      } catch (_) {}
-      return results;
-    }
-
-    if (!cleanWord.contains(' ')) return runSingle(cleanWord);
-    final full = runSingle(cleanWord);
-    if (full.isNotEmpty) return full;
-    final out = <Map<String, dynamic>>[];
-    for (final tok in cleanWord.split(RegExp(r'\s+')).toSet().take(20)) {
-      if (tok.isNotEmpty) out.addAll(runSingle(tok));
-    }
-    return out;
+    return _lookupMultiWord(
+      cleanWord,
+      const [],
+      (w, _) {
+        final fchar = _getFChar(w, 'SPLI', db, useSplitter: true);
+        final safe = '"${fchar.replaceAll('"', '""')}"';
+        final results = <Map<String, dynamic>>[];
+        try {
+          final rows = db.select('SELECT word, defi FROM $safe WHERE word = ?', [w]);
+          for (final r in rows) {
+            final hw = (r['word'] ?? w).toString();
+            final rawDefi = (r['defi'] ?? '').toString();
+            results.add(_buildSplitterEntry(hw, rawDefi));
+          }
+        } catch (_) {}
+        return results;
+      },
+      useSynonymsForTokens: false,
+    );
   }
 
   List<String> _resolveLangCodes(String? rawLangs) {
@@ -2755,18 +3155,210 @@ class TipitakaWebApi {
     });
   }
 
+  ApiResponse suggestDict(String rawPrefix, {int limit = 15}) {
+    final safeLimit = limit.clamp(1, 30);
+    final clean = PaliScriptConverter.cleanDictionaryQuery(rawPrefix);
+    if (clean.length < 2 || clean.startsWith('##')) {
+      return ApiResponse({'query': clean, 'suggestions': const []});
+    }
+
+    final cacheKey = '$clean|$safeLimit';
+    final cached = _suggestCache[cacheKey];
+    if (cached != null) {
+      return ApiResponse(cached);
+    }
+
+    final foldedQuery = PaliScriptConverter.normalizePaliForSearch(clean);
+    final results = <Map<String, dynamic>>[];
+    final seen = <String>{};
+
+    void addCandidate(String rawWord, Object? rawDefi) {
+      final w = rawWord.trim();
+      if (w.isEmpty) return;
+      final key = w.toLowerCase();
+      if (!seen.add(key)) return;
+      final isExact =
+          key == clean ||
+          (foldedQuery.isNotEmpty &&
+              PaliScriptConverter.normalizePaliForSearch(key) == foldedQuery);
+      final decoded = _decodeDictValue(rawDefi);
+      final preview = decoded.isNotEmpty ? _extractShortPreview(decoded) : '';
+      results.add({
+        'word': w,
+        'preview': preview.isNotEmpty ? preview : null,
+        'isExact': isExact,
+      });
+    }
+
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      try {
+        final cleanUpper = _prefixUpperBound(clean);
+        final exactRows = unified.select(
+          'WITH top_words AS ('
+          '  SELECT word, MIN(source_id * 1000000000 + id) AS best_key '
+          '  FROM dict_entries '
+          '  WHERE source_id IN (0, 2) AND word >= ? AND word < ? '
+          '  GROUP BY word '
+          '  ORDER BY CASE WHEN word = ? THEN 0 ELSE 1 END, length(word), word '
+          '  LIMIT ?'
+          ') '
+          'SELECT d.word, d.defi_z '
+          'FROM top_words t '
+          'JOIN dict_entries d ON d.id = (t.best_key % 1000000000) '
+          'ORDER BY CASE WHEN d.word = ? THEN 0 ELSE 1 END, length(d.word), d.word',
+          [clean, cleanUpper, clean, safeLimit, clean],
+        );
+        for (final r in exactRows) {
+          addCandidate((r['word'] ?? '').toString(), r['defi_z']);
+          if (results.length >= safeLimit) break;
+        }
+
+        if (foldedQuery.length >= 2 &&
+            (clean == foldedQuery || results.length < safeLimit)) {
+          final foldedUpper = _prefixUpperBound(foldedQuery);
+          final foldedRows = unified.select(
+            'WITH top_words AS ('
+            '  SELECT word, MIN(source_id * 1000000000 + id) AS best_key '
+            '  FROM dict_entries '
+            '  WHERE source_id IN (0, 2) AND folded >= ? AND folded < ? '
+            '  GROUP BY word '
+            '  ORDER BY length(word), word '
+            '  LIMIT ?'
+            ') '
+            'SELECT d.word, d.defi_z '
+            'FROM top_words t '
+            'JOIN dict_entries d ON d.id = (t.best_key % 1000000000) '
+            'ORDER BY length(d.word), d.word',
+            [foldedQuery, foldedUpper, safeLimit * 2],
+          );
+          for (final r in foldedRows) {
+            addCandidate((r['word'] ?? '').toString(), r['defi_z']);
+          }
+        }
+      } catch (_) {}
+    } else {
+      void queryLegacy(Database db, String dbKey) {
+        final tables = _getTableNames(dbKey, db);
+        final escGlob = clean
+            .replaceAll('[', '[[]')
+            .replaceAll('*', '[*]')
+            .replaceAll('?', '[?]');
+        final primaryTable = _getFChar(clean, dbKey, db);
+        if (tables.contains(primaryTable) || primaryTable == 'misc') {
+          final safe = '"${primaryTable.replaceAll('"', '""')}"';
+          try {
+            final rows = db.select(
+              'SELECT word, MIN(defi) AS defi FROM $safe '
+              'WHERE word GLOB ? GROUP BY word '
+              'ORDER BY CASE WHEN word = ? THEN 0 ELSE 1 END, length(word), word LIMIT ?',
+              ['$escGlob*', clean, safeLimit],
+            );
+            for (final r in rows) {
+              addCandidate((r['word'] ?? '').toString(), r['defi']);
+              if (results.length >= safeLimit) break;
+            }
+          } catch (_) {}
+        }
+        if (foldedQuery.length >= 2 &&
+            (clean == foldedQuery || results.length < safeLimit)) {
+          final diacriticGlob = _buildDiacriticGlob(foldedQuery);
+          final candidateTables = _expandDiacriticPrefixTables(
+            foldedQuery,
+            tables,
+          );
+          final perTableLimit = candidateTables.length > 1
+              ? math.min(safeLimit, 8)
+              : safeLimit;
+          for (final t in candidateTables) {
+            final safe = '"${t.replaceAll('"', '""')}"';
+            try {
+              final rows = db.select(
+                'SELECT word, MIN(defi) AS defi FROM $safe '
+                'WHERE word GLOB ? GROUP BY word '
+                'ORDER BY length(word), word LIMIT ?',
+                [diacriticGlob, perTableLimit],
+              );
+              for (final r in rows) {
+                addCandidate((r['word'] ?? '').toString(), r['defi']);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+
+      final dpdDb = _openDb('dpd_tipitakapali.db');
+      if (dpdDb != null) queryLegacy(dpdDb, 'DPD');
+      if (results.length < safeLimit) {
+        final ptsDb = _openPtsDb();
+        if (ptsDb != null) queryLegacy(ptsDb, 'PTS');
+      }
+    }
+
+    results.sort((a, b) {
+      final aExact = a['isExact'] == true;
+      final bExact = b['isExact'] == true;
+      if (aExact != bExact) return aExact ? -1 : 1;
+      final aw = (a['word'] as String).toLowerCase();
+      final bw = (b['word'] as String).toLowerCase();
+      final aPrefix = aw.startsWith(clean);
+      final bPrefix = bw.startsWith(clean);
+      if (aPrefix != bPrefix) return aPrefix ? -1 : 1;
+      if (aw.length != bw.length) return aw.length.compareTo(bw.length);
+      return (a['word'] as String).compareTo(b['word'] as String);
+    });
+
+    final payload = <String, dynamic>{
+      'query': clean,
+      'suggestions': results.take(safeLimit).toList(growable: false),
+    };
+    _putBoundedLru(_suggestCache, cacheKey, payload, 250);
+    return ApiResponse(payload);
+  }
+
   ApiResponse lookupInflection(String rawQuery) {
     final trimmed = rawQuery.trim();
     if (trimmed.isEmpty) {
       return const ApiResponse({'error': 'Empty inflection query'});
     }
+    final clean = trimmed
+        .replaceFirst(RegExp(r'^(declension_|conjugation_)'), '')
+        .trim();
+
+    final unified = _openUnifiedDictDb();
+    if (unified != null) {
+      try {
+        final rows = unified.select(
+          'SELECT word, html_z FROM dict_inflections WHERE key = ? LIMIT 1',
+          [clean],
+        );
+        if (rows.isNotEmpty && rows.first['html_z'] != null) {
+          return ApiResponse({
+            'word': rows.first['word'],
+            'query': rawQuery,
+            'html': _decodeDictValue(rows.first['html_z']),
+          });
+        }
+        if (clean.contains('_')) {
+          final base = clean.split('_').first;
+          final baseRows = unified.select(
+            'SELECT word, html_z FROM dict_inflections WHERE key = ? LIMIT 1',
+            [base],
+          );
+          if (baseRows.isNotEmpty && baseRows.first['html_z'] != null) {
+            return ApiResponse({
+              'word': baseRows.first['word'],
+              'query': rawQuery,
+              'html': _decodeDictValue(baseRows.first['html_z']),
+            });
+          }
+        }
+      } catch (_) {}
+      return ApiResponse({'word': trimmed, 'html': ''});
+    }
+
     final db = _openDb('dpd_inflection_tipitakapali.db');
     if (db == null) return ApiResponse({'word': trimmed, 'html': ''});
-
-    final clean = trimmed.replaceFirst(
-      RegExp(r'^(declension_|conjugation_)'),
-      '',
-    ).trim();
 
     Map<String, dynamic>? queryTable(String key) {
       final fchar = _getFChar(key, 'INF', db);

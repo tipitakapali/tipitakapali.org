@@ -324,22 +324,15 @@ function createMarkdownEngine({
     let transMap = null;
     if (langMeta && translationEngine) {
       const code = translationEngine.ensureLanguage(langMeta.code);
-      const dbEntry = code ? translationEngine.databases.get(code) : null;
-      if (dbEntry) {
+      if (code) {
         if (!chapterNum) {
-          try {
-            const firstRow = dbEntry.db
-              .prepare(
-                'SELECT MIN(chapter_index) AS min_ch FROM paragraph_translations WHERE book_code = ?'
-              )
-              .get(bookCode);
-            if (firstRow && firstRow.min_ch !== null && firstRow.min_ch !== undefined) {
-              chapterIndex = Number(firstRow.min_ch);
-            }
-          } catch (_) {}
+          const minCh = translationEngine.getFirstTranslatedChapter(code, bookCode);
+          if (minCh !== null && minCh !== undefined) {
+            chapterIndex = minCh;
+          }
         }
         try {
-          const rows = dbEntry.stmtChapter.all(bookCode, chapterIndex);
+          const rows = translationEngine.getChapterRows(code, bookCode, chapterIndex);
           transMap = new Map();
           for (const r of rows) {
             if (r.translation && String(r.translation).trim()) {
@@ -362,10 +355,9 @@ function createMarkdownEngine({
     let defaultEnMap = null;
     if (!langMeta && !scriptMeta && translationEngine) {
       const enCode = translationEngine.ensureLanguage('en');
-      const enEntry = enCode ? translationEngine.databases.get(enCode) : null;
-      if (enEntry) {
+      if (enCode) {
         try {
-          const rows = enEntry.stmtChapter.all(bookCode, chapterIndex);
+          const rows = translationEngine.getChapterRows(enCode, bookCode, chapterIndex);
           defaultEnMap = new Map();
           for (const r of rows) {
             if (r.translation && String(r.translation).trim()) {
