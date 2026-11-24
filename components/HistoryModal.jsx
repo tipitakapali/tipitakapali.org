@@ -41,10 +41,13 @@ export default function HistoryModal({ isOpen, onClose }) {
   });
 
   const handleJump = (item) => {
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
     openBook(item.bookCode, {
       targetChapterIdx: item.chapterIdx || 0,
       targetParaNum: item.paraNum,
-      targetParaIndex: item.paraNum ? undefined : item.paraIndex,
+      targetParaIndex: item.paraIndex,
     });
     onClose();
   };

@@ -16,6 +16,7 @@ import 'package:tipitakapali_app/core/server/dpd_family_templates.dart';
 import 'package:tipitakapali_app/core/server/tipitaka_local_server.dart';
 import 'package:tipitakapali_app/core/server/tipitaka_web_api.dart';
 import 'package:tipitakapali_app/core/services/github_release_service.dart';
+import 'package:tipitakapali_app/core/services/tipitaka_repository.dart';
 import 'package:tipitakapali_app/core/storage/db_storage_service.dart';
 import 'package:tipitakapali_app/core/utils/formatters.dart';
 import 'package:tipitakapali_app/core/utils/pali_script_converter.dart';
@@ -1827,6 +1828,55 @@ void main() {
       await tester.pump();
       expect(observedUris.last.port, equals(realServer.port));
       expect(observedUris.last.port, isNot(initialUri.port));
+    },
+  );
+
+  test(
+    'WebView bridge script handles .modal-backdrop, window-scroll, programmatic jumps, and bar-sync events',
+    () {
+      expect(tipitakaWebBridgeScript, contains('.modal-backdrop'));
+      expect(tipitakaWebBridgeScript, contains('window-scroll'));
+      expect(tipitakaWebBridgeScript, contains('__tpoProgrammaticScroll'));
+      expect(tipitakaWebBridgeScript, contains('__tpoModalClosedAt'));
+      expect(tipitakaWebBridgeScript, contains('tipitaka:show-bars'));
+      expect(tipitakaWebBridgeScript, contains('tipitaka:header-visibility'));
+      expect(tipitakaWebBridgeScript, contains('isDocScrollTarget'));
+      expect(tipitakaWebBridgeScript, contains('data-toc-view="true"'));
+    },
+  );
+
+  test(
+    'TipitakaRepository.findEditionPageChapter resolves abh03m7.mul pages, vol 0, skipped print pages, and rejects out-of-range',
+    () {
+      final repo = TipitakaRepository();
+      const meta = BookNavigationMeta(
+        bookCode: 'abh03m7.mul',
+        paraToChapter: {'1': 0},
+        pageToChapter: {
+          'M': {
+            '1.0001': 0,
+            '1.0250': 3,
+            '1.0460': 7,
+          },
+          'V': {
+            '1.0001': 0,
+            '1.0518': 7,
+            '1.0520': 7,
+            '1.0529': 7,
+          },
+          'O': {
+            '0.0005': 1,
+            '1.0005': 4,
+          },
+        },
+      );
+
+      expect(repo.findEditionPageChapter(meta, 'M', '250'), 3);
+      expect(repo.findEditionPageChapter(meta, 'M', '1.250'), 3);
+      expect(repo.findEditionPageChapter(meta, 'V', '519'), 7); // skipped print page between 518 and 520
+      expect(repo.findEditionPageChapter(meta, 'O', '0.5'), 1);
+      expect(repo.findEditionPageChapter(meta, 'O', '1.5'), 4);
+      expect(repo.findEditionPageChapter(meta, 'M', '999'), isNull);
     },
   );
 }

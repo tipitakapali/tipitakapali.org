@@ -190,6 +190,10 @@ export function computeNextHeaderVisibility({
   const clampedTop = Math.max(0, Math.min(safeTop, maxScroll));
   const isBottomOverscroll = hasRange && safeTop > maxScroll + 1;
 
+  if (viewportHeight > 0 && scrollHeight > 0 && maxScroll <= 80) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
+
   if (isJumping) {
     const nextVisible = clampedTop <= 24 ? true : isHeaderVisible;
     return { nextVisible, upPeakY: clampedTop, downPeakY: clampedTop };

@@ -69,6 +69,426 @@ export function computeAboveViewportScrollDelta({
   return 0;
 }
 
+export function pickBestSearchHitAnchor(
+  row,
+  { isTransTarget = false, targetTransLang = null, vpHeight = 700 } = {}
+) {
+  if (!row || !row.querySelector) return null;
+  const isMeasurable = (el) =>
+    Boolean(el && typeof el.getClientRects === 'function' && el.getClientRects().length > 0);
+
+  let hitEl = null;
+  if (isTransTarget && targetTransLang) {
+    const cand =
+      row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] mark.search-hit`) ||
+      row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] .search-hit`);
+    if (isMeasurable(cand)) hitEl = cand;
+  } else {
+    const hits = row.querySelectorAll('mark.search-hit, .search-hit');
+    for (const h of hits) {
+      if (h.closest?.('.sent-pair-trans, .reader-trans-block:not(.reader-pali-trans-block):not(.sent-pair-pali)')) continue;
+      if (isMeasurable(h)) {
+        hitEl = h;
+        break;
+      }
+    }
+  }
+  if (!hitEl) {
+    const anyHit = row.querySelector('mark.search-hit, .search-hit');
+    if (isMeasurable(anyHit)) hitEl = anyHit;
+  }
+  if (!hitEl) return null;
+
+  const lineBlock =
+    hitEl.closest?.('.sent-pair') ||
+    hitEl.closest?.('.pali-sent') ||
+    hitEl.closest?.('.reader-trans-block') ||
+    hitEl;
+  if (!isMeasurable(lineBlock) || lineBlock === hitEl) {
+    return hitEl;
+  }
+
+  const maxComfortSpan = Math.max(180, (Number.isFinite(vpHeight) && vpHeight > 0 ? vpHeight : 700) * 0.45);
+  const blockRect = lineBlock.getBoundingClientRect();
+  const hitRect = hitEl.getBoundingClientRect();
+  if (hitRect.bottom - blockRect.top > maxComfortSpan) {
+    return hitEl;
+  }
+  return lineBlock;
+}
+
+function normalizePassageProbe(raw, paliScript = 'roman') {
+  if (!raw) return '';
+  let text = String(raw)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  if (paliScript && paliScript !== 'roman') {
+    try {
+      text = convertPaliScript(text, paliScript);
+    } catch (_) {}
+  }
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function stripPassageEdgePunct(str) {
+  return String(str || '')
+    .replace(/^[\s.,;:!?…—–\-_'"‘’“”«»()\[\]{}၊။]+|[\s.,;:!?…—–\-_'"‘’“”«»()\[\]{}၊။]+$/g, '')
+    .trim();
+}
+
+function buildPaliTextNodeMap(rootEl, { targetTransLang = null } = {}) {
+  const charMap = [];
+  let normText = '';
+  let prevWasSpace = true;
+
+  const isIgnoredElement = (node) => {
+    if (!node || node.nodeType !== 1) return false;
+    if (typeof node.matches === 'function') {
+      if (targetTransLang) {
+        if (node.matches('.note, .paranum, .dot, .pb, .linked-def-row, .sent-pair-pali, .reader-pali-trans-block')) {
+          return true;
+        }
+        const transLangAttr = node.getAttribute?.('data-trans-lang');
+        if (transLangAttr && transLangAttr !== targetTransLang) return true;
+        return false;
+      }
+      return node.matches(
+        '.note, .paranum, .dot, .pb, .linked-def-row, .sent-pair-trans, .reader-trans-block:not(.reader-pali-trans-block):not(.sent-pair-pali)'
+      );
+    }
+    const cls = String(node.className || '');
+    return /\b(?:note|paranum|dot|pb|linked-def-row)\b/.test(cls);
+  };
+
+  const isBlockOrSentBoundary = (node) => {
+    if (!node || node.nodeType !== 1) return false;
+    const tag = String(node.tagName || '').toUpperCase();
+    if (tag === 'P' || tag === 'DIV' || tag === 'BR') return true;
+    const cls = String(node.className || '');
+    return /\b(?:pali-sent|trans-sent|sent-pair)\b/.test(cls);
+  };
+
+  const walk = (node) => {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      const txt = node.textContent || '';
+      for (let i = 0; i < txt.length; i++) {
+        const ch = txt[i];
+        if (/\s/.test(ch)) {
+          if (!prevWasSpace) {
+            normText += ' ';
+            charMap.push({ node, offset: i });
+            prevWasSpace = true;
+          }
+        } else {
+          normText += ch;
+          charMap.push({ node, offset: i });
+          prevWasSpace = false;
+        }
+      }
+      return;
+    }
+    if (node.nodeType !== 1 || isIgnoredElement(node)) return;
+    const isBoundary = isBlockOrSentBoundary(node);
+    const children = node.childNodes;
+    if (children) {
+      for (let i = 0; i < children.length; i++) {
+        walk(children[i]);
+      }
+    }
+    if (isBoundary && !prevWasSpace && charMap.length > 0) {
+      const last = charMap[charMap.length - 1];
+      normText += ' ';
+      charMap.push(last);
+      prevWasSpace = true;
+    }
+  };
+
+  walk(rootEl);
+  if (normText.endsWith(' ')) {
+    normText = normText.slice(0, -1);
+    charMap.pop();
+  }
+  return { normText, charMap };
+}
+
+export function findPassageSubTarget(
+  row,
+  { word = null, bold = null, snippet = null, paliScript = 'roman', isTransTarget = false, targetTransLang = null } = {}
+) {
+  if (!row) return null;
+  const isMeasurable = (el) =>
+    Boolean(el && typeof el.getClientRects === 'function' && el.getClientRects().length > 0);
+
+  if (isTransTarget) {
+    if (!snippet || !targetTransLang) return null;
+    const cleanTransSnip = stripPassageEdgePunct(
+      String(snippet)
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\.\.\.|…/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    ).toLowerCase();
+    if (!cleanTransSnip || cleanTransSnip.length < 4) return null;
+    const { normText, charMap } = buildPaliTextNodeMap(row, { targetTransLang });
+    if (!normText || charMap.length === 0) return null;
+    const lowerTrans = normText.toLowerCase();
+    const transProbes = [];
+    for (const seg of String(snippet)
+      .replace(/<[^>]+>/g, ' ')
+      .split(/\.\.\.|…/)
+      .map((s) => stripPassageEdgePunct(s.replace(/\s+/g, ' ').trim()).toLowerCase())
+      .filter((s) => s.length >= 6)) {
+      if (seg.length > 64) transProbes.push(seg.slice(0, 64));
+      transProbes.push(seg);
+    }
+    if (cleanTransSnip.length >= 6) transProbes.push(cleanTransSnip.slice(0, 48));
+    for (const probe of transProbes) {
+      const idx = lowerTrans.indexOf(probe);
+      if (idx !== -1 && typeof document !== 'undefined' && typeof document.createRange === 'function') {
+        const startRef = charMap[idx];
+        const endRef = charMap[Math.min(charMap.length - 1, idx + probe.length - 1)];
+        if (startRef?.node && endRef?.node) {
+          const sentPair = startRef.node.parentElement?.closest?.('.sent-pair');
+          if (sentPair && isMeasurable(sentPair)) {
+            return { element: sentPair, range: null, anchor: sentPair };
+          }
+          try {
+            const range = document.createRange();
+            range.setStart(startRef.node, startRef.offset);
+            range.setEnd(endRef.node, endRef.offset + 1);
+            if (typeof range.getClientRects === 'function' && range.getClientRects().length > 0) {
+              return {
+                element: null,
+                range: null,
+                anchor: {
+                  getBoundingClientRect: () => range.getBoundingClientRect(),
+                  getClientRects: () => range.getClientRects(),
+                  closest: (sel) => (startRef.node.parentElement || row)?.closest?.(sel) || null,
+                  classList: null,
+                  getAttribute: () => null,
+                  hostRow: row,
+                },
+              };
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    return null;
+  }
+
+  const normBold = stripPassageEdgePunct(normalizePassageProbe(bold, paliScript)).toLowerCase();
+  const normWord = stripPassageEdgePunct(normalizePassageProbe(word, paliScript)).toLowerCase();
+  const normSnippet = normalizePassageProbe(snippet, paliScript).toLowerCase();
+  if (!normBold && !normWord && !normSnippet) return null;
+
+  // 1. Match <strong class="bld"> / bold term spans directly inside Pāḷi paragraph
+  if ((normBold || normWord) && typeof row.querySelectorAll === 'function') {
+    const boldNodes = row.querySelectorAll('strong.bld, .bld, strong, b');
+    const matchedBoldEls = [];
+    const stripTi = (s) => s.replace(/(?:nti|ti)$/i, '').replace(/ṃ$/i, 'm');
+
+    for (const bEl of boldNodes) {
+      if (
+        bEl.closest?.(
+          '.paranum, .sent-paranum, .linked-def-row, .sent-pair-trans, .reader-trans-block:not(.reader-pali-trans-block):not(.sent-pair-pali)'
+        )
+      ) {
+        continue;
+      }
+      if (!isMeasurable(bEl)) continue;
+      const bTxt = stripPassageEdgePunct((bEl.textContent || '').replace(/\s+/g, ' ')).toLowerCase();
+      if (!bTxt) continue;
+      const bStem = stripTi(bTxt);
+      let score = 0;
+      if (normBold && bTxt === normBold) score = 100;
+      else if (normWord && bTxt === normWord) score = 95;
+      else if (normBold && bStem && bStem === stripTi(normBold)) score = 90;
+      else if (normWord && bStem && bStem === stripTi(normWord)) score = 85;
+      else if (normBold && normBold.length >= 2 && (bTxt.includes(normBold) || normBold.includes(bTxt))) score = 75;
+      else if (normWord && normWord.length >= 2 && (bTxt.includes(normWord) || normWord.includes(bTxt))) score = 70;
+      if (score > 0) {
+        matchedBoldEls.push({ el: bEl, score });
+      }
+    }
+
+    if (matchedBoldEls.length === 1) {
+      return { element: matchedBoldEls[0].el, range: null, anchor: matchedBoldEls[0].el };
+    }
+    if (matchedBoldEls.length > 1) {
+      if (normSnippet) {
+        const boldIdxInSnip = normBold ? normSnippet.indexOf(normBold) : -1;
+        const tailProbe = (boldIdxInSnip >= 0 ? normSnippet.slice(boldIdxInSnip) : normSnippet).slice(0, 48);
+        const leadProbe = boldIdxInSnip > 2 ? normSnippet.slice(Math.max(0, boldIdxInSnip - 24), boldIdxInSnip).trim() : '';
+        for (const item of matchedBoldEls) {
+          let afterText = item.el.textContent || '';
+          let sib = item.el.nextSibling;
+          while (sib && afterText.length < 140) {
+            if (sib.nodeType === 3 || (sib.nodeType === 1 && !sib.classList?.contains('pb'))) {
+              afterText += sib.textContent || '';
+            }
+            sib = sib.nextSibling;
+          }
+          const nextTxt = normalizePassageProbe(afterText, 'roman').toLowerCase();
+          const nextInScript =
+            paliScript && paliScript !== 'roman'
+              ? normalizePassageProbe(afterText, paliScript).toLowerCase()
+              : nextTxt;
+          const prefixCheck = tailProbe.slice(0, Math.min(28, tailProbe.length));
+          if (prefixCheck && (nextInScript.startsWith(prefixCheck) || nextTxt.startsWith(prefixCheck))) {
+            item.score += 60;
+          } else if (prefixCheck && (nextInScript.includes(prefixCheck) || nextTxt.includes(prefixCheck))) {
+            item.score += 15;
+          }
+          if (leadProbe) {
+            let beforeText = '';
+            let prev = item.el.previousSibling;
+            while (prev && beforeText.length < 60) {
+              if (prev.nodeType === 3 || (prev.nodeType === 1 && !prev.classList?.contains('pb'))) {
+                beforeText = (prev.textContent || '') + beforeText;
+              }
+              prev = prev.previousSibling;
+            }
+            const prevNorm = normalizePassageProbe(beforeText, paliScript).toLowerCase();
+            if (prevNorm.endsWith(leadProbe)) {
+              item.score += 25;
+            }
+          }
+        }
+      }
+      matchedBoldEls.sort((a, b) => b.score - a.score);
+      return { element: matchedBoldEls[0].el, range: null, anchor: matchedBoldEls[0].el };
+    }
+  }
+
+  // 2. Match Pāḷi sentence snippet or bold/word phrase in text nodes via DOM Range
+  const paliRoot =
+    typeof row.matches === 'function' && row.matches('p')
+      ? row
+      : row.querySelector?.('.reader-sent-pairs')
+        ? row
+        : row.querySelector?.('.reader-pali-trans-block p, p[data-pindex]') || row;
+  const { normText, charMap } = buildPaliTextNodeMap(paliRoot);
+  if (!normText || charMap.length === 0) return null;
+
+  const lowerText = normText.toLowerCase();
+  const probes = [];
+  if (normSnippet) {
+    const cleanSnip = stripPassageEdgePunct(normSnippet);
+    if (cleanSnip.length >= 4) probes.push(cleanSnip.slice(0, 96));
+    if (cleanSnip.length > 48) probes.push(cleanSnip.slice(0, 48));
+    if (cleanSnip.length > 24) probes.push(cleanSnip.slice(0, 24));
+  }
+  if (normBold && normBold.length >= 2) probes.push(normBold);
+  if (normWord && normWord.length >= 2) probes.push(normWord);
+
+  let matchStart = -1;
+  let matchLen = 0;
+  for (const p of probes) {
+    if (!p) continue;
+    const idx = lowerText.indexOf(p);
+    if (idx !== -1) {
+      matchStart = idx;
+      matchLen = p.length;
+      break;
+    }
+  }
+
+  if (
+    matchStart >= 0 &&
+    matchLen > 0 &&
+    typeof document !== 'undefined' &&
+    typeof document.createRange === 'function'
+  ) {
+    const startRef = charMap[matchStart];
+    const endRef = charMap[Math.min(charMap.length - 1, matchStart + matchLen - 1)];
+    if (startRef?.node && endRef?.node) {
+      try {
+        const range = document.createRange();
+        range.setStart(startRef.node, startRef.offset);
+        range.setEnd(endRef.node, endRef.offset + 1);
+        if (typeof range.getClientRects === 'function' && range.getClientRects().length > 0) {
+          const anchor = {
+            getBoundingClientRect: () => range.getBoundingClientRect(),
+            getClientRects: () => range.getClientRects(),
+            closest: (sel) => (startRef.node.parentElement || paliRoot || row)?.closest?.(sel) || null,
+            classList: null,
+            getAttribute: () => null,
+            range,
+            hostRow: row,
+          };
+          return { element: null, range, anchor };
+        }
+      } catch (_) {}
+    }
+  }
+
+  return null;
+}
+
+export function resolveMeasurablePbAnchor(pbEl, sentenceMode = false) {
+  if (!pbEl) return null;
+  const hasRects = (el) => Boolean(el && typeof el.getClientRects === 'function' && el.getClientRects().length > 0);
+  if (sentenceMode) {
+    const sentPair = pbEl.closest?.('.sent-pair');
+    if (hasRects(sentPair)) return sentPair;
+  }
+  if (hasRects(pbEl)) return pbEl;
+
+  // When page breaks are hidden via CSS (e.g. body.hide-pb), locate the exact adjacent text
+  // node inside the enclosing paragraph so multi-screen paragraphs still land at the exact line.
+  if (typeof document !== 'undefined' && typeof document.createRange === 'function' && pbEl.parentNode) {
+    const hostRow = pbEl.closest?.('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl;
+    const findFirstVisibleChar = (startNode, forward = true) => {
+      let cur = startNode;
+      let steps = 0;
+      while (cur && steps < 24) {
+        steps++;
+        if (cur.nodeType === 3) {
+          const txt = cur.textContent || '';
+          const idx = forward ? txt.search(/\S/) : txt.trimEnd().length - 1;
+          if (idx >= 0 && idx < txt.length) {
+            try {
+              const r = document.createRange();
+              r.setStart(cur, idx);
+              r.setEnd(cur, idx + 1);
+              if (r.getClientRects?.().length > 0) return r;
+            } catch (_) {}
+          }
+        } else if (cur.nodeType === 1 && !cur.classList?.contains('pb') && hasRects(cur)) {
+          if (cur.firstChild) {
+            const inner = findFirstVisibleChar(forward ? cur.firstChild : cur.lastChild, forward);
+            if (inner) return inner;
+          }
+          return cur;
+        }
+        cur = forward ? cur.nextSibling : cur.previousSibling;
+      }
+      return null;
+    };
+
+    const hit =
+      findFirstVisibleChar(pbEl.nextSibling, true) || findFirstVisibleChar(pbEl.previousSibling, false);
+    if (hit) {
+      if (hit.nodeType === 1) return hit;
+      return {
+        getBoundingClientRect: () => hit.getBoundingClientRect(),
+        getClientRects: () => hit.getClientRects(),
+        closest: (sel) => hostRow?.closest?.(sel) || null,
+        classList: null,
+        getAttribute: () => null,
+        hostRow,
+      };
+    }
+  }
+
+  return pbEl.closest?.('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl;
+}
+
 // Batch-evaluate multiple chunk height changes (in ascending DOM order) from a
 // single commit so we perform all DOM reads before a single scrollTop write
 // without interleaved read->write layout thrashing, adjusting subsequent chunk
@@ -114,6 +534,10 @@ export function computeNextHeaderVisibility({
   const maxScroll = hasRange ? Math.max(0, scrollHeight - viewportHeight) : Math.max(0, safeTop);
   const clampedTop = Math.max(0, Math.min(safeTop, maxScroll));
   const isBottomOverscroll = hasRange && safeTop > maxScroll + 1;
+
+  if (viewportHeight > 0 && scrollHeight > 0 && maxScroll <= 80) {
+    return { nextVisible: true, upPeakY: clampedTop, downPeakY: clampedTop };
+  }
 
   if (isJumping) {
     const nextVisible = clampedTop <= 24 ? true : isHeaderVisible;
@@ -1167,11 +1591,22 @@ export function injectTranslationsIntoHtml(
       }
     }
 
+    const preservedPbs = !isPaliEnabled
+      ? (pTag.match(/<span\b[^>]*\bclass="[^"]*\bpb\b[^"]*"[^>]*>[\s\S]*?<\/span>/gi) || [])
+          .map((pbHtml) =>
+            pbHtml.replace(
+              /\bclass="([^"]*)"/i,
+              (_, cls) => `class="${cls.includes('hidden') ? cls : `${cls} hidden`}"`
+            )
+          )
+          .join('')
+      : '';
+
     if (renderedItems.length === 0) {
       if (!isPaliEnabled) {
         // Keep section headings/titles/colophons so chapter hierarchy remains visible
         if (isHeading) return pTag;
-        return `<div class="reader-para-row reader-trans-empty" ${rowAttrs}></div>`;
+        return `<div class="reader-para-row reader-trans-empty" ${rowAttrs}>${preservedPbs}</div>`;
       }
       return fullMatch;
     }
@@ -1179,7 +1614,7 @@ export function injectTranslationsIntoHtml(
     // Heading row styling when Pāḷi is disabled
     if (!isPaliEnabled && isHeading) {
       const headingItemsHtml = renderedItems.map((item) => item.html).join('');
-      return `<div class="reader-para-row reader-trans-heading-row ${headingClass}" ${rowAttrs}>${headingItemsHtml}</div>`;
+      return `<div class="reader-para-row reader-trans-heading-row ${headingClass}" ${rowAttrs}>${preservedPbs}${headingItemsHtml}</div>`;
     }
 
     if (isSideActive && renderedItems.length >= 2) {
@@ -1345,7 +1780,7 @@ export function injectTranslationsIntoHtml(
               return `<div class="sent-pair" data-line="${ln}">` +
                 `<div class="sent-pair-body">` +
                 (pHtml !== undefined
-                  ? `<div class="sent-pair-pali reader-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-line="${ln}">${stripSentNumBadge(pHtml)}</div>${lineStrip}${extraLeftover}`
+                  ? `<div class="sent-pair-pali reader-trans-block reader-pali-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-trans-lang="pali" data-line="${ln}">${stripSentNumBadge(pHtml)}</div>${lineStrip}${extraLeftover}`
                   : '') +
                 cells +
                 `</div></div>`;
@@ -1367,7 +1802,7 @@ export function injectTranslationsIntoHtml(
     const itemsHtml = renderedItems
       .map((item) => (item.type === 'pali' && allLinksStrip ? `${item.html}${allLinksStrip}` : item.html))
       .join('');
-    return `<div class="reader-para-row reader-trans-stack-row" ${rowAttrs}>${itemsHtml}</div>`;
+    return `<div class="reader-para-row reader-trans-stack-row" ${rowAttrs}>${preservedPbs}${itemsHtml}</div>`;
   });
 }
 
@@ -1822,6 +2257,95 @@ export function findTargetChunkIndex(
     }
   }
 
+  // Check edition page BEFORE paraNum so GoTo Page jumps never latch onto a chapter-start fallback paraNum
+  if (page !== undefined && page !== null && String(page).trim() !== '') {
+    const cleanP = String(page).trim();
+    const targetEd = pageSystem ? String(pageSystem).trim().toUpperCase() : null;
+    const hasDot = cleanP.includes('.');
+    let explicitVol = null;
+    let targetPageInt = NaN;
+    let paddedExact = null;
+    let paddedSuffix = null;
+    if (hasDot) {
+      const parts = cleanP.split('.');
+      const vol = parseInt(parts[0], 10);
+      const num = parseInt(parts[1], 10);
+      if (!Number.isNaN(vol) && !Number.isNaN(num)) {
+        explicitVol = vol;
+        targetPageInt = num;
+        paddedExact = `${vol}.${String(num).padStart(4, '0')}`;
+      }
+    } else if (/^\d+$/.test(cleanP)) {
+      const num = parseInt(cleanP, 10);
+      if (!Number.isNaN(num)) {
+        targetPageInt = num;
+        paddedSuffix = `.${String(num).padStart(4, '0')}`;
+        paddedExact = String(num).padStart(4, '0');
+      }
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      const edPages = chunks[i].edPages;
+      if (!edPages || edPages.length === 0) continue;
+      for (let j = 0; j < edPages.length; j++) {
+        const item = edPages[j];
+        if (targetEd && String(item.ed || '').toUpperCase() !== targetEd) continue;
+        const pVal = String(item.page || '');
+        if (
+          pVal === cleanP ||
+          (paddedExact && pVal === paddedExact) ||
+          (paddedSuffix && pVal.endsWith(paddedSuffix))
+        ) {
+          return i;
+        }
+      }
+    }
+
+    // Nearest-page chunk fallback when an edition skipped an intermediate print page number
+    if (!Number.isNaN(targetPageInt)) {
+      let bestBeforeIdx = -1;
+      let bestBeforeDiff = Infinity;
+      let bestAfterIdx = -1;
+      let bestAfterDiff = Infinity;
+      for (let i = 0; i < chunks.length; i++) {
+        const edPages = chunks[i].edPages;
+        if (!edPages || edPages.length === 0) continue;
+        for (let j = 0; j < edPages.length; j++) {
+          const item = edPages[j];
+          if (targetEd && String(item.ed || '').toUpperCase() !== targetEd) continue;
+          const pVal = String(item.page || '');
+          let itemVol = null;
+          let itemNum = NaN;
+          if (pVal.includes('.')) {
+            const [vs, ps] = pVal.split('.');
+            itemVol = parseInt(vs, 10);
+            itemNum = parseInt(ps, 10);
+            if (explicitVol !== null && itemVol !== explicitVol) continue;
+          } else {
+            if (explicitVol !== null && explicitVol > 0) continue;
+            itemNum = parseInt(pVal, 10);
+          }
+          if (Number.isNaN(itemNum)) continue;
+          if (itemNum <= targetPageInt) {
+            const diff = targetPageInt - itemNum;
+            if (diff < bestBeforeDiff) {
+              bestBeforeDiff = diff;
+              bestBeforeIdx = i;
+            }
+          } else {
+            const diff = itemNum - targetPageInt;
+            if (diff < bestAfterDiff) {
+              bestAfterDiff = diff;
+              bestAfterIdx = i;
+            }
+          }
+        }
+      }
+      if (bestBeforeIdx >= 0) return bestBeforeIdx;
+      if (bestAfterIdx >= 0) return bestAfterIdx;
+    }
+  }
+
   if (paraNum !== undefined && paraNum !== null && String(paraNum).trim() !== '') {
     const cleanPara = String(paraNum).replace(/^(?:para-?|p)/i, '').trim();
     for (let i = 0; i < chunks.length; i++) {
@@ -1862,45 +2386,6 @@ export function findTargetChunkIndex(
       }
       if (bestBeforeIdx >= 0) return bestBeforeIdx;
       if (bestAfterIdx >= 0) return bestAfterIdx;
-    }
-  }
-
-  if (page !== undefined && page !== null && String(page).trim() !== '') {
-    const cleanP = String(page).trim();
-    const targetEd = pageSystem ? String(pageSystem).trim().toUpperCase() : null;
-    const hasDot = cleanP.includes('.');
-    let paddedExact = null;
-    let paddedSuffix = null;
-    if (hasDot) {
-      const parts = cleanP.split('.');
-      const vol = parseInt(parts[0], 10);
-      const num = parseInt(parts[1], 10);
-      if (!Number.isNaN(vol) && !Number.isNaN(num)) {
-        paddedExact = `${vol}.${String(num).padStart(4, '0')}`;
-      }
-    } else if (/^\d+$/.test(cleanP)) {
-      const num = parseInt(cleanP, 10);
-      if (!Number.isNaN(num)) {
-        paddedSuffix = `.${String(num).padStart(4, '0')}`;
-        paddedExact = String(num).padStart(4, '0');
-      }
-    }
-
-    for (let i = 0; i < chunks.length; i++) {
-      const edPages = chunks[i].edPages;
-      if (!edPages || edPages.length === 0) continue;
-      for (let j = 0; j < edPages.length; j++) {
-        const item = edPages[j];
-        if (targetEd && String(item.ed || '').toUpperCase() !== targetEd) continue;
-        const pVal = String(item.page || '');
-        if (
-          pVal === cleanP ||
-          (paddedExact && pVal === paddedExact) ||
-          (paddedSuffix && pVal.endsWith(paddedSuffix))
-        ) {
-          return i;
-        }
-      }
     }
   }
 
@@ -2103,6 +2588,7 @@ const ChapterChunk = memo(function ChapterChunk({
             className="pb hidden"
             data-ed={ed}
             data-page={page}
+            data-chunk-pb="1"
             aria-hidden="true"
           />
         ))}
@@ -2759,6 +3245,7 @@ export const ChapterBlock = memo(function ChapterBlock({
         ? getCachedChapterLinks(bookCode, chapter.chapter_index)
         : null;
     if (syncCached) {
+      blockRef.current?.removeAttribute('data-links-loading');
       setChapterLinks((prev) => (prev === syncCached ? prev : syncCached));
       if (linksNotifiedKeyRef.current !== notifyKey) {
         linksNotifiedKeyRef.current = notifyKey;
@@ -2767,19 +3254,25 @@ export const ChapterBlock = memo(function ChapterBlock({
       return;
     }
     let cancelled = false;
+    blockRef.current?.setAttribute('data-links-loading', '1');
     fetchChapterLinks(bookCode, chapter.chapter_index)
       .then((data) => {
         if (cancelled) return;
+        blockRef.current?.removeAttribute('data-links-loading');
         const paras = data?.paragraphs || null;
         setChapterLinks(paras);
         linksNotifiedKeyRef.current = notifyKey;
         onLinksLoaded?.(chapter.chapter_index, paras);
       })
       .catch(() => {
-        if (!cancelled) setChapterLinks(null);
+        if (!cancelled) {
+          blockRef.current?.removeAttribute('data-links-loading');
+          setChapterLinks(null);
+        }
       });
     return () => {
       cancelled = true;
+      blockRef.current?.removeAttribute('data-links-loading');
     };
   }, [
     showBookLinks,
@@ -3091,7 +3584,9 @@ export const ChapterBlock = memo(function ChapterBlock({
     // Phase 2: Single scroll adjustment write
     const totalDelta = computeBatchedAboveViewportScrollDelta(measurements, vpTop);
     if (totalDelta !== 0) {
-      if (ctx.useWindowScroll) {
+      if (typeof ctx.adjustScrollBy === 'function') {
+        ctx.adjustScrollBy(totalDelta);
+      } else if (ctx.useWindowScroll) {
         if (typeof window !== 'undefined' && typeof window.scrollBy === 'function') {
           window.scrollBy(0, totalDelta);
         }
@@ -3126,6 +3621,20 @@ export const ChapterBlock = memo(function ChapterBlock({
     const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 768;
 
     if (!isCurrentOrTarget && !isWithinDomWindow) {
+      let estVirtualizedHeight = measuredHeightRef.current;
+      if (!(estVirtualizedHeight > 220)) {
+        estVirtualizedHeight = 0;
+        for (let i = 0; i < chunks.length; i++) {
+          estVirtualizedHeight += estimateChunkHeight(chunks[i], {
+            isPaliEnabled,
+            activeLangCount: activeLangs.length,
+            effectiveSentenceMode,
+            translationDisplayMode,
+            showBookLinks,
+            isMobile: isMobileViewport,
+          });
+        }
+      }
       return (
         <div
           ref={blockRef}
@@ -3133,7 +3642,7 @@ export const ChapterBlock = memo(function ChapterBlock({
           data-chapter={chapter.chapter_index}
           data-virtualized="1"
           className="chapter-content-block chapter-virtualized-placeholder"
-          style={{ minHeight: measuredHeightRef.current || 600 }}
+          style={{ minHeight: estVirtualizedHeight || 600 }}
         />
       );
     }
@@ -4261,6 +4770,8 @@ const ReaderPane = memo(function ReaderPane({
   const attemptScrollTimerRef = useRef(null);
   const activeTabRef = useRef(tab);
   activeTabRef.current = tab;
+  const activeLangsRef = useRef(activeLangs);
+  activeLangsRef.current = activeLangs;
   const useWindowScrollRef = useRef(useWindowScroll);
   useWindowScrollRef.current = useWindowScroll;
   const prevUseWindowScrollRef = useRef(useWindowScroll);
@@ -4269,6 +4780,13 @@ const ReaderPane = memo(function ReaderPane({
   const lastScrollYRef = useRef(0);
   const scrollUpPeakYRef = useRef(0);
   const scrollDownPeakYRef = useRef(0);
+  const touchPullStartYRef = useRef(null);
+  const [jumpPin, setJumpPin] = useState(null);
+  const jumpPinRef = useRef(null);
+  const pinJumpTarget = useCallback((nextPin) => {
+    jumpPinRef.current = nextPin;
+    setJumpPin(nextPin);
+  }, []);
   const jumpResizeObserverRef = useRef(null);
   const anchorPinRef = useRef({
     active: false,
@@ -4505,10 +5023,80 @@ const ReaderPane = memo(function ReaderPane({
   const hasRenderableChapters = Boolean(tab.chapters?.length || tab.html);
   const isTocMode = Boolean(tab.viewMode === 'toc' || tab.isTocView);
 
+  // Expire pinned jump window once user switches into TOC view or reads 2+ chapters away
+  useEffect(() => {
+    if (!jumpPin) return;
+    if (isTocMode || jumpPin.bookCode !== tab.bookCode) {
+      pinJumpTarget(null);
+      return;
+    }
+    if (
+      !paneScrollIntent &&
+      !paraJumpRef.current.key &&
+      !chapterJumpRef.current.key &&
+      !isProgrammaticScrollRef.current &&
+      jumpPin.chapterIdx !== undefined &&
+      jumpPin.chapterIdx !== null &&
+      tab.currentChapterIdx !== undefined &&
+      tab.currentChapterIdx !== null &&
+      Math.abs(tab.currentChapterIdx - jumpPin.chapterIdx) >= 2
+    ) {
+      pinJumpTarget(null);
+    }
+  }, [jumpPin, isTocMode, tab.bookCode, tab.currentChapterIdx, paneScrollIntent, pinJumpTarget]);
+
+  // Guarantee bars stay visible when active chapter content is shorter than scrollable threshold
+  useEffect(() => {
+    if (!isVisible || isTocMode || !hasRenderableChapters) return;
+    const timer = setTimeout(() => {
+      if (!isVisible || isHeaderVisibleRef.current) return;
+      const { height: vpH, scrollHeight: sH } = getViewportBounds();
+      if (vpH > 0 && sH > 0 && sH - vpH <= 80) {
+        isHeaderVisibleRef.current = true;
+        setIsHeaderVisible?.(true);
+      }
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [isVisible, isTocMode, hasRenderableChapters, tab.currentChapterIdx, tab.loadedChapters, setIsHeaderVisible, getViewportBounds]);
+
   useEffect(() => {
     const container = containerRef.current;
+    const MODAL_GUARD_SELECTOR =
+      '.modal-overlay, .modal-backdrop, .search-modal, .dict-dock-panel, .dict-overlay, .dict-panel-modal, .linked-def-modal-backdrop, [role="dialog"], [aria-modal="true"]';
     const onUserInput = (e) => {
-      if (e?.target?.closest?.('.modal-overlay, .search-modal, .dict-dock-panel')) return;
+      if (e?.target?.closest?.(MODAL_GUARD_SELECTOR)) return;
+      if (
+        e?.type === 'wheel' &&
+        typeof window !== 'undefined' &&
+        window.__tpoModalClosedAt &&
+        Date.now() - window.__tpoModalClosedAt < 650
+      ) {
+        return;
+      }
+      if (e?.type === 'mousedown') {
+        const intentTs = paneScrollIntentRef.current?.timestamp;
+        const isScrollbarClick =
+          container &&
+          typeof e.clientX === 'number' &&
+          e.clientX >= container.getBoundingClientRect().right - 20;
+        if (intentTs && Date.now() - intentTs < 350 && !isScrollbarClick) {
+          return;
+        }
+      }
+      if (e?.type === 'touchstart' && e.touches?.length === 1) {
+        touchPullStartYRef.current = e.touches[0].clientY;
+      } else if (e?.type === 'touchmove' && e.touches?.length === 1 && touchPullStartYRef.current !== null) {
+        const pullDeltaY = e.touches[0].clientY - touchPullStartYRef.current;
+        // Reveal hidden bars on downward pull near top even when WebView clamps scrollTop at 0 (no scroll event)
+        if (pullDeltaY >= 28 && !isHeaderVisibleRef.current && getScrollTop() <= 24) {
+          isHeaderVisibleRef.current = true;
+          setIsHeaderVisible?.(true);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('tipitaka:show-bars'));
+          }
+          touchPullStartYRef.current = e.touches[0].clientY;
+        }
+      }
       if (!anchorPinRef.current.resizing) {
         anchorPinRef.current.active = false;
       }
@@ -4517,7 +5105,7 @@ const ReaderPane = memo(function ReaderPane({
     };
     const onKeyDown = (e) => {
       if (!useWindowScroll || !isVisible) return;
-      if (e?.target?.closest?.('input, textarea, select, [contenteditable="true"], .modal-overlay')) return;
+      if (e?.target?.closest?.(`input, textarea, select, [contenteditable="true"], ${MODAL_GUARD_SELECTOR}`)) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
         if (!anchorPinRef.current.resizing) {
           anchorPinRef.current.active = false;
@@ -4638,6 +5226,9 @@ const ReaderPane = memo(function ReaderPane({
     if (Math.abs(delta) >= 0.75) {
       const nextTop = Math.max(0, getScrollTop() + delta);
       isProgrammaticScrollRef.current = true;
+      if (typeof window !== 'undefined') {
+        window.__tpoProgrammaticScroll = true;
+      }
       lastScrollYRef.current = nextTop;
       scrollUpPeakYRef.current = nextTop;
       scrollDownPeakYRef.current = nextTop;
@@ -4648,6 +5239,9 @@ const ReaderPane = memo(function ReaderPane({
       clearTimeout(programmaticScrollTimerRef.current);
       programmaticScrollTimerRef.current = setTimeout(() => {
         isProgrammaticScrollRef.current = false;
+        if (typeof window !== 'undefined') {
+          window.__tpoProgrammaticScroll = false;
+        }
       }, 120);
     }
   }, [getScrollTop, setScrollTop, saveTabScroll]);
@@ -4717,6 +5311,9 @@ const ReaderPane = memo(function ReaderPane({
     const targetScroll = savedScroll > 0 ? savedScroll : (lastScrollYRef.current > 0 ? lastScrollYRef.current : 0);
     if (targetScroll > 0 || Math.abs(getScrollTop() - targetScroll) > 1) {
       isProgrammaticScrollRef.current = true;
+      if (typeof window !== 'undefined') {
+        window.__tpoProgrammaticScroll = true;
+      }
       lastScrollYRef.current = targetScroll;
       scrollUpPeakYRef.current = targetScroll;
       scrollDownPeakYRef.current = targetScroll;
@@ -4727,6 +5324,9 @@ const ReaderPane = memo(function ReaderPane({
       clearTimeout(programmaticScrollTimerRef.current);
       programmaticScrollTimerRef.current = setTimeout(() => {
         isProgrammaticScrollRef.current = false;
+        if (typeof window !== 'undefined') {
+          window.__tpoProgrammaticScroll = false;
+        }
       }, 150);
     }
   }, [
@@ -4824,19 +5424,40 @@ const ReaderPane = memo(function ReaderPane({
 
     const savedScroll = getSavedScroll(tab.bookCode);
 
+    const syncRestoredScrollPos = (pos) => {
+      const safePos = Math.max(0, pos);
+      lastScrollYRef.current = safePos;
+      scrollUpPeakYRef.current = safePos;
+      scrollDownPeakYRef.current = safePos;
+      isProgrammaticScrollRef.current = true;
+      if (typeof window !== 'undefined') {
+        window.__tpoProgrammaticScroll = true;
+      }
+      clearTimeout(programmaticScrollTimerRef.current);
+      programmaticScrollTimerRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+        if (typeof window !== 'undefined') {
+          window.__tpoProgrammaticScroll = false;
+        }
+      }, 160);
+      setScrollTop(safePos, 'auto');
+    };
+
     // FAST PATH: Pane was already mounted & restored previously.
     // Because the pane's DOM stayed mounted while hidden, its layout height is already exact.
     // Restore exact pixel scrollTop synchronously before paint with ZERO drift timers or anchor snapping!
     if (hasInitialRestoredRef.current) {
       isTabSwitchingRef.current = true;
       lastScrollYRef.current = savedScroll;
+      scrollUpPeakYRef.current = Math.max(0, savedScroll);
+      scrollDownPeakYRef.current = Math.max(0, savedScroll);
       if (Math.abs(getScrollTop() - savedScroll) > 1) {
-        setScrollTop(savedScroll, 'auto');
+        syncRestoredScrollPos(savedScroll);
       }
       const rafId = requestAnimationFrame(() => {
         if (containerRef.current && !paneScrollIntent) {
           if (Math.abs(getScrollTop() - savedScroll) > 2) {
-            setScrollTop(savedScroll, 'auto');
+            syncRestoredScrollPos(savedScroll);
           }
         }
         isTabSwitchingRef.current = false;
@@ -4908,8 +5529,7 @@ const ReaderPane = memo(function ReaderPane({
           if (tab?.fromSavedSession && !hostTransReady && !allowStaleFallback) {
             return false;
           }
-          lastScrollYRef.current = savedScroll;
-          setScrollTop(savedScroll, 'auto');
+          syncRestoredScrollPos(savedScroll);
           hasInitialRestoredRef.current = true;
           return true;
         }
@@ -4942,8 +5562,7 @@ const ReaderPane = memo(function ReaderPane({
         const curTop = getScrollTop();
         const pRect = pEl.getBoundingClientRect();
         const offset = Math.max(0, pRect.top - vpTop + curTop - TOP_PAD);
-        lastScrollYRef.current = offset;
-        setScrollTop(offset, 'auto');
+        syncRestoredScrollPos(offset);
         saveTabScroll(tab.bookCode, offset);
         hasInitialRestoredRef.current = true;
         return true;
@@ -4957,8 +5576,7 @@ const ReaderPane = memo(function ReaderPane({
         const curTop = getScrollTop();
         const chRect = chapEl.getBoundingClientRect();
         const offset = Math.max(0, chRect.top - vpTop + curTop - TOP_PAD);
-        lastScrollYRef.current = offset;
-        setScrollTop(offset, 'auto');
+        syncRestoredScrollPos(offset);
         saveTabScroll(tab.bookCode, offset);
       }
       hasInitialRestoredRef.current = true;
@@ -5025,7 +5643,20 @@ const ReaderPane = memo(function ReaderPane({
       return;
     }
 
-    const { chapterIdx, paraIndex, paraNum, page, pageSystem, subBook, lang, db, lineId } = paneScrollIntent;
+    const {
+      chapterIdx,
+      paraIndex,
+      paraNum,
+      page,
+      pageSystem,
+      subBook,
+      lang,
+      db,
+      lineId,
+      word: targetWord,
+      bold: targetBold,
+      snippet: targetSnippet,
+    } = paneScrollIntent;
     const targetTransLang = normalizeLangCode(lang || db || searchHighlight?.lang || searchHighlight?.db);
     const isTransTarget = Boolean(targetTransLang && targetTransLang !== 'pali');
 
@@ -5154,7 +5785,7 @@ const ReaderPane = memo(function ReaderPane({
           if (Number.isNaN(idx) || idx >= targetIdx) continue; // only chapters above the anchor
           if (curLoadingChaps[idx]) return false;
           if (chEl.classList.contains('chapter-placeholder')) {
-            if (idx === targetIdx - 1 && targetIdx > 0 && paneScrollIntent) return false;
+            if (idx === targetIdx - 1 && targetIdx > 0 && (paneScrollIntentRef.current || jumpPinRef.current)) return false;
             continue;
           }
           if (chEl.getAttribute('data-trans-loading') === '1') return false;
@@ -5169,12 +5800,69 @@ const ReaderPane = memo(function ReaderPane({
       const isWaitingForContent =
         Boolean(activeTab.loadingChapters?.[chapterIdx]) ||
         prevChapLoading ||
+        (isTransTarget && !activeLangsRef.current?.includes(targetTransLang)) ||
         (targetChapEl && targetChapEl.classList.contains('chapter-placeholder')) ||
         (hasTransLayers &&
           (!targetChapEl ||
             targetChapEl.getAttribute('data-trans-settled') !== '1' ||
             !areaTranslationSettled(targetChapEl)));
       const effectiveMaxRetries = isWaitingForContent ? 300 : maxRetries;
+
+      // Wait for newly-enabled translation language state to propagate into ReaderView/ChapterBlock
+      if (isTransTarget && !activeLangsRef.current?.includes(targetTransLang) && retries < effectiveMaxRetries - 5) {
+        scheduleAttemptScroll(50);
+        return;
+      }
+
+      const resolveNearestPbInScope = (scopeEl, edCode, rawPage) => {
+        if (!scopeEl || !scopeEl.querySelectorAll) return null;
+        const cleanStr = String(rawPage || '').trim();
+        let expVol = null;
+        let pInt = NaN;
+        if (cleanStr.includes('.')) {
+          const [vs, ps] = cleanStr.split('.');
+          expVol = parseInt(vs, 10);
+          pInt = parseInt(ps, 10);
+        } else {
+          pInt = parseInt(cleanStr, 10);
+        }
+        if (Number.isNaN(pInt)) return null;
+        const pbs = scopeEl.querySelectorAll(`span.pb[data-ed="${edCode}"][data-page], [data-ed="${edCode}"][data-page]`);
+        let bestBefore = null;
+        let bestBeforeDiff = Infinity;
+        let bestAfter = null;
+        let bestAfterDiff = Infinity;
+        for (const pb of pbs) {
+          if (pb.hasAttribute?.('data-chunk-pb')) continue;
+          const pv = pb.getAttribute('data-page') || '';
+          let kVol = null;
+          let kNum = NaN;
+          if (pv.includes('.')) {
+            const [vs, ps] = pv.split('.');
+            kVol = parseInt(vs, 10);
+            kNum = parseInt(ps, 10);
+            if (expVol !== null && kVol !== expVol) continue;
+          } else {
+            if (expVol !== null && expVol > 0) continue;
+            kNum = parseInt(pv, 10);
+          }
+          if (Number.isNaN(kNum)) continue;
+          if (kNum <= pInt) {
+            const diff = pInt - kNum;
+            if (diff < bestBeforeDiff) {
+              bestBeforeDiff = diff;
+              bestBefore = pb;
+            }
+          } else {
+            const diff = kNum - pInt;
+            if (diff < bestAfterDiff) {
+              bestAfterDiff = diff;
+              bestAfter = pb;
+            }
+          }
+        }
+        return bestBefore || bestAfter;
+      };
 
       // ── Paragraph-jump settle watcher ──────────────────────────────────
       // Re-resolve the paragraph target the jump scrolled to (same flavour:
@@ -5186,33 +5874,33 @@ const ReaderPane = memo(function ReaderPane({
         const visible = (el) =>
           el && el.getClientRects && el.getClientRects().length > 0 ? el : null;
         const hasSearchQuery = Boolean((searchHighlight?.query || paneScrollIntent?.highlightQuery || '').trim());
+        const vpHNow = getViewportBounds().height || 700;
         const pickSearchHitInRow = (row) => {
           if (!hasSearchQuery || !row || !row.querySelector) return null;
-          if (isTransTarget) {
-            const hitInTrans =
-              row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] mark.search-hit`) ||
-              row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] .search-hit`);
-            if (visible(hitInTrans)) {
-              return hitInTrans.closest('.sent-pair') || hitInTrans.closest('.reader-trans-block') || hitInTrans;
-            }
-          } else {
-            const hits = row.querySelectorAll('mark.search-hit, .search-hit');
-            for (const h of hits) {
-              if (h.closest('.reader-trans-block:not(.reader-pali-trans-block)')) continue;
-              if (visible(h)) {
-                return h.closest('.sent-pair') || h.closest('.pali-sent') || h;
-              }
-            }
-          }
-          const anyHit = row.querySelector('mark.search-hit, .search-hit');
-          if (visible(anyHit)) {
-            return anyHit.closest('.sent-pair') || anyHit.closest('.reader-trans-block') || anyHit;
-          }
-          return null;
+          return pickBestSearchHitAnchor(row, {
+            isTransTarget,
+            targetTransLang,
+            vpHeight: vpHNow,
+          });
+        };
+        const pickPassageSubInRow = (row) => {
+          if (isTransTarget && !targetSnippet) return null;
+          if (!isTransTarget && !targetWord && !targetBold && !targetSnippet) return null;
+          const sub = findPassageSubTarget(row, {
+            word: targetWord,
+            bold: targetBold,
+            snippet: targetSnippet,
+            paliScript: settings?.paliScript || 'roman',
+            isTransTarget,
+            targetTransLang,
+          });
+          return sub?.anchor && visible(sub.anchor) ? sub.anchor : null;
         };
         const pickTransOrRow = (row, scopeForChapter) => {
           const hitTarget = pickSearchHitInRow(row);
           if (hitTarget) return hitTarget;
+          const passageSub = pickPassageSubInRow(row);
+          if (passageSub) return passageSub;
           if (isTransTarget) {
             const transEl =
               (row.querySelector &&
@@ -5256,7 +5944,10 @@ const ReaderPane = memo(function ReaderPane({
               row?.querySelector?.(`[data-line="${lineId}"]`) ||
               row?.querySelector?.(`.sent-pair[data-line="${lineId}"]`) ||
               row?.querySelector?.(`.pali-sent[data-line="${lineId}"]`);
-            if (visible(sentLineEl)) return sentLineEl;
+            if (visible(sentLineEl)) {
+              const subInLine = pickPassageSubInRow(sentLineEl);
+              return subInLine || sentLineEl;
+            }
           }
           return pickTransOrRow(row, chapterEl || container);
         }
@@ -5285,10 +5976,10 @@ const ReaderPane = memo(function ReaderPane({
             if (!isNaN(vol) && !isNaN(num)) {
               const padded = `${vol}.${String(num).padStart(4, '0')}`;
               pbEl =
-                scope.querySelector(`[id="${ed}${padded}"]`) ||
-                scope.querySelector(`[id="${ed}${cleanP}"]`) ||
-                scope.querySelector(`[data-ed="${ed}"][data-page="${padded}"]`) ||
-                scope.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+                scope.querySelector(`[id="${ed}${padded}"]:not([data-chunk-pb])`) ||
+                scope.querySelector(`[id="${ed}${cleanP}"]:not([data-chunk-pb])`) ||
+                scope.querySelector(`span.pb[data-ed="${ed}"][data-page="${padded}"]:not([data-chunk-pb])`) ||
+                scope.querySelector(`span.pb[data-ed="${ed}"][data-page="${cleanP}"]:not([data-chunk-pb])`);
             }
           } else {
             const num = parseInt(cleanP, 10);
@@ -5297,15 +5988,19 @@ const ReaderPane = memo(function ReaderPane({
               const knownAnchor =
                 activeTab?.page_anchors?.[ed]?.[cleanP] || activeTab?.page_anchors?.[ed]?.[String(num)];
               if (knownAnchor) {
-                pbEl = scope.querySelector(`[id="${knownAnchor}"]`);
+                pbEl = scope.querySelector(`[id="${knownAnchor}"]:not([data-chunk-pb])`);
               }
               if (!pbEl) {
                 pbEl =
-                  scope.querySelector(`[data-ed="${ed}"][data-page$=".${paddedNum}"]`) ||
-                  scope.querySelector(`[data-ed="${ed}"][data-page="${paddedNum}"]`) ||
-                  scope.querySelector(`[data-ed="${ed}"][data-page="${cleanP}"]`);
+                  scope.querySelector(`span.pb[data-ed="${ed}"][data-page$=".${paddedNum}"]:not([data-chunk-pb])`) ||
+                  scope.querySelector(`span.pb[data-ed="${ed}"][data-page="${paddedNum}"]:not([data-chunk-pb])`) ||
+                  scope.querySelector(`span.pb[data-ed="${ed}"][data-page="${cleanP}"]:not([data-chunk-pb])`);
               }
             }
+          }
+
+          if (!pbEl) {
+            pbEl = resolveNearestPbInScope(scope, ed, cleanP);
           }
 
           if (!pbEl) {
@@ -5334,11 +6029,7 @@ const ReaderPane = memo(function ReaderPane({
             }
           }
 
-          const targetEl =
-            (sentenceMode && pbEl.closest('.sent-pair')) ||
-            (pbEl.getClientRects().length > 0
-              ? pbEl
-              : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl);
+          const targetEl = resolveMeasurablePbAnchor(pbEl, sentenceMode);
 
           return visible(targetEl);
         }
@@ -5430,6 +6121,7 @@ const ReaderPane = memo(function ReaderPane({
           }
           const hostChapter = target.closest ? target.closest('[data-chapter]') : null;
           const areaSettled = areaTranslationSettled(hostChapter);
+          const linksLoading = hostChapter?.getAttribute?.('data-links-loading') === '1';
           const rRect = target.getBoundingClientRect();
           const diff = Math.abs(rRect.top - vpTop - topInset);
           if (diff > TOL) {
@@ -5441,16 +6133,22 @@ const ReaderPane = memo(function ReaderPane({
               stickyInset: topInset,
             });
             if (curTop + vpHeight >= vpScrollHeight - 4 && fresh >= vpScrollHeight - vpHeight - 2 && rRect.top >= vpTop + topInset - 8) {
-              if (areaSettled) {
+              if (areaSettled && !linksLoading) {
                 stopWatcher();
                 return;
               }
             } else {
               performProgrammaticScroll(container, fresh, { scrollMotion: 'instant' });
+              if (target.range) {
+                highlightRangeInReader(target.range);
+              }
               if (settings.pulseAnimation) {
-                target.classList.remove('pulse-highlight');
-                void target.offsetWidth;
-                target.classList.add('pulse-highlight');
+                const pulseEl = target.classList ? target : target.hostRow;
+                if (pulseEl?.classList) {
+                  pulseEl.classList.remove('pulse-highlight');
+                  void pulseEl.offsetWidth;
+                  pulseEl.classList.add('pulse-highlight');
+                }
               }
               saveTabScroll(activeTab.bookCode, fresh);
               cur.lastOffset = fresh;
@@ -5464,7 +6162,7 @@ const ReaderPane = memo(function ReaderPane({
           const layoutChanged =
             cur.lastScrollHeight !== null && vpScrollHeight !== cur.lastScrollHeight;
           cur.lastScrollHeight = vpScrollHeight;
-          if (!areaSettled || layoutChanged) {
+          if (!areaSettled || linksLoading || layoutChanged) {
             cur.stableCount = 0;
             cur.timer = setTimeout(tick, GAP);
             return;
@@ -5558,6 +6256,8 @@ const ReaderPane = memo(function ReaderPane({
             return;
           }
           const areaSettled = areaTranslationSettled(el, { includeHost: false });
+          const hostChapEl = el.closest?.('[data-chapter]') || el;
+          const linksLoading = hostChapEl?.getAttribute?.('data-links-loading') === '1';
           const rRect = el.getBoundingClientRect();
           if (Math.abs(rRect.top - vpTop - topInset) > TOL) {
             cur.stableCount = 0;
@@ -5568,7 +6268,7 @@ const ReaderPane = memo(function ReaderPane({
               stickyInset: topInset,
             });
             if (curTop + vpHeight >= vpScrollHeight - 4 && fresh >= vpScrollHeight - vpHeight - 2 && rRect.top >= vpTop + topInset - 8) {
-              if (areaSettled) {
+              if (areaSettled && !linksLoading) {
                 stopWatcher();
                 return;
               }
@@ -5584,7 +6284,7 @@ const ReaderPane = memo(function ReaderPane({
           const layoutChanged =
             cur.lastScrollHeight !== null && vpScrollHeight !== cur.lastScrollHeight;
           cur.lastScrollHeight = vpScrollHeight;
-          if (!areaSettled || layoutChanged) {
+          if (!areaSettled || linksLoading || layoutChanged) {
             cur.stableCount = 0;
             cur.timer = setTimeout(tick, GAP);
             return;
@@ -5663,47 +6363,61 @@ const ReaderPane = memo(function ReaderPane({
               targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
             }
 
-            // Target specific sentence line if lineId is specified, otherwise jump to matched search-hit line inside multi-sentence rows
+            // Target specific sentence line if lineId is specified, else sub-paragraph bold/linked passage or search-hit line
+            const row = el.closest('.reader-para-row') || el;
+            let matchedSubRange = null;
+            let resolvedSubLine = false;
             if (lineId) {
-              const row = el.closest('.reader-para-row') || el;
               const sentLineEl =
                 row?.querySelector?.(`[data-line="${lineId}"]`) ||
                 row?.querySelector?.(`.sent-pair[data-line="${lineId}"]`) ||
                 row?.querySelector?.(`.pali-sent[data-line="${lineId}"]`);
               if (sentLineEl && sentLineEl.getClientRects().length > 0) {
                 targetEl = sentLineEl;
+                resolvedSubLine = true;
+                if (!isTransTarget && (targetWord || targetBold || targetSnippet)) {
+                  const subInLine = findPassageSubTarget(sentLineEl, {
+                    word: targetWord,
+                    bold: targetBold,
+                    snippet: targetSnippet,
+                    paliScript: settings?.paliScript || 'roman',
+                  });
+                  if (subInLine?.anchor) {
+                    targetEl = subInLine.anchor;
+                    matchedSubRange = subInLine.range || null;
+                  }
+                }
               }
-            } else {
-              const row = el.closest('.reader-para-row') || el;
+            }
+            if (!resolvedSubLine) {
               const hasSearchQuery = Boolean((searchHighlight?.query || paneScrollIntent?.highlightQuery || '').trim());
               if (hasSearchQuery && row?.querySelector) {
-                let hitEl = null;
-                if (isTransTarget) {
-                  hitEl =
-                    row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] mark.search-hit`) ||
-                    row.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"] .search-hit`);
-                } else {
-                  const hits = row.querySelectorAll('mark.search-hit, .search-hit');
-                  for (const h of hits) {
-                    if (!h.closest('.reader-trans-block:not(.reader-pali-trans-block)') && h.getClientRects().length > 0) {
-                      hitEl = h;
-                      break;
-                    }
-                  }
+                const hitAnchor = pickBestSearchHitAnchor(row, {
+                  isTransTarget,
+                  targetTransLang,
+                  vpHeight: getViewportBounds().height || 700,
+                });
+                if (hitAnchor) {
+                  targetEl = hitAnchor;
+                  resolvedSubLine = true;
                 }
-                if (!hitEl) {
-                  hitEl = row.querySelector('mark.search-hit, .search-hit');
-                }
-                if (hitEl && hitEl.getClientRects().length > 0) {
-                  const lineBlock =
-                    hitEl.closest('.sent-pair') ||
-                    hitEl.closest('.pali-sent') ||
-                    hitEl.closest('.reader-trans-block') ||
-                    hitEl;
-                  if (lineBlock && lineBlock.getClientRects().length > 0) {
-                    targetEl = lineBlock;
-                  }
-                }
+              }
+            }
+            if (
+              !resolvedSubLine &&
+              ((isTransTarget && targetSnippet) || (!isTransTarget && (targetWord || targetBold || targetSnippet)))
+            ) {
+              const subHit = findPassageSubTarget(row, {
+                word: targetWord,
+                bold: targetBold,
+                snippet: targetSnippet,
+                paliScript: settings?.paliScript || 'roman',
+                isTransTarget,
+                targetTransLang,
+              });
+              if (subHit?.anchor) {
+                targetEl = subHit.anchor;
+                matchedSubRange = subHit.range || null;
               }
             }
 
@@ -5726,22 +6440,37 @@ const ReaderPane = memo(function ReaderPane({
               });
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
+              if (matchedSubRange) {
+                highlightRangeInReader(matchedSubRange);
+              }
               if (settings.pulseAnimation) {
-                targetEl.classList.remove('pulse-highlight');
-                void targetEl.offsetWidth;
-                targetEl.classList.add('pulse-highlight');
+                const pulseEl = targetEl.classList ? targetEl : targetEl.hostRow || row;
+                if (pulseEl?.classList) {
+                  pulseEl.classList.remove('pulse-highlight');
+                  void pulseEl.offsetWidth;
+                  pulseEl.classList.add('pulse-highlight');
+                }
               }
               const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para');
               if (foundPNum) {
                 setPaneParaNum(foundPNum);
                 if (isActive) setActiveParaNum(foundPNum);
               }
+              const resolvedChapPin = hostChapter
+                ? parseInt(hostChapter.getAttribute('data-chapter'), 10)
+                : chapterIdx;
               hasInitialRestoredRef.current = true;
               saveTabScroll(activeTab.bookCode, offset);
               armParaJumpWatcher(
                 `${activeTab.bookCode}:ch${chapterIdx}:pi${paraIndex}:${Date.now()}`,
                 offset
               );
+              pinJumpTarget({
+                bookCode: activeTab.bookCode,
+                chapterIdx: !Number.isNaN(resolvedChapPin) ? resolvedChapPin : chapterIdx,
+                paraIndex,
+                paraNum: foundPNum || paraNum || null,
+              });
               clearTargetScrollIntent(activeTab.bookCode);
               setIsTargetScrollWaiting(false);
               return;
@@ -5779,7 +6508,13 @@ const ReaderPane = memo(function ReaderPane({
               }
 
               const row = hitEl.closest('.reader-para-row') || hitEl.closest('p') || hitEl;
-              const targetEl = hitEl.getClientRects().length > 0 ? hitEl : row;
+              const bestHit =
+                pickBestSearchHitAnchor(row, {
+                  isTransTarget,
+                  targetTransLang,
+                  vpHeight: getViewportBounds().height || 700,
+                }) || (hitEl.getClientRects().length > 0 ? hitEl : row);
+              const targetEl = bestHit;
               const { top: vpTop } = getViewportBounds();
               const rect = targetEl.getBoundingClientRect();
               const currentScroll = getScrollTop();
@@ -5792,7 +6527,7 @@ const ReaderPane = memo(function ReaderPane({
               });
               performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
-              if (settings.pulseAnimation) {
+              if (settings.pulseAnimation && row?.classList) {
                 row.classList.remove('pulse-highlight');
                 void row.offsetWidth;
                 row.classList.add('pulse-highlight');
@@ -5802,12 +6537,21 @@ const ReaderPane = memo(function ReaderPane({
                 setPaneParaNum(foundPNum);
                 if (isActive) setActiveParaNum(foundPNum);
               }
+              const resolvedChapPin = hostChapter
+                ? parseInt(hostChapter.getAttribute('data-chapter'), 10)
+                : chapterIdx;
               hasInitialRestoredRef.current = true;
               saveTabScroll(activeTab.bookCode, offset);
               armParaJumpWatcher(
                 `${activeTab.bookCode}:ch${chapterIdx}:q:${queryTerm}:${Date.now()}`,
                 offset
               );
+              pinJumpTarget({
+                bookCode: activeTab.bookCode,
+                chapterIdx: !Number.isNaN(resolvedChapPin) ? resolvedChapPin : chapterIdx,
+                paraIndex: row?.getAttribute?.('data-pindex') || null,
+                paraNum: foundPNum || null,
+              });
               clearTargetScrollIntent(activeTab.bookCode);
               setIsTargetScrollWaiting(false);
               return;
@@ -5847,8 +6591,8 @@ const ReaderPane = memo(function ReaderPane({
             pbEl =
               findElement(`${ed}${padded}`, '', targetChap) ||
               findElement(`${ed}${cleanP}`, '', targetChap) ||
-              findElement(null, `[data-ed="${ed}"][data-page="${padded}"]`, targetChap) ||
-              findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`, targetChap);
+              findElement(null, `[data-ed="${ed}"][data-page="${padded}"]:not([data-chunk-pb])`, targetChap) ||
+              findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]:not([data-chunk-pb])`, targetChap);
           }
         } else {
           const num = parseInt(cleanP, 10);
@@ -5861,10 +6605,24 @@ const ReaderPane = memo(function ReaderPane({
             }
             if (!pbEl) {
               pbEl =
-                findElement(null, `[data-ed="${ed}"][data-page$=".${paddedNum}"]`, targetChap) ||
-                findElement(null, `[data-ed="${ed}"][data-page="${paddedNum}"]`, targetChap) ||
-                findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]`, targetChap);
+                findElement(null, `[data-ed="${ed}"][data-page$=".${paddedNum}"]:not([data-chunk-pb])`, targetChap) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${paddedNum}"]:not([data-chunk-pb])`, targetChap) ||
+                findElement(null, `[data-ed="${ed}"][data-page="${cleanP}"]:not([data-chunk-pb])`, targetChap);
             }
+          }
+        }
+
+        if (pbEl?.hasAttribute?.('data-chunk-pb')) {
+          pbEl = null;
+        }
+
+        if (!pbEl) {
+          const scopeForChap =
+            targetChap !== undefined && targetChap !== null
+              ? containerRef.current.querySelector(`[data-chapter="${targetChap}"]`)
+              : containerRef.current;
+          if (scopeForChap && !scopeForChap.classList?.contains('chapter-placeholder')) {
+            pbEl = resolveNearestPbInScope(scopeForChap, ed, cleanP);
           }
         }
 
@@ -5891,14 +6649,9 @@ const ReaderPane = memo(function ReaderPane({
           const isSentenceWaiting = sentenceMode && hasTransLayers && !hasSentPair && hostTransLoading;
 
           if (!isSentenceWaiting || retries >= maxRetries) {
-            // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its enclosing paragraph or sentence card
-            const targetEl =
-              (sentenceMode && pbEl.closest('.sent-pair')) ||
-              (pbEl.getClientRects().length > 0
-                ? pbEl
-                : pbEl.closest('.reader-para-row, [data-pindex], .sent-pair, p') || pbEl.parentElement || pbEl);
+            // If pbEl is hidden by CSS (e.g. showPageBreaks is false), resolve to its exact adjacent text line or enclosing block
+            const targetEl = resolveMeasurablePbAnchor(pbEl, sentenceMode);
 
-            const hostChapter = pbEl.closest ? pbEl.closest('[data-chapter]') : null;
             if (hasTransLayers && !areaTranslationSettled(hostChapter) && retries < effectiveMaxRetries - 5) {
               scheduleAttemptScroll(50);
               return;
@@ -5917,24 +6670,44 @@ const ReaderPane = memo(function ReaderPane({
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
             if (settings.pulseAnimation) {
-              targetEl.classList.remove('pulse-highlight');
-              void targetEl.offsetWidth;
-              targetEl.classList.add('pulse-highlight');
+              const pulseEl =
+                targetEl.classList
+                  ? targetEl
+                  : targetEl.hostRow || pbEl.closest?.('.reader-para-row, .sent-pair, p');
+              if (pulseEl?.classList) {
+                pulseEl.classList.remove('pulse-highlight');
+                void pulseEl.offsetWidth;
+                pulseEl.classList.add('pulse-highlight');
+              }
             }
             const foundPNum =
               targetEl.getAttribute?.('data-para') ||
               targetEl.closest?.('[data-para]')?.getAttribute?.('data-para') ||
-              pbEl.getAttribute?.('data-para');
+              pbEl.getAttribute?.('data-para') ||
+              pbEl.closest?.('[data-para]')?.getAttribute?.('data-para');
             if (foundPNum) {
               setPaneParaNum(foundPNum);
               if (isActive) setActiveParaNum(foundPNum);
             }
+            const resolvedChapPin = hostChapter
+              ? parseInt(hostChapter.getAttribute('data-chapter'), 10)
+              : targetChap;
             hasInitialRestoredRef.current = true;
             saveTabScroll(activeTab.bookCode, offset);
+            if (resolvedChapPin !== undefined && resolvedChapPin !== null && !Number.isNaN(resolvedChapPin)) {
+              saveTabPosition(activeTab.bookCode, resolvedChapPin, foundPNum || null, offset);
+            }
             armParaJumpWatcher(
               `${activeTab.bookCode}:page:${ed}:${cleanP}:${Date.now()}`,
               offset
             );
+            pinJumpTarget({
+              bookCode: activeTab.bookCode,
+              chapterIdx: !Number.isNaN(resolvedChapPin) ? resolvedChapPin : targetChap,
+              page: cleanP,
+              pageSystem: ed,
+              paraNum: foundPNum || paraNum || null,
+            });
             clearTargetScrollIntent(activeTab.bookCode);
             setIsTargetScrollWaiting(false);
             return;
@@ -6061,9 +6834,10 @@ const ReaderPane = memo(function ReaderPane({
         }
 
         if (el) {
+          const row = el.closest?.('.reader-para-row') || el;
           let targetEl = null;
+          let matchedSubRange = null;
           if (isTransTarget) {
-            const row = el.closest('.reader-para-row') || el;
             const transEl = row?.querySelector(`.reader-trans-block[data-trans-lang="${targetTransLang}"]`);
             if (transEl) {
               targetEl = transEl;
@@ -6074,6 +6848,19 @@ const ReaderPane = memo(function ReaderPane({
             }
           } else {
             targetEl = el.getClientRects().length > 0 ? el : el.closest('p') || el.parentElement || el;
+          }
+
+          if (targetEl && !isTransTarget && (targetWord || targetBold || targetSnippet)) {
+            const subHit = findPassageSubTarget(row, {
+              word: targetWord,
+              bold: targetBold,
+              snippet: targetSnippet,
+              paliScript: settings?.paliScript || 'roman',
+            });
+            if (subHit?.anchor) {
+              targetEl = subHit.anchor;
+              matchedSubRange = subHit.range || null;
+            }
           }
 
           if (targetEl) {
@@ -6095,10 +6882,16 @@ const ReaderPane = memo(function ReaderPane({
             });
             performProgrammaticScroll(containerRef.current, offset, { scrollMotion: settings?.scrollMotion || 'fast' });
 
+            if (matchedSubRange) {
+              highlightRangeInReader(matchedSubRange);
+            }
             if (settings.pulseAnimation) {
-              targetEl.classList.remove('pulse-highlight');
-              void targetEl.offsetWidth;
-              targetEl.classList.add('pulse-highlight');
+              const pulseEl = targetEl.classList ? targetEl : targetEl.hostRow || row;
+              if (pulseEl?.classList) {
+                pulseEl.classList.remove('pulse-highlight');
+                void pulseEl.offsetWidth;
+                pulseEl.classList.add('pulse-highlight');
+              }
             }
             const hostChapIdx = hostChapter ? parseInt(hostChapter.getAttribute('data-chapter'), 10) : targetChap;
             const foundPNum = targetEl.getAttribute?.('data-para') || el.getAttribute?.('data-para') || cleanPara;
@@ -6115,6 +6908,12 @@ const ReaderPane = memo(function ReaderPane({
               `${activeTab.bookCode}:ch${chapterIdx}:pn${cleanPara}:${Date.now()}`,
               offset
             );
+            pinJumpTarget({
+              bookCode: activeTab.bookCode,
+              chapterIdx: hostChapIdx !== undefined && !Number.isNaN(hostChapIdx) ? hostChapIdx : effectiveScopeChap,
+              paraIndex: row?.getAttribute?.('data-pindex') || null,
+              paraNum: foundPNum || cleanPara,
+            });
             clearTargetScrollIntent(activeTab.bookCode);
             setIsTargetScrollWaiting(false);
             return;
@@ -6144,6 +6943,7 @@ const ReaderPane = memo(function ReaderPane({
               if (isActive) setActiveParaNum(pNum);
             }
           }
+          pinJumpTarget({ bookCode: activeTab.bookCode, chapterIdx: 0 });
           clearTargetScrollIntent(activeTab.bookCode);
           setIsTargetScrollWaiting(false);
           return;
@@ -6209,6 +7009,7 @@ const ReaderPane = memo(function ReaderPane({
 
           const jumpKey = `${activeTab.bookCode}:ch${chapterIdx}`;
           armChapterJumpWatcher(jumpKey, offset, chapterIdx);
+          pinJumpTarget({ bookCode: activeTab.bookCode, chapterIdx });
 
           clearTargetScrollIntent(activeTab.bookCode);
           setIsTargetScrollWaiting(false);
@@ -7019,6 +7820,28 @@ const ReaderPane = memo(function ReaderPane({
           chapterJumpRef.current?.key ||
           paneScrollIntentRef.current
       ),
+    adjustScrollBy: (delta) => {
+      if (!delta || !Number.isFinite(delta)) return;
+      const nextTop = Math.max(0, getScrollTop() + delta);
+      isProgrammaticScrollRef.current = true;
+      if (typeof window !== 'undefined') {
+        window.__tpoProgrammaticScroll = true;
+      }
+      lastScrollYRef.current = nextTop;
+      scrollUpPeakYRef.current = nextTop;
+      scrollDownPeakYRef.current = nextTop;
+      setScrollTop(nextTop, 'auto');
+      if (activeTabRef.current?.bookCode && activeTabRef.current.bookCode !== 'ai_chat') {
+        saveTabScroll(activeTabRef.current.bookCode, nextTop);
+      }
+      clearTimeout(programmaticScrollTimerRef.current);
+      programmaticScrollTimerRef.current = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+        if (typeof window !== 'undefined') {
+          window.__tpoProgrammaticScroll = false;
+        }
+      }, 120);
+    },
   };
 
   const handleLinksLoaded = useCallback(
@@ -7183,6 +8006,7 @@ const ReaderPane = memo(function ReaderPane({
         <main
           ref={setMainRef}
           data-book-code={activeTab.bookCode}
+          data-toc-view="true"
           data-active-pane={isActive ? 'true' : undefined}
           className="content-area flex-1 min-h-0 overflow-y-auto relative flex flex-col bg-[var(--bg-primary)]"
           onClick={() => isColumnsMode && !isActive && activatePane(activeTab.bookCode)}
@@ -7523,28 +8347,50 @@ const ReaderPane = memo(function ReaderPane({
                         paneScrollIntent.chapterIdx === null ||
                         paneScrollIntent.chapterIdx === chap.chapter_index)
                   );
+                  const activeJumpPin =
+                    !paneScrollIntent && jumpPin?.bookCode === activeTab.bookCode ? jumpPin : null;
+                  const pinAppliesToChap = Boolean(
+                    activeJumpPin &&
+                      activeJumpPin.chapterIdx !== undefined &&
+                      activeJumpPin.chapterIdx !== null &&
+                      activeJumpPin.chapterIdx === chap.chapter_index
+                  );
                   const isSavedCurrentChap = activeTab.currentChapterIdx === chap.chapter_index;
+                  const anchorTargetChapIdx =
+                    paneScrollIntent?.chapterIdx ?? activeJumpPin?.chapterIdx ?? null;
                   const isPrecedingIntentChap = Boolean(
                     hasTransLayers &&
-                      paneScrollIntent?.chapterIdx !== undefined &&
-                      paneScrollIntent?.chapterIdx !== null &&
-                      chap.chapter_index === paneScrollIntent.chapterIdx - 1
+                      anchorTargetChapIdx !== undefined &&
+                      anchorTargetChapIdx !== null &&
+                      chap.chapter_index === anchorTargetChapIdx - 1
                   );
                   const useSavedParaForInitialRestore = Boolean(
                     isSavedCurrentChap && !hasInitialRestoredRef.current
                   );
                   const targetParaIndex = intentAppliesToChap
                     ? paneScrollIntent.paraIndex ?? null
-                    : useSavedParaForInitialRestore
-                      ? activeTab.lastParaIndex ?? null
-                      : null;
+                    : pinAppliesToChap
+                      ? activeJumpPin.paraIndex ?? null
+                      : useSavedParaForInitialRestore
+                        ? activeTab.lastParaIndex ?? null
+                        : null;
                   const targetParaNum = intentAppliesToChap
                     ? paneScrollIntent.paraNum ?? null
-                    : useSavedParaForInitialRestore
-                      ? activeTab.lastParaNum ?? null
+                    : pinAppliesToChap
+                      ? activeJumpPin.paraNum ?? null
+                      : useSavedParaForInitialRestore
+                        ? activeTab.lastParaNum ?? null
+                        : null;
+                  const targetPage = intentAppliesToChap
+                    ? paneScrollIntent.page ?? null
+                    : pinAppliesToChap
+                      ? activeJumpPin.page ?? null
                       : null;
-                  const targetPage = intentAppliesToChap ? paneScrollIntent.page ?? null : null;
-                  const targetPageSystem = intentAppliesToChap ? paneScrollIntent.pageSystem ?? null : null;
+                  const targetPageSystem = intentAppliesToChap
+                    ? paneScrollIntent.pageSystem ?? null
+                    : pinAppliesToChap
+                      ? activeJumpPin.pageSystem ?? null
+                      : null;
                   return (
                     <ChapterBlock
                       key={`${activeTab.bookCode}_${chap.chapter_index}`}
@@ -7556,10 +8402,12 @@ const ReaderPane = memo(function ReaderPane({
                       isCurrentOrTarget={
                         isSavedCurrentChap ||
                         paneScrollIntent?.chapterIdx === chap.chapter_index ||
+                        pinAppliesToChap ||
                         isPrecedingIntentChap ||
                         (chap.chapter_index === 0 &&
                           (activeTab.currentChapterIdx === null || activeTab.currentChapterIdx === undefined) &&
-                          !paneScrollIntent?.chapterIdx)
+                          !paneScrollIntent?.chapterIdx &&
+                          !activeJumpPin?.chapterIdx)
                       }
                       anchorEnd={isPrecedingIntentChap && !isSavedCurrentChap}
                       scrollCtxRef={chunkScrollCtxRef}

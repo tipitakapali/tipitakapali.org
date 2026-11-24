@@ -5,6 +5,224 @@ import { X, Navigation, Hash, BookOpen, CornerDownLeft, AlertCircle } from 'luci
 import { useTabs } from '../context/TabContext';
 import { useThemeSettings } from '../context/ThemeSettingsContext';
 import { convertPaliScript, capitalizePali } from '../services/transliterate';
+import { fetchBookTocOnly } from '../services/api';
+
+const EDITION_ORDER = ['M', 'V', 'P', 'T', 'O'];
+
+export function extractEditionVolumes(pageToChapterEd) {
+  if (!pageToChapterEd || typeof pageToChapterEd !== 'object') return [];
+  const byVol = new Map();
+  for (const key of Object.keys(pageToChapterEd)) {
+    if (!key.includes('.')) continue;
+    const [volStr, pageStr] = key.split('.');
+    const vol = parseInt(volStr, 10);
+    const num = parseInt(pageStr, 10);
+    if (Number.isNaN(vol) || Number.isNaN(num) || vol < 0) continue;
+    const prev = byVol.get(vol);
+    if (!prev) {
+      byVol.set(vol, { vol, minNum: num, maxNum: num, count: 1 });
+    } else {
+      if (num < prev.minNum) prev.minNum = num;
+      if (num > prev.maxNum) prev.maxNum = num;
+      prev.count += 1;
+    }
+  }
+  return Array.from(byVol.values()).sort((a, b) => a.vol - b.vol);
+}
+
+export function resolveBookPageTarget({
+  pageInput,
+  edition,
+  editionRange,
+  pageToChapter,
+  pageToPara,
+  pageAnchors,
+  selectedVolume = null,
+}) {
+  const clean = String(pageInput ?? '').trim();
+  if (!clean) {
+    return { ok: false, error: 'Please enter a page number' };
+  }
+
+  const ed = String(edition || 'M').trim().toUpperCase();
+  if (!editionRange || !editionRange.available) {
+    return { ok: false, error: `${ed} edition page numbers are not available for this book.` };
+  }
+
+  let explicitVol = null;
+  let enteredNum = NaN;
+  if (clean.includes('.')) {
+    const parts = clean.split('.');
+    if (parts.length !== 2 || parts[0].trim() === '' || parts[1].trim() === '') {
+      return { ok: false, error: 'Please enter a valid positive page number.' };
+    }
+    explicitVol = parseInt(parts[0], 10);
+    enteredNum = parseInt(parts[1], 10);
+    if (Number.isNaN(explicitVol) || explicitVol < 0) {
+      return { ok: false, error: 'Please enter a valid positive page number.' };
+    }
+  } else if (/^\d+$/.test(clean)) {
+    enteredNum = parseInt(clean, 10);
+  }
+
+  if (Number.isNaN(enteredNum) || enteredNum <= 0) {
+    return { ok: false, error: 'Please enter a valid positive page number.' };
+  }
+
+  const volumes = extractEditionVolumes(pageToChapter);
+  const isMultiVol = volumes.length > 1;
+  const effectiveVol =
+    explicitVol !== null
+      ? explicitVol
+      : isMultiVol && selectedVolume !== null && selectedVolume !== undefined
+        ? Number(selectedVolume)
+        : null;
+
+  const volInfo =
+    effectiveVol !== null && effectiveVol >= 0
+      ? volumes.find((v) => v.vol === effectiveVol) || null
+      : null;
+
+  if (explicitVol !== null && explicitVol >= 0 && volumes.length > 1 && !volInfo) {
+    const availVols = volumes.map((v) => v.vol).join(', ');
+    return {
+      ok: false,
+      error: `Volume ${explicitVol} was not found in ${ed} edition (available volumes: ${availVols}).`,
+    };
+  }
+
+  const minBound = volInfo ? volInfo.minNum : editionRange.minNum;
+  const maxBound = volInfo ? volInfo.maxNum : editionRange.maxNum;
+  if (minBound !== undefined && maxBound !== undefined) {
+    if (enteredNum < minBound || enteredNum > maxBound) {
+      const volPrefix = volInfo && isMultiVol ? ` (Vol ${volInfo.vol})` : '';
+      return {
+        ok: false,
+        error: `Page ${enteredNum} is out of range for ${ed} edition${volPrefix}. Please enter a page between ${minBound} and ${maxBound}.`,
+      };
+    }
+  }
+
+  const pMap = pageToChapter || {};
+  const paraMap = pageToPara || {};
+  const anchorMap = pageAnchors || {};
+  const padded4 = String(enteredNum).padStart(4, '0');
+
+  let matchedKey = null;
+  let targetChap = undefined;
+  let targetPara = undefined;
+
+  // 1. Explicit or selected volume match (e.g. "2.0015" or "2.15")
+  if (effectiveVol !== null) {
+    const volPadded = `${effectiveVol}.${padded4}`;
+    const volPlain = `${effectiveVol}.${enteredNum}`;
+    if (pMap[volPadded] !== undefined) {
+      matchedKey = volPadded;
+      targetChap = pMap[volPadded];
+    } else if (pMap[volPlain] !== undefined) {
+      matchedKey = volPlain;
+      targetChap = pMap[volPlain];
+    } else if (explicitVol !== null && pMap[clean] !== undefined) {
+      matchedKey = clean;
+      targetChap = pMap[clean];
+    }
+  }
+
+  // 2. When no explicit/selected volume, align with page_anchors[ed][clean] first so multi-volume
+  // plain-page lookups never disagree between page_to_chapter and page_anchors
+  if (targetChap === undefined && effectiveVol === null) {
+    const knownAnchor = anchorMap[clean] || anchorMap[String(enteredNum)];
+    if (knownAnchor && typeof knownAnchor === 'string') {
+      const stripped = knownAnchor.startsWith(ed) ? knownAnchor.slice(ed.length) : knownAnchor;
+      if (stripped && pMap[stripped] !== undefined) {
+        matchedKey = stripped;
+        targetChap = pMap[stripped];
+      }
+    }
+  }
+
+  // 3. Exact or suffix match in page_to_chapter
+  if (targetChap === undefined && effectiveVol === null) {
+    for (const [pKey, cIdx] of Object.entries(pMap)) {
+      if (pKey.includes('.')) {
+        if (pKey.endsWith(`.${padded4}`) || pKey.endsWith(`.${enteredNum}`)) {
+          matchedKey = pKey;
+          targetChap = cIdx;
+          break;
+        }
+      }
+    }
+    if (targetChap === undefined) {
+      if (pMap[clean] !== undefined) {
+        matchedKey = clean;
+        targetChap = pMap[clean];
+      } else if (pMap[String(enteredNum)] !== undefined) {
+        matchedKey = String(enteredNum);
+        targetChap = pMap[String(enteredNum)];
+      } else if (pMap[padded4] !== undefined) {
+        matchedKey = padded4;
+        targetChap = pMap[padded4];
+      }
+    }
+  }
+
+  // 4. Nearest-page fallback within bounds (handles print editions that skipped an intermediate page number, e.g. abh03m7.mul V 519)
+  if (targetChap === undefined) {
+    let bestBefore = null;
+    let bestAfter = null;
+    for (const [pKey, cIdx] of Object.entries(pMap)) {
+      let kVol = null;
+      let kNum = NaN;
+      if (pKey.includes('.')) {
+        const [vs, ps] = pKey.split('.');
+        kVol = parseInt(vs, 10);
+        kNum = parseInt(ps, 10);
+        if (effectiveVol !== null && kVol !== effectiveVol) continue;
+      } else {
+        if (effectiveVol !== null && effectiveVol > 0) continue;
+        kNum = parseInt(pKey, 10);
+      }
+      if (Number.isNaN(kNum)) continue;
+      if (kNum <= enteredNum) {
+        if (!bestBefore || enteredNum - kNum < enteredNum - bestBefore.num || (kNum === bestBefore.num && pKey.includes('.'))) {
+          bestBefore = { key: pKey, num: kNum, chap: cIdx };
+        }
+      } else if (!bestAfter || kNum - enteredNum < bestAfter.num - enteredNum || (kNum === bestAfter.num && pKey.includes('.'))) {
+        bestAfter = { key: pKey, num: kNum, chap: cIdx };
+      }
+    }
+    const chosen = bestBefore || bestAfter;
+    if (chosen) {
+      matchedKey = chosen.key;
+      targetChap = chosen.chap;
+    }
+  }
+
+  if (matchedKey !== null) {
+    const numFromKey = matchedKey.includes('.') ? String(parseInt(matchedKey.split('.')[1], 10)) : matchedKey;
+    targetPara = paraMap[matchedKey] ?? (!isMultiVol ? paraMap[numFromKey] ?? paraMap[clean] : undefined);
+  } else if (paraMap[clean] !== undefined) {
+    targetPara = paraMap[clean];
+  }
+
+  if (targetChap === undefined && targetPara === undefined) {
+    return { ok: false, error: `Page "${clean}" was not found in ${ed} edition for this book.` };
+  }
+
+  // Preserve volume-qualified page key when disambiguated or nearest-resolved so ReaderView jumps to the exact pb span
+  const targetPage =
+    matchedKey && (matchedKey.includes('.') || parseInt(matchedKey, 10) !== enteredNum)
+      ? matchedKey
+      : clean;
+
+  return {
+    ok: true,
+    targetChapterIdx: targetChap,
+    targetParaNum: targetPara || undefined,
+    targetPage,
+    targetPageSystem: ed,
+  };
+}
 
 export default function GoToModal({ isOpen, onClose, initialTab = 'para', initialEdition = null }) {
   const { activeTab, openBook, activeParaNum } = useTabs();
@@ -14,20 +232,74 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
   const [paraInput, setParaInput] = useState('');
   const [pageInput, setPageInput] = useState('');
   const [pageSystem, setPageSystem] = useState(initialEdition || 'M'); // Default to 'M' (Myanmar)
+  const [selectedVolume, setSelectedVolume] = useState(null);
+  const [fetchedMeta, setFetchedMeta] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   const inputRef = useRef(null);
 
+  const effectiveBookMeta = useMemo(() => {
+    if (!activeTab) return null;
+    if (fetchedMeta && fetchedMeta.code === activeTab.bookCode) {
+      return {
+        ...activeTab,
+        para_to_chapter:
+          activeTab.para_to_chapter && Object.keys(activeTab.para_to_chapter).length > 0
+            ? activeTab.para_to_chapter
+            : fetchedMeta.para_to_chapter || {},
+        page_to_chapter:
+          activeTab.page_to_chapter && Object.keys(activeTab.page_to_chapter).length > 0
+            ? activeTab.page_to_chapter
+            : fetchedMeta.page_to_chapter || {},
+        page_to_para:
+          activeTab.page_to_para && Object.keys(activeTab.page_to_para).length > 0
+            ? activeTab.page_to_para
+            : fetchedMeta.page_to_para || {},
+        page_anchors:
+          activeTab.page_anchors && Object.keys(activeTab.page_anchors).length > 0
+            ? activeTab.page_anchors
+            : fetchedMeta.page_anchors || {},
+        para_range: activeTab.para_range || fetchedMeta.para_range || null,
+        edition_ranges:
+          activeTab.edition_ranges && Object.keys(activeTab.edition_ranges).length > 0
+            ? activeTab.edition_ranges
+            : fetchedMeta.edition_ranges || null,
+      };
+    }
+    return activeTab;
+  }, [activeTab, fetchedMeta]);
+
+  // Lazy-fetch navigation metadata if GoToModal opens on an unhydrated/TOC tab missing page_to_chapter
+  useEffect(() => {
+    if (!isOpen || !activeTab?.bookCode || activeTab.bookCode === 'ai_chat') return;
+    const hasPages = activeTab.page_to_chapter && Object.keys(activeTab.page_to_chapter).length > 0;
+    const hasEdRanges = activeTab.edition_ranges && Object.keys(activeTab.edition_ranges).length > 0;
+    if (hasPages && hasEdRanges) return;
+    if (fetchedMeta?.code === activeTab.bookCode) return;
+
+    let cancelled = false;
+    fetchBookTocOnly(activeTab.bookCode)
+      .then((data) => {
+        if (!cancelled && data) {
+          setFetchedMeta({ ...data, code: data.code || activeTab.bookCode });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeTab?.bookCode, activeTab?.page_to_chapter, activeTab?.edition_ranges, fetchedMeta?.code]);
+
   // Load saved edition preference or initialEdition
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (initialEdition && ['M', 'V', 'P', 'T', 'O'].includes(initialEdition)) {
+    if (initialEdition && EDITION_ORDER.includes(initialEdition)) {
       setPageSystem(initialEdition);
       return;
     }
     try {
       const savedEd = localStorage.getItem('tipitaka_goto_edition_v2');
-      if (savedEd && ['M', 'V', 'P', 'T', 'O'].includes(savedEd)) {
+      if (savedEd && EDITION_ORDER.includes(savedEd)) {
         setPageSystem(savedEd);
       }
     } catch (e) {}
@@ -39,7 +311,7 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
       if (initialTab) {
         setActiveTabMode(initialTab);
       }
-      if (initialEdition && ['M', 'V', 'P', 'T', 'O'].includes(initialEdition)) {
+      if (initialEdition && EDITION_ORDER.includes(initialEdition)) {
         setPageSystem(initialEdition);
       }
       setErrorMessage('');
@@ -52,8 +324,10 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
 
   // 1. Direct precomputed paragraph limits (from server DB/JSON, 0ms compute)
   const paraRange = useMemo(() => {
-    if (activeTab?.para_range) return activeTab.para_range;
-    const pMap = activeTab?.para_to_chapter || {};
+    if (effectiveBookMeta?.para_range && effectiveBookMeta.para_range.total > 0) {
+      return effectiveBookMeta.para_range;
+    }
+    const pMap = effectiveBookMeta?.para_to_chapter || {};
     let min = Infinity;
     let max = -Infinity;
     let count = 0;
@@ -67,14 +341,19 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
     }
     if (count === 0) return { min: 1, max: 1, total: 0 };
     return { min, max, total: count };
-  }, [activeTab]);
+  }, [effectiveBookMeta]);
 
   // 2. Direct precomputed page limits per edition (from server DB/JSON, 0ms compute)
   const editionRanges = useMemo(() => {
-    if (activeTab?.edition_ranges) return activeTab.edition_ranges;
+    if (
+      effectiveBookMeta?.edition_ranges &&
+      Object.keys(effectiveBookMeta.edition_ranges).length > 0
+    ) {
+      return effectiveBookMeta.edition_ranges;
+    }
     const res = {};
-    const pageToChap = activeTab?.page_to_chapter || {};
-    for (const sys of ['M', 'V', 'P', 'T', 'O']) {
+    const pageToChap = effectiveBookMeta?.page_to_chapter || {};
+    for (const sys of EDITION_ORDER) {
       const pMap = pageToChap[sys] || {};
       const uniquePages = new Set();
       let minNum = Infinity;
@@ -114,9 +393,50 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
       }
     }
     return res;
-  }, [activeTab]);
+  }, [effectiveBookMeta]);
 
-  const currentEdRange = editionRanges[pageSystem] || { available: false, label: 'Unavailable' };
+  // Auto-switch to the first available edition when the stored/default edition is unavailable in this book
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editionRanges[pageSystem]?.available) return;
+    const firstAvail = EDITION_ORDER.find((code) => editionRanges[code]?.available);
+    if (firstAvail && firstAvail !== pageSystem) {
+      setPageSystem(firstAvail);
+    }
+  }, [isOpen, editionRanges, pageSystem]);
+
+  const editionVolumes = useMemo(
+    () => extractEditionVolumes(effectiveBookMeta?.page_to_chapter?.[pageSystem]),
+    [effectiveBookMeta, pageSystem]
+  );
+
+  useEffect(() => {
+    if (editionVolumes.length > 1) {
+      setSelectedVolume((prev) =>
+        editionVolumes.some((v) => v.vol === prev) ? prev : editionVolumes[0].vol
+      );
+    } else {
+      setSelectedVolume(null);
+    }
+  }, [editionVolumes, activeTab?.bookCode, pageSystem]);
+
+  const activeVolumeInfo = useMemo(() => {
+    if (editionVolumes.length <= 1 || selectedVolume === null) return null;
+    return editionVolumes.find((v) => v.vol === selectedVolume) || editionVolumes[0] || null;
+  }, [editionVolumes, selectedVolume]);
+
+  const baseEdRange = editionRanges[pageSystem] || { available: false, label: 'Unavailable' };
+  const currentEdRange = useMemo(() => {
+    if (!baseEdRange.available || !activeVolumeInfo) return baseEdRange;
+    return {
+      ...baseEdRange,
+      count: activeVolumeInfo.count,
+      minNum: activeVolumeInfo.minNum,
+      maxNum: activeVolumeInfo.maxNum,
+      label: `Vol ${activeVolumeInfo.vol}: p.${activeVolumeInfo.minNum} – ${activeVolumeInfo.maxNum}`,
+      hint: `e.g. ${activeVolumeInfo.minNum} to ${activeVolumeInfo.maxNum} (or ${activeVolumeInfo.vol}.${activeVolumeInfo.minNum})`,
+    };
+  }, [baseEdRange, activeVolumeInfo]);
 
   // 3. Dynamic quick paragraph chips
   const quickParaChips = useMemo(() => {
@@ -217,6 +537,9 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
       return;
     }
 
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
     openBook(activeTab.bookCode, { targetParaNum: clean });
     onClose();
   };
@@ -226,80 +549,29 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
-    const clean = String(pageInput || '').trim();
-    if (!clean) {
-      setErrorMessage('Please enter a page number');
-      return;
-    }
-
     const ed = pageSystem.toUpperCase();
-    const edRange = editionRanges[ed];
-
-    if (!edRange || !edRange.available) {
-      setErrorMessage(`${ed} edition page numbers are not available for this book.`);
+    const resolved = resolveBookPageTarget({
+      pageInput,
+      edition: ed,
+      editionRange: editionRanges[ed],
+      pageToChapter: effectiveBookMeta?.page_to_chapter?.[ed],
+      pageToPara: effectiveBookMeta?.page_to_para?.[ed],
+      pageAnchors: effectiveBookMeta?.page_anchors?.[ed],
+      selectedVolume,
+    });
+    if (!resolved.ok) {
+      setErrorMessage(resolved.error);
       return;
     }
 
-    // Extract numerical page for range validation
-    let enteredNum = NaN;
-    if (clean.includes('.')) {
-      const parts = clean.split('.');
-      enteredNum = parseInt(parts[1], 10);
-    } else {
-      enteredNum = parseInt(clean, 10);
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
     }
-
-    if (isNaN(enteredNum) || enteredNum <= 0) {
-      setErrorMessage('Please enter a valid positive page number.');
-      return;
-    }
-
-    if (edRange.minNum !== undefined && edRange.maxNum !== undefined) {
-      if (enteredNum < edRange.minNum || enteredNum > edRange.maxNum) {
-        setErrorMessage(
-          `Page ${enteredNum} is out of range for ${ed} edition. Please enter a page between ${edRange.minNum} and ${edRange.maxNum}.`
-        );
-        return;
-      }
-    }
-
-    const pageToChap = activeTab?.page_to_chapter?.[ed];
-    const pageToPara = activeTab?.page_to_para?.[ed];
-
-    let targetChap = undefined;
-    let targetPara = undefined;
-
-    if (pageToChap) {
-      if (pageToChap[clean] !== undefined) {
-        targetChap = pageToChap[clean];
-        targetPara = pageToPara?.[clean];
-      } else {
-        const padded4 = String(enteredNum).padStart(4, '0');
-        for (const [pKey, cIdx] of Object.entries(pageToChap)) {
-          if (
-            pKey === clean ||
-            pKey === String(enteredNum) ||
-            pKey.endsWith(`.${clean}`) ||
-            pKey.endsWith(`.${padded4}`)
-          ) {
-            targetChap = cIdx;
-            targetPara = pageToPara?.[pKey];
-            break;
-          }
-        }
-      }
-    }
-
-    if (targetChap === undefined && targetPara === undefined) {
-      setErrorMessage(`Page "${clean}" was not found in ${ed} edition for this book.`);
-      return;
-    }
-
     openBook(activeTab.bookCode, {
-      targetChapterIdx: targetChap,
-      targetParaNum: targetPara,
-      targetPage: clean,
-      targetPageSystem: ed,
+      targetChapterIdx: resolved.targetChapterIdx,
+      targetParaNum: resolved.targetParaNum,
+      targetPage: resolved.targetPage,
+      targetPageSystem: resolved.targetPageSystem,
     });
     onClose();
   };
@@ -311,7 +583,9 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+      role="dialog"
+      aria-modal="true"
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
@@ -495,6 +769,33 @@ export default function GoToModal({ isOpen, onClose, initialTab = 'para', initia
                 </p>
               </div>
 
+
+              {editionVolumes.length > 1 && (
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+                    Volume ({pageSystem})
+                  </label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {editionVolumes.map((v) => (
+                      <button
+                        key={v.vol}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVolume(v.vol);
+                          setErrorMessage('');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-mono transition cursor-pointer ${
+                          selectedVolume === v.vol
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold'
+                            : 'bg-[var(--bg-secondary)] hover:border-[var(--accent)] border-[var(--border-color)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        Vol {v.vol} ({v.minNum}–{v.maxNum})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">

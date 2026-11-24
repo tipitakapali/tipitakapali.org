@@ -554,6 +554,18 @@ export function TabProvider({ children }) {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('tipitaka:header-visibility', {
+            detail: { visible: Boolean(isHeaderVisible) },
+          })
+        );
+      } catch (_) {}
+    }
+  }, [isHeaderVisible]);
+
   const setIsSidebarOpen = useCallback((nextValue) => {
     const resolved =
       typeof nextValue === 'function' ? Boolean(nextValue(isSidebarOpenRef.current)) : Boolean(nextValue);
@@ -1175,7 +1187,15 @@ export function TabProvider({ children }) {
 
       // Resolve and enable any requested translation language immediately (works for BOTH
       // TOC routes like /translation/vi/{book_code} or /book/{code}?l=vi AND chapter routes)
-      const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
+      const hasExplicitLangOpt =
+        options.l !== undefined || options.lang !== undefined || options.db !== undefined;
+      const allowUrlLangFallback = Boolean(
+        !hasExplicitLangOpt && (options.highlightQuery || options.searchQuery || options.fromTranslationRoute)
+      );
+      const currentUrlL =
+        allowUrlLangFallback && typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('l')
+          : null;
       const requestedRawLang = options.l || options.lang || options.db || currentUrlL || null;
       const requestedNormLang = requestedRawLang ? normalizeLangCode(requestedRawLang) : null;
       const requestedCleanLang = (requestedNormLang && requestedNormLang !== 'pali') ? requestedNormLang : null;
@@ -1212,6 +1232,14 @@ export function TabProvider({ children }) {
         openTabsRef.current.some((t) => t.bookCode === sourceBookCode)
       );
       const effectiveActiveCode = keepActive ? sourceBookCode : cleanCode;
+      if (!keepActive) {
+        setIsHeaderVisible(true);
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          try {
+            window.dispatchEvent(new CustomEvent('tipitaka:show-bars'));
+          } catch (_) {}
+        }
+      }
 
       const currentTabs = openTabsRef.current;
       const existingTabIndex = currentTabs.findIndex((t) => t.bookCode === cleanCode);
@@ -1254,8 +1282,15 @@ export function TabProvider({ children }) {
 
         // TOC request — show book TOC (no auto chapter 1)
         if (isTocRequest) {
-          const needsTocFetch = !tab.toc || tab.toc.length === 0 || !tab.chapters || tab.chapters.length === 0;
-          const updatedTocTab = { ...tab, viewMode: 'toc', isTocView: true, currentChapterIdx: null, isLoading: needsTocFetch };
+          const needsTocFetch =
+            !tab.toc ||
+            tab.toc.length === 0 ||
+            !tab.chapters ||
+            tab.chapters.length === 0 ||
+            !tab.page_to_chapter ||
+            Object.keys(tab.page_to_chapter).length === 0 ||
+            !tab.edition_ranges;
+          const updatedTocTab = { ...tab, viewMode: 'toc', isTocView: true, currentChapterIdx: null, isLoading: !tab.toc || tab.toc.length === 0 };
           const nextTabsToc = insertOrUpdateTabInList(currentTabs, updatedTocTab, {
             isSingleMode,
             isAlongside,
@@ -1285,9 +1320,18 @@ export function TabProvider({ children }) {
                             chapter_count: bData.chapter_count || t.chapter_count,
                             chapters: bData.chapters || t.chapters,
                             toc: bData.toc || t.toc,
-                            para_to_chapter: bData.para_to_chapter || t.para_to_chapter,
-                            para_to_index: bData.para_to_index || t.para_to_index,
-                            page_to_chapter: bData.page_to_chapter || t.page_to_chapter,
+                            mat: bData.mat || t.mat,
+                            para_to_chapter: bData.para_to_chapter || t.para_to_chapter || {},
+                            para_to_index: bData.para_to_index || t.para_to_index || {},
+                            page_to_chapter: bData.page_to_chapter || t.page_to_chapter || {},
+                            page_to_para: bData.page_to_para || t.page_to_para || {},
+                            page_anchors: bData.page_anchors || t.page_anchors || {},
+                            para_range: bData.para_range || t.para_range || null,
+                            edition_ranges: bData.edition_ranges || t.edition_ranges || null,
+                            sub_books: bData.sub_books || t.sub_books || null,
+                            sub_book: bData.sub_book || t.sub_book || null,
+                            chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                            sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
                             viewMode: 'toc',
                             isTocView: true,
                             isLoading: false,
@@ -1397,7 +1441,12 @@ export function TabProvider({ children }) {
           setActiveParaNum(effectivePara);
         }
 
-        if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
+        if (
+          hasTargetChapter &&
+          !hasPageTarget &&
+          !rawParaNum &&
+          (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')
+        ) {
           const firstP = getFirstParaOfChapter(tab.para_to_chapter, targetChapIdx, targetSub, tab.sub_books_para_to_chapter);
           if (firstP) {
             if (!keepActive) setActiveParaNum(firstP);
@@ -1440,7 +1489,6 @@ export function TabProvider({ children }) {
           bufferAdjacentChapters(cleanCode, targetChapIdx);
         }
 
-        const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
         const rawLang = options.l || options.lang || options.db || currentUrlL || null;
         const normLang = rawLang ? normalizeLangCode(rawLang) : null;
         const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
@@ -1460,8 +1508,11 @@ export function TabProvider({ children }) {
           setBookScrollIntent(cleanCode, {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
-            paraNum: effectivePara || rawParaNum,
+            paraNum: rawParaNum ? (effectivePara || rawParaNum) : undefined,
             lineId: options.targetLineId || null,
+            word: options.targetWord || null,
+            bold: options.targetBold || null,
+            snippet: options.targetSnippet || null,
             subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
@@ -1696,8 +1747,7 @@ export function TabProvider({ children }) {
 
         // Prefetch target chapter's translations + pali_sentences in parallel with fetchBook
         // on local offline hosts so ChapterBlock renders on frame 1 without a loading spinner.
-        const urlLang = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
-        const extraRaw = options.l || options.lang || options.db || urlLang || null;
+        const extraRaw = options.l || options.lang || options.db || currentUrlL || null;
         const extraNorm = extraRaw ? normalizeLangCode(extraRaw) : null;
         const openBookExtraLang = extraNorm && extraNorm !== 'pali' ? extraNorm : null;
         const prefetchedBundleChapters = new Set();
@@ -1789,7 +1839,12 @@ export function TabProvider({ children }) {
           prefetchedChapters: prefetchedBundleChapters,
         });
 
-        if (hasTargetChapter && !rawParaNum && (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')) {
+        if (
+          hasTargetChapter &&
+          !hasPageTarget &&
+          !rawParaNum &&
+          (options.targetParaIndex === undefined || options.targetParaIndex === null || options.targetParaIndex === '')
+        ) {
           const firstP = getFirstParaOfChapter(bookData.para_to_chapter, targetChapIdx, targetSub, bookData.sub_books_para_to_chapter);
           if (firstP) {
             if (!keepActive) setActiveParaNum(firstP);
@@ -1872,7 +1927,6 @@ export function TabProvider({ children }) {
           loadChapter(cleanCode, targetChapIdx - 1);
         }
 
-        const currentUrlL = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('l') : null;
         const rawLang = options.l || options.lang || options.db || currentUrlL || null;
         const normLang = rawLang ? normalizeLangCode(rawLang) : null;
         const cleanLangCode = (normLang && normLang !== 'pali') ? normLang : null;
@@ -1892,8 +1946,11 @@ export function TabProvider({ children }) {
           setBookScrollIntent(cleanCode, {
             chapterIdx: hasTargetChapter ? targetChapIdx : undefined,
             paraIndex: options.targetParaIndex,
-            paraNum: effectivePara || rawParaNum,
+            paraNum: rawParaNum ? (effectivePara || rawParaNum) : undefined,
             lineId: options.targetLineId || null,
+            word: options.targetWord || null,
+            bold: options.targetBold || null,
+            snippet: options.targetSnippet || null,
             subBook: targetSub || undefined,
             page: options.targetPage,
             pageSystem: options.targetPageSystem,
@@ -2002,6 +2059,12 @@ export function TabProvider({ children }) {
         } catch (e) {}
       }
 
+      setIsHeaderVisible(true);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        try {
+          window.dispatchEvent(new CustomEvent('tipitaka:show-bars'));
+        } catch (_) {}
+      }
       setActiveBookCode(bookCode);
       setBookScrollIntent(bookCode, null);
 
@@ -2016,7 +2079,37 @@ export function TabProvider({ children }) {
         }
         const isToc = tab.viewMode === 'toc' || tab.isTocView;
         if (isToc) {
-          // TOC view: no chapter fetch, just show TOC
+          // TOC view: no chapter fetch, just show TOC (and ensure GoTo metadata is hydrated)
+          if (
+            (!tab.page_to_chapter || Object.keys(tab.page_to_chapter).length === 0 || !tab.edition_ranges) &&
+            !hydratingBooksRef.current.has(tab.bookCode)
+          ) {
+            hydratingBooksRef.current.add(tab.bookCode);
+            fetchBookTocOnly(tab.bookCode)
+              .then((bData) => {
+                if (!bData) return;
+                setOpenTabs((prev) =>
+                  prev.map((t) =>
+                    t.bookCode === tab.bookCode
+                      ? {
+                          ...t,
+                          para_to_chapter: bData.para_to_chapter || t.para_to_chapter || {},
+                          para_to_index: bData.para_to_index || t.para_to_index || {},
+                          page_to_chapter: bData.page_to_chapter || t.page_to_chapter || {},
+                          page_to_para: bData.page_to_para || t.page_to_para || {},
+                          page_anchors: bData.page_anchors || t.page_anchors || {},
+                          para_range: bData.para_range || t.para_range || null,
+                          edition_ranges: bData.edition_ranges || t.edition_ranges || null,
+                        }
+                      : t
+                  )
+                );
+              })
+              .catch(() => {})
+              .finally(() => {
+                hydratingBooksRef.current.delete(tab.bookCode);
+              });
+          }
           setTreeSelectedNode({ bookCode: tab.bookCode, chapterIdx: null });
           setSearchHighlight(null);
           updateUrlParams({ book: tab.bookCode, chapter: null, q: null, search: null });
@@ -2692,6 +2785,17 @@ export function TabProvider({ children }) {
                       chapters: bData.chapters || [],
                       toc: bData.toc || [],
                       mat: bData.mat || t.mat,
+                      para_to_chapter: bData.para_to_chapter || t.para_to_chapter || {},
+                      para_to_index: bData.para_to_index || t.para_to_index || {},
+                      page_to_chapter: bData.page_to_chapter || t.page_to_chapter || {},
+                      page_to_para: bData.page_to_para || t.page_to_para || {},
+                      page_anchors: bData.page_anchors || t.page_anchors || {},
+                      para_range: bData.para_range || t.para_range || null,
+                      edition_ranges: bData.edition_ranges || t.edition_ranges || null,
+                      sub_books: bData.sub_books || t.sub_books || null,
+                      sub_book: bData.sub_book || t.sub_book || null,
+                      chapter_to_sub_book: bData.chapter_to_sub_book || t.chapter_to_sub_book || null,
+                      sub_books_para_to_chapter: bData.sub_books_para_to_chapter || t.sub_books_para_to_chapter || null,
                       split_targets: bData.split_targets || bData.mat?.split_targets || t.split_targets || null,
                       book_type: bData.book_type || t.book_type || 'Whole',
                       isLoading: false,

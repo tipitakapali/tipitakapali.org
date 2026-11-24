@@ -2702,11 +2702,59 @@ const String _languageMenuBridgeScript = r'''
     head.appendChild(style);
   }
 
+  var MODAL_BLOCK_SELECTOR =
+    '.modal-overlay, .modal-backdrop, .search-modal, .dict-overlay, .dict-dock-panel, .dict-panel-modal, .linked-def-modal-backdrop, [role="dialog"], [aria-modal="true"]';
   var cachedBarsBlocked = false;
   var cachedBarsBlockedAt = 0;
   var cachedScrollMetricsEl = null;
   var cachedScrollMax = 0;
   var cachedScrollMetricsAt = 0;
+  var touchPullStartY = null;
+
+  function isDocScrollTarget(target) {
+    return (
+      target === window ||
+      target === document ||
+      target === document.scrollingElement ||
+      target === document.documentElement ||
+      target === document.body
+    );
+  }
+
+  function getTargetScrollTop(target) {
+    if (!target) return 0;
+    if (isDocScrollTarget(target)) {
+      return (
+        window.scrollY ||
+        window.pageYOffset ||
+        (document.scrollingElement && document.scrollingElement.scrollTop) ||
+        (document.documentElement && document.documentElement.scrollTop) ||
+        (document.body && document.body.scrollTop) ||
+        0
+      );
+    }
+    return target.scrollTop || 0;
+  }
+
+  function computeTargetMaxScroll(target) {
+    if (!target) return 0;
+    if (isDocScrollTarget(target)) {
+      var sh = Math.max(
+        document.scrollingElement ? document.scrollingElement.scrollHeight : 0,
+        document.documentElement ? document.documentElement.scrollHeight : 0,
+        document.body ? document.body.scrollHeight : 0
+      );
+      var ch =
+        (document.documentElement && document.documentElement.clientHeight) ||
+        window.innerHeight ||
+        0;
+      if (window.innerHeight && ch > window.innerHeight) {
+        ch = window.innerHeight;
+      }
+      return Math.max(0, sh - ch);
+    }
+    return Math.max(0, target.scrollHeight - target.clientHeight);
+  }
 
   function refreshBarsToggleBlocked(now) {
     cachedBarsBlocked = isBarsToggleBlocked();
@@ -2726,7 +2774,7 @@ const String _languageMenuBridgeScript = r'''
       return cachedScrollMax;
     }
     cachedScrollMetricsEl = target;
-    cachedScrollMax = Math.max(0, target.scrollHeight - target.clientHeight);
+    cachedScrollMax = computeTargetMaxScroll(target);
     cachedScrollMetricsAt = now;
     return cachedScrollMax;
   }
@@ -2738,14 +2786,23 @@ const String _languageMenuBridgeScript = r'''
     return rect.width > 20 && rect.right > 20;
   }
 
+  function hasActiveScrollableReaderSurface() {
+    if (document.querySelector('.welcome-view')) return false;
+    if (document.querySelector('.ai-chat-view .ai-chat-messages')) return true;
+    var activeContent = document.querySelector(
+      '.reader-pane:not(.hidden) main.content-area:not([data-toc-view="true"]), .reader-view-panel main.content-area:not([data-toc-view="true"])'
+    );
+    return !!activeContent;
+  }
+
   function isBarsToggleBlocked() {
     var body = document.body;
     if (!body) return true;
     if (body.classList.contains('zen-mode')) return true;
-    if (document.querySelector('.modal-overlay, .dict-overlay')) return true;
+    if (document.querySelector(MODAL_BLOCK_SELECTOR)) return true;
     if (document.querySelector('.ai-chat-header [aria-expanded="true"]')) return true;
     if (isSidebarVisible()) return true;
-    if (!document.querySelector('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return true;
+    if (!hasActiveScrollableReaderSurface()) return true;
     return false;
   }
 
@@ -2763,22 +2820,59 @@ const String _languageMenuBridgeScript = r'''
     syncThemeBars();
   }
 
+  function resolveActiveScrollTarget() {
+    if (document.body && document.body.classList.contains('window-scroll')) {
+      return document.scrollingElement || document.documentElement || document.body;
+    }
+    return (
+      document.querySelector('.reader-pane:not(.hidden) main.content-area:not([data-toc-view="true"])') ||
+      document.querySelector('.ai-chat-view .ai-chat-messages') ||
+      document.querySelector('.reader-view-panel main.content-area')
+    );
+  }
+
+  function isBodyBarsHidden() {
+    return barsHidden || !!(document.body && document.body.classList.contains('tpo-bars-hidden'));
+  }
+
   function syncAutoHideState() {
     injectAutoHideStyles();
     cachedScrollMetricsAt = 0;
-    refreshBarsToggleBlocked(Date.now());
-    if (!barsHidden) return;
+    var blocked = refreshBarsToggleBlocked(Date.now());
+    if (!isBodyBarsHidden()) return;
     var body = document.body;
-    if (!body ||
-        body.classList.contains('zen-mode') ||
-        isSidebarVisible() ||
-        !document.querySelector('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) {
+    var activeTarget = resolveActiveScrollTarget();
+    var shortContent = activeTarget ? computeTargetMaxScroll(activeTarget) <= 80 : false;
+    if (!body || blocked || shortContent) {
       scrollAccum = 0;
       setBarsHidden(false);
     }
   }
 
-  function markUserScrollInput() {
+  function markUserScrollInput(e) {
+    if (e && e.target && e.target.closest) {
+      if (e.target.closest(MODAL_BLOCK_SELECTOR + ', .app-header, .book-tabs-bar, aside.app-sidebar, footer.app-footer')) {
+        return;
+      }
+    }
+    if (e && e.type === 'wheel' && window.__tpoModalClosedAt && Date.now() - window.__tpoModalClosedAt < 650) {
+      return;
+    }
+    if (e && e.type === 'touchstart' && e.touches && e.touches.length === 1) {
+      touchPullStartY = e.touches[0].clientY;
+    } else if (e && e.type === 'touchmove' && e.touches && e.touches.length === 1 && touchPullStartY !== null) {
+      var pullDeltaY = e.touches[0].clientY - touchPullStartY;
+      if (pullDeltaY >= 28 && barsHidden) {
+        var curEl = resolveActiveScrollTarget();
+        if (!curEl || getTargetScrollTop(curEl) <= 24 || computeTargetMaxScroll(curEl) <= 80) {
+          scrollAccum = 0;
+          setBarsHidden(false);
+          touchPullStartY = e.touches[0].clientY;
+        }
+      }
+    } else if (e && e.type === 'touchend') {
+      touchPullStartY = null;
+    }
     lastUserInputAt = Date.now();
   }
 
@@ -2789,9 +2883,25 @@ const String _languageMenuBridgeScript = r'''
   document.addEventListener('keydown', function(e) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' ||
         e.key === 'PageUp' || e.key === ' ' || e.key === 'Home' || e.key === 'End') {
-      markUserScrollInput();
+      markUserScrollInput(e);
     }
   }, { passive: true, capture: true });
+
+  window.addEventListener('tipitaka:show-bars', function() {
+    scrollAccum = 0;
+    suppressDeltaUntil = Date.now() + 450;
+    setBarsHidden(false);
+  });
+
+  window.addEventListener('tipitaka:header-visibility', function(e) {
+    if (!e || !e.detail || typeof e.detail.visible !== 'boolean') return;
+    scrollAccum = 0;
+    if (e.detail.visible) {
+      setBarsHidden(false);
+    } else if (!isBarsToggleBlocked()) {
+      setBarsHidden(true);
+    }
+  });
 
   var scrollRafPending = false;
   var pendingScrollTarget = null;
@@ -2800,14 +2910,14 @@ const String _languageMenuBridgeScript = r'''
     if (!target) return;
     var now = Date.now();
     var maxScroll = getCachedMaxScroll(target, now);
-    var rawTop = target.scrollTop;
+    var rawTop = getTargetScrollTop(target);
     var top = Math.max(0, Math.min(rawTop, maxScroll));
 
     if (lastScrollEl !== target) {
       lastScrollEl = target;
       lastScrollTop = top;
       scrollAccum = 0;
-      if (top <= 24 && barsHidden) {
+      if ((top <= 24 || maxScroll <= 80) && isBodyBarsHidden()) {
         setBarsHidden(false);
       }
       return;
@@ -2816,7 +2926,7 @@ const String _languageMenuBridgeScript = r'''
     if (getCachedBarsToggleBlocked(now) || maxScroll <= 80) {
       lastScrollTop = top;
       scrollAccum = 0;
-      if (barsHidden) {
+      if (isBodyBarsHidden()) {
         setBarsHidden(false);
       }
       return;
@@ -2825,13 +2935,18 @@ const String _languageMenuBridgeScript = r'''
     if (top <= 24) {
       lastScrollTop = top;
       scrollAccum = 0;
-      if (barsHidden) {
+      if (isBodyBarsHidden()) {
         setBarsHidden(false);
       }
       return;
     }
 
-    if (now < suppressDeltaUntil) {
+    if (
+      window.__tpoProgrammaticScroll ||
+      (window.__tpoModalClosedAt && now - window.__tpoModalClosedAt < 700) ||
+      document.querySelector('.reader-jump-loading-overlay') ||
+      now < suppressDeltaUntil
+    ) {
       lastScrollTop = top;
       scrollAccum = 0;
       return;
@@ -2871,9 +2986,23 @@ const String _languageMenuBridgeScript = r'''
   }
 
   document.addEventListener('scroll', function(e) {
-    var target = e.target;
-    if (!target || !target.matches) return;
-    if (target !== lastScrollEl && !target.matches('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) return;
+    var rawTarget = e ? e.target : null;
+    var target = null;
+    if (!rawTarget || isDocScrollTarget(rawTarget)) {
+      if (document.body && document.body.classList.contains('window-scroll')) {
+        target = document.scrollingElement || document.documentElement || document.body;
+      } else {
+        return;
+      }
+    } else if (rawTarget.matches) {
+      if (rawTarget === lastScrollEl || rawTarget.matches('.reader-view-panel main.content-area, .ai-chat-view .ai-chat-messages')) {
+        target = rawTarget;
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
     pendingScrollTarget = target;
     if (scrollRafPending) return;
     scrollRafPending = true;

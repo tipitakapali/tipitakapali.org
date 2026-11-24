@@ -301,6 +301,7 @@ export default function BoldDefinitionSection({
                           book_code: m.data.book_code,
                           chapter_index: m.data.chapter,
                           para_num: m.data.para,
+                          word: item.word,
                         })
                       }
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-[var(--bg-secondary)] hover:bg-[var(--accent-light)] text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border-color)] hover:border-[var(--accent-border)] transition cursor-pointer"

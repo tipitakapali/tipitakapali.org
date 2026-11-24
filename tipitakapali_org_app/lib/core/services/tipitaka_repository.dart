@@ -710,7 +710,8 @@ class TipitakaRepository {
     }
   }
 
-  /// Resolves edition page number (e.g. `1.0005` or `5`) -> chapterIndex.
+  /// Resolves edition page number (e.g. `1.0005`, `1.5`, or `5`) -> chapterIndex,
+  /// including nearest-page fallback for skipped intermediate print pages (e.g. `abh03m7.mul` V 519).
   int? findEditionPageChapter(
     BookNavigationMeta meta,
     String edition,
@@ -719,16 +720,79 @@ class TipitakaRepository {
     final map = meta.pageToChapter[edition];
     if (map == null || map.isEmpty) return null;
     final clean = pageInput.trim();
+    if (clean.isEmpty) return null;
     if (map.containsKey(clean)) return map[clean];
-    final asInt = int.tryParse(clean);
-    if (asInt != null) {
-      final padded = asInt.toString().padLeft(4, '0');
-      for (final entry in map.entries) {
-        if (entry.key == asInt.toString() ||
-            entry.key.endsWith('.$padded') ||
-            entry.key.endsWith('.$asInt')) {
-          return entry.value;
+
+    int? expVol;
+    int? targetNum;
+    if (clean.contains('.')) {
+      final parts = clean.split('.');
+      if (parts.length == 2) {
+        expVol = int.tryParse(parts[0]);
+        targetNum = int.tryParse(parts[1]);
+        if (expVol != null && targetNum != null) {
+          final padded = '$expVol.${targetNum.toString().padLeft(4, '0')}';
+          if (map.containsKey(padded)) return map[padded];
+          if (expVol == 0 && map.containsKey(targetNum.toString())) {
+            return map[targetNum.toString()];
+          }
         }
+      }
+    } else {
+      targetNum = int.tryParse(clean);
+      if (targetNum != null) {
+        final padded = targetNum.toString().padLeft(4, '0');
+        for (final entry in map.entries) {
+          if (entry.key == targetNum.toString() ||
+              entry.key == padded ||
+              entry.key.endsWith('.$padded') ||
+              entry.key.endsWith('.$targetNum')) {
+            return entry.value;
+          }
+        }
+      }
+    }
+
+    if (targetNum != null) {
+      int minNum = 1 << 30;
+      int maxNum = -1;
+      int? bestBeforeChap;
+      int bestBeforeDiff = 1 << 30;
+      int? bestAfterChap;
+      int bestAfterDiff = 1 << 30;
+      for (final entry in map.entries) {
+        int? kVol;
+        int? kNum;
+        if (entry.key.contains('.')) {
+          final kp = entry.key.split('.');
+          if (kp.length == 2) {
+            kVol = int.tryParse(kp[0]);
+            kNum = int.tryParse(kp[1]);
+          }
+          if (expVol != null && kVol != expVol) continue;
+        } else {
+          if (expVol != null && expVol > 0) continue;
+          kNum = int.tryParse(entry.key);
+        }
+        if (kNum == null) continue;
+        if (kNum < minNum) minNum = kNum;
+        if (kNum > maxNum) maxNum = kNum;
+        if (kNum <= targetNum) {
+          final diff = targetNum - kNum;
+          if (diff < bestBeforeDiff) {
+            bestBeforeDiff = diff;
+            bestBeforeChap = entry.value;
+          }
+        } else {
+          final diff = kNum - targetNum;
+          if (diff < bestAfterDiff) {
+            bestAfterDiff = diff;
+            bestAfterChap = entry.value;
+          }
+        }
+      }
+      if (maxNum >= 0 && targetNum >= minNum && targetNum <= maxNum) {
+        return bestBeforeChap ?? bestAfterChap;
       }
     }
     return null;

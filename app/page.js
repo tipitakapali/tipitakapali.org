@@ -329,7 +329,8 @@ export function MainAppContent({ params: rawParams, ssrContent = null, initialRo
   );
   const isColumnsActive =
     settings?.tabView === 'columns' && viewportWidth >= 900 && bookTabCount > 1 && !isAiTab;
-  const useWindowScroll = !isNotFound && !isAiTab && !isColumnsActive && Boolean(activeTab?.bookCode);
+  const isTocTab = Boolean(activeTab?.viewMode === 'toc' || activeTab?.isTocView);
+  const useWindowScroll = !isNotFound && !isAiTab && !isTocTab && !isColumnsActive && Boolean(activeTab?.bookCode);
 
   const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
   useIsoLayoutEffect(() => {

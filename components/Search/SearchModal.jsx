@@ -812,6 +812,9 @@ export default function SearchModal() {
   };
 
   const handleResultClick = async (result) => {
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
     closeSearchModal();
     const isPali = selectedDb === 'fts_tipitaka.db' || selectedDb === 'pali';
     const romanQuery = isPali ? convertAnyToRoman(query).trim() : query.trim();
@@ -834,6 +837,7 @@ export default function SearchModal() {
     await openBook(result.book_code, {
       targetParaIndex: result.para_index,
       targetParaNum: isPali ? cleanParaNum : undefined,
+      targetSnippet: result.snippet || undefined,
       highlightQuery: romanQuery,
       searchQuery: romanQuery || query.trim(),
       lang: cleanLangCode,

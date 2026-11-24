@@ -753,6 +753,43 @@ export function shouldDismissUnpinnedDictionaryOnClick(
   return true;
 }
 
+export function shouldCloseDictOnReaderOpen({
+  dockMode = 'side',
+  isPinned = false,
+  viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280,
+} = {}) {
+  if (dockMode === 'modal') return true;
+  if (!isPinned) return true;
+  if (Number.isFinite(viewportWidth) && viewportWidth < 768) return true;
+  return false;
+}
+
+export function buildBoldPassageOpenOpts(item, fallbackWord = '') {
+  if (!item) return { lang: 'pali' };
+  const rawSentenceHtml = item.sentence_html || '';
+  const boldTagMatch = rawSentenceHtml ? rawSentenceHtml.match(/<b\b[^>]*>([\s\S]*?)<\/b>/i) : null;
+  const extractedBold = boldTagMatch
+    ? boldTagMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    : '';
+  const cleanSentenceSnippet = rawSentenceHtml
+    ? rawSentenceHtml
+        .replace(/<[^>]+>/g, '')
+        .replace(/^\s*\d+\s*\.\s*/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : '';
+  return {
+    targetChapterIdx: item.chapter_index,
+    targetParaIndex: item.para_index,
+    targetParaNum: item.para_num,
+    targetLineId: item.line_id,
+    targetWord: item.word || fallbackWord || undefined,
+    targetBold: item.bold || extractedBold || undefined,
+    targetSnippet: cleanSentenceSnippet || item.context || item.meaning || undefined,
+    lang: 'pali',
+  };
+}
+
 export default function DictionaryModal() {
   const {
     isOpen,
@@ -1729,36 +1766,42 @@ export default function DictionaryModal() {
     return [];
   }, [lookupData, activeDictTab]);
 
+  const shouldCloseOnOpen = useCallback(
+    () => shouldCloseDictOnReaderOpen({ dockMode, isPinned }),
+    [dockMode, isPinned]
+  );
+
+  const buildBoldOpts = useCallback(
+    (item) => buildBoldPassageOpenOpts(item, queryWord),
+    [queryWord]
+  );
+
   const handleOpenBoldPassage = useCallback((item) => {
     if (!item?.book_code) return;
-    openBook(item.book_code, {
-      targetChapterIdx: item.chapter_index,
-      targetParaIndex: item.para_index,
-      targetParaNum: item.para_num,
-      targetLineId: item.line_id,
-    });
-    if (dockMode === 'modal') {
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
+    openBook(item.book_code, buildBoldOpts(item));
+    if (shouldCloseOnOpen()) {
       closeDictionary();
     }
-  }, [openBook, dockMode, closeDictionary]);
+  }, [openBook, buildBoldOpts, shouldCloseOnOpen, closeDictionary]);
 
   const handleOpenBoldAlongside = useCallback((item) => {
     if (!item?.book_code) return;
-    const opts = {
-      targetChapterIdx: item.chapter_index,
-      targetParaIndex: item.para_index,
-      targetParaNum: item.para_num,
-      targetLineId: item.line_id,
-    };
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
+    const opts = buildBoldOpts(item);
     if (typeof openAlongside === 'function') {
       openAlongside(item.book_code, opts);
     } else {
       openBook(item.book_code, opts);
     }
-    if (dockMode === 'modal') {
+    if (shouldCloseOnOpen()) {
       closeDictionary();
     }
-  }, [openAlongside, openBook, dockMode, closeDictionary]);
+  }, [openAlongside, openBook, buildBoldOpts, shouldCloseOnOpen, closeDictionary]);
 
   if (!isOpen) return null;
 

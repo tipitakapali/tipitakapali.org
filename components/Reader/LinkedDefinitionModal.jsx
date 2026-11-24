@@ -345,7 +345,8 @@ export default function LinkedDefinitionModal({
   onClose,
 }) {
   const { openBook } = useTabs();
-  const { openDictionary } = useDictionary();
+  const dictCtx = useDictionary() || {};
+  const { openDictionary } = dictCtx;
   const { settings } = useThemeSettings() || {};
 
   const langsKey = Array.isArray(activeLangs) ? activeLangs.filter(Boolean).join(',') : '';
@@ -472,7 +473,13 @@ export default function LinkedDefinitionModal({
   const catClass = getLinkedCategoryClass(rawCategory);
 
   const lines = Array.isArray(preview?.lines) ? preview.lines : [];
-  const firstTargetIdx = lines.findIndex((l) => Boolean(l?.is_target));
+  const explicitTargetIdx = lines.findIndex((l) => Boolean(l?.is_target));
+  const firstTargetIdx =
+    explicitTargetIdx >= 0
+      ? explicitTargetIdx
+      : link?.target_line_id !== undefined && link?.target_line_id !== null
+        ? lines.findIndex((l) => String(l?.line_id) === String(link.target_line_id))
+        : -1;
   const defaultTargetLine = firstTargetIdx >= 0 ? lines[firstTargetIdx] : null;
   const selectedLineObj =
     (selectedLineKey && lines.find((l, i) => getLinkedLineKey(l, i) === selectedLineKey)) ||
@@ -490,9 +497,47 @@ export default function LinkedDefinitionModal({
   const openPayload = buildLinkedOpenOptions(preview, link, selectedLineObj);
 
   const openLineInReader = (lineOverride = null) => {
-    const payload = buildLinkedOpenOptions(preview, link, lineOverride || selectedLineObj);
+    const chosenLine = lineOverride || selectedLineObj;
+    const payload = buildLinkedOpenOptions(preview, link, chosenLine);
     if (!payload) return;
-    openBook(payload.targetBook, payload.opts);
+    if (typeof window !== 'undefined') {
+      window.__tpoModalClosedAt = Date.now();
+    }
+    const rawLineHtml =
+      chosenLine?.pali_html ||
+      chosenLine?.pali ||
+      defaultTargetLine?.pali_html ||
+      defaultTargetLine?.pali ||
+      link?.snippet ||
+      '';
+    const boldTagMatch = rawLineHtml ? String(rawLineHtml).match(/<b\b[^>]*>([\s\S]*?)<\/b>/i) : null;
+    const extractedBold = boldTagMatch
+      ? boldTagMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      : '';
+    const snippetText = rawLineHtml
+      ? String(rawLineHtml)
+          .replace(/<[^>]+>/g, '')
+          .replace(/^\s*\d+\s*\.\s*/, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      : undefined;
+    const enrichedOpts = {
+      ...payload.opts,
+      ...(link?.word ? { targetWord: link.word } : {}),
+      ...(extractedBold ? { targetBold: extractedBold } : {}),
+      ...(snippetText ? { targetSnippet: snippetText } : {}),
+      lang: 'pali',
+    };
+    openBook(payload.targetBook, enrichedOpts);
+    if (
+      dictCtx.isOpen &&
+      typeof dictCtx.closeDictionary === 'function' &&
+      (dictCtx.dockMode === 'modal' ||
+        !dictCtx.isPinned ||
+        (typeof window !== 'undefined' && window.innerWidth < 768))
+    ) {
+      dictCtx.closeDictionary();
+    }
     onClose?.();
   };
 

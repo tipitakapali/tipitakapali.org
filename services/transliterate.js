@@ -470,24 +470,60 @@ export function highlightTranslationText(html, query, lang = 'en') {
   const minLen = isCjk ? 1 : 2;
   const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  // Term candidates: raw phrase, Roman phrase, and individual words without outer punctuation
+  // Term candidates: raw phrase, Roman phrase, and individual words preserving FTS5 prefix/contains wildcards
   const romanQ = convertAnyToRoman(rawQ).trim();
-  const rawParts = rawQ
-    .split(/\s+/)
-    .map((t) => t.replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '').trim())
-    .filter((t) => t && t.length >= minLen);
-  const romanParts = romanQ
-    ? romanQ
-        .split(/\s+/)
-        .map((t) => t.replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '').trim())
-        .filter((t) => t && t.length >= minLen)
-    : [];
+  const parsePartSpec = (rawPart) => {
+    const trimmed = String(rawPart || '').trim();
+    if (!trimmed) return null;
+    const hasLeadStar = /^\*/.test(trimmed);
+    const hasTrailStar = /\*$/.test(trimmed);
+    const clean = trimmed.replace(/^[\p{P}\s*]+|[\p{P}\s*]+$/gu, '').trim();
+    if (!clean || clean.length < minLen) return null;
+    return {
+      term: clean,
+      prefixLeft: hasLeadStar,
+      prefixRight: hasTrailStar || clean.length >= 3,
+    };
+  };
 
-  const candidateTerms = [rawQ, romanQ, ...rawParts, ...romanParts].filter(
-    (t) => t && t.length >= minLen
-  );
-  const uniqueTerms = Array.from(new Set(candidateTerms));
-  if (uniqueTerms.length === 0) return html;
+  const phraseCleanRaw = rawQ.replace(/^[\p{P}\s*]+|[\p{P}\s*]+$/gu, '').trim();
+  const phraseCleanRoman = romanQ.replace(/^[\p{P}\s*]+|[\p{P}\s*]+$/gu, '').trim();
+  const specMap = new Map();
+  const addSpec = (spec) => {
+    if (!spec || !spec.term || spec.term.length < minLen) return;
+    const prev = specMap.get(spec.term);
+    if (!prev) {
+      specMap.set(spec.term, spec);
+    } else {
+      specMap.set(spec.term, {
+        term: spec.term,
+        prefixLeft: prev.prefixLeft || spec.prefixLeft,
+        prefixRight: prev.prefixRight || spec.prefixRight,
+      });
+    }
+  };
+
+  if (phraseCleanRaw.length >= minLen) {
+    addSpec({
+      term: phraseCleanRaw,
+      prefixLeft: /^\*/.test(rawQ),
+      prefixRight: /\*$/.test(rawQ) || phraseCleanRaw.length >= 3,
+    });
+  }
+  if (phraseCleanRoman.length >= minLen) {
+    addSpec({
+      term: phraseCleanRoman,
+      prefixLeft: /^\*/.test(rawQ),
+      prefixRight: /\*$/.test(rawQ) || phraseCleanRoman.length >= 3,
+    });
+  }
+  for (const p of rawQ.split(/\s+/)) addSpec(parsePartSpec(p));
+  if (romanQ) {
+    for (const p of romanQ.split(/\s+/)) addSpec(parsePartSpec(p));
+  }
+
+  const termSpecs = Array.from(specMap.values());
+  if (termSpecs.length === 0) return html;
 
   const diacriticMap = {
     'a': '[aāAĀ]', 'ā': '[aāAĀ]',
@@ -507,7 +543,7 @@ export function highlightTranslationText(html, query, lang = 'en') {
   };
 
   const patternItems = [];
-  for (const term of uniqueTerms) {
+  for (const { term, prefixLeft, prefixRight } of termSpecs) {
     const isContinuousScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Myanmar}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}]/u.test(term);
     const escaped = escapeRegex(term);
     const wordCount = term.trim().split(/\s+/).length;
@@ -516,7 +552,9 @@ export function highlightTranslationText(html, query, lang = 'en') {
     if (isContinuousScript) {
       patternItems.push({ regex: escaped, wordCount, termLen });
     } else {
-      patternItems.push({ regex: `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, wordCount, termLen });
+      const leftBound = prefixLeft ? '[\\p{L}\\p{M}]*' : '(?<![\\p{L}\\p{N}])';
+      const rightBound = prefixRight ? '[\\p{L}\\p{M}]*' : '(?![\\p{L}\\p{N}])';
+      patternItems.push({ regex: `${leftBound}${escaped}${rightBound}`, wordCount, termLen });
       // For Latin terms in Pali or loanwords, also build diacritic-tolerant regex (including multi-word phrases)
       if (/^[a-zA-ZāĀīĪūŪṁṀṃṂṅṄñÑṇṆṭṬḍḌḷḶṣṢśŚṛṚṝṜhHkKgGcCjJpPbyYvV\s]+$/.test(term)) {
         let regexStr = '';
@@ -531,7 +569,7 @@ export function highlightTranslationText(html, query, lang = 'en') {
           }
         }
         if (regexStr && regexStr !== escaped) {
-          patternItems.push({ regex: `(?<![\\p{L}\\p{N}])${regexStr}(?![\\p{L}\\p{N}])`, wordCount, termLen });
+          patternItems.push({ regex: `${leftBound}${regexStr}${rightBound}`, wordCount, termLen });
         }
       }
     }
