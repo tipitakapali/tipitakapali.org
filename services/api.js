@@ -861,10 +861,37 @@ export async function fetchPaliSentences(bookCode, chapterIndex = null) {
       chapCacheKey,
       async () => {
         const base = getApiBase();
-        const res = await fetch(
-          `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/pali_sentences`
-        );
-        if (res.ok) return await res.json();
+        try {
+          const res = await fetch(
+            `${base}/api/book/${encodeURIComponent(cleanCode)}/chapter/${chapterIndex}/pali_sentences`
+          );
+          if (res.ok) return await res.json();
+        } catch (_) {}
+        try {
+          const res = await fetch(
+            `${base}/api/book/${encodeURIComponent(cleanCode)}/pali_sentences`
+          );
+          if (res.ok) {
+            const wholeData = await res.json();
+            if (ENABLE_CLIENT_CACHE && wholeData && typeof wholeData === 'object') {
+              setBoundedCache(
+                cache,
+                wholeBookKey,
+                { data: wholeData, timestamp: Date.now() },
+                MAX_CACHE_ENTRIES
+              );
+            }
+            const chapMap = wholeData?.chapters?.[String(chapterIndex)] || null;
+            if (chapMap) {
+              return {
+                book_code: cleanCode,
+                chapter_index: chapterIndex,
+                chapters: { [String(chapterIndex)]: chapMap },
+                paragraphs: chapMap,
+              };
+            }
+          }
+        } catch (_) {}
         return null;
       },
       24 * 60 * 60 * 1000

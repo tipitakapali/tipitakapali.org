@@ -479,3 +479,219 @@ test('ChapterBlock renders Pali alone as paragraph even in side/side_rev modes',
     assert.doesNotMatch(markup, /pali-sent-num/);
   }
 });
+
+test('server_api/server.js imports readChapterSentences and exposes has_pali_sentences', () => {
+  const serverPath = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    '../server_api/server.js'
+  );
+  const serverSrc = fs.readFileSync(serverPath, 'utf8');
+  assert.match(
+    serverSrc,
+    /\{[^}]*\breadChapterSentences\b[^}]*\}\s*=\s*require\(['"]\.\/tipitakaCoreHelper['"]\)/,
+    'server_api/server.js must import readChapterSentences from ./tipitakaCoreHelper'
+  );
+  assert.match(
+    serverSrc,
+    /fastify\.get\(['"]\/api\/translations['"][\s\S]*?has_pali_sentences:\s*Boolean\(getPaliSentencesDb\(\)\)/,
+    '/api/translations should expose has_pali_sentences'
+  );
+});
+
+test('services/api.js fetchPaliSentences falls back to whole-book endpoint when per-chapter endpoint fails on localhost', async () => {
+  const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const compileSvc = (relPath, stubs) => {
+    const fullPath = path.join(rootDir, relPath);
+    const src = fs.readFileSync(fullPath, 'utf8');
+    const { code } = transform(src, { transforms: ['imports'], filePath: fullPath });
+    const mod = { exports: {} };
+    const localRequire = (spec) => (Object.prototype.hasOwnProperty.call(stubs, spec) ? stubs[spec] : require(spec));
+    new Function('exports', 'require', 'module', '__filename', '__dirname', code)(
+      mod.exports,
+      localRequire,
+      mod,
+      fullPath,
+      path.dirname(fullPath)
+    );
+    return mod.exports;
+  };
+
+  const apiMod = compileSvc('services/api.js', {
+    './transliterate': compileSvc('services/transliterate.js', {}),
+    './dpdFeedback': compileSvc('services/dpdFeedback.js', {}),
+  });
+
+  const prevWindow = globalThis.window;
+  const prevFetch = globalThis.fetch;
+  const calledUrls = [];
+  globalThis.window = { location: { hostname: 'localhost', port: '3000', protocol: 'http:' } };
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    calledUrls.push(u);
+    if (u.includes('/chapter/0/pali_sentences')) {
+      return { ok: false, status: 500, json: async () => ({ error: 'boom' }) };
+    }
+    if (u.endsWith('/api/book/s0101m.mul/pali_sentences')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          book_code: 's0101m.mul',
+          chapters: {
+            0: SAMPLE_PALI_SENTS,
+            1: { 0: [{ line: 1, text: 'Chap 1 sent.' }] },
+          },
+        }),
+      };
+    }
+    throw new Error(`Unexpected fetch URL: ${u}`);
+  };
+
+  try {
+    assert.equal(apiMod.isLocalDynamicHost(), true);
+    const ch0 = await apiMod.fetchPaliSentences('s0101m.mul', 0);
+    assert.deepEqual(calledUrls, [
+      '/api/book/s0101m.mul/chapter/0/pali_sentences',
+      '/api/book/s0101m.mul/pali_sentences',
+    ]);
+    assert.deepEqual(ch0.paragraphs, SAMPLE_PALI_SENTS);
+    assert.deepEqual(ch0.chapters['0'], SAMPLE_PALI_SENTS);
+    // Subsequent chapter lookup resolves synchronously from warmed whole-book cache
+    const cachedCh1 = apiMod.getCachedPaliSentences('s0101m.mul', 1);
+    assert.deepEqual(cachedCh1, { 0: [{ line: 1, text: 'Chap 1 sent.' }] });
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.fetch = prevFetch;
+  }
+});
+
+test('ChapterBlock bundle mode falls back to fetchPaliSentences when bundle omits pali_sentences', async () => {
+  const readerViewPath = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    '../components/Reader/ReaderView.jsx'
+  );
+  const src = fs.readFileSync(readerViewPath, 'utf8');
+  const { code } = transform(src, { transforms: ['jsx', 'imports'], filePath: readerViewPath });
+
+  const effects = [];
+  const stateValues = [];
+  const reactStub = {
+    Fragment: Symbol('Fragment'),
+    createElement: () => null,
+    memo: (c) => c,
+    forwardRef: (c) => c,
+    createContext: () => ({ Provider: () => null }),
+    useContext: () => ({}),
+    useRef: (init) => ({ current: init }),
+    useCallback: (fn) => fn,
+    useMemo: (fn) => fn(),
+    useState: (init) => {
+      const idx = stateValues.length;
+      const initial = typeof init === 'function' ? init() : init;
+      stateValues.push(initial);
+      return [initial, (next) => {
+        stateValues[idx] = typeof next === 'function' ? next(stateValues[idx]) : next;
+      }];
+    },
+    useEffect: (fn) => {
+      effects.push(fn);
+    },
+    useLayoutEffect: () => {},
+  };
+
+  let bundleCalls = 0;
+  let paliFallbackCalls = 0;
+  const noopComp = () => null;
+  const stubs = {
+    react: Object.assign({}, reactStub, { __esModule: true, default: reactStub }),
+    'lucide-react': new Proxy({}, { get: () => noopComp }),
+    './WelcomeView': { __esModule: true, default: noopComp },
+    './MeditationLoader': { __esModule: true, default: noopComp },
+    './BookTocView': { __esModule: true, default: noopComp },
+    './LinkedDefinitionModal': { __esModule: true, default: noopComp },
+    '../AiChat/AiChatView': { __esModule: true, default: noopComp },
+    '../../context/TabContext': { useTabs: () => ({}) },
+    '../../context/ThemeSettingsContext': {
+      useThemeSettings: () => ({}),
+      getDefaultTranslationColorsForTheme: () => ({ text: '#000', border: '#000', bg: '' }),
+    },
+    '../../context/DictionaryContext': { useDictionary: () => ({}) },
+    '../../services/transliterate': {
+      transliterateHtml: (h) => h,
+      convertPaliScript: (s) => s,
+      highlightHtmlText: (h) => h,
+      highlightTranslationText: (t) => t,
+      capitalizePali: (s) => s,
+      convertAnyToRoman: (s) => s,
+      cleanDictionaryQuery: (s) => s,
+    },
+    '../../services/scroll': { smartScrollTo: () => {} },
+    '../../services/api': {
+      isLocalDynamicHost: () => true,
+      fetchChapterBundle: async () => {
+        bundleCalls++;
+        return {
+          book_code: 's0101m.mul',
+          chapter_index: 0,
+          languages: ['en'],
+          translations: SAMPLE_TRANS,
+          sentences: SAMPLE_TRANS_SENTS,
+          // intentionally omit pali_sentences (old server_api/server.js behavior)
+        };
+      },
+      fetchChapterTranslations: async () => ({}),
+      getCachedChapterTranslations: () => null,
+      fetchPaliSentences: async () => {
+        paliFallbackCalls++;
+        return { book_code: 's0101m.mul', chapter_index: 0, paragraphs: SAMPLE_PALI_SENTS };
+      },
+      getCachedPaliSentences: () => null,
+      fetchChapterLinks: async () => ({}),
+      getCachedChapterLinks: () => null,
+    },
+  };
+
+  const mod = { exports: {} };
+  const localRequire = (spec) => (Object.prototype.hasOwnProperty.call(stubs, spec) ? stubs[spec] : require(spec));
+  new Function('exports', 'require', 'module', '__filename', '__dirname', code)(
+    mod.exports,
+    localRequire,
+    mod,
+    readerViewPath,
+    path.dirname(readerViewPath)
+  );
+
+  mod.exports.ChapterBlock({
+    chapter: { chapter_index: 0, title: 'Brahmajālasuttaṃ' },
+    bookCode: 's0101m.mul',
+    html: SAMPLE_PALI_HTML,
+    isLoading: false,
+    onVisible: () => {},
+    isCurrentOrTarget: true,
+    paliScript: 'roman',
+    activeLangs: ['en'],
+    orderedLayers: [
+      { id: 'pali', type: 'pali' },
+      { id: 'english', type: 'trans', lang: 'en' },
+    ],
+    isPaliEnabled: true,
+    translationDisplayMode: 'stack',
+    sentenceMode: true,
+    showBookLinks: false,
+  });
+
+  const cleanups = [];
+  for (const eff of effects) {
+    const c = eff();
+    if (typeof c === 'function') cleanups.push(c);
+  }
+  await new Promise((r) => setTimeout(r, 20));
+  for (const c of cleanups) c();
+
+  assert.equal(bundleCalls, 1, 'ChapterBlock should call fetchChapterBundle on localhost');
+  assert.equal(paliFallbackCalls, 1, 'ChapterBlock should fall back to fetchPaliSentences when bundle lacks pali_sentences');
+  assert.ok(
+    stateValues.some((v) => v && v[0] && Array.isArray(v[0]) && v[0].length === 2),
+    'Fallback paliSentMap state should be populated with chapter sentence splits'
+  );
+});

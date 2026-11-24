@@ -14,6 +14,7 @@ const {
   decodeTextOrZlib,
   hasPaliSentencesSupport,
   readBookSentences,
+  readChapterSentences,
   hydrateCanonRows,
   tryParseGuid,
 } = require('./tipitakaCoreHelper');
@@ -797,7 +798,9 @@ async function main() {
           paraMap[String(pi)] = list.map((s) => ({ line: s.lineId, text: s.text }));
         }
         payload.pali_sentences = paraMap;
-      } catch (_) {}
+      } catch (err) {
+        console.warn('[Bundle] Pali sentences error:', err.message);
+      }
     }
 
     if (withLinks) {
@@ -1289,6 +1292,7 @@ async function main() {
     applyCacheHeader(reply, 'public, max-age=3600, stale-while-revalidate=86400');
     return {
       available: translationEngine.getAvailableLanguages(),
+      has_pali_sentences: Boolean(getPaliSentencesDb()),
     };
   });
 

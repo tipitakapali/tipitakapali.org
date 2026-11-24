@@ -3002,6 +3002,24 @@ export const ChapterBlock = memo(function ChapterBlock({
       setIsPaliSentLoading(true);
     }
 
+    const loadPaliSentFallback = () => {
+      fetchPaliSentences(bookCode, chapter.chapter_index)
+        .then((data) => {
+          if (cancelled) return;
+          setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
+          setPaliSentFetched(true);
+          paliSentFetchedRef.current = true;
+          setIsPaliSentLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPaliSentFetched(true);
+            paliSentFetchedRef.current = true;
+            setIsPaliSentLoading(false);
+          }
+        });
+    };
+
     const runFallbackIndividual = () => {
       if (missingTrans) {
         fetchChapterTranslations(bookCode, chapter.chapter_index, langsToFetch, {
@@ -3025,21 +3043,7 @@ export const ChapterBlock = memo(function ChapterBlock({
           });
       }
       if (missingPaliSent) {
-        fetchPaliSentences(bookCode, chapter.chapter_index)
-          .then((data) => {
-            if (cancelled) return;
-            setPaliSentMap(extractPaliChapMap(data, chapter.chapter_index));
-            setPaliSentFetched(true);
-            paliSentFetchedRef.current = true;
-            setIsPaliSentLoading(false);
-          })
-          .catch(() => {
-            if (!cancelled) {
-              setPaliSentFetched(true);
-              paliSentFetchedRef.current = true;
-              setIsPaliSentLoading(false);
-            }
-          });
+        loadPaliSentFallback();
       }
     };
 
@@ -3064,10 +3068,14 @@ export const ChapterBlock = memo(function ChapterBlock({
           setIsTransLoading(false);
         }
         if (missingPaliSent) {
-          setPaliSentMap(extractPaliChapMap(bundle.pali_sentences, chapter.chapter_index));
-          setPaliSentFetched(true);
-          paliSentFetchedRef.current = true;
-          setIsPaliSentLoading(false);
+          if (bundle.pali_sentences && typeof bundle.pali_sentences === 'object') {
+            setPaliSentMap(extractPaliChapMap(bundle.pali_sentences, chapter.chapter_index));
+            setPaliSentFetched(true);
+            paliSentFetchedRef.current = true;
+            setIsPaliSentLoading(false);
+          } else {
+            loadPaliSentFallback();
+          }
         }
       })
       .catch(() => {
