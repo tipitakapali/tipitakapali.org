@@ -1680,10 +1680,9 @@ export function injectTranslationsIntoHtml(
       ) {
         const paliLines = extractClassSpans(paliItem.html, 'pali-sent');
         if (paliLines.length > 1) {
-          const transByLang = transItems.map((item) => ({
-            item,
-            byLine: new Map(item.sentItems.map((s) => [s.line, s.html])),
-          }));
+          const transByItem = new Map(
+            transItems.map((item) => [item, new Map(item.sentItems.map((s) => [s.line, s.html]))])
+          );
           const lineOrder = [];
           const seen = new Set();
           for (const l of paliLines.map((p) => p.line)) {
@@ -1692,7 +1691,7 @@ export function injectTranslationsIntoHtml(
               lineOrder.push(l);
             }
           }
-          for (const { byLine } of transByLang) {
+          for (const byLine of transByItem.values()) {
             for (const l of byLine.keys()) {
               if (!seen.has(l)) {
                 seen.add(l);
@@ -1755,15 +1754,6 @@ export function injectTranslationsIntoHtml(
           const pairs = lineOrder
             .map((ln) => {
               const pHtml = paliByLine.get(ln);
-              const cells = transByLang
-                .map(({ item, byLine }) => {
-                  const tHtml = byLine.get(ln);
-                  if (tHtml === undefined) return '';
-                  return `<div class="sent-pair-trans reader-trans-block" data-trans-lang="${item.lang}" data-line="${ln}"${item.blockStyles ? ` style="${item.blockStyles}"` : ''}>` +
-                    `<div class="reader-trans-content"${item.contentStyles ? ` style="${item.contentStyles}"` : ''}>${tHtml}</div></div>`;
-                })
-                .join('');
-              if (pHtml === undefined && !cells) return '';
               const lineLinks = injectedLines.has(ln) ? pLinks?.by_line?.[ln] : null;
               const lineStrip =
                 lineLinks && lineLinks.length > 0
@@ -1777,12 +1767,28 @@ export function injectTranslationsIntoHtml(
                 !placedLeftover && leftoverStripHtml && pHtml !== undefined
                   ? ((placedLeftover = true), leftoverStripHtml)
                   : '';
+              const rowCells = [];
+              for (const item of renderedItems) {
+                if (item.type === 'pali') {
+                  if (pHtml !== undefined) {
+                    rowCells.push(
+                      `<div class="sent-pair-pali reader-trans-block reader-pali-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-trans-lang="pali" data-line="${ln}">${stripSentNumBadge(pHtml)}</div>${lineStrip}${extraLeftover}`
+                    );
+                  }
+                } else if (item.type === 'trans') {
+                  const tHtml = transByItem.get(item)?.get(ln);
+                  if (tHtml !== undefined) {
+                    rowCells.push(
+                      `<div class="sent-pair-trans reader-trans-block" data-trans-lang="${item.lang}" data-line="${ln}"${item.blockStyles ? ` style="${item.blockStyles}"` : ''}>` +
+                        `<div class="reader-trans-content"${item.contentStyles ? ` style="${item.contentStyles}"` : ''}>${tHtml}</div></div>`
+                    );
+                  }
+                }
+              }
+              if (rowCells.length === 0) return '';
               return `<div class="sent-pair" data-line="${ln}">` +
                 `<div class="sent-pair-body">` +
-                (pHtml !== undefined
-                  ? `<div class="sent-pair-pali reader-trans-block reader-pali-trans-block"${hasPaliCustom ? ` style="${paliSentStyle}"` : ''} data-trans-lang="pali" data-line="${ln}">${stripSentNumBadge(pHtml)}</div>${lineStrip}${extraLeftover}`
-                  : '') +
-                cells +
+                rowCells.join('') +
                 `</div></div>`;
             })
             .filter(Boolean)

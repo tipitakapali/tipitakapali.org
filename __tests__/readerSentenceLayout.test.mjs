@@ -695,3 +695,95 @@ test('ChapterBlock bundle mode falls back to fetchPaliSentences when bundle omit
     'Fallback paliSentMap state should be populated with chapter sentence splits'
   );
 });
+
+test('Stacked sentence mode respects orderedLayers when Pali is moved after translations', () => {
+  const paliHtml = injectPaliSentencesIntoHtml(SAMPLE_PALI_HTML, SAMPLE_PALI_SENTS, {
+    showSentenceNumbers: false,
+  });
+
+  // 1. [English, Pali] -> within each .sent-pair, English appears before Pali
+  const enFirstOut = injectTranslationsIntoHtml(
+    paliHtml,
+    SAMPLE_TRANS,
+    [
+      { id: 'english', type: 'trans', lang: 'en' },
+      { id: 'pali', type: 'pali' },
+    ],
+    true,
+    'stack',
+    {},
+    null,
+    true,
+    SAMPLE_TRANS_SENTS,
+    'classic'
+  );
+  const enFirstPairs = enFirstOut.split('<div class="sent-pair" ').slice(1);
+  assert.equal(enFirstPairs.length, 2, 'Expected 2 sent-pair rows');
+  for (const pair of enFirstPairs) {
+    const enIdx = pair.indexOf('data-trans-lang="en"');
+    const paliIdx = pair.indexOf('data-trans-lang="pali"');
+    assert.ok(enIdx !== -1 && paliIdx !== -1 && enIdx < paliIdx, 'English cell must precede Pali cell');
+  }
+
+  // 2. [English, Pali, Vietnamese] -> English first, Pali second, Vietnamese third
+  const multiTrans = {
+    ...SAMPLE_TRANS,
+    vi: { 0: 'Tôi đã nghe như vầy. Một thời Đức Thế Tôn.' },
+  };
+  const multiTransSents = {
+    ...SAMPLE_TRANS_SENTS,
+    vi: {
+      0: [
+        { line_id: 1, translation: 'Tôi đã nghe như vầy.' },
+        { line_id: 2, translation: 'Một thời Đức Thế Tôn.' },
+      ],
+    },
+  };
+  const threeLayerOut = injectTranslationsIntoHtml(
+    paliHtml,
+    multiTrans,
+    [
+      { id: 'english', type: 'trans', lang: 'en' },
+      { id: 'pali', type: 'pali' },
+      { id: 'vietnamese', type: 'trans', lang: 'vi' },
+    ],
+    true,
+    'stack',
+    {},
+    null,
+    true,
+    multiTransSents,
+    'classic'
+  );
+  const threePairs = threeLayerOut.split('<div class="sent-pair" ').slice(1);
+  assert.equal(threePairs.length, 2);
+  for (const pair of threePairs) {
+    const enIdx = pair.indexOf('data-trans-lang="en"');
+    const paliIdx = pair.indexOf('data-trans-lang="pali"');
+    const viIdx = pair.indexOf('data-trans-lang="vi"');
+    assert.ok(
+      enIdx !== -1 && paliIdx !== -1 && viIdx !== -1 && enIdx < paliIdx && paliIdx < viIdx,
+      'Layer order within .sent-pair must be English -> Pali -> Vietnamese'
+    );
+  }
+
+  // 3. Paragraph mode [English, Pali] -> English also renders before Pali
+  const paraOut = injectTranslationsIntoHtml(
+    SAMPLE_PALI_HTML,
+    SAMPLE_TRANS,
+    [
+      { id: 'english', type: 'trans', lang: 'en' },
+      { id: 'pali', type: 'pali' },
+    ],
+    true,
+    'stack',
+    {},
+    null,
+    false,
+    SAMPLE_TRANS_SENTS,
+    'classic'
+  );
+  const paraEnIdx = paraOut.indexOf('data-trans-lang="en"');
+  const paraPaliIdx = paraOut.indexOf('data-trans-lang="pali"');
+  assert.ok(paraEnIdx !== -1 && paraPaliIdx !== -1 && paraEnIdx < paraPaliIdx, 'Paragraph mode must render English before Pali');
+});
